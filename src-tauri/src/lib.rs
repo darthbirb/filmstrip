@@ -14,7 +14,9 @@ const DEBUG_PORT: u16 = 9322;
 /// Everything the app writes lives beside its executable. DECISIONS.md "Nothing outside the app folder".
 fn app_dir() -> PathBuf {
     let exe = std::env::current_exe().expect("the executable's own path is readable");
-    exe.parent().expect("the executable sits in a directory").to_path_buf()
+    exe.parent()
+        .expect("the executable sits in a directory")
+        .to_path_buf()
 }
 
 pub fn run() {

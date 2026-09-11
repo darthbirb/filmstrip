@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["--yes", "@playwright/mcp@0.0.80"]
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": ["--yes", "shadcn@4.21.0", "mcp"]
+    }
+  }
+}
