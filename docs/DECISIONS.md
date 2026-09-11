@@ -40,6 +40,18 @@ is sufficient on its own.
 
 The library is a folder the user chooses. Nothing in it is touched except when they ask.
 
+## Places, not queries
+
+Everything the navigation shows is somewhere on disk, and every item has a parent directory.
+
+The predecessor modelled two of them as queries instead — the Sorting Box as `folder_id = None`,
+the Trash as `is:trashed` — and the cost was structural rather than cosmetic: a row that could
+never highlight because it had no scope to be in, no empty state to design, and nowhere for a
+restore to put anything back.
+
+The Sorting Box is the one that is plural. It is several real folders the user nominates, shown
+as one surface — not one directory, and not a view over the index.
+
 ## The window
 
 Native decorations are off, so the app draws its own chrome and the title bar is ours to

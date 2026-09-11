@@ -22,9 +22,12 @@ well. An empty folder goes without asking.
 
 ## The Sorting Box
 
-Not a place — a **view** over one or more *sorting sources*: folders the user nominates for
-incoming files. A sorting source may neither contain a library source nor sit inside one.
-Sorting an item moves it on disk, out of its sorting source and into the library.
+**A real place, but not a single folder.** It is one or more *sorting sources* — folders the
+user nominates for incoming files — shown together as one surface. An item sitting in it has a
+real directory of its own: the Sorting Box is not a saved search, and it is not "no folder".
+
+A sorting source may neither contain a library source nor sit inside one. Sorting an item moves
+it on disk, out of its sorting source and into the library.
 
 ## Trash
 
