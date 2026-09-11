@@ -14,6 +14,13 @@ npx --yes pnpm@12.4.1 install
 npx --yes pnpm@12.4.1 tauri dev
 ```
 
+Once per clone, point git at the repository's hooks. The only one refuses a
+commit on `main`, which is a mistake that is tedious to undo afterwards:
+
+```bash
+git config core.hooksPath .githooks
+```
+
 `pnpm` is deliberately not installed globally, and corepack cannot launch pnpm 12, so commands
 go through `npx` at the pinned version.
 
