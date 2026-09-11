@@ -1,0 +1,16 @@
+#!/bin/sh
+# Refuses a commit on main. Work goes on a branch and arrives through a pull
+# request — CONTRIBUTING.md "Conventions".
+#
+# Enable once per clone:  git config core.hooksPath .githooks
+# Bypass deliberately:    git commit --no-verify
+
+branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+
+if [ "$branch" = "main" ]; then
+  echo "pre-commit: main takes commits through pull requests only." >&2
+  echo "            git switch -c <branch>   (then commit)" >&2
+  exit 1
+fi
+
+exit 0

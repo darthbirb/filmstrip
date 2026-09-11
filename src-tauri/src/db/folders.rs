@@ -3,7 +3,7 @@
 
 use rusqlite::{Connection, OptionalExtension, params};
 
-use crate::db::now;
+use crate::db::{now, tags};
 use crate::error::{AppError, Result};
 
 /// Where a folder sits: which source, and the titles between that source's
@@ -95,7 +95,9 @@ pub fn create_root(conn: &Connection, source_id: i64, title: &str) -> Result<i64
         "INSERT INTO folder (source_id, title, parent_id, created_at) VALUES (?1, ?2, NULL, ?3)",
         params![source_id, title, now()],
     )?;
-    Ok(conn.last_insert_rowid())
+    let id = conn.last_insert_rowid();
+    tags::sync_title_tag(conn, id, title)?;
+    Ok(id)
 }
 
 pub fn create(conn: &Connection, parent_id: i64, title: &str) -> Result<i64> {
@@ -108,7 +110,9 @@ pub fn create(conn: &Connection, parent_id: i64, title: &str) -> Result<i64> {
         "INSERT INTO folder (title, parent_id, created_at) VALUES (?1, ?2, ?3)",
         params![title, parent_id, now()],
     )?;
-    Ok(conn.last_insert_rowid())
+    let id = conn.last_insert_rowid();
+    tags::sync_title_tag(conn, id, title)?;
+    Ok(id)
 }
 
 #[cfg(test)]

@@ -24,7 +24,9 @@ collide. Stop any server you started before ending a turn.
 ## Rules
 
 - **Work on a branch and open a pull request.** Never commit to `main`. Never push — the user
-  pushes.
+  pushes. `git status -sb` before committing: the user merges and pulls between turns, so the
+  branch you were on may now be `main`. The `.githooks/pre-commit` hook refuses that commit
+  when the clone has run `git config core.hooksPath .githooks`.
 - **Commit messages are one lowercase subject line.** No body, no trailers.
 - **Do not add a dependency without asking.** Versions are pinned exactly, never ranges.
 - **Nothing changes the machine.** No global installs, no system settings, no registry. A test
