@@ -1,0 +1,183 @@
+//! Folders. A folder's path is never stored — it is derived from ancestry, so
+//! renaming a directory costs one row. DECISIONS.md "Places, not queries".
+
+use rusqlite::{Connection, OptionalExtension, params};
+
+use crate::db::now;
+use crate::error::{AppError, Result};
+
+/// Where a folder sits: which source, and the titles between that source's
+/// root and the folder itself. **The source's own root contributes no title**
+/// — it names the root directory, which is already the source's `root` path.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FolderLocation {
+    pub source_id: i64,
+    pub titles: Vec<String>,
+}
+
+pub fn location(conn: &Connection, folder_id: i64) -> Result<FolderLocation> {
+    let mut stmt = conn.prepare(
+        "WITH RECURSIVE ancestry(id, title, parent_id, source_id, depth) AS (
+             SELECT id, title, parent_id, source_id, 0 FROM folder WHERE id = ?1
+           UNION ALL
+             SELECT f.id, f.title, f.parent_id, f.source_id, a.depth + 1
+               FROM folder f JOIN ancestry a ON f.id = a.parent_id
+         )
+         SELECT title, source_id, parent_id FROM ancestry ORDER BY depth DESC",
+    )?;
+    let rows: Vec<(String, Option<i64>, Option<i64>)> = stmt
+        .query_map(params![folder_id], |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+
+    let titles = rows
+        .iter()
+        .filter(|(_, _, parent_id)| parent_id.is_some())
+        .map(|(title, ..)| title.clone())
+        .collect();
+    let source_id = rows
+        .iter()
+        .find_map(|(_, source_id, _)| *source_id)
+        .ok_or_else(|| {
+            AppError::invalid(format!("folder {folder_id} has no source in its ancestry"))
+        })?;
+    Ok(FolderLocation { source_id, titles })
+}
+
+pub fn source_root_folder(conn: &Connection, source_id: i64) -> Result<i64> {
+    conn.query_row(
+        "SELECT id FROM folder WHERE source_id = ?1 AND parent_id IS NULL AND deleted_at IS NULL",
+        params![source_id],
+        |r| r.get(0),
+    )
+    .map_err(|_| AppError::invalid(format!("source {source_id} has no folder of its own")))
+}
+
+pub fn title(conn: &Connection, id: i64) -> Result<Option<String>> {
+    Ok(conn
+        .query_row("SELECT title FROM folder WHERE id = ?1", params![id], |r| {
+            r.get(0)
+        })
+        .optional()?)
+}
+
+/// The live child of `parent_id` with this title, case-insensitively — the
+/// same comparison `idx_folder_sibling` uses, so a lookup and the index can
+/// never disagree about what already exists.
+pub fn child_id(conn: &Connection, parent_id: i64, title: &str) -> Result<Option<i64>> {
+    Ok(conn
+        .query_row(
+            "SELECT id FROM folder
+              WHERE parent_id = ?1 AND title = ?2 COLLATE NOCASE AND deleted_at IS NULL",
+            params![parent_id, title],
+            |r| r.get(0),
+        )
+        .optional()?)
+}
+
+pub fn children(conn: &Connection, parent_id: i64) -> Result<Vec<(i64, String)>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, title FROM folder
+          WHERE parent_id = ?1 AND deleted_at IS NULL
+          ORDER BY title COLLATE NOCASE",
+    )?;
+    let rows = stmt
+        .query_map(params![parent_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(rows)
+}
+
+/// A source's own folder. Created with the source, so nothing can observe one
+/// without the other.
+pub fn create_root(conn: &Connection, source_id: i64, title: &str) -> Result<i64> {
+    conn.execute(
+        "INSERT INTO folder (source_id, title, parent_id, created_at) VALUES (?1, ?2, NULL, ?3)",
+        params![source_id, title, now()],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+pub fn create(conn: &Connection, parent_id: i64, title: &str) -> Result<i64> {
+    if child_id(conn, parent_id, title)?.is_some() {
+        return Err(AppError::invalid(format!(
+            "a folder named '{title}' already exists here"
+        )));
+    }
+    conn.execute(
+        "INSERT INTO folder (title, parent_id, created_at) VALUES (?1, ?2, ?3)",
+        params![title, parent_id, now()],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db;
+    use crate::db::sources::{self, SourceKind};
+
+    fn library() -> (Connection, i64) {
+        let mut conn = Connection::open_in_memory().unwrap();
+        db::migrate(&mut conn).unwrap();
+        let source =
+            sources::add(&conn, "D:/library".as_ref(), "Library", SourceKind::Library).unwrap();
+        let root = source_root_folder(&conn, source.id).unwrap();
+        (conn, root)
+    }
+
+    #[test]
+    fn a_sources_own_folder_contributes_no_title() {
+        let (conn, root) = library();
+        assert_eq!(
+            location(&conn, root).unwrap(),
+            FolderLocation {
+                source_id: 1,
+                titles: vec![]
+            }
+        );
+    }
+
+    #[test]
+    fn location_reads_the_whole_ancestry_in_order() {
+        let (conn, root) = library();
+        let people = create(&conn, root, "People").unwrap();
+        let ana = create(&conn, people, "Ana").unwrap();
+
+        let location = location(&conn, ana).unwrap();
+        assert_eq!(location.source_id, 1);
+        assert_eq!(location.titles, ["People", "Ana"]);
+    }
+
+    #[test]
+    fn one_name_per_spot_whatever_the_case() {
+        let (conn, root) = library();
+        create(&conn, root, "Beach").unwrap();
+
+        assert!(
+            create(&conn, root, "beach").is_err(),
+            "the same name in another case"
+        );
+        assert!(
+            create(&conn, root, "Beach").is_err(),
+            "the same name exactly"
+        );
+    }
+
+    #[test]
+    fn the_same_name_under_different_parents_is_two_folders() {
+        let (conn, root) = library();
+        let a = create(&conn, root, "2024").unwrap();
+        let b = create(&conn, root, "2025").unwrap();
+
+        let one = create(&conn, a, "Trips").unwrap();
+        let two = create(&conn, b, "Trips").unwrap();
+        assert_ne!(one, two);
+    }
+
+    #[test]
+    fn a_second_root_for_one_source_is_refused() {
+        let (conn, _) = library();
+        assert!(create_root(&conn, 1, "Second").is_err());
+    }
+}

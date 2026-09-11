@@ -1,6 +1,9 @@
 //! The desktop shell: one window, drawn without native chrome.
 
-use std::path::PathBuf;
+pub mod config;
+pub mod db;
+pub mod error;
+pub mod fs;
 
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 
@@ -11,17 +14,13 @@ const WEBVIEW_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreen
 #[cfg(debug_assertions)]
 const DEBUG_PORT: u16 = 9322;
 
-/// Everything the app writes lives beside its executable. DECISIONS.md "Nothing outside the app folder".
-fn app_dir() -> PathBuf {
-    let exe = std::env::current_exe().expect("the executable's own path is readable");
-    exe.parent()
-        .expect("the executable sits in a directory")
-        .to_path_buf()
-}
-
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
+            // Beside the executable, never in the user's profile.
+            // DECISIONS.md "Nothing outside the app folder".
+            let webview_dir = config::app_data_dir()?.join("webview");
+
             #[cfg(debug_assertions)]
             let args = format!("{WEBVIEW_ARGS} --remote-debugging-port={DEBUG_PORT}");
             #[cfg(not(debug_assertions))]
@@ -34,7 +33,7 @@ pub fn run() {
                 .decorations(false)
                 .shadow(true)
                 .zoom_hotkeys_enabled(true)
-                .data_directory(app_dir().join("data").join("webview"))
+                .data_directory(webview_dir)
                 .additional_browser_args(&args)
                 .build()?;
             Ok(())
