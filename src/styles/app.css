@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+/* Scaffold tokens only; the token layer is built slice by slice. DEVELOPMENT.md "Slices". */
+@theme {
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --color-ground: oklch(0.19 0 0);
+  --color-fg: oklch(0.93 0 0);
+  --spacing-bar: 2.25rem;
+}
+
+:root {
+  color-scheme: dark;
+}

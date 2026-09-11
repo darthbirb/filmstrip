@@ -1,0 +1,28 @@
+[package]
+name = "filmstrip"
+version = "0.1.0"
+description = "A gallery viewer and collection organiser for Windows."
+license = "GPL-3.0-or-later"
+repository = "https://github.com/darthbirb/filmstrip"
+edition = "2024"
+rust-version = "1.85"
+
+[[bin]]
+name = "Filmstrip"
+path = "src/main.rs"
+
+[lib]
+name = "filmstrip_lib"
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6", features = [] }
+
+[dependencies]
+tauri = { version = "2.11", features = [] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
