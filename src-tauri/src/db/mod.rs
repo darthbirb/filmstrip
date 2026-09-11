@@ -2,7 +2,9 @@
 //! use functions, never queries.
 
 pub mod folders;
+pub mod items;
 pub mod sources;
+pub mod tags;
 
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
