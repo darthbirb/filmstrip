@@ -1,0 +1,89 @@
+# Decisions
+
+Why the code is the shape it is. Comments in the source cite these headings by exact title —
+see DEVELOPMENT.md "Keeping the docs true".
+
+## The stack
+
+Tauri 2 and a Rust backend, because the app's real work is filesystem work and it must ship as
+one small executable. React 19 for the interface: the accessible primitives and the
+virtualisation libraries are all React-first, and it is the ecosystem with the most prior art
+for the components this app needs.
+
+**Base UI** for primitives — stable 1.x, written by the authors of Radix, and shadcn's default
+since July 2026. Its components are copied in and styled onto our own tokens, never themed
+from a vendor's defaults. **Tailwind v4** carries the token layer, with `@theme` and container
+queries in the core. **Biome** lints and formats, one binary instead of a toolchain, and its
+GritQL plugins can express project-specific rules later. **Vitest** for component tests,
+**Playwright** for end-to-end.
+
+**ts-rs** will carry Rust types into TypeScript when the backend lands. **tauri-specta** would
+have generated the command wrappers too, but it has been a release candidate since 2023 and
+the backend boundary is small enough to write by hand.
+
+## Pinned versions and the supply chain
+
+Every dependency is pinned to an exact version, and pnpm 12 runs through `npx` at a version
+pinned with its registry checksum. pnpm holds any release younger than 24 hours, refuses to run
+a dependency's install scripts unless it has been allowed, and `trustPolicy: no-downgrade`
+rejects a package whose publishing provenance has weakened — the shape of a hijacked release.
+
+MCP servers in `.mcp.json` are pinned for the same reason: `@latest` in an agent's
+configuration fetches whatever was published minutes ago, every time it starts.
+
+## Nothing outside the app folder
+
+Everything the app writes lives beside its own executable: the index, thumbnails, the trash,
+and WebView2's profile. `lib.rs` passes `data_directory` to the window builder. Measured on 12
+September 2026, `%LOCALAPPDATA%\com.darthbirb.filmstrip` is never created — the builder call
+is sufficient on its own.
+
+The library is a folder the user chooses. Nothing in it is touched except when they ask.
+
+## The window
+
+Native decorations are off, so the app draws its own chrome and the title bar is ours to
+design. Two consequences follow. Something must always provide move, minimise and close —
+until the window-bar slice, that is the scaffold in `App.tsx`. And zoom hotkeys are turned on
+explicitly, because Tauri disables them by default and the app is meant to answer to zoom.
+
+The 640×480 minimum is provisional until the frame slice measures what actually fits.
+
+## Testing in a real browser, never jsdom
+
+jsdom reports every element as zero-sized, so anything about size, overflow, position or
+visibility passes there and fails in life. Vitest's browser mode runs on the Edge already
+installed on the machine, so no browser is downloaded and the numbers are real.
+
+## The mark
+
+The mark is a filmstrip: an opaque dark body, five sprocket holes above and five below, seven
+colour frames across the window.
+
+**Its colours are literal and stay literal** — no token, no `currentColor`. An identity that
+changes with a theme is not an identity. `src/assets/mark.svg` is the only source, and every
+icon is generated from it with `tauri icon`, rendered from the geometry rather than
+screenshotted so no subpixel fringing is baked in. One composition at every size, 16px
+included: at that size the frames read as a colour band, which is accepted.
+
+## The scale is the arbiter
+
+Every radius, height, type size, duration and colour comes from the token layer in
+`src/styles/app.css`. A component may look however it looks, but it may not invent a number.
+
+Sizes are in `rem`, so one root font-size moves everything at once. **"Does it fit" is
+measured, never enumerated:** no hand-written pixel breakpoints. A control that does not fit
+collapses because it did not fit, not because the window crossed a number somebody wrote down
+once and never re-measured.
+
+## Built in slices, not ported
+
+The interface is built from scratch rather than carried across from its predecessor.
+
+That predecessor spent four months matching a static drawing, surface by surface. It converged
+per surface and never as a system: a typeface substitution sat at 97 call sites unnoticed, and
+a toolbar cut buttons that would have fitted because someone had measured pixel thresholds by
+hand and written them down. A drawing shows one width, one state, one text size — it cannot
+express what a window does at another width, at 200% zoom, or on the third click.
+
+What carries over is the backend, the product decisions, and those lessons. Not the markup.
