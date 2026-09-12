@@ -32,6 +32,9 @@ way a choice is offered.
   when the clone has run `git config core.hooksPath .githooks`.
 - **Commit messages are one lowercase subject line.** No body, no trailers.
 - **Do not add a dependency without asking.** npm versions are exact; `Cargo.lock` holds Rust's.
+- **Port before you build.** Most of the backend already exists, tested, in ggallery at
+  `../ggallery`. It is read-only: never edit, install or run anything there. Look there first,
+  then port critically — see `docs/DEVELOPMENT.md` "Porting from ggallery".
 - **Nothing changes the machine.** No global installs, no system settings, no registry. A test
   that seems to need one is reaching too far — say so instead.
 - **Verify before claiming.** Run the gates. For anything visual, look at a screenshot rather

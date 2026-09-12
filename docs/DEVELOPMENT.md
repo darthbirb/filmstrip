@@ -116,6 +116,48 @@ driving the real window: side by side, or stacked at full width when the slice i
 the first candidate. **A turn that ends on a choice leaves `tauri dev` running** with the
 candidates on it. When the user picks, the others and their picker entry are deleted.
 
+## Porting from ggallery
+
+ggallery, the private predecessor, sits beside this repository at `../ggallery` and holds a
+tested implementation of most of what this app does. It is a reference only: nothing there is
+edited, installed or run.
+
+**Look there before building anything.** A feature is ported when its slice needs it, not ahead
+of time, so each port is exercised as soon as it lands and stays small enough to review
+properly. Interface logic that is not markup — the grid's layout maths, the query term helpers —
+ports the same way; components and styles never do (DECISIONS.md "Built in slices, not ported").
+
+**A port is a rewrite with the original open beside it**, never a copy:
+
+- Read the whole module and its callers first. Note what it assumes that no longer holds here —
+  one library root, paths stored per row, sweeps across every source — and what it got right
+  that would be easy to lose.
+- Fit it to this schema and to DECISIONS.md. Where they disagree this repository wins, and a
+  disagreement worth keeping goes into DECISIONS.md.
+- Carry its tests across and extend them; a port lands with tests like any other change.
+- Write every comment fresh, in this repository's convention. None are copied.
+- A dependency it used is a dependency to ask about, pinned to today's version.
+- The commit or pull request says what was ported and what changed on the way.
+
+| Feature | In ggallery | Brought in by |
+| --- | --- | --- |
+| Serving files to the window | `lib.rs`, the asset protocol's scope | grid and tiles |
+| Thumbnails, and image dimensions | `media/thumbs.rs`, `media/mod.rs` | grid and tiles |
+| Background jobs | `jobs/`, `db/jobs.rs`, `commands/jobs.rs` | grid and tiles |
+| Content hashing | `media/hash.rs` | grid and tiles |
+| Grid layout | `features/grid/useGridLayout.ts`, `layoutWorker.ts` | grid and tiles |
+| Performance fixture | `bin/synth_library.rs` | grid and tiles |
+| Probing video and capture dates | `media/probe.rs`, `sidecar/` | the pane |
+| Scrub sprites | `media/sprites.rs` | the pane |
+| Moving, renaming, undo | `fs/relocate.rs`, `fs/undo.rs`, `db/journal.rs`, `commands/triage.rs` | selection and moving |
+| Trash | `fs/trash.rs` | selection and moving |
+| Destination hotkeys | `db/hotkeys.rs`, `state/hotkeys.ts` | selection and moving |
+| Watching the disk | `fs/watch.rs` | selection and moving |
+| Search and the query language | `query/`, `db/search.rs`, `commands/search.rs`, `lib/queryTerm.ts` | search |
+| The tags screen | `commands/tags.rs` | settings and the tags screen |
+| Import, paste, export | `fs/import.rs`, `fs/paste.rs`, `fs/clipboard.rs`, `fs/export.rs` | not yet scheduled |
+| Backups | `db/backup.rs` | not yet scheduled |
+
 ## Keeping the docs true
 
 Comments cite headings in PRODUCT.md, DECISIONS.md, DEVELOPMENT.md and SCHEMA.md **by exact
