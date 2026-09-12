@@ -29,3 +29,8 @@ export const folderItems = (folderId: number) => invoke<ItemRow[]>("folder_items
 export const itemTags = (itemId: number) => invoke<EffectiveTag[]>("item_tags", { itemId });
 
 export const reconcile = () => invoke<WalkReport>("reconcile");
+
+export const uiPreferences = () => invoke<unknown>("ui_preferences");
+
+export const setUiPreferences = (preferences: unknown) =>
+  invoke<void>("set_ui_preferences", { preferences });

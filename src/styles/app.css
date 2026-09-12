@@ -19,20 +19,22 @@
   --color-on-danger: #fff;
   --color-focus: oklch(0.93 0 0);
 
-  /* Windows 11 caption metrics: a 32px strip, 46px buttons, 10px glyphs. */
-  --spacing-caption: 2rem;
+  /* Windows 11 caption buttons and glyphs, 46px and 10px; the strip is 36px to seat search. */
+  --spacing-caption: 2.25rem;
   --spacing-caption-button: 2.875rem;
   --spacing-mark: 1rem;
   --spacing-toolbar: 2.5rem;
   --spacing-rail: 2.5rem;
   --spacing-splitter: 0.375rem;
-  --spacing-bar-field: 1.5rem;
+  --spacing-bar-field: 1.75rem;
   --spacing-bar-search: 36rem;
 
   --shadow-overlay: 0 0.5rem 2rem oklch(0 0 0 / 0.5);
 
-  --text-caption: 0.75rem;
+  --text-caption: 0.8125rem;
   --text-caption--line-height: 1;
+  --text-ui: 0.875rem;
+  --text-ui--line-height: calc(1.25 / 0.875);
   --text-glyph: 0.625rem;
   --text-glyph--line-height: 1;
   --text-icon: 1rem;

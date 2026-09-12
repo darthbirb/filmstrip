@@ -78,11 +78,11 @@ case, and what keeps walking an unchanged library cheap.
 
 ## The window
 
-Native decorations are off, so the app draws its own chrome. Zoom hotkeys are turned on
-explicitly, because Tauri disables them by default and the app is meant to answer to zoom.
+Native decorations are off, so the app draws its own chrome. WebView2's own zoom stays off:
+the app scales itself, as "The interface size" describes.
 
 **The bar is Windows' own caption strip**, picked from three candidates on 12 September 2026:
-32px tall, the mark and the name at the left, and minimise, maximise and close at 46px wide in
+36px tall — Windows draws 32, raised to seat the search field — the mark and the name at the left, and minimise, maximise and close at 46px wide in
 Windows' own glyphs, close turning red under the pointer. The title and the glyphs dim while
 another window has focus. The candidates it beat were a 48px header and a strip that receded
 over the content until the pointer reached the top.
@@ -106,13 +106,25 @@ window with header-less panels beneath, and a pane floating over the grid's edge
 
 **Widths are the user's, in rem.** A splitter between two columns drags, answers to the arrow
 keys and resets on double-click, and rem keeps a chosen width in proportion when the text size
-or the zoom changes. Widths are not yet kept between sessions.
+or the zoom changes. Widths, and which panels are hidden, are kept between sessions.
 
 **A panel folds because it did not fit**, never at a breakpoint. The frame measures its own
 width against the columns' actual widths and the grid's minimum: the pane folds first, then
 navigation, and the grid never does. A folded panel leaves a rail at the window's edge, and its
 button opens the panel over the grid until Escape or a click elsewhere. A panel hidden by hand
 behaves the same way.
+
+## The interface size
+
+**Everything is sized in rem, so one number scales the whole interface.** The interface size is
+that number: the root font size, from 80% to 200%, stepped with Ctrl+= and Ctrl+-, put back with
+Ctrl+0, and kept in `filmstrip.config.json` along with the panel widths. It stacks with Windows'
+text size and display scaling, which reach the WebView on their own.
+
+**WebView2's zoom is off**, because two zooms would stack and make every measured size
+ambiguous. The app's own is the one that is remembered.
+
+The settings slice will give it a control on screen; until then it is keyboard only.
 
 ## Testing in a real browser, never jsdom
 

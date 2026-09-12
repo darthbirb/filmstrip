@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { LocationStandIn, NavStandIn, PaneStandIn, SearchStandIn } from "../dev/FrameStandIns";
 import { StandIn } from "../dev/StandIn";
 import { Frame, type Regions } from "./frame/Frame";
+import { useScaleHotkeys } from "./preferences";
 import { WindowBar } from "./window-bar/WindowBar";
 
 // Until the slices that fill them land, the regions hold dev stand-ins, and nothing in production.
@@ -12,6 +13,8 @@ const REGIONS: Regions = import.meta.env.DEV
 const SEARCH = import.meta.env.DEV ? <SearchStandIn /> : undefined;
 
 export function App() {
+  useScaleHotkeys();
+
   return (
     <div className="flex h-dvh flex-col bg-ground text-fg">
       <WindowBar search={SEARCH} />

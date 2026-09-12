@@ -64,9 +64,9 @@ test("the bar is sized in rem, so it follows the text size", async () => {
   recordIPC();
   const screen = await render(<WindowBar />);
   const bar = screen.getByRole("banner").element();
-  expect(bar.getBoundingClientRect().height).toBe(32);
+  expect(bar.getBoundingClientRect().height).toBe(36);
   document.documentElement.style.fontSize = "24px";
-  expect(bar.getBoundingClientRect().height).toBe(48);
+  expect(bar.getBoundingClientRect().height).toBe(54);
 });
 
 test("nothing is cut off in the narrowest window", async () => {

@@ -2,6 +2,7 @@ import { afterEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
+import { getPreferences, updatePreferences } from "../preferences";
 import { Frame } from "./Frame";
 
 function renderFrame() {
@@ -19,6 +20,7 @@ function renderFrame() {
 
 afterEach(() => {
   document.documentElement.style.fontSize = "";
+  updatePreferences({ widths: undefined, hidden: undefined });
 });
 
 test("a wide window docks navigation, grid and pane", async () => {
@@ -79,4 +81,21 @@ test("scrollers use thin scrollbars in the token colours", async () => {
   const screen = await renderFrame();
   const scroller = screen.getByText("grid content").element().parentElement as HTMLElement;
   expect(getComputedStyle(scroller).scrollbarWidth).toBe("thin");
+});
+
+test("panel widths and hidden panels come back from the saved preferences", async () => {
+  await page.viewport(1600, 900);
+  updatePreferences({ widths: { nav: 20, pane: 16 }, hidden: { nav: false, pane: true } });
+  const screen = await renderFrame();
+  const nav = screen.getByRole("navigation", { name: "Navigation" }).element();
+  expect(nav.getBoundingClientRect().width).toBe(320);
+  expect(screen.getByRole("complementary", { name: "Pane" }).elements()).toHaveLength(0);
+});
+
+test("resizing a panel is saved to the preferences", async () => {
+  await page.viewport(1600, 900);
+  const screen = await renderFrame();
+  (screen.getByRole("separator", { name: "Resize navigation" }).element() as HTMLElement).focus();
+  await userEvent.keyboard("{ArrowRight}");
+  expect(getPreferences().widths?.nav).toBe(16);
 });

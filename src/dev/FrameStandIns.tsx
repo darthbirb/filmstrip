@@ -12,7 +12,7 @@ const LINES = ["85%", "60%", "70%", "40%"].map((width, n) => ({ id: `line-${n}`,
 
 export function NavStandIn() {
   return (
-    <div className="flex flex-col gap-3 p-2 text-caption">
+    <div className="flex flex-col gap-3 p-2 text-ui">
       {PLACES.map((place) => (
         <section key={place.name} className="flex flex-col gap-2">
           <span className="px-2 text-fg-muted">{place.name}</span>
@@ -26,17 +26,17 @@ export function NavStandIn() {
 }
 
 export function LocationStandIn() {
-  return <Slot label="location" className="h-7 flex-1" />;
+  return <Slot label="location" className="h-7 flex-1 text-ui" />;
 }
 
 export function SearchStandIn() {
-  return <Slot label="search" className="h-full flex-1 justify-center" />;
+  return <Slot label="search" className="h-full flex-1 justify-center text-caption" />;
 }
 
 function Slot({ label, className }: { label: string; className: string }) {
   return (
     <span
-      className={`flex min-w-0 items-center border border-line border-dashed px-2 text-caption text-fg-muted ${className}`}
+      className={`flex min-w-0 items-center border border-line border-dashed px-2 text-fg-muted ${className}`}
     >
       {label}
     </span>

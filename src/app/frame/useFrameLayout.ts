@@ -1,7 +1,10 @@
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { getPreferences, updatePreferences } from "../preferences";
+
 export type Side = "nav" | "pane";
 export type FrameLayout = ReturnType<typeof useFrameLayout>;
+type Metrics = ReturnType<typeof readMetrics>;
 
 function token(name: string) {
   return Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
@@ -26,8 +29,10 @@ function readMetrics() {
 export function useFrameLayout() {
   const frameRef = useRef<HTMLDivElement>(null);
   const [metrics] = useState(readMetrics);
-  const [widths, setWidths] = useState({ nav: metrics.nav.initial, pane: metrics.pane.initial });
-  const [hidden, setHidden] = useState({ nav: false, pane: false });
+  const [widths, setWidths] = useState(() => restoredWidths(metrics, getPreferences().widths));
+  const [hidden, setHidden] = useState(
+    () => getPreferences().hidden ?? { nav: false, pane: false },
+  );
   const [overlay, setOverlay] = useState<Side | null>(null);
   const room = useRoomInRem(frameRef);
 
@@ -54,17 +59,35 @@ export function useFrameLayout() {
     widths,
     folded,
     open,
-    setWidth: (side: Side, rem: number) => setWidths((current) => ({ ...current, [side]: rem })),
+    setWidth: (side: Side, rem: number) => {
+      const next = { ...widths, [side]: rem };
+      setWidths(next);
+      updatePreferences({ widths: next });
+    },
     show: (side: Side) => {
-      setHidden((current) => ({ ...current, [side]: false }));
+      const next = { ...hidden, [side]: false };
+      setHidden(next);
+      updatePreferences({ hidden: next });
       setOverlay(side);
     },
     hide: (side: Side) => {
-      setHidden((current) => ({ ...current, [side]: true }));
+      const next = { ...hidden, [side]: true };
+      setHidden(next);
+      updatePreferences({ hidden: next });
       setOverlay(null);
     },
     close: () => setOverlay(null),
   };
+}
+
+/** Saved widths, held within today's limits; the defaults where nothing was saved. */
+function restoredWidths(metrics: Metrics, saved?: { nav: number; pane: number }) {
+  const width = (side: Side) =>
+    Math.min(
+      metrics[side].max,
+      Math.max(metrics[side].min, saved?.[side] ?? metrics[side].initial),
+    );
+  return { nav: width("nav"), pane: width("pane") };
 }
 
 /** The frame's width in rem, kept current as the window, the zoom or the text size changes. */
