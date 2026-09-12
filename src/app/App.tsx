@@ -1,44 +1,25 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState } from "react";
 
-// Scaffold: with native chrome off, this bar is the only way to move or close the window.
-// The window-bar slice replaces it. DEVELOPMENT.md "Slices".
+import { CandidatePicker } from "../dev/CandidatePicker";
+import { chosenCandidate } from "./candidates";
+import { WINDOW_BARS, type WindowBarName } from "./window-bar";
+
+const BAR_NAMES = Object.keys(WINDOW_BARS) as WindowBarName[];
+const barName = chosenCandidate("window-bar", BAR_NAMES);
+
 export function App() {
-  const win = getCurrentWindow();
+  const Bar = WINDOW_BARS[barName];
 
   return (
-    <div className="flex h-dvh flex-col bg-ground text-fg">
-      <header data-tauri-drag-region className="flex h-bar shrink-0 select-none items-center">
-        <span data-tauri-drag-region className="flex-1 px-3 text-sm">
-          Filmstrip
-        </span>
-        <button
-          type="button"
-          aria-label="Minimise"
-          className="h-full px-4"
-          onClick={() => void win.minimize()}
-        >
-          –
-        </button>
-        <button
-          type="button"
-          aria-label="Maximise"
-          className="h-full px-4"
-          onClick={() => void win.toggleMaximize()}
-        >
-          □
-        </button>
-        <button
-          type="button"
-          aria-label="Close"
-          className="h-full px-4"
-          onClick={() => void win.close()}
-        >
-          ×
-        </button>
-      </header>
+    <div className="relative flex h-dvh flex-col bg-ground text-fg">
+      <Bar />
       <main className="flex-1" />
-      {import.meta.env.DEV && <DisplayReadout />}
+      {import.meta.env.DEV && (
+        <footer className="flex items-center gap-3 px-3 py-1 text-xs opacity-60">
+          <DisplayReadout />
+          <CandidatePicker slice="window-bar" names={BAR_NAMES} current={barName} />
+        </footer>
+      )}
     </div>
   );
 }
@@ -54,7 +35,7 @@ function DisplayReadout() {
   }, []);
 
   return (
-    <output data-testid="display-readout" className="px-3 py-1 text-xs tabular-nums opacity-60">
+    <output data-testid="display-readout" className="tabular-nums">
       {reading}
     </output>
   );

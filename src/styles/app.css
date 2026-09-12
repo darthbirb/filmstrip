@@ -1,13 +1,44 @@
 @import "tailwindcss";
 
-/* Scaffold tokens only; the token layer is built slice by slice. DEVELOPMENT.md "Slices". */
+/* The token layer: every size, colour and duration a component may use. DECISIONS.md "The scale is the arbiter". */
 @theme {
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  /* Installed with Windows, never fetched. */
+  --font-glyph: "Segoe Fluent Icons", "Segoe MDL2 Assets";
+
   --color-ground: oklch(0.19 0 0);
+  --color-scrim: oklch(0.19 0 0 / 0.85);
   --color-fg: oklch(0.93 0 0);
-  --spacing-bar: 2.25rem;
+  --color-fg-muted: oklch(0.93 0 0 / 0.45);
+  --color-hover: oklch(1 0 0 / 0.06);
+  --color-press: oklch(1 0 0 / 0.04);
+  --color-danger: #c42b1c;
+  --color-danger-press: rgb(196 43 28 / 0.9);
+  --color-on-danger: #fff;
+  --color-focus: oklch(0.93 0 0);
+
+  /* Windows 11 caption metrics: a 32px strip, a 48px tall bar, 46px buttons, 10px glyphs. */
+  --spacing-caption: 2rem;
+  --spacing-header: 3rem;
+  --spacing-caption-button: 2.875rem;
+  --spacing-mark: 1rem;
+
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1;
+  --text-glyph: 0.625rem;
+  --text-glyph--line-height: 1;
 }
 
 :root {
   color-scheme: dark;
+  --motion-quick: 120ms;
+  --motion-linger: 700ms;
+  --focus-width: 2px;
+}
+
+@utility focus-ring {
+  &:focus-visible {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: calc(var(--focus-width) * -1);
+  }
 }

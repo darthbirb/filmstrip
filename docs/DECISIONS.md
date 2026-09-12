@@ -80,7 +80,7 @@ case, and what keeps walking an unchanged library cheap.
 
 Native decorations are off, so the app draws its own chrome and the title bar is ours to
 design. Two consequences follow. Something must always provide move, minimise and close —
-until the window-bar slice, that is the scaffold in `App.tsx`. And zoom hotkeys are turned on
+the window bar in `src/app/window-bar/`. And zoom hotkeys are turned on
 explicitly, because Tauri disables them by default and the app is meant to answer to zoom.
 
 The 640×480 minimum is provisional until the frame slice measures what actually fits.

@@ -101,8 +101,10 @@ Each slice builds two to four candidates that differ in **structure**, not colou
 checks them in a real browser first; the user then picks one in the real window, the rest are
 deleted, and what won is written into DECISIONS.md.
 
-The bar in `src/app/App.tsx` is scaffolding, not a candidate — with native decorations off,
-something has to move and close the window. The window-bar slice deletes it.
+**Candidates are switched from the dev readout** at the bottom of the window, in the browser
+and in `tauri dev` alike. The choice is kept in `localStorage` and survives a reload; a
+production build always takes the first candidate. When the user picks, the others and their
+entry in the picker are deleted.
 
 ## Keeping the docs true
 
