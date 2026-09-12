@@ -17,8 +17,8 @@ import {
   trashRow,
 } from "./shared";
 
-/** One tree: the Sorting Box, each library source with its folders opening in place, the Trash. */
-export function TreeNav() {
+/** The Sorting Box, each library source with its folders opening in place, the Trash. DECISIONS.md "Navigation". */
+export function Navigation() {
   const { sources, children } = useIndex();
   const place = usePlace();
   const [expanded, setExpanded] = useState<ReadonlySet<number>>(new Set());

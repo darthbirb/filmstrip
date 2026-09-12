@@ -24,12 +24,10 @@ type Props = {
   onSelect: (id: string) => void;
   onExpand: (id: string) => void;
   onCollapse: (id: string) => void;
-  /** Left on a top-level row; a list that drills down uses it to go back up. */
-  onLeave?: () => void;
 };
 
 /** An ARIA tree: one tab stop, arrows to move, Right and Left to open and close, Enter to go. */
-export function Tree({ label, rows, selectedId, onSelect, onExpand, onCollapse, onLeave }: Props) {
+export function Tree({ label, rows, selectedId, onSelect, onExpand, onCollapse }: Props) {
   const [focusId, setFocusId] = useState<string | null>(null);
   const elements = useRef(new Map<string, HTMLElement>());
   const has = (id: string | null) => id !== null && rows.some((row) => row.id === id);
@@ -75,7 +73,6 @@ export function Tree({ label, rows, selectedId, onSelect, onExpand, onCollapse, 
       case "ArrowLeft":
         if (row.expanded) onCollapse(row.id);
         else if (row.level > 1) focus(parentOf(index));
-        else onLeave?.();
         break;
       case "Enter":
       case " ":

@@ -126,6 +126,23 @@ ambiguous. The app's own is the one that is remembered.
 
 The settings slice will give it a control on screen; until then it is keyboard only.
 
+## Navigation
+
+**One tree, as Explorer's navigation pane is**, picked from three candidates on 13 September
+2026: the Sorting Box first, with the number of files waiting in it; then each library source,
+its folders opening in place beneath it; then the Trash. The candidates it beat were a list of
+places with the chosen source's folders in a second tree beneath, and a list that showed one
+level at a time.
+
+**Choosing a row goes there; only its chevron, Right or a double-click opens it.** The tree is
+one tab stop and follows the ARIA tree pattern: the arrow keys move and open, Enter goes. A
+source that cannot be read is muted and marked offline but keeps its folders, since a walk never
+empties it — see "A walk only judges what it read". Which folders are open is not yet kept
+between sessions.
+
+**Where you are shows as a breadcrumb** in the grid's header, and every step above the last goes
+back to that folder.
+
 ## Testing in a real browser, never jsdom
 
 jsdom reports every element as zero-sized, so anything about size, overflow, position or
