@@ -1,12 +1,12 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { ReactNode } from "react";
 
-import mark from "../../assets/mark.svg";
+import markUrl from "../../assets/mark.svg";
 import { CaptionButton } from "../../ui/CaptionButton";
 import { useWindowState } from "./useWindowState";
 
 /** The caption strip, with search centred on the window. DECISIONS.md "The window". */
-export function WindowBar({ search }: { search?: ReactNode }) {
+export function WindowBar({ search, mark }: { search?: ReactNode; mark?: ReactNode }) {
   const { maximized, focused } = useWindowState();
   const win = getCurrentWindow();
   const dimmed = !focused;
@@ -20,7 +20,7 @@ export function WindowBar({ search }: { search?: ReactNode }) {
       <span
         className={`pointer-events-none flex items-center gap-3 justify-self-start px-3 text-caption ${dimmed ? "text-fg-muted" : ""}`}
       >
-        <img src={mark} alt="" className="size-mark" />
+        {mark ?? <img src={markUrl} alt="" className="size-mark" />}
         Filmstrip
       </span>
       <div className="flex h-bar-field min-w-0 px-2">{search}</div>
