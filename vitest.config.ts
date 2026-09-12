@@ -9,7 +9,7 @@ export default mergeConfig(
   defineConfig({
     test: {
       include: ["src/**/*.test.{ts,tsx}"],
-      setupFiles: ["./src/dev/mock.ts"],
+      setupFiles: ["./src/dev/test-setup.ts"],
       browser: {
         enabled: true,
         headless: true,

@@ -1,44 +1,17 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useEffect, useState } from "react";
 
-// Scaffold: with native chrome off, this bar is the only way to move or close the window.
-// The window-bar slice replaces it. DEVELOPMENT.md "Slices".
-export function App() {
-  const win = getCurrentWindow();
+import { WindowBar } from "./window-bar/WindowBar";
 
+export function App() {
   return (
     <div className="flex h-dvh flex-col bg-ground text-fg">
-      <header data-tauri-drag-region className="flex h-bar shrink-0 select-none items-center">
-        <span data-tauri-drag-region className="flex-1 px-3 text-sm">
-          Filmstrip
-        </span>
-        <button
-          type="button"
-          aria-label="Minimise"
-          className="h-full px-4"
-          onClick={() => void win.minimize()}
-        >
-          –
-        </button>
-        <button
-          type="button"
-          aria-label="Maximise"
-          className="h-full px-4"
-          onClick={() => void win.toggleMaximize()}
-        >
-          □
-        </button>
-        <button
-          type="button"
-          aria-label="Close"
-          className="h-full px-4"
-          onClick={() => void win.close()}
-        >
-          ×
-        </button>
-      </header>
+      <WindowBar />
       <main className="flex-1" />
-      {import.meta.env.DEV && <DisplayReadout />}
+      {import.meta.env.DEV && (
+        <footer className="flex items-center gap-4 px-3 py-1 text-xs">
+          <DisplayReadout />
+        </footer>
+      )}
     </div>
   );
 }
@@ -54,7 +27,7 @@ function DisplayReadout() {
   }, []);
 
   return (
-    <output data-testid="display-readout" className="px-3 py-1 text-xs tabular-nums opacity-60">
+    <output data-testid="display-readout" className="tabular-nums opacity-60">
       {reading}
     </output>
   );

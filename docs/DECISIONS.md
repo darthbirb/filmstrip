@@ -78,10 +78,18 @@ case, and what keeps walking an unchanged library cheap.
 
 ## The window
 
-Native decorations are off, so the app draws its own chrome and the title bar is ours to
-design. Two consequences follow. Something must always provide move, minimise and close —
-until the window-bar slice, that is the scaffold in `App.tsx`. And zoom hotkeys are turned on
+Native decorations are off, so the app draws its own chrome. Zoom hotkeys are turned on
 explicitly, because Tauri disables them by default and the app is meant to answer to zoom.
+
+**The bar is Windows' own caption strip**, picked from three candidates on 12 September 2026:
+32px tall, the mark and the name at the left, and minimise, maximise and close at 46px wide in
+Windows' own glyphs, close turning red under the pointer. The title and the glyphs dim while
+another window has focus. **It belongs to the window, not the app** — location and search go
+in the frame below it. The candidates it beat were a 48px header that would have carried them,
+and a strip that receded over the content until the pointer reached the top.
+
+Drawing our own buttons costs two things a native title bar has: the snap-layout panel on
+hovering maximise, and the system menu on right-clicking the bar.
 
 The 640×480 minimum is provisional until the frame slice measures what actually fits.
 
