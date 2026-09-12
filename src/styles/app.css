@@ -14,6 +14,7 @@
   --color-fg-muted: oklch(0.93 0 0 / 0.45);
   --color-hover: oklch(1 0 0 / 0.06);
   --color-press: oklch(1 0 0 / 0.04);
+  --color-selected: oklch(1 0 0 / 0.1);
   --color-danger: #c42b1c;
   --color-danger-press: rgb(196 43 28 / 0.9);
   --color-on-danger: #fff;
@@ -28,6 +29,9 @@
   --spacing-splitter: 0.375rem;
   --spacing-bar-field: 1.75rem;
   --spacing-bar-search: 36rem;
+  --spacing-row: 2rem;
+  --spacing-indent: 1rem;
+  --spacing-chevron: 1rem;
 
   --shadow-overlay: 0 0.5rem 2rem oklch(0 0 0 / 0.5);
 

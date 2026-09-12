@@ -1,0 +1,99 @@
+import type { FolderNode } from "../../ipc/bindings/FolderNode";
+import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
+import type { TreeRow } from "../../ui/Tree";
+import type { Crumb, Place } from "../place";
+
+export const SORTING_ID = "sorting";
+export const TRASH_ID = "trash";
+export const folderRowId = (id: number) => `folder-${id}`;
+
+export function libraries(sources: SourceSummary[]) {
+  return sources.filter((source) => source.kind === "library");
+}
+
+export function sourcePlace(source: SourceSummary): Place {
+  return {
+    kind: "folder",
+    sourceId: source.id,
+    path: [{ id: source.rootFolderId, title: source.title }],
+  };
+}
+
+/** The Sorting Box: every sorting source shown as one place, counted together. */
+export function sortingRow(sources: SourceSummary[]): TreeRow {
+  const waiting = sources
+    .filter((source) => source.kind === "sorting")
+    .reduce((sum, source) => sum + source.itemCount, 0);
+  return {
+    id: SORTING_ID,
+    label: "Sorting Box",
+    level: 1,
+    expandable: false,
+    glyph: "sortingBox",
+    detail: waiting > 0 ? String(waiting) : undefined,
+  };
+}
+
+export function trashRow(separated = false): TreeRow {
+  return { id: TRASH_ID, label: "Trash", level: 1, expandable: false, glyph: "trash", separated };
+}
+
+/** A source's own row. One that cannot be read is muted and says so, but keeps its folders. */
+export function sourceRow(source: SourceSummary, row: Partial<TreeRow> = {}): TreeRow {
+  return {
+    id: folderRowId(source.rootFolderId),
+    label: source.title,
+    level: 1,
+    expandable: false,
+    glyph: "source",
+    detail: source.reachable ? undefined : "offline",
+    muted: !source.reachable,
+    ...row,
+  };
+}
+
+type Walk = {
+  children: ReadonlyMap<number, FolderNode[]>;
+  expanded: ReadonlySet<number>;
+  sourceId: number;
+  rows: TreeRow[];
+  places: Map<string, Place>;
+};
+
+/** A folder's subtree as rows, down through whichever folders are open. */
+export function addFolderRows(walk: Walk, parent: Crumb[], level: number) {
+  const parentId = parent.at(-1)?.id;
+  if (parentId === undefined) return;
+  for (const node of walk.children.get(parentId) ?? []) {
+    const path = [...parent, { id: node.id, title: node.title }];
+    const id = folderRowId(node.id);
+    walk.rows.push({
+      id,
+      label: node.title,
+      level,
+      expandable: node.childCount > 0,
+      expanded: walk.expanded.has(node.id),
+      glyph: "folder",
+    });
+    walk.places.set(id, { kind: "folder", sourceId: walk.sourceId, path });
+    if (walk.expanded.has(node.id)) addFolderRows(walk, path, level + 1);
+  }
+}
+
+/** The row that stands for a place, in a tree that shows every folder. */
+export function selectedRowId(place: Place | null) {
+  if (!place) return null;
+  if (place.kind === "sorting") return SORTING_ID;
+  if (place.kind === "trash") return TRASH_ID;
+  const folder = place.path.at(-1);
+  return folder ? folderRowId(folder.id) : null;
+}
+
+/** The folder a row id names, if it names one. */
+export function rowFolder(id: string) {
+  return id.startsWith("folder-") ? Number(id.slice("folder-".length)) : undefined;
+}
+
+export function NoSources() {
+  return <p className="px-3 py-2 text-fg-muted text-ui">No sources yet.</p>;
+}

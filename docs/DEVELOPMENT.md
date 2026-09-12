@@ -47,6 +47,9 @@ Three ways, cheapest first.
 3. **The real window.** `tauri dev`, then attach Playwright over the Chrome DevTools Protocol
    at `http://127.0.0.1:9322`. `src-tauri/src/lib.rs` opens that port in **debug builds only**.
    Verified on 12 September 2026: the page reported real Tauri, `dpr 1.5`, viewport 1280×820.
+   With it running, `node scripts/dev-library.mjs` builds a small library under
+   `src-tauri/target/dev-library` and registers it, one unplugged source included, so the real
+   app has folders to show.
 
 ## Tests
 
