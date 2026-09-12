@@ -78,7 +78,14 @@ const ITEMS: Record<number, ItemRow[]> = {
 
 type Args = Record<string, unknown>;
 
+let storedPreferences: unknown = null;
+
 const COMMANDS: Record<string, (args: Args) => unknown> = {
+  ui_preferences: () => storedPreferences,
+  set_ui_preferences: ({ preferences }) => {
+    storedPreferences = preferences;
+    return null;
+  },
   list_sources: () => SOURCES,
   add_source: () =>
     Promise.reject<AppError>({ kind: "invalid", message: "Adding a source needs the real app." }),

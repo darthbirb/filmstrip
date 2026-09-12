@@ -86,6 +86,16 @@ pub async fn reconcile(state: State<'_, AppState>) -> Result<WalkReport> {
     run(&state, walk::reconcile).await
 }
 
+#[tauri::command]
+pub async fn ui_preferences() -> Result<Option<serde_json::Value>> {
+    Ok(crate::config::Config::load().ui)
+}
+
+#[tauri::command]
+pub async fn set_ui_preferences(preferences: serde_json::Value) -> Result<()> {
+    crate::config::Config::set_ui(preferences)
+}
+
 /// Off the main thread, which a synchronous command would block.
 async fn run<T: Send + 'static>(
     state: &AppState,

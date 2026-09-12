@@ -38,7 +38,6 @@ pub fn run() {
                 .min_inner_size(640.0, 480.0)
                 .decorations(false)
                 .shadow(true)
-                .zoom_hotkeys_enabled(true)
                 .data_directory(webview_dir)
                 .additional_browser_args(&args)
                 .build()?;
@@ -52,6 +51,8 @@ pub fn run() {
             commands::folder_items,
             commands::item_tags,
             commands::reconcile,
+            commands::ui_preferences,
+            commands::set_ui_preferences,
         ])
         .run(tauri::generate_context!())
         .expect("Filmstrip failed to start");

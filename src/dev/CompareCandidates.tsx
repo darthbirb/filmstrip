@@ -1,25 +1,31 @@
 import type { ComponentType } from "react";
 
-import { StandIn } from "./StandIn";
+type Props = {
+  candidates: Record<string, ComponentType>;
+  /** Side by side, or stacked: a layout is judged at full width. */
+  layout?: "columns" | "rows";
+};
 
-type Props = { candidates: Record<string, ComponentType> };
-
-/** Every candidate at once, each over the same stand-in, each still driving the real window. */
-export function CompareCandidates({ candidates }: Props) {
+/** Every candidate at once, each still driving the real window. */
+export function CompareCandidates({ candidates, layout = "columns" }: Props) {
   const entries = Object.entries(candidates);
+  const tracks = `repeat(${entries.length}, minmax(0, 1fr))`;
+  const rows = layout === "rows";
   return (
     <div
       className="grid min-h-0 flex-1"
-      style={{ gridTemplateColumns: `repeat(${entries.length}, minmax(0, 1fr))` }}
+      style={rows ? { gridTemplateRows: tracks } : { gridTemplateColumns: tracks }}
     >
       {entries.map(([name, Candidate], index) => (
         <section
           key={name}
           aria-label={name}
-          className="relative flex min-h-0 min-w-0 flex-col border-fg-muted border-r last:border-r-0"
+          className={`relative flex min-h-0 min-w-0 flex-col border-fg-muted ${rows ? "border-b last:border-b-0" : "border-r last:border-r-0"}`}
         >
           <Candidate />
-          <StandIn label={`${index + 1} ${name}`} />
+          <span className="pointer-events-none absolute bottom-2 left-1/2 z-30 -translate-x-1/2 bg-ground px-2 py-1 text-xs">
+            {index + 1} {name}
+          </span>
         </section>
       ))}
     </div>

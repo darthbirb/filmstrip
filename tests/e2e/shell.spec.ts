@@ -12,15 +12,19 @@ test("the shell fits at every width and text size", async ({ page }, testInfo) =
 
   for (const width of WIDTHS) {
     for (const rootSize of ROOT_SIZES) {
-      await page.setViewportSize({ width, height: 600 });
+      await page.setViewportSize({ width, height: 700 });
       await page.goto("/");
       await page.evaluate((size) => {
         document.documentElement.style.fontSize = size;
       }, rootSize);
 
-      const banner = page.getByRole("banner");
       await expect(page.getByRole("button", { name: "Close" })).toBeInViewport();
-      expect(await banner.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+      await expect(page.getByRole("banner").getByText("search")).toBeVisible();
+      await expect(page.getByRole("main")).toBeVisible();
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBe(0);
       await page.screenshot({ path: testInfo.outputPath(`shell-${width}-${rootSize}.png`) });
     }
   }
