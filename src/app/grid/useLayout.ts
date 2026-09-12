@@ -8,6 +8,8 @@ const UNKNOWN_ASPECT = 1;
 
 // One worker for the page's life: StrictMode mounts effects twice, and a worker per mount churns.
 let shared: Worker | null = null;
+// Numbered across every grid on the page, so one grid never takes a layout meant for another.
+let requests = 0;
 function worker() {
   shared ??= new Worker(new URL("./layout.worker.ts", import.meta.url), { type: "module" });
   return shared;
@@ -41,8 +43,9 @@ export function useLayout(
 
   useEffect(() => {
     if (width <= 0) return;
-    latest.current += 1;
-    const request: LayoutRequest = { id: latest.current, mode, aspects, width, target, gap };
+    requests += 1;
+    latest.current = requests;
+    const request: LayoutRequest = { id: requests, mode, aspects, width, target, gap };
     worker().postMessage(request);
   }, [aspects, width, target, gap, mode]);
 

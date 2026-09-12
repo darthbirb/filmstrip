@@ -129,3 +129,27 @@ test("the grid fetches its items again when background work moves on", async () 
   await emit("job-progress", { phase: "working", pending: 1, running: 1, failed: 0, completed: 3 });
   await expect.poll(() => sent.filter((cmd) => cmd === "folder_items").length).toBe(2);
 });
+
+test("two grids on one page each keep their own layout", async () => {
+  serve(20);
+  await page.viewport(1000, 700);
+  await render(
+    <div style={{ display: "flex", width: 1000, height: 600 }}>
+      <section aria-label="justified" style={{ width: 500 }}>
+        <Grid mode="justified" />
+      </section>
+      <section aria-label="uniform" style={{ width: 500 }}>
+        <Grid mode="uniform" />
+      </section>
+    </div>,
+  );
+  const widths = (name: string) =>
+    [...document.querySelectorAll(`section[aria-label="${name}"] figure`)].map(
+      (tile) => (tile as HTMLElement).style.width,
+    );
+  await expect.poll(() => widths("justified").length).toBe(20);
+  await expect.poll(() => widths("uniform").length).toBe(20);
+
+  expect(new Set(widths("uniform")).size).toBe(1);
+  expect(new Set(widths("justified")).size).toBeGreaterThan(1);
+});
