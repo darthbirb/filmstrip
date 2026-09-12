@@ -19,8 +19,8 @@ test("the shell fits at every width and text size", async ({ page }, testInfo) =
       }, rootSize);
 
       await expect(page.getByRole("button", { name: "Close" })).toBeInViewport();
-      await expect(page.getByRole("banner").getByText("search")).toBeVisible();
       await expect(page.getByRole("main")).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "Location" })).toContainText("Pictures");
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );

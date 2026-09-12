@@ -47,6 +47,9 @@ Three ways, cheapest first.
 3. **The real window.** `tauri dev`, then attach Playwright over the Chrome DevTools Protocol
    at `http://127.0.0.1:9322`. `src-tauri/src/lib.rs` opens that port in **debug builds only**.
    Verified on 12 September 2026: the page reported real Tauri, `dpr 1.5`, viewport 1280×820.
+   With it running, `node scripts/dev-library.mjs` builds a small library under
+   `src-tauri/target/dev-library` and registers it, one unplugged source included, so the real
+   app has folders to show.
 
 ## Tests
 
@@ -94,12 +97,17 @@ tests/e2e/     Playwright
 ## Slices
 
 The interface is built one slice at a time: **window bar → the frame (navigation, grid, pane)
-→ navigation → grid and tiles → the pane → selection and moving → search → menus and dialogs
-→ settings and the tags screen → empty states and guidance.**
+→ navigation → grid and tiles → the pane → the visual direction → selection and moving → search
+→ menus and dialogs → settings and the tags screen → empty states and guidance.**
 
 Each slice builds two to four candidates that differ in **structure**, not colour. Claude
 checks them in a real browser first; the user then picks one in the real window, the rest are
 deleted, and what won is written into DECISIONS.md.
+
+**Until the visual direction, the look is deliberately plain** — Windows metrics and neutral
+greys — so each structure is judged on its own. That slice runs once the grid and the pane
+show real pictures: the design skills shape two or three directions on the token layer, the
+user picks one live, and it restyles every surface built before it.
 
 **Candidates are compared live in `tauri dev`, never by screenshot.** The dev readout at the
 bottom of the window switches between them instantly, by click or by the digit beside each, and

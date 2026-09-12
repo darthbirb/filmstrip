@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "./app/App";
+import { startIndex } from "./app/navigation/index-store";
 import { loadPreferences } from "./app/preferences";
 import "./styles/app.css";
 
@@ -10,6 +11,7 @@ if (import.meta.env.DEV && !("__TAURI_INTERNALS__" in window)) {
   await import("./dev/mock");
 }
 await loadPreferences();
+void startIndex();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("index.html has no #root");
