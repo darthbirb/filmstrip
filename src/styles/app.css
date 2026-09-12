@@ -7,7 +7,6 @@
   --font-glyph: "Segoe Fluent Icons", "Segoe MDL2 Assets";
 
   --color-ground: oklch(0.19 0 0);
-  --color-scrim: oklch(0.19 0 0 / 0.85);
   --color-fg: oklch(0.93 0 0);
   --color-fg-muted: oklch(0.93 0 0 / 0.45);
   --color-hover: oklch(1 0 0 / 0.06);
@@ -17,9 +16,8 @@
   --color-on-danger: #fff;
   --color-focus: oklch(0.93 0 0);
 
-  /* Windows 11 caption metrics: a 32px strip, a 48px tall bar, 46px buttons, 10px glyphs. */
+  /* Windows 11 caption metrics: a 32px strip, 46px buttons, 10px glyphs. */
   --spacing-caption: 2rem;
-  --spacing-header: 3rem;
   --spacing-caption-button: 2.875rem;
   --spacing-mark: 1rem;
 
@@ -32,7 +30,6 @@
 :root {
   color-scheme: dark;
   --motion-quick: 120ms;
-  --motion-linger: 700ms;
   --focus-width: 2px;
 }
 
