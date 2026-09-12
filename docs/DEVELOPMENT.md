@@ -101,10 +101,12 @@ Each slice builds two to four candidates that differ in **structure**, not colou
 checks them in a real browser first; the user then picks one in the real window, the rest are
 deleted, and what won is written into DECISIONS.md.
 
-**Candidates are switched from the dev readout** at the bottom of the window, in the browser
-and in `tauri dev` alike. The choice is kept in `localStorage` and survives a reload; a
-production build always takes the first candidate. When the user picks, the others and their
-entry in the picker are deleted.
+**Candidates are compared live in `tauri dev`, never by screenshot.** The dev readout at the
+bottom of the window switches between them instantly, by click or by the digit beside each, and
+its last entry, compare, puts every candidate side by side over neutral stand-in tiles, each
+still driving the real window. The choice survives a reload; a production build always takes
+the first candidate. **A turn that ends on a choice leaves `tauri dev` running** with the
+candidates on it. When the user picks, the others and their picker entry are deleted.
 
 ## Keeping the docs true
 

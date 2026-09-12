@@ -20,7 +20,9 @@ pinned version:
 ## Ports
 
 **1420 belongs to `tauri dev`.** Claude's own dev server runs on **1422** so the two never
-collide. Stop any server you started before ending a turn.
+collide. Stop any server you started before ending a turn — unless the turn ends on a choice
+for the user: then leave `tauri dev` running with the options on it. A screenshot is never the
+way a choice is offered.
 
 ## Rules
 
