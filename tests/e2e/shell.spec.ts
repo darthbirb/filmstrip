@@ -9,9 +9,6 @@ test("the shell fits at every width and text size", async ({ page }, testInfo) =
     if (message.type() === "error") errors.push(message.text());
   });
   page.on("pageerror", (error) => errors.push(error.message));
-  await page.addInitScript(() => {
-    localStorage.setItem("filmstrip:candidate:mark", "five");
-  });
 
   for (const width of WIDTHS) {
     for (const rootSize of ROOT_SIZES) {

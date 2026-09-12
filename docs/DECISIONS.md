@@ -151,14 +151,15 @@ installed on the machine, so no browser is downloaded and the numbers are real.
 
 ## The mark
 
-The mark is a filmstrip: an opaque dark body, five sprocket holes above and five below, seven
-colour frames across the window.
+The mark is a filmstrip: an opaque dark body, and five colour frames parted by dark gaps, each
+with one sprocket hole centred above it and one below. Picked on 13 September 2026 over four
+frames, and over frames run together.
 
 **Its colours are literal and stay literal** — no token, no `currentColor`. An identity that
 changes with a theme is not an identity. `src/assets/mark.svg` is the only source, and every
 icon is generated from it with `tauri icon`, rendered from the geometry rather than
 screenshotted so no subpixel fringing is baked in. One composition at every size, 16px
-included: at that size the frames read as a colour band, which is accepted.
+included, and a test holds the SVG to it.
 
 ## The scale is the arbiter
 
