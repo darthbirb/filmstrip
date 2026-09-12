@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 
-import { PaneStandIn, SearchStandIn } from "../dev/FrameStandIns";
+import { CandidatePicker } from "../dev/CandidatePicker";
+import { CompareCandidates } from "../dev/CompareCandidates";
+import { SearchStandIn } from "../dev/FrameStandIns";
+import { COMPARE, useCandidate } from "./candidates";
 import { Frame } from "./frame/Frame";
 import { Grid } from "./grid/Grid";
 import { LayoutToggle } from "./grid/LayoutToggle";
@@ -8,16 +11,24 @@ import { DEFAULT_LAYOUT } from "./grid/layout";
 import { TileSize } from "./grid/TileSize";
 import { Breadcrumb } from "./navigation/Breadcrumb";
 import { Navigation } from "./navigation/Navigation";
+import { PANE_CANDIDATES, Pane } from "./pane/Pane";
 import { usePreferences, useScaleHotkeys } from "./preferences";
 import { WindowBar } from "./window-bar/WindowBar";
 
-// Until the slices that fill them land, these regions hold dev stand-ins, and nothing in production.
-const PANE = import.meta.env.DEV ? <PaneStandIn /> : undefined;
+// Until the search slice lands, the bar holds a dev stand-in, and nothing in production.
 const SEARCH = import.meta.env.DEV ? <SearchStandIn /> : undefined;
+
+const PANE_CHOICES = [...PANE_CANDIDATES, COMPARE] as const;
+const COMPARED_PANES = {
+  stack: () => <Pane candidate="stack" />,
+  viewer: () => <Pane candidate="viewer" />,
+  split: () => <Pane candidate="split" />,
+};
 
 export function App() {
   useScaleHotkeys();
   const layout = usePreferences().layout ?? DEFAULT_LAYOUT;
+  const [pane, choosePane] = useCandidate("pane", PANE_CANDIDATES);
 
   return (
     <div className="flex h-dvh flex-col bg-ground text-fg">
@@ -32,10 +43,17 @@ export function App() {
           </>
         }
         grid={<Grid mode={layout} />}
-        pane={PANE}
+        pane={
+          import.meta.env.DEV && pane === COMPARE ? (
+            <CompareCandidates candidates={COMPARED_PANES} layout="rows" />
+          ) : (
+            <Pane candidate={pane === COMPARE ? PANE_CANDIDATES[0] : pane} />
+          )
+        }
       />
       {import.meta.env.DEV && (
         <footer className="flex items-center gap-4 px-3 py-1 text-xs">
+          <CandidatePicker slice="pane" names={PANE_CHOICES} current={pane} onChoose={choosePane} />
           <DisplayReadout />
         </footer>
       )}

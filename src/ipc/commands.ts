@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { EffectiveTag } from "./bindings/EffectiveTag";
 import type { Failure } from "./bindings/Failure";
 import type { FolderNode } from "./bindings/FolderNode";
+import type { ItemDetail } from "./bindings/ItemDetail";
 import type { ItemRow } from "./bindings/ItemRow";
 import type { Progress } from "./bindings/Progress";
 import type { Source } from "./bindings/Source";
@@ -28,6 +29,8 @@ export const folderChildren = (folderId: number) =>
 export const folderItems = (folderId: number) => invoke<ItemRow[]>("folder_items", { folderId });
 
 export const itemTags = (itemId: number) => invoke<EffectiveTag[]>("item_tags", { itemId });
+
+export const itemDetail = (itemId: number) => invoke<ItemDetail | null>("item_detail", { itemId });
 
 export const sortingItems = () => invoke<ItemRow[]>("sorting_items");
 

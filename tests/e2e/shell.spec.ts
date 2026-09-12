@@ -31,3 +31,46 @@ test("the shell fits at every width and text size", async ({ page }, testInfo) =
 
   expect(errors).toEqual([]);
 });
+
+test("a clicked picture shows in the pane, in every candidate, at every size", async ({
+  page,
+}, testInfo) => {
+  const errors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") errors.push(message.text());
+  });
+  page.on("pageerror", (error) => errors.push(error.message));
+
+  for (const candidate of ["stack", "viewer", "split"]) {
+    for (const width of [1024, 1920]) {
+      for (const rootSize of ROOT_SIZES) {
+        await page.setViewportSize({ width, height: 700 });
+        await page.goto("/");
+        await page.evaluate(
+          (name) => localStorage.setItem("filmstrip:candidate:pane", name),
+          candidate,
+        );
+        await page.reload();
+        await page.evaluate((size) => {
+          document.documentElement.style.fontSize = size;
+        }, rootSize);
+
+        await page.getByRole("button", { name: "cover.jpg" }).click();
+        // A pane that did not fit is folded to its rail, and opens over the grid.
+        const show = page.getByRole("button", { name: "Show pane" });
+        if (await show.isVisible()) await show.click();
+        const pane = page.getByRole("complementary", { name: "Pane" });
+        await expect(pane.getByRole("heading", { name: "cover.jpg" })).toBeVisible();
+        const overflow = await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        );
+        expect(overflow).toBe(0);
+        await page.screenshot({
+          path: testInfo.outputPath(`pane-${candidate}-${width}-${rootSize}.png`),
+        });
+      }
+    }
+  }
+
+  expect(errors).toEqual([]);
+});

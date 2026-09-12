@@ -25,7 +25,7 @@ impl SourceKind {
         }
     }
 
-    fn from_str(text: &str) -> Self {
+    pub(crate) fn parse(text: &str) -> Self {
         match text {
             "sorting" => SourceKind::Sorting,
             _ => SourceKind::Library,
@@ -49,7 +49,7 @@ fn read(row: &rusqlite::Row<'_>) -> rusqlite::Result<Source> {
         id: row.get(0)?,
         root: row.get(1)?,
         title: row.get(2)?,
-        kind: SourceKind::from_str(&row.get::<_, String>(3)?),
+        kind: SourceKind::parse(&row.get::<_, String>(3)?),
         added_at: row.get(4)?,
     })
 }

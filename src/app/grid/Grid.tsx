@@ -2,6 +2,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { type ReactElement, type RefObject, useLayoutEffect, useRef, useState } from "react";
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
+import { showInPane, usePaneItem } from "../pane/pane-store";
 import { usePlace } from "../place";
 import { usePreferences } from "../preferences";
 import { type LayoutMode, rowAt } from "./layout";
@@ -12,6 +13,7 @@ import { useLayout } from "./useLayout";
 /** The current place's pictures, laid out in rows and drawn only where they can be seen. */
 export function Grid({ mode }: { mode: LayoutMode }) {
   const items = useGridItems(usePlace());
+  const inPane = usePaneItem();
   const { tile } = usePreferences();
   const scroller = useRef<HTMLDivElement>(null);
   const view = useViewport(scroller);
@@ -33,6 +35,7 @@ export function Grid({ mode }: { mode: LayoutMode }) {
           <Tile
             key={item.id}
             item={item}
+            shown={item.id === inPane}
             left={(result.itemLeft[index] ?? 0) + gap}
             top={(result.rowTops[row] ?? 0) + gap}
             width={result.itemWidth[index] ?? 0}
@@ -56,25 +59,46 @@ export function Grid({ mode }: { mode: LayoutMode }) {
   );
 }
 
-type TileProps = { item: ItemRow; left: number; top: number; width: number; height: number };
+type TileProps = {
+  item: ItemRow;
+  /** Whether the pane is showing it. */
+  shown: boolean;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
 
-function Tile({ item, left, top, width, height }: TileProps) {
+function Tile({ item, shown, left, top, width, height }: TileProps) {
   return (
     <figure
-      aria-label={item.diskName}
       title={item.diskName}
       className="absolute m-0 overflow-hidden bg-hover"
       style={{ left, top, width, height }}
     >
-      {item.thumb && (
-        <img
-          src={convertFileSrc(item.thumb)}
-          alt=""
-          draggable={false}
-          decoding="async"
-          className="size-full object-cover"
-        />
-      )}
+      <button
+        type="button"
+        aria-label={item.diskName}
+        aria-current={shown || undefined}
+        onClick={() => showInPane(item.id)}
+        className="focus-ring relative block size-full"
+      >
+        {item.thumb && (
+          <img
+            src={convertFileSrc(item.thumb)}
+            alt=""
+            draggable={false}
+            decoding="async"
+            className="size-full object-cover"
+          />
+        )}
+        {shown && (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 shadow-[inset_0_0_0_var(--focus-width)_var(--color-fg)]"
+          />
+        )}
+      </button>
     </figure>
   );
 }

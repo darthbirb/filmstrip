@@ -46,6 +46,39 @@ pub fn location(conn: &Connection, folder_id: i64) -> Result<FolderLocation> {
     Ok(FolderLocation { source_id, titles })
 }
 
+/// A folder on the way down from a source's own folder, as the breadcrumb takes it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[ts(export)]
+pub struct Crumb {
+    pub id: i64,
+    pub title: String,
+}
+
+/// Every folder from the source's own down to this one. The source's own goes by the source's
+/// title, as navigation shows it.
+pub fn ancestry(conn: &Connection, folder_id: i64) -> Result<Vec<Crumb>> {
+    let mut stmt = conn.prepare(
+        "WITH RECURSIVE ancestry(id, title, parent_id, source_id, depth) AS (
+             SELECT id, title, parent_id, source_id, 0 FROM folder WHERE id = ?1
+           UNION ALL
+             SELECT f.id, f.title, f.parent_id, f.source_id, a.depth + 1
+               FROM folder f JOIN ancestry a ON f.id = a.parent_id
+         )
+         SELECT a.id, COALESCE(s.title, a.title)
+           FROM ancestry a LEFT JOIN source s ON a.parent_id IS NULL AND s.id = a.source_id
+          ORDER BY a.depth DESC",
+    )?;
+    let crumbs = stmt
+        .query_map(params![folder_id], |r| {
+            Ok(Crumb {
+                id: r.get(0)?,
+                title: r.get(1)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(crumbs)
+}
+
 pub fn source_root_folder(conn: &Connection, source_id: i64) -> Result<i64> {
     conn.query_row(
         "SELECT id FROM folder WHERE source_id = ?1 AND parent_id IS NULL AND deleted_at IS NULL",

@@ -57,6 +57,9 @@ Three ways, cheapest first.
   the test that reproduces it. CI runs every suite below on each pull request.
 - **Rust** is tested beside the code, in `#[cfg(test)]` modules. A test that needs real files
   writes them under `src-tauri/target/`, never outside the repository.
+- **A test that needs ffmpeg is `#[ignore]`d**, because CI has none. Where ffmpeg is on PATH,
+  `cargo test --manifest-path src-tauri/Cargo.toml -- --ignored` runs them; run it after touching
+  video.
 - **Component tests** run in Vitest's browser mode on Edge (`channel: "msedge"`), over
   `src/**/*.test.tsx`. **Never jsdom** — see
   DECISIONS.md "Testing in a real browser, never jsdom".
@@ -148,7 +151,7 @@ ports the same way; components and styles never do (DECISIONS.md "Built in slice
 | Grid layout | `features/grid/useGridLayout.ts`, `layoutWorker.ts` | grid and tiles |
 | Performance fixture | `bin/synth_library.rs` | grid and tiles |
 | Probing video and capture dates | `media/probe.rs`, `sidecar/` | the pane |
-| Scrub sprites | `media/sprites.rs` | the pane |
+| Scrub sprites | `media/sprites.rs`, `sidecar/ffmpeg.rs` `frames` | not yet scheduled: nothing shows one yet |
 | Moving, renaming, undo | `fs/relocate.rs`, `fs/undo.rs`, `db/journal.rs`, `commands/triage.rs` | selection and moving |
 | Trash | `fs/trash.rs` | selection and moving |
 | Destination hotkeys | `db/hotkeys.rs`, `state/hotkeys.ts` | selection and moving |

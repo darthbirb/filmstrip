@@ -60,6 +60,9 @@
   --frame-pane-max: 40rem;
   --frame-grid-min: 20rem;
 
+  /* The tallest a picture stands in the pane at its own shape, so a panorama never runs away. */
+  --pane-media-max: 70dvh;
+
   /* Tile sizes the grid's size control allows, in rem. */
   --tile-min: 6rem;
   --tile-max: 20rem;

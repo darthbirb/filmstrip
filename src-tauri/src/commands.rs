@@ -9,7 +9,7 @@ use tauri::{AppHandle, Manager, State};
 use ts_rs::TS;
 
 use crate::db::folders::{self, FolderNode};
-use crate::db::items::{self, ItemRow};
+use crate::db::items::{self, ItemDetail, ItemRow};
 use crate::db::jobs::{self as job_table, Failure};
 use crate::db::sources::{self, Source, SourceKind};
 use crate::db::tags::{self, EffectiveTag};
@@ -101,6 +101,13 @@ pub async fn item_tags(state: State<'_, AppState>, item_id: i64) -> Result<Vec<E
     run(&state, move |conn| tags::item_effective_tags(conn, item_id)).await
 }
 
+/// One item in full for the pane, or nothing once it is gone.
+#[tauri::command]
+pub async fn item_detail(state: State<'_, AppState>, item_id: i64) -> Result<Option<ItemDetail>> {
+    let thumbs = state.thumbs.clone();
+    run(&state, move |conn| detail_of(conn, item_id, &thumbs)).await
+}
+
 /// Queues a walk of every source; asking again while one waits or runs does nothing.
 #[tauri::command]
 pub async fn start_index(state: State<'_, AppState>) -> Result<()> {
@@ -151,12 +158,25 @@ fn in_transaction<T>(conn: &Connection, work: impl FnOnce(&Connection) -> Result
 /// Fills in the thumbnail path on each row whose thumbnail has been made.
 pub fn with_thumbnails(mut rows: Vec<ItemRow>, thumbs: &Path) -> Vec<ItemRow> {
     for row in &mut rows {
-        let path = thumbs.join(paths::thumb_rel(&row.uuid));
-        if path.is_file() {
-            row.thumb = Some(path.to_string_lossy().into_owned());
-        }
+        row.thumb = thumb_of(&row.uuid, thumbs);
     }
     rows
+}
+
+fn thumb_of(uuid: &str, thumbs: &Path) -> Option<String> {
+    let path = thumbs.join(paths::thumb_rel(uuid));
+    path.is_file().then(|| path.to_string_lossy().into_owned())
+}
+
+/// An item in full, with the paths to its file and its thumbnail.
+pub fn detail_of(conn: &Connection, item_id: i64, thumbs: &Path) -> Result<Option<ItemDetail>> {
+    let Some(mut detail) = items::detail(conn, item_id)? else {
+        return Ok(None);
+    };
+    let file = paths::item_path(conn, detail.row.folder_id, &detail.row.disk_name)?;
+    detail.path = file.to_string_lossy().into_owned();
+    detail.row.thumb = thumb_of(&detail.row.uuid, thumbs);
+    Ok(Some(detail))
 }
 
 pub fn source_summaries(conn: &Connection) -> Result<Vec<SourceSummary>> {
@@ -400,6 +420,47 @@ mod tests {
             Some(made.to_string_lossy().as_ref())
         );
         assert_eq!(rows[1].thumb, None);
+    }
+
+    #[test]
+    fn an_items_detail_names_its_file_and_every_folder_down_to_it() {
+        let base = scratch("detail");
+        let app = app_dir(&base);
+        let library = base.join("library");
+        std::fs::create_dir_all(library.join("Trips/Cairo")).unwrap();
+        std::fs::write(library.join("Trips/Cairo/pyramid.jpg"), "abc").unwrap();
+        let conn = conn();
+        let root = library.to_str().unwrap();
+        register_source(&conn, root, SourceKind::Library, Some("Pictures"), &app).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let id: i64 = conn
+            .query_row("SELECT id FROM item", [], |r| r.get(0))
+            .unwrap();
+        let thumbs = base.join("thumbs");
+
+        let detail = detail_of(&conn, id, &thumbs).unwrap().unwrap();
+        assert_eq!(
+            PathBuf::from(&detail.path),
+            library.join("Trips").join("Cairo").join("pyramid.jpg")
+        );
+        let titles: Vec<_> = detail.folders.iter().map(|c| c.title.as_str()).collect();
+        assert_eq!(
+            titles,
+            ["Pictures", "Trips", "Cairo"],
+            "the source by its title, then each folder"
+        );
+        assert_eq!(
+            detail.folders.last().map(|c| c.id),
+            Some(detail.row.folder_id)
+        );
+        assert_eq!(detail.source_kind, SourceKind::Library);
+
+        items::trash(&conn, id).unwrap();
+        assert_eq!(
+            detail_of(&conn, id, &thumbs).unwrap(),
+            None,
+            "a trashed item is gone"
+        );
     }
 
     /// Tauri finds a command by name and an argument by its camelCase key, and

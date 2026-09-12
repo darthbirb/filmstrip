@@ -17,6 +17,7 @@ use ts_rs::TS;
 
 use crate::db::{self, jobs as table};
 use crate::error::Result;
+use crate::media::ffmpeg::Ffmpeg;
 
 pub const PROGRESS_EVENT: &str = "job-progress";
 
@@ -54,6 +55,8 @@ pub type Report = Box<dyn Fn(&Progress) + Send + Sync>;
 pub struct QueueInner {
     db_path: PathBuf,
     thumbs: PathBuf,
+    /// Videos are only read while this is here. DECISIONS.md "Video and ffmpeg".
+    ffmpeg: Option<Ffmpeg>,
     stop: AtomicBool,
     walking: AtomicBool,
     completed: AtomicU64,
@@ -87,10 +90,16 @@ pub struct JobQueue {
 
 impl JobQueue {
     /// One worker per core but one, within bounds, and a reporter that sends progress as it changes.
-    pub fn start(db_path: PathBuf, thumbs: PathBuf, report: Report) -> JobQueue {
+    pub fn start(
+        db_path: PathBuf,
+        thumbs: PathBuf,
+        ffmpeg: Option<Ffmpeg>,
+        report: Report,
+    ) -> JobQueue {
         let inner = Arc::new(QueueInner {
             db_path,
             thumbs,
+            ffmpeg,
             stop: AtomicBool::new(false),
             walking: AtomicBool::new(false),
             completed: AtomicU64::new(0),
@@ -237,6 +246,7 @@ mod tests {
         let queue = JobQueue::start(
             db_path,
             dir.join("thumbs"),
+            None,
             Box::new(move |progress| {
                 let _ = sent.send(progress.clone());
             }),

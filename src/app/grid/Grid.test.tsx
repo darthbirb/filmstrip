@@ -5,6 +5,7 @@ import { page } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
+import { getPaneItem, showInPane } from "../pane/pane-store";
 import { setPlace } from "../place";
 import { updatePreferences } from "../preferences";
 import { Grid } from "./Grid";
@@ -67,6 +68,7 @@ const firstRow = () => {
 
 beforeEach(() => {
   setPlace({ kind: "folder", sourceId: 1, path: [{ id: 1, title: "Pictures" }] });
+  showInPane(null);
 });
 
 afterEach(() => {
@@ -110,9 +112,19 @@ test("only the rows near the view are drawn, and scrolling draws the rest", asyn
 
   const scroller = document.querySelector("figure")?.closest(".overflow-auto") as HTMLElement;
   scroller.scrollTop = scroller.scrollHeight;
-  await expect
-    .poll(() => tiles().some((tile) => tile.getAttribute("aria-label") === "item-1999.png"))
-    .toBe(true);
+  await expect.poll(() => tiles().some((tile) => tile.title === "item-1999.png")).toBe(true);
+});
+
+test("clicking a picture puts it in the pane, and the grid marks which one it is", async () => {
+  serve(6);
+  const screen = await renderGrid("justified");
+  const third = screen.getByRole("button", { name: "item-2.png" });
+  await third.click();
+
+  expect(getPaneItem()).toBe(3);
+  await expect.element(third).toHaveAttribute("aria-current", "true");
+  await screen.getByRole("button", { name: "item-4.png" }).click();
+  await expect.element(third).not.toHaveAttribute("aria-current");
 });
 
 test("a folder with nothing in it says so", async () => {

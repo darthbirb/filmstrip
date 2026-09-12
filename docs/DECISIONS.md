@@ -95,9 +95,53 @@ changed, so a queue that empties within a tick still says so.
 
 **320px on the longest edge, lossy WebP at quality 78**, as measured in ggallery: AVIF encoded
 41 times slower for a 12% saving. A picture is decoded by what the file holds, never by its
-extension; turned upright by its EXIF orientation; and keeps its transparency. A thumbnail is
-named by the item's uuid, so a rename or a move never orphans one, and making it is where an
-image's width and height are learned.
+extension; turned upright by its EXIF orientation; and keeps its transparency. A video's is a
+frame a tenth of the way in, and never later than ten minutes: past the fades and black leaders
+most clips open with, and early enough to still be the shot the file is about. A thumbnail is
+named by the item's uuid, so a rename or a move never orphans one.
+
+**Making a thumbnail is when a file is read.** A picture's width, height and capture date come
+from the decode that makes it, a video's from ffprobe, so nothing opens a file twice.
+`item.probed_at` records that it happened. A walk that finds a file changed clears it, and the
+index job queues every live picture and video still uncleared or missing its thumbnail.
+
+## Capture dates
+
+**Only the file's own metadata dates it.** For a picture, EXIF's DateTimeOriginal, else
+DateTimeDigitized; for a video, its container's creation time. Nothing is guessed. ggallery fell
+back to the file's creation time, but copying a file on Windows stamps a new creation time and
+keeps the modification time, so an imported library's "capture dates" were the day it was
+copied. The pane shows the modification time as a row of its own, named for what it is.
+
+EXIF's plain DateTime is not a capture date: editors rewrite it on every save. **A zeroed date is
+no date** — a camera whose clock was never set writes zeros, and a container never stamped says
+1904 or 1970.
+
+**EXIF has no time zone in the common case**, so its time is kept as the camera's clock read as
+UTC, and shown in UTC: as written, wherever the viewer is. A container's creation time is real
+UTC, and is shown in local time. Sorting across the two can be out by a zone's offset, which is
+the price of never inventing one.
+
+## Video and ffmpeg
+
+**ffmpeg is found, never installed.** At launch the app looks for `ffmpeg.exe` and `ffprobe.exe`
+together in `tools\` beside the executable, then in any one directory on PATH. Reading PATH
+writes nothing, so "Nothing outside the app folder" holds. Bundling it, so that a release needs
+nothing downloaded, is under PRODUCT.md "Later". Without it videos are not queued at all, so no
+failures pile up, and the first launch that finds it picks them up.
+
+**`media::ffmpeg` is the only place the app starts another program.** Every run has a limit — 30
+seconds to probe, 60 to take a frame — and is killed past it, so one damaged file cannot hold a
+worker; ggallery had none. Each file goes in as a `file:` input, so no file name is read as one
+of ffmpeg's other protocols, and no console window flashes.
+
+**A recording's rotation turns its shape.** A phone records a landscape sensor and a note to turn
+it, and ffmpeg draws the frames upright, so the width and height the index keeps are swapped to
+match. ggallery kept them unturned, and portrait videos laid out as landscape.
+
+**The window plays what WebView2 plays**: H.264 MP4 and WebM, but not HEVC without its extension,
+MKV or AVI. A video it cannot play keeps its poster and says so. Scrub strips wait for a surface
+that shows them.
 
 ## The window
 

@@ -109,7 +109,7 @@ pub fn mirror(
 
 enum Outcome {
     Unchanged,
-    Indexed { id: i64, kind: &'static str },
+    Indexed,
 }
 
 fn record_file(conn: &Connection, file: &Path, folder_id: i64, source_id: i64) -> Result<Outcome> {
@@ -162,19 +162,11 @@ fn record_file(conn: &Connection, file: &Path, folder_id: i64, source_id: i64) -
         |r| r.get(0),
     )?;
     items::mark_seen(conn, &uuid)?;
-    Ok(Outcome::Indexed {
-        id,
-        kind: kind_of(&ext),
-    })
+    Ok(Outcome::Indexed)
 }
 
 /// Brings the index back in line with what is on disk.
 pub fn reconcile(conn: &Connection) -> Result<WalkReport> {
-    reconcile_with(conn, &mut |_, _| {})
-}
-
-/// As `reconcile`, telling `indexed` about every file it recorded or refreshed, and its kind.
-pub fn reconcile_with(conn: &Connection, indexed: &mut dyn FnMut(i64, &str)) -> Result<WalkReport> {
     let mut report = WalkReport::default();
     let mut walked: Vec<i64> = Vec::new();
 
@@ -193,10 +185,7 @@ pub fn reconcile_with(conn: &Connection, indexed: &mut dyn FnMut(i64, &str)) -> 
             };
             match record_file(conn, &file, folder_id, source.id) {
                 Ok(Outcome::Unchanged) => report.unchanged += 1,
-                Ok(Outcome::Indexed { id, kind }) => {
-                    report.indexed += 1;
-                    indexed(id, kind);
-                }
+                Ok(Outcome::Indexed) => report.indexed += 1,
                 Err(err) => eprintln!("could not index {}: {err}", file.display()),
             }
         }

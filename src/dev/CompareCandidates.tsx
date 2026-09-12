@@ -13,7 +13,7 @@ export function CompareCandidates({ candidates, layout = "columns" }: Props) {
   const rows = layout === "rows";
   return (
     <div
-      className="grid min-h-0 flex-1"
+      className="grid h-full min-h-0 flex-1"
       style={rows ? { gridTemplateRows: tracks } : { gridTemplateColumns: tracks }}
     >
       {entries.map(([name, Candidate], index) => (
