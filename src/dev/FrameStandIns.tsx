@@ -25,19 +25,18 @@ export function NavStandIn() {
   );
 }
 
-export function ToolbarStandIn() {
-  return (
-    <>
-      <Slot label="location" grow />
-      <Slot label="search" />
-    </>
-  );
+export function LocationStandIn() {
+  return <Slot label="location" className="h-7 flex-1" />;
 }
 
-function Slot({ label, grow = false }: { label: string; grow?: boolean }) {
+export function SearchStandIn() {
+  return <Slot label="search" className="h-full flex-1 justify-center" />;
+}
+
+function Slot({ label, className }: { label: string; className: string }) {
   return (
     <span
-      className={`flex h-7 items-center border border-line border-dashed px-2 text-caption text-fg-muted ${grow ? "min-w-0 flex-1" : "w-48 min-w-0 shrink"}`}
+      className={`flex min-w-0 items-center border border-line border-dashed px-2 text-caption text-fg-muted ${className}`}
     >
       {label}
     </span>

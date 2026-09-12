@@ -79,3 +79,22 @@ test("nothing is cut off in the narrowest window", async () => {
     expect(button.getBoundingClientRect().right).toBeLessThanOrEqual(640);
   }
 });
+
+test("search sits centred on the window, and narrows before anything is cut off", async () => {
+  recordIPC();
+  await page.viewport(1600, 400);
+  const screen = await render(
+    <WindowBar search={<div data-testid="search" className="h-full w-full" />} />,
+  );
+  const search = screen.getByTestId("search").element();
+  const wide = search.getBoundingClientRect();
+  expect(Math.abs(wide.left + wide.width / 2 - 800)).toBeLessThan(1);
+
+  await page.viewport(640, 400);
+  await expect.poll(() => search.getBoundingClientRect().width).toBeLessThan(wide.width);
+  const bar = screen.getByRole("banner").element();
+  expect(bar.scrollWidth).toBeLessThanOrEqual(bar.clientWidth);
+  for (const button of screen.getByRole("button").elements()) {
+    expect(button.getBoundingClientRect().right).toBeLessThanOrEqual(640);
+  }
+});

@@ -84,14 +84,35 @@ explicitly, because Tauri disables them by default and the app is meant to answe
 **The bar is Windows' own caption strip**, picked from three candidates on 12 September 2026:
 32px tall, the mark and the name at the left, and minimise, maximise and close at 46px wide in
 Windows' own glyphs, close turning red under the pointer. The title and the glyphs dim while
-another window has focus. **It belongs to the window, not the app** — location and search go
-in the frame below it. The candidates it beat were a 48px header that would have carried them,
-and a strip that receded over the content until the pointer reached the top.
+another window has focus. The candidates it beat were a 48px header and a strip that receded
+over the content until the pointer reached the top.
+
+**Search lives in the bar**, as VS Code's command centre does, chosen with the frame on
+12 September 2026. It is centred on the window, not on the gap between the title and the
+buttons, and it narrows before anything else has to give. Everything else the app shows sits in
+the frame below.
 
 Drawing our own buttons costs two things a native title bar has: the snap-layout panel on
 hovering maximise, and the system menu on right-clicking the bar.
 
 The 640×480 minimum is provisional until the frame slice measures what actually fits.
+
+## The frame
+
+**Three docked columns — navigation, the grid, the pane — each with a header row of its own**,
+picked from three candidates on 12 September 2026. The grid's header holds the location; the
+side panels' hold the buttons that hide them. The candidates it beat were one toolbar across the
+window with header-less panels beneath, and a pane floating over the grid's edge.
+
+**Widths are the user's, in rem.** A splitter between two columns drags, answers to the arrow
+keys and resets on double-click, and rem keeps a chosen width in proportion when the text size
+or the zoom changes. Widths are not yet kept between sessions.
+
+**A panel folds because it did not fit**, never at a breakpoint. The frame measures its own
+width against the columns' actual widths and the grid's minimum: the pane folds first, then
+navigation, and the grid never does. A folded panel leaves a rail at the window's edge, and its
+button opens the panel over the grid until Escape or a click elsewhere. A panel hidden by hand
+behaves the same way.
 
 ## Testing in a real browser, never jsdom
 

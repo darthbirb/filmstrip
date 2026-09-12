@@ -26,8 +26,9 @@
   --spacing-toolbar: 2.5rem;
   --spacing-rail: 2.5rem;
   --spacing-splitter: 0.375rem;
+  --spacing-bar-field: 1.5rem;
+  --spacing-bar-search: 36rem;
 
-  --radius-panel: 0.5rem;
   --shadow-overlay: 0 0.5rem 2rem oklch(0 0 0 / 0.5);
 
   --text-caption: 0.75rem;

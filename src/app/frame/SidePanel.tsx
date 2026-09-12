@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, type RefObject, useEffect, useRef } from "react";
 
 import { GlyphButton } from "../../ui/GlyphButton";
 import { Splitter } from "../../ui/Splitter";
@@ -9,27 +9,10 @@ const COPY = {
   pane: { label: "Pane", show: "Show pane", hide: "Hide pane", glyph: "dockRight" },
 } as const;
 
-type Props = {
-  layout: FrameLayout;
-  side: Side;
-  /** A header row of its own, holding the hide button. */
-  header?: boolean;
-  /** A rail left behind when folded, holding the show button. */
-  rail?: boolean;
-  /** Floats over the grid instead of taking width from it. */
-  floating?: boolean;
-  children?: ReactNode;
-};
+type Props = { layout: FrameLayout; side: Side; children?: ReactNode };
 
-/** Navigation or the pane: docked, folded to a rail, or open over the grid while folded. */
-export function SidePanel({
-  layout,
-  side,
-  header = false,
-  rail = true,
-  floating = false,
-  children,
-}: Props) {
+/** Navigation or the pane: docked beside a splitter, or folded to a rail that opens it over the grid. */
+export function SidePanel({ layout, side, children }: Props) {
   const copy = COPY[side];
   const width = `${layout.widths[side]}rem`;
   const limits = layout.metrics[side];
@@ -40,13 +23,11 @@ export function SidePanel({
 
   const body = (
     <>
-      {header && (
-        <div
-          className={`flex h-toolbar shrink-0 items-center ${side === "pane" ? "justify-end" : ""}`}
-        >
-          <GlyphButton glyph={copy.glyph} label={copy.hide} onClick={() => layout.hide(side)} />
-        </div>
-      )}
+      <div
+        className={`flex h-toolbar shrink-0 items-center ${side === "pane" ? "justify-end" : ""}`}
+      >
+        <GlyphButton glyph={copy.glyph} label={copy.hide} onClick={() => layout.hide(side)} />
+      </div>
       <div className="min-h-0 flex-1 overflow-auto">{children}</div>
     </>
   );
@@ -55,20 +36,20 @@ export function SidePanel({
     const edge = side === "nav" ? "left" : "right";
     return (
       <>
-        {rail && (
-          <div
-            data-frame-toggle={side}
-            className={`flex w-rail shrink-0 flex-col bg-panel ${floating ? "absolute top-toolbar right-0 bottom-0 z-10" : ""}`}
-          >
-            <PanelToggle layout={layout} side={side} />
-          </div>
-        )}
+        <div data-frame-toggle={side} className="flex w-rail shrink-0 flex-col bg-panel">
+          <GlyphButton
+            glyph={copy.glyph}
+            label={copy.show}
+            pressed={open}
+            onClick={() => (open ? layout.close() : layout.show(side))}
+          />
+        </div>
         {open && (
           <Region
             ref={overlayRef}
             aria-label={copy.label}
             className="absolute inset-y-0 z-20 flex flex-col bg-panel shadow-overlay"
-            style={{ width, [edge]: rail ? "var(--spacing-rail)" : 0 }}
+            style={{ width, [edge]: "var(--spacing-rail)" }}
           >
             {body}
           </Region>
@@ -88,20 +69,6 @@ export function SidePanel({
       onChange={(rem) => layout.setWidth(side, rem)}
     />
   );
-
-  if (floating) {
-    return (
-      <Region
-        aria-label={copy.label}
-        className="absolute top-toolbar right-2 bottom-2 z-10 flex overflow-hidden rounded-panel bg-panel shadow-overlay"
-        style={{ width }}
-      >
-        {splitter}
-        <div className="flex min-w-0 flex-1 flex-col">{body}</div>
-      </Region>
-    );
-  }
-
   const panel = (
     <Region aria-label={copy.label} className="flex shrink-0 flex-col bg-panel" style={{ width }}>
       {body}
@@ -120,32 +87,11 @@ export function SidePanel({
   );
 }
 
-/** Shows a folded or hidden panel, or hides a docked one. */
-export function PanelToggle({ layout, side }: { layout: FrameLayout; side: Side }) {
-  const copy = COPY[side];
-  const folded = layout.folded[side];
-  const open = layout.open === side;
-  return (
-    <span data-frame-toggle={side} className="contents">
-      <GlyphButton
-        glyph={copy.glyph}
-        label={folded ? copy.show : copy.hide}
-        pressed={folded ? open : undefined}
-        onClick={() => {
-          if (!folded) layout.hide(side);
-          else if (open) layout.close();
-          else layout.show(side);
-        }}
-      />
-    </span>
-  );
-}
-
-/** Closes an open overlay when the pointer goes down anywhere but on it or on its toggle. */
+/** Closes an open overlay when the pointer goes down anywhere but on it or on its rail. */
 function useDismiss(
   open: boolean,
   side: Side,
-  ref: React.RefObject<HTMLElement | null>,
+  ref: RefObject<HTMLElement | null>,
   close: () => void,
 ) {
   useEffect(() => {
