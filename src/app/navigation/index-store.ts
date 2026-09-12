@@ -1,8 +1,9 @@
+import { listen } from "@tauri-apps/api/event";
 import { useSyncExternalStore } from "react";
-
 import type { FolderNode } from "../../ipc/bindings/FolderNode";
+import type { Progress } from "../../ipc/bindings/Progress";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
-import { folderChildren, listSources, reconcile } from "../../ipc/commands";
+import { folderChildren, listSources } from "../../ipc/commands";
 import { getPlace, setPlace } from "../place";
 
 /** The index as navigation reads it: the sources, and each folder's children once asked for. */
@@ -30,11 +31,12 @@ export async function loadIndex() {
   }
 }
 
-/** Loads what is indexed, then walks every source and loads again, so the disk has the last word. */
+/** Loads what is indexed, and again each time the background work goes quiet. */
 export async function startIndex() {
   await loadIndex().catch(() => undefined);
-  await reconcile().catch(() => undefined);
-  await loadIndex().catch(() => undefined);
+  await listen<Progress>("job-progress", (event) => {
+    if (event.payload.phase === "idle") void loadIndex().catch(() => undefined);
+  }).catch(() => undefined);
 }
 
 export function useIndex() {

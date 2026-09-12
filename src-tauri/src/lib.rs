@@ -5,8 +5,10 @@ pub mod config;
 pub mod db;
 pub mod error;
 pub mod fs;
+pub mod jobs;
+pub mod media;
 
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
 
 /// Tauri's defaults, which `additional_browser_args` replaces rather than extends.
 const WEBVIEW_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection";
@@ -16,12 +18,36 @@ const WEBVIEW_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreen
 const DEBUG_PORT: u16 = 9322;
 
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .setup(|app| {
             fs::paths::ensure_app_dirs()?;
             let db_path = fs::paths::db_path()?;
-            db::migrate(&mut db::open(&db_path)?)?;
-            app.manage(commands::AppState { db: db_path });
+            let thumbs = fs::paths::thumbs_dir()?;
+            let mut conn = db::open(&db_path)?;
+            db::migrate(&mut conn)?;
+            db::jobs::requeue_running(&conn)?;
+            jobs::enqueue_index(&conn)?;
+
+            // The window may load files from the sources and the thumbnail cache, and nothing else.
+            let scope = app.asset_protocol_scope();
+            scope.allow_directory(&thumbs, true)?;
+            for source in db::sources::list(&conn)? {
+                scope.allow_directory(&source.root, true)?;
+            }
+
+            let handle = app.handle().clone();
+            let queue = jobs::JobQueue::start(
+                db_path.clone(),
+                thumbs.clone(),
+                Box::new(move |progress| {
+                    let _ = handle.emit(jobs::PROGRESS_EVENT, progress);
+                }),
+            );
+            app.manage(commands::AppState {
+                db: db_path,
+                thumbs,
+                queue,
+            });
 
             // Beside the executable, never in the user's profile.
             // DECISIONS.md "Nothing outside the app folder".
@@ -49,11 +75,23 @@ pub fn run() {
             commands::remove_source,
             commands::folder_children,
             commands::folder_items,
+            commands::sorting_items,
             commands::item_tags,
-            commands::reconcile,
+            commands::start_index,
+            commands::index_progress,
+            commands::index_failures,
+            commands::retry_failed_jobs,
             commands::ui_preferences,
             commands::set_ui_preferences,
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("Filmstrip failed to start");
+
+    app.run(|app, event| {
+        if let RunEvent::Exit = event
+            && let Some(state) = app.try_state::<commands::AppState>()
+        {
+            state.queue.stop();
+        }
+    });
 }

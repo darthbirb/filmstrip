@@ -1,9 +1,9 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import type { FolderNode } from "../ipc/bindings/FolderNode";
 import type { ItemRow } from "../ipc/bindings/ItemRow";
+import type { Progress } from "../ipc/bindings/Progress";
 import type { SourceKind } from "../ipc/bindings/SourceKind";
 import type { SourceSummary } from "../ipc/bindings/SourceSummary";
-import type { WalkReport } from "../ipc/bindings/WalkReport";
 import type { AppError } from "../ipc/commands";
 
 // A small library for the dev server and component tests, typed by the Rust bindings so it
@@ -54,6 +54,7 @@ function items(folderId: number, names: string[]): ItemRow[] {
       height: 3000,
       durationMs: video ? 12_000 : null,
       favorite: false,
+      thumb: null,
     };
   });
 }
@@ -93,7 +94,17 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   folder_children: ({ folderId }) => FOLDERS[folderId as number] ?? [],
   folder_items: ({ folderId }) => ITEMS[folderId as number] ?? [],
   item_tags: () => [],
-  reconcile: (): WalkReport => ({ unchanged: 15, indexed: 0, itemsRetired: 0, foldersRetired: 0 }),
+  sorting_items: () => ITEMS[2] ?? [],
+  start_index: () => null,
+  index_progress: (): Progress => ({
+    phase: "idle",
+    pending: 0,
+    running: 0,
+    failed: 0,
+    completed: 0,
+  }),
+  index_failures: () => [],
+  retry_failed_jobs: () => 0,
 };
 
 mockWindows("main");

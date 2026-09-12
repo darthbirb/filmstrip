@@ -1,18 +1,19 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import type { EffectiveTag } from "./bindings/EffectiveTag";
+import type { Failure } from "./bindings/Failure";
 import type { FolderNode } from "./bindings/FolderNode";
 import type { ItemRow } from "./bindings/ItemRow";
+import type { Progress } from "./bindings/Progress";
 import type { Source } from "./bindings/Source";
 import type { SourceKind } from "./bindings/SourceKind";
 import type { SourceSummary } from "./bindings/SourceSummary";
-import type { WalkReport } from "./bindings/WalkReport";
 
 // One wrapper per Rust command, each typed invoke on one line: a Rust test reads this file.
 // DEVELOPMENT.md "The command boundary".
 
 /** What a failed command rejects with; `kind` mirrors `AppError::kind` in Rust. */
-export type AppError = { kind: "io" | "db" | "json" | "invalid"; message: string };
+export type AppError = { kind: "io" | "db" | "json" | "invalid" | "media"; message: string };
 
 export const listSources = () => invoke<SourceSummary[]>("list_sources");
 
@@ -28,7 +29,15 @@ export const folderItems = (folderId: number) => invoke<ItemRow[]>("folder_items
 
 export const itemTags = (itemId: number) => invoke<EffectiveTag[]>("item_tags", { itemId });
 
-export const reconcile = () => invoke<WalkReport>("reconcile");
+export const sortingItems = () => invoke<ItemRow[]>("sorting_items");
+
+export const startIndex = () => invoke<void>("start_index");
+
+export const indexProgress = () => invoke<Progress>("index_progress");
+
+export const indexFailures = () => invoke<Failure[]>("index_failures");
+
+export const retryFailedJobs = () => invoke<number>("retry_failed_jobs");
 
 export const uiPreferences = () => invoke<unknown>("ui_preferences");
 

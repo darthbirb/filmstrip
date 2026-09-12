@@ -144,6 +144,8 @@ pub struct ItemRow {
     pub height: Option<i64>,
     pub duration_ms: Option<i64>,
     pub favorite: bool,
+    /// The thumbnail's path, once one has been made.
+    pub thumb: Option<String>,
 }
 
 /// The live items directly in a folder, by name whatever the case.
@@ -170,6 +172,7 @@ pub fn in_folder(conn: &Connection, folder_id: i64) -> Result<Vec<ItemRow>> {
                 height: r.get(9)?,
                 duration_ms: r.get(10)?,
                 favorite: r.get(11)?,
+                thumb: None,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
@@ -241,6 +244,80 @@ pub fn finish_sweep(conn: &Connection, source_id: i64) -> Result<usize> {
     )?;
     conn.execute_batch("DROP TABLE IF EXISTS temp.seen;")?;
     Ok(gone)
+}
+
+/// The live items in every sorting source, which the Sorting Box shows as one place.
+pub fn in_sorting(conn: &Connection) -> Result<Vec<ItemRow>> {
+    let mut stmt = conn.prepare(
+        "SELECT i.id, i.uuid, i.folder_id, i.disk_name, i.ext, i.kind, i.size_bytes, i.mtime,
+                i.width, i.height, i.duration_ms, i.favorite
+           FROM item i
+           JOIN source s ON s.id = i.source_id
+          WHERE s.kind = 'sorting' AND i.deleted_at IS NULL
+          ORDER BY i.disk_name COLLATE NOCASE",
+    )?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok(ItemRow {
+                id: r.get(0)?,
+                uuid: r.get(1)?,
+                folder_id: r.get(2)?,
+                disk_name: r.get(3)?,
+                ext: r.get(4)?,
+                kind: r.get(5)?,
+                size_bytes: r.get(6)?,
+                mtime: r.get(7)?,
+                width: r.get(8)?,
+                height: r.get(9)?,
+                duration_ms: r.get(10)?,
+                favorite: r.get(11)?,
+                thumb: None,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(rows)
+}
+
+/// Where an item's file is, and the uuid its thumbnail is named by.
+#[derive(Debug, Clone)]
+pub struct ItemFile {
+    pub folder_id: i64,
+    pub disk_name: String,
+    pub uuid: String,
+}
+
+pub fn file_of(conn: &Connection, id: i64) -> Result<Option<ItemFile>> {
+    Ok(conn
+        .query_row(
+            "SELECT folder_id, disk_name, uuid FROM item WHERE id = ?1",
+            params![id],
+            |r| {
+                Ok(ItemFile {
+                    folder_id: r.get(0)?,
+                    disk_name: r.get(1)?,
+                    uuid: r.get(2)?,
+                })
+            },
+        )
+        .optional()?)
+}
+
+pub fn set_dimensions(conn: &Connection, id: i64, width: i64, height: i64) -> Result<()> {
+    conn.execute(
+        "UPDATE item SET width = ?1, height = ?2 WHERE id = ?3",
+        params![width, height, id],
+    )?;
+    Ok(())
+}
+
+/// Every live image, with the uuid its thumbnail is named by.
+pub fn live_images(conn: &Connection) -> Result<Vec<(i64, String)>> {
+    let mut stmt =
+        conn.prepare("SELECT id, uuid FROM item WHERE kind = 'image' AND deleted_at IS NULL")?;
+    let rows = stmt
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(rows)
 }
 
 #[cfg(test)]
@@ -377,6 +454,24 @@ mod tests {
             source_id, archive.id,
             "derived from the new folder, not carried over"
         );
+    }
+
+    #[test]
+    fn the_sorting_box_lists_every_sorting_source_and_no_library() {
+        let (conn, library_root) = library();
+        upsert(&conn, &sample(1, library_root, "kept.jpg")).unwrap();
+        for (root, name) in [("D:/incoming", "b.jpg"), ("D:/camera", "a.jpg")] {
+            let source = sources::add(&conn, Path::new(root), root, SourceKind::Sorting).unwrap();
+            let folder = folders::source_root_folder(&conn, source.id).unwrap();
+            upsert(&conn, &sample(source.id, folder, name)).unwrap();
+        }
+
+        let names: Vec<_> = in_sorting(&conn)
+            .unwrap()
+            .into_iter()
+            .map(|item| item.disk_name)
+            .collect();
+        assert_eq!(names, ["a.jpg", "b.jpg"]);
     }
 
     /// A walk reads one root, so it can only speak for that root. Sweeping the

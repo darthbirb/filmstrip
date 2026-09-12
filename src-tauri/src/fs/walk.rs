@@ -109,7 +109,7 @@ pub fn mirror(
 
 enum Outcome {
     Unchanged,
-    Indexed,
+    Indexed { id: i64, kind: &'static str },
 }
 
 fn record_file(conn: &Connection, file: &Path, folder_id: i64, source_id: i64) -> Result<Outcome> {
@@ -122,11 +122,13 @@ fn record_file(conn: &Connection, file: &Path, folder_id: i64, source_id: i64) -
     let size = meta.len() as i64;
     let mtime = mtime_secs(&meta);
 
-    if let Some(existing) = items::existing_by_disk_name(conn, folder_id, &name)? {
-        if !existing.deleted && existing.size_bytes == size && existing.mtime == mtime {
-            items::mark_seen(conn, &existing.uuid)?;
-            return Ok(Outcome::Unchanged);
-        }
+    if let Some(existing) = items::existing_by_disk_name(conn, folder_id, &name)?
+        && !existing.deleted
+        && existing.size_bytes == size
+        && existing.mtime == mtime
+    {
+        items::mark_seen(conn, &existing.uuid)?;
+        return Ok(Outcome::Unchanged);
     }
 
     let ext = paths::extension_of(&name);
@@ -160,11 +162,19 @@ fn record_file(conn: &Connection, file: &Path, folder_id: i64, source_id: i64) -
         |r| r.get(0),
     )?;
     items::mark_seen(conn, &uuid)?;
-    Ok(Outcome::Indexed)
+    Ok(Outcome::Indexed {
+        id,
+        kind: kind_of(&ext),
+    })
 }
 
 /// Brings the index back in line with what is on disk.
 pub fn reconcile(conn: &Connection) -> Result<WalkReport> {
+    reconcile_with(conn, &mut |_, _| {})
+}
+
+/// As `reconcile`, telling `indexed` about every file it recorded or refreshed, and its kind.
+pub fn reconcile_with(conn: &Connection, indexed: &mut dyn FnMut(i64, &str)) -> Result<WalkReport> {
     let mut report = WalkReport::default();
     let mut walked: Vec<i64> = Vec::new();
 
@@ -183,7 +193,10 @@ pub fn reconcile(conn: &Connection) -> Result<WalkReport> {
             };
             match record_file(conn, &file, folder_id, source.id) {
                 Ok(Outcome::Unchanged) => report.unchanged += 1,
-                Ok(Outcome::Indexed) => report.indexed += 1,
+                Ok(Outcome::Indexed { id, kind }) => {
+                    report.indexed += 1;
+                    indexed(id, kind);
+                }
                 Err(err) => eprintln!("could not index {}: {err}", file.display()),
             }
         }

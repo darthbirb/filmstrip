@@ -3,6 +3,7 @@
 
 pub mod folders;
 pub mod items;
+pub mod jobs;
 pub mod sources;
 pub mod tags;
 
@@ -14,7 +15,10 @@ use rusqlite::Connection;
 use crate::error::Result;
 
 /// Applied in order, never edited once shipped.
-const MIGRATIONS: &[(i64, &str)] = &[(1, include_str!("migrations/001_initial.sql"))];
+const MIGRATIONS: &[(i64, &str)] = &[
+    (1, include_str!("migrations/001_initial.sql")),
+    (2, include_str!("migrations/002_jobs.sql")),
+];
 
 /// A connection with the app's pragmas. One per thread: WAL allows one writer
 /// beside any number of readers.
@@ -95,7 +99,7 @@ mod tests {
         let applied: i64 = conn
             .query_row("SELECT COUNT(*) FROM schema_version", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(applied, 1);
+        assert_eq!(applied, MIGRATIONS.len() as i64);
     }
 
     #[test]
