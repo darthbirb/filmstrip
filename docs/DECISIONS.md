@@ -166,6 +166,21 @@ between sessions.
 **Where you are shows as a breadcrumb** in the grid's header, and every step above the last goes
 back to that folder.
 
+## The grid
+
+**Two layouts, and the user chooses**, decided on 13 September 2026 after comparing both live:
+justified rows, where every picture keeps its shape and each row runs edge to edge, and uniform
+squares, cropped to fill. Rows are the default. Whether the choice ends up as an always-visible
+toggle or a setting is open; until then it sits in the grid's header beside the tile size.
+
+**Only the rows near the view are drawn**, a screen's height above and below, so a folder of
+thousands scrolls like one of ten. The layout is computed off the main thread, and every grid on
+a page numbers its requests from one counter, so two grids never take each other's layout. The
+layout and the tile size are kept with the other preferences.
+
+**A picture without a thumbnail yet lays out square**, and takes its real shape once the
+thumbnail job has read its size.
+
 ## Testing in a real browser, never jsdom
 
 jsdom reports every element as zero-sized, so anything about size, overflow, position or

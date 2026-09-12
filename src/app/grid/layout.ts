@@ -3,6 +3,8 @@
 
 export type LayoutMode = "justified" | "uniform";
 
+export const DEFAULT_LAYOUT: LayoutMode = "justified";
+
 export type LayoutRequest = {
   id: number;
   mode: LayoutMode;

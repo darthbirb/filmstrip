@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 
 import { setUiPreferences, uiPreferences } from "../ipc/commands";
+import type { LayoutMode } from "./grid/layout";
 
 // The interface's own preferences, kept in filmstrip.config.json. DECISIONS.md "The interface size".
 export type Preferences = {
@@ -9,6 +10,8 @@ export type Preferences = {
   hidden?: { nav: boolean; pane: boolean };
   /** The grid's tile size, in rem. */
   tile?: number;
+  /** The grid's layout: rows that keep each picture's shape, or squares. */
+  layout?: LayoutMode;
 };
 
 /** The interface sizes Ctrl+= and Ctrl+- step through; 1 is the root size Windows gives. */
@@ -74,7 +77,7 @@ function applyScale() {
 
 function validated(value: unknown): Partial<Preferences> {
   if (typeof value !== "object" || value === null) return {};
-  const { scale, widths, hidden, tile } = value as Record<string, unknown>;
+  const { scale, widths, hidden, tile, layout } = value as Record<string, unknown>;
   const valid: Partial<Preferences> = {};
   if (typeof scale === "number" && SCALES.includes(scale)) valid.scale = scale;
   const savedWidths = pair<number>(widths, "number");
@@ -82,6 +85,7 @@ function validated(value: unknown): Partial<Preferences> {
   const savedHidden = pair<boolean>(hidden, "boolean");
   if (savedHidden) valid.hidden = savedHidden;
   if (typeof tile === "number" && Number.isFinite(tile) && tile > 0) valid.tile = tile;
+  if (layout === "justified" || layout === "uniform") valid.layout = layout;
   return valid;
 }
 

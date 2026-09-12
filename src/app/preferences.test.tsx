@@ -47,12 +47,21 @@ test("the size stops at its smallest and largest steps", async () => {
 });
 
 test("saved preferences come back, and anything malformed falls back to the defaults", async () => {
-  stored = { scale: 1.25, widths: { nav: 18, pane: 22 }, hidden: { nav: false, pane: true } };
+  stored = {
+    scale: 1.25,
+    widths: { nav: 18, pane: 22 },
+    hidden: { nav: false, pane: true },
+    layout: "uniform",
+  };
   await loadPreferences();
-  expect(getPreferences()).toMatchObject({ scale: 1.25, widths: { nav: 18, pane: 22 } });
+  expect(getPreferences()).toMatchObject({
+    scale: 1.25,
+    widths: { nav: 18, pane: 22 },
+    layout: "uniform",
+  });
   expect(document.documentElement.style.fontSize).toBe("125%");
 
-  stored = { scale: 7, widths: { nav: "wide" }, hidden: "yes" };
+  stored = { scale: 7, widths: { nav: "wide" }, hidden: "yes", layout: "masonry" };
   await loadPreferences();
   expect(getPreferences()).toEqual({ scale: 1 });
 });
