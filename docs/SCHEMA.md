@@ -18,6 +18,7 @@ The schema lives in `src-tauri/src/db/migrations/`. There is one migration today
 | `item_tag` | Tags an item carries itself. |
 | `item_effective_tag` | Everything an item carries once inheritance is resolved. |
 | `setting` | Key-value pairs. |
+| `job` | Background work: waiting, running, or failed with its error. |
 
 ## Where things live on disk
 
@@ -65,5 +66,5 @@ The schema lives in `src-tauri/src/db/migrations/`. There is one migration today
 
 ## Not here yet
 
-Search indexes, background jobs, the undo journal and destination hotkeys each arrive as a new
-migration alongside the feature that uses them.
+Search indexes, the undo journal and destination hotkeys each arrive as a new migration
+alongside the feature that uses them.

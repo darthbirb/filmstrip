@@ -7,6 +7,8 @@ export type Preferences = {
   scale: number;
   widths?: { nav: number; pane: number };
   hidden?: { nav: boolean; pane: boolean };
+  /** The grid's tile size, in rem. */
+  tile?: number;
 };
 
 /** The interface sizes Ctrl+= and Ctrl+- step through; 1 is the root size Windows gives. */
@@ -72,13 +74,14 @@ function applyScale() {
 
 function validated(value: unknown): Partial<Preferences> {
   if (typeof value !== "object" || value === null) return {};
-  const { scale, widths, hidden } = value as Record<string, unknown>;
+  const { scale, widths, hidden, tile } = value as Record<string, unknown>;
   const valid: Partial<Preferences> = {};
   if (typeof scale === "number" && SCALES.includes(scale)) valid.scale = scale;
   const savedWidths = pair<number>(widths, "number");
   if (savedWidths) valid.widths = savedWidths;
   const savedHidden = pair<boolean>(hidden, "boolean");
   if (savedHidden) valid.hidden = savedHidden;
+  if (typeof tile === "number" && Number.isFinite(tile) && tile > 0) valid.tile = tile;
   return valid;
 }
 

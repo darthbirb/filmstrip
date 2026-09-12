@@ -16,6 +16,9 @@ pub enum AppError {
 
     #[error("{0}")]
     Invalid(String),
+
+    #[error("{0}")]
+    Media(String),
 }
 
 impl AppError {
@@ -25,6 +28,7 @@ impl AppError {
             AppError::Db(_) => "db",
             AppError::Json(_) => "json",
             AppError::Invalid(_) => "invalid",
+            AppError::Media(_) => "media",
         }
     }
 
@@ -40,6 +44,12 @@ impl serde::Serialize for AppError {
         st.serialize_field("kind", self.kind())?;
         st.serialize_field("message", &self.to_string())?;
         st.end()
+    }
+}
+
+impl From<image::ImageError> for AppError {
+    fn from(e: image::ImageError) -> Self {
+        AppError::Media(e.to_string())
     }
 }
 

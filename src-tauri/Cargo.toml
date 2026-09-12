@@ -5,7 +5,7 @@ description = "A gallery viewer and collection organiser for Windows."
 license = "GPL-3.0-or-later"
 repository = "https://github.com/darthbirb/filmstrip"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 
 [[bin]]
 name = "Filmstrip"
@@ -19,7 +19,7 @@ crate-type = ["rlib"]
 tauri-build = { version = "2.6", features = [] }
 
 [dependencies]
-tauri = { version = "2.11", features = [] }
+tauri = { version = "2.11", features = ["protocol-asset"] }
 rusqlite = { version = "0.40", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -27,6 +27,8 @@ thiserror = "2"
 uuid = { version = "1", features = ["v4"] }
 walkdir = "2"
 ts-rs = "12.0.1"
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "tiff"] }
+webp = { version = "0.3.1", default-features = false }
 
 [profile.release]
 opt-level = 3

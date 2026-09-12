@@ -76,6 +76,29 @@ speak for that root's files and folders.
 A file whose size and modification time match its row is not opened again. That is the common
 case, and what keeps walking an unchanged library cheap.
 
+## Background work
+
+**Anything slower than a moment runs on the job queue**, never inside a command: a walk, a
+thumbnail. A command returns at once; worker threads, one per core but one and between two and
+eight, each with its own connection, claim jobs from the `job` table in priority order. A walk
+is queued at every launch.
+
+**The table outlives the app.** A job that succeeds is deleted. One that fails is retried once
+if the failure might pass — a locked file, a busy database — and otherwise kept with its error
+for the failure list. One left running at shutdown goes back to waiting at the next launch. A
+decoder that panics on one file fails that job and nothing else.
+
+**Progress is pushed**, one `job-progress` event per half second and only when something
+changed, so a queue that empties within a tick still says so.
+
+## Thumbnails
+
+**320px on the longest edge, lossy WebP at quality 78**, as measured in ggallery: AVIF encoded
+41 times slower for a 12% saving. A picture is decoded by what the file holds, never by its
+extension; turned upright by its EXIF orientation; and keeps its transparency. A thumbnail is
+named by the item's uuid, so a rename or a move never orphans one, and making it is where an
+image's width and height are learned.
+
 ## The window
 
 Native decorations are off, so the app draws its own chrome. WebView2's own zoom stays off:

@@ -3,4 +3,8 @@
 /**
  * An item as the grid lists it.
  */
-export type ItemRow = { id: number, uuid: string, folderId: number, diskName: string, ext: string, kind: "image" | "video" | "other", sizeBytes: number, mtime: number, width: number | null, height: number | null, durationMs: number | null, favorite: boolean, };
+export type ItemRow = { id: number, uuid: string, folderId: number, diskName: string, ext: string, kind: "image" | "video" | "other", sizeBytes: number, mtime: number, width: number | null, height: number | null, durationMs: number | null, favorite: boolean, 
+/**
+ * The thumbnail's path, once one has been made.
+ */
+thumb: string | null, };

@@ -5,19 +5,22 @@ use std::path::{Component, Path, PathBuf};
 
 use rusqlite::Connection;
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, Manager, State};
 use ts_rs::TS;
 
 use crate::db::folders::{self, FolderNode};
 use crate::db::items::{self, ItemRow};
+use crate::db::jobs::{self as job_table, Failure};
 use crate::db::sources::{self, Source, SourceKind};
 use crate::db::tags::{self, EffectiveTag};
 use crate::error::{AppError, Result};
 use crate::fs::paths;
-use crate::fs::walk::{self, WalkReport};
+use crate::jobs::{self, JobQueue, Progress};
 
 pub struct AppState {
     pub db: PathBuf,
+    pub thumbs: PathBuf,
+    pub queue: JobQueue,
 }
 
 /// A source as the navigation and Settings show it.
@@ -41,18 +44,22 @@ pub async fn list_sources(state: State<'_, AppState>) -> Result<Vec<SourceSummar
 
 #[tauri::command]
 pub async fn add_source(
+    app: AppHandle,
     state: State<'_, AppState>,
     root: String,
     kind: SourceKind,
     title: Option<String>,
 ) -> Result<Source> {
     let app_dir = crate::config::app_dir()?;
-    run(&state, move |conn| {
+    let source = run(&state, move |conn| {
         in_transaction(conn, |tx| {
             register_source(tx, &root, kind, title.as_deref(), &app_dir)
         })
     })
-    .await
+    .await?;
+    app.asset_protocol_scope()
+        .allow_directory(&source.root, true)?;
+    Ok(source)
 }
 
 #[tauri::command]
@@ -73,7 +80,20 @@ pub async fn folder_children(
 
 #[tauri::command]
 pub async fn folder_items(state: State<'_, AppState>, folder_id: i64) -> Result<Vec<ItemRow>> {
-    run(&state, move |conn| items::in_folder(conn, folder_id)).await
+    let thumbs = state.thumbs.clone();
+    run(&state, move |conn| {
+        Ok(with_thumbnails(items::in_folder(conn, folder_id)?, &thumbs))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn sorting_items(state: State<'_, AppState>) -> Result<Vec<ItemRow>> {
+    let thumbs = state.thumbs.clone();
+    run(&state, move |conn| {
+        Ok(with_thumbnails(items::in_sorting(conn)?, &thumbs))
+    })
+    .await
 }
 
 #[tauri::command]
@@ -81,9 +101,25 @@ pub async fn item_tags(state: State<'_, AppState>, item_id: i64) -> Result<Vec<E
     run(&state, move |conn| tags::item_effective_tags(conn, item_id)).await
 }
 
+/// Queues a walk of every source; asking again while one waits or runs does nothing.
 #[tauri::command]
-pub async fn reconcile(state: State<'_, AppState>) -> Result<WalkReport> {
-    run(&state, walk::reconcile).await
+pub async fn start_index(state: State<'_, AppState>) -> Result<()> {
+    run(&state, jobs::enqueue_index).await
+}
+
+#[tauri::command]
+pub async fn index_progress(state: State<'_, AppState>) -> Result<Progress> {
+    state.queue.progress()
+}
+
+#[tauri::command]
+pub async fn index_failures(state: State<'_, AppState>) -> Result<Vec<Failure>> {
+    run(&state, job_table::failures).await
+}
+
+#[tauri::command]
+pub async fn retry_failed_jobs(state: State<'_, AppState>) -> Result<usize> {
+    run(&state, job_table::retry_failed).await
 }
 
 #[tauri::command]
@@ -110,6 +146,17 @@ fn in_transaction<T>(conn: &Connection, work: impl FnOnce(&Connection) -> Result
     let out = work(&tx)?;
     tx.commit()?;
     Ok(out)
+}
+
+/// Fills in the thumbnail path on each row whose thumbnail has been made.
+pub fn with_thumbnails(mut rows: Vec<ItemRow>, thumbs: &Path) -> Vec<ItemRow> {
+    for row in &mut rows {
+        let path = thumbs.join(paths::thumb_rel(&row.uuid));
+        if path.is_file() {
+            row.thumb = Some(path.to_string_lossy().into_owned());
+        }
+    }
+    rows
 }
 
 pub fn source_summaries(conn: &Connection) -> Result<Vec<SourceSummary>> {
@@ -185,6 +232,7 @@ fn checked_root(conn: &Connection, raw: &str, app_dir: &Path) -> Result<PathBuf>
 mod tests {
     use super::*;
     use crate::db;
+    use crate::fs::walk;
     use std::collections::BTreeSet;
 
     fn scratch(name: &str) -> PathBuf {
@@ -324,6 +372,36 @@ mod tests {
         assert_eq!(summary.item_count, 1, "what it held is still indexed");
     }
 
+    #[test]
+    fn a_row_carries_its_thumbnail_only_once_one_has_been_made() {
+        let thumbs = scratch("thumbnails").join("thumbs");
+        let row = |uuid: &str| ItemRow {
+            id: 1,
+            uuid: uuid.into(),
+            folder_id: 1,
+            disk_name: "a.jpg".into(),
+            ext: "jpg".into(),
+            kind: "image".into(),
+            size_bytes: 1,
+            mtime: 0,
+            width: None,
+            height: None,
+            duration_ms: None,
+            favorite: false,
+            thumb: None,
+        };
+        let made = thumbs.join(paths::thumb_rel("abcdef12"));
+        std::fs::create_dir_all(made.parent().unwrap()).unwrap();
+        std::fs::write(&made, "webp").unwrap();
+
+        let rows = with_thumbnails(vec![row("abcdef12"), row("99887766")], &thumbs);
+        assert_eq!(
+            rows[0].thumb.as_deref(),
+            Some(made.to_string_lossy().as_ref())
+        );
+        assert_eq!(rows[1].thumb, None);
+    }
+
     /// Tauri finds a command by name and an argument by its camelCase key, and
     /// nothing checks either until a call fails at runtime.
     #[test]
@@ -368,7 +446,7 @@ mod tests {
                     .split(',')
                     .filter_map(|param| param.split_once(':'))
                     .map(|(arg, _)| arg.trim().to_string())
-                    .filter(|arg| arg != "state")
+                    .filter(|arg| arg != "state" && arg != "app")
                     .collect();
                 (name.trim().to_string(), args)
             })

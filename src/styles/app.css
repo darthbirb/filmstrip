@@ -32,6 +32,7 @@
   --spacing-row: 2rem;
   --spacing-indent: 1rem;
   --spacing-chevron: 1rem;
+  --spacing-tile-gap: 0.25rem;
 
   --shadow-overlay: 0 0.5rem 2rem oklch(0 0 0 / 0.5);
 
@@ -58,6 +59,11 @@
   --frame-pane-min: 14rem;
   --frame-pane-max: 40rem;
   --frame-grid-min: 20rem;
+
+  /* Tile sizes the grid's size control allows, in rem. */
+  --tile-min: 6rem;
+  --tile-max: 20rem;
+  --tile-default: 10rem;
 }
 
 @utility focus-ring {
