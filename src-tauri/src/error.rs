@@ -2,9 +2,7 @@ use std::fmt;
 
 pub type Result<T> = std::result::Result<T, AppError>;
 
-/// Everything that can go wrong, in one enum. It serialises as
-/// `{ kind, message }` so the frontend can branch on `kind` without reading
-/// prose. New variants are added when the code that needs them lands.
+/// Serialises as `{ kind, message }`, so the frontend branches on `kind`.
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
     #[error("{0}")]

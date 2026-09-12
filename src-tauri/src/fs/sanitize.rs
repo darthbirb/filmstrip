@@ -1,6 +1,5 @@
-//! Names that a filesystem will actually accept. A folder title and an item's
-//! `disk_name` are real names on disk, so the filesystem's rules are the
-//! app's rules.
+//! Names a filesystem will accept. A folder title and a `disk_name` are real
+//! names on disk, so Windows' rules are the app's rules.
 
 /// What Windows refuses in a path component, plus the control range. NTFS
 /// rejects both, and neither belongs in a name typed or arriving from outside.
@@ -13,15 +12,12 @@ const RESERVED: &[&str] = &[
     "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
 ];
 
-/// NTFS's own per-component limit. The 260-character whole-path limit cannot
-/// be enforced here — this has no idea how deep the destination sits — so
-/// components are capped at the tighter filesystem bound.
+/// NTFS's per-component limit. The 260-character path limit depends on depth,
+/// which is unknown here.
 const MAX_COMPONENT_LEN: usize = 255;
 
-/// One component — a folder title or a file's stem — with what the filesystem
-/// refuses removed, trailing dots and spaces trimmed, a reserved device name
-/// suffixed, and a length cap. Something that sanitises away to nothing
-/// becomes `fallback`, because no filesystem accepts an empty name.
+/// One component with what Windows refuses removed, trailing dots and spaces
+/// trimmed, a reserved name suffixed and the length capped. Empty becomes `fallback`.
 fn component(raw: &str, fallback: &str) -> String {
     let mut cleaned: String = raw
         .chars()
@@ -65,9 +61,7 @@ pub fn file_name(raw: &str) -> String {
     }
 }
 
-/// Appends " (2)", " (3)"… before the extension until `taken` says the
-/// candidate is free. One policy for a colliding folder title and a colliding
-/// file name alike.
+/// Appends " (2)", " (3)"… before the extension until `taken` says it is free.
 pub fn suffix_until_free(base: &str, mut taken: impl FnMut(&str) -> bool) -> String {
     if !taken(base) {
         return base.to_string();

@@ -1,11 +1,5 @@
-//! Tags, labels, and what an item ends up carrying once inheritance is
-//! resolved.
-//!
-//! A **tag** is a word. A **label** is a key and a value, and belongs to a
-//! folder only — PRODUCT.md "Tags and labels". Values are folded on the way
-//! in, so `Beach` and `beach` cannot become two terms splitting one set of
-//! items; a folder's title keeps its case, and the tag derived from it is
-//! what gets folded.
+//! Tags, labels, and what an item carries once inheritance is resolved.
+//! PRODUCT.md "Tags and labels"; the rules the data keeps are in SCHEMA.md.
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
@@ -123,9 +117,7 @@ pub fn ancestor_tags(conn: &Connection, folder_id: i64) -> Result<Vec<(i64, i64)
         .collect::<rusqlite::Result<_>>()?)
 }
 
-/// Recomputes what one item carries: everything inherited from its ancestry,
-/// plus its own tags. `origin_id` is the folder a tag came from, or NULL when
-/// the item owns it.
+/// Recomputes what one item carries: its ancestry's tags, then its own.
 pub fn rebuild_item(conn: &Connection, item_id: i64) -> Result<()> {
     let folder_id: i64 = conn.query_row(
         "SELECT folder_id FROM item WHERE id = ?1",

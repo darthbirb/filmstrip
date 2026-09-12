@@ -1,25 +1,6 @@
-//! Reading a source's directory tree into the index.
-//!
-//! Every source is a real tree the database only describes, so reconciling is
-//! a walk. Per source it:
-//!
-//! 1. **Mirrors directories into folders.** A real directory with no record
-//!    becomes one; a directory that already has a record is reused.
-//! 2. **Records every file it finds.** A file whose row already matches by
-//!    size and modification time is left alone, which is the common case.
-//! 3. **Retires what it never found** — items first, then folders whose
-//!    directory is gone.
-//!
-//! **Only sources it could actually read.** An unplugged drive is skipped
-//! entirely: nothing under it can be confirmed, and reading "the directory is
-//! not there" as "everything in it was deleted" would empty the index for a
-//! source that is merely unavailable.
-//!
-//! **What this cannot do yet.** A directory renamed while the app was closed
-//! reads as one folder gone and another arrived, so its items are indexed
-//! afresh and lose their tags. Pairing the two needs content hashes to
-//! recognise the same files in a new place. See
-//! DECISIONS.md "Renames made while the app was closed".
+//! Reads each source's tree into the index and retires what it did not find.
+//! DECISIONS.md "A walk only judges what it read".
+//! Gap: DECISIONS.md "Renames made while the app was closed".
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -78,16 +59,8 @@ fn is_hidden(entry: &walkdir::DirEntry) -> bool {
     entry.file_name().to_string_lossy().starts_with('.')
 }
 
-/// Turns a source's directories into folder records and collects its files.
-///
-/// The source's own folder is seeded as the root, so a file lying directly in
-/// the source root belongs to it rather than to nothing. Parents always come
-/// before their children, so a directory's parent is always already known.
-///
-/// Skips hidden entries and the app's own directory — nothing app-owned lives
-/// inside a source, but a carelessly chosen root could still contain it, and
-/// indexing the database as library content is the one mistake worth guarding
-/// against outright.
+/// Mirrors a source's directories into folders and collects its files. Skips
+/// hidden entries, and the app's own directory should a root contain it.
 pub fn mirror(
     conn: &Connection,
     source_root: &Path,
@@ -220,9 +193,7 @@ pub fn reconcile(conn: &Connection) -> Result<WalkReport> {
     Ok(report)
 }
 
-/// Soft-deletes folders whose directory is gone — **only within sources this
-/// pass actually read**. A source that was skipped as unreachable keeps every
-/// folder it has.
+/// Retires folders whose directory is gone, **only in sources this pass read**.
 fn retire_vanished_folders(conn: &Connection, walked: &[i64]) -> Result<i64> {
     if walked.is_empty() {
         return Ok(0);

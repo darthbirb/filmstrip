@@ -21,7 +21,8 @@ version through `npx`:
 | `npx --yes pnpm@12.4.1 check` | TypeScript |
 | `npx --yes pnpm@12.4.1 test` | component tests |
 | `npx --yes pnpm@12.4.1 test:e2e` | end-to-end tests |
-| `cargo check --manifest-path src-tauri/Cargo.toml` | the Rust gate |
+| `npx --yes pnpm@12.4.1 check:docs` | doc pointers resolve, comments stay short |
+| `cargo test --manifest-path src-tauri/Cargo.toml` | the Rust gate; CI adds fmt and clippy |
 
 ## Ports
 
@@ -48,9 +49,13 @@ Three ways, cheapest first.
 
 ## Tests
 
+- **A change in behaviour lands with a test that fails without it**, and a bug fix starts with
+  the test that reproduces it. CI runs every suite below on each pull request.
+- **Rust** is tested beside the code, in `#[cfg(test)]` modules. A test that needs real files
+  writes them under `src-tauri/target/`, never outside the repository.
 - **Component tests** run in Vitest's browser mode on Edge (`channel: "msedge"`), over
-  `src/**/*.test.tsx`. **Never jsdom** — see DECISIONS.md "Testing in a real browser, never
-  jsdom".
+  `src/**/*.test.tsx`. **Never jsdom** — see
+  DECISIONS.md "Testing in a real browser, never jsdom".
 - **End-to-end tests** run in Playwright over `tests/e2e`, against the dev server on 1422.
   Screenshots land in `test-results/`, which is git-ignored.
 - **A check proves something at more than one size.** Sweep widths, and fail on any console
@@ -83,14 +88,14 @@ something has to move and close the window. The window-bar slice deletes it.
 
 ## Keeping the docs true
 
-Comments in the source cite headings in this file and in DECISIONS.md **by exact title**.
-Renaming a heading orphans every one of them and nothing fails, so rename and fix the callers
-in the same commit. **Keep each pointer on one line** — a title wrapped across a line break
-is invisible to this search. To find them:
+Comments cite headings in PRODUCT.md, DECISIONS.md, DEVELOPMENT.md and SCHEMA.md **by exact
+title**, each pointer on one line. Renaming a heading orphans its callers, so rename and fix
+them in the same commit.
 
-```bash
-grep -rn 'DECISIONS.md "\|DEVELOPMENT.md "' src src-tauri
-```
+**A comment runs three lines at most.** What a future edit would break silently stays in the
+source; the reasoning goes in DECISIONS.md, and the comment names the section.
+
+`check:docs` enforces both, over the source and the prose docs, and CI runs it.
 
 ## Gotchas
 
@@ -98,4 +103,7 @@ grep -rn 'DECISIONS.md "\|DEVELOPMENT.md "' src src-tauri
   a different drive from the home folder. A cache, not configuration.
 - **Windows' text-size setting scales all WebView2 content**, the way zoom does. So layouts
   answer to the width they are given, never to a device.
+- **A migration runs with foreign keys off.** SQLite empties a table before dropping it, which
+  fires `ON DELETE CASCADE` on everything referencing it. The pragma cannot change inside a
+  transaction, so `db::migrate` switches it around them rather than in the SQL.
 - **CI compiles Rust from scratch**; there is no build cache yet, which is most of its runtime.

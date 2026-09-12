@@ -1,8 +1,5 @@
-//! `filmstrip.config.json`, beside the executable and nowhere else.
-//!
-//! Sources live in the database. This file holds only what has no other home:
-//! where the window was, and the interface's own preferences.
-//! DECISIONS.md "Nothing outside the app folder".
+//! `filmstrip.config.json`: only what has no home in the database — window
+//! placement and interface preferences. DECISIONS.md "Nothing outside the app folder".
 
 use std::path::PathBuf;
 
@@ -16,9 +13,7 @@ const CONFIG_NAME: &str = "filmstrip.config.json";
 /// trash, WebView2's profile.
 pub const APP_DATA_DIR: &str = "data";
 
-/// Directory the running executable sits in. In development that is
-/// `src-tauri/target/debug`, which is correct — what the app writes belongs
-/// beside whichever binary is running.
+/// Directory of the running executable — `src-tauri/target/debug` in development.
 pub fn app_dir() -> Result<PathBuf> {
     let exe = std::env::current_exe()?;
     exe.parent()
@@ -38,10 +33,8 @@ pub fn config_path() -> Result<PathBuf> {
 #[serde(default, rename_all = "camelCase")]
 pub struct Config {
     pub window: Option<WindowState>,
-    /// Panel widths, folded states, tile size — whatever the interface keeps
-    /// between sessions. Deliberately opaque: the shape belongs to the
-    /// frontend, and nothing in Rust reads inside it, so nothing in Rust
-    /// changes when it grows.
+    /// Whatever the interface keeps between sessions. Opaque on purpose: its
+    /// shape belongs to the frontend, and nothing in Rust reads inside it.
     pub ui: Option<serde_json::Value>,
 }
 

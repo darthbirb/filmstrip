@@ -1,14 +1,8 @@
--- The shape the app has now. Migrations are never edited once shipped; later
--- changes are new numbered files.
+-- Never edited once shipped; later changes are new numbered files.
+-- docs/SCHEMA.md describes these tables and the rules they keep.
 
--- Where a registered root lives on disk. `source.root` is the only absolute
--- path stored anywhere — everything else resolves through folder ancestry.
---
--- `kind` separates the two things a root can be. A **library** source holds
--- what has been organised. A **sorting** source is somewhere incoming files
--- land, and the Sorting Box is every sorting source shown as one surface —
--- DECISIONS.md "Places, not queries". Neither may contain the other, which
--- the application checks before adding one.
+-- `root` is the only absolute path stored anywhere. No root may contain
+-- another; the application checks before inserting.
 CREATE TABLE source (
   id       INTEGER PRIMARY KEY,
   root     TEXT    NOT NULL UNIQUE,
@@ -17,12 +11,8 @@ CREATE TABLE source (
   added_at INTEGER NOT NULL
 );
 
--- A folder is a real directory. Its path is not stored: it is its ancestors'
--- titles joined onto its source's root, derived on every read, so renaming a
--- directory costs one row rather than a subtree of paths.
---
--- `source_id` is set on a source's own root folder and nowhere else; a nested
--- folder's source comes from its ancestry.
+-- A real directory; its path is derived from ancestry, never stored.
+-- `source_id` is set on a source's root folder and nowhere else.
 CREATE TABLE folder (
   id            INTEGER PRIMARY KEY,
   title         TEXT    NOT NULL,
@@ -40,13 +30,8 @@ CREATE TABLE folder (
 CREATE INDEX idx_folder_parent ON folder(parent_id);
 CREATE INDEX idx_folder_status ON folder(status, last_added_at);
 
--- One name per spot. `COLLATE NOCASE` keeps the case a title was typed in
--- while making it insignificant, because Windows will not hold `Ana` and
--- `ana` side by side either. Partial, so a trashed folder never blocks the
--- spot it left.
---
--- Known limit: SQLite's NOCASE folds ASCII only, so `Ä` and `ä` are two
--- names where `A` and `a` are one.
+-- NOCASE because Windows cannot hold `Ana` and `ana` side by side (ASCII only);
+-- partial, so a trashed folder frees its spot.
 CREATE UNIQUE INDEX idx_folder_sibling
     ON folder(parent_id, title COLLATE NOCASE)
  WHERE deleted_at IS NULL;
@@ -57,14 +42,8 @@ CREATE UNIQUE INDEX idx_folder_one_root_per_source
     ON folder(source_id)
  WHERE parent_id IS NULL AND deleted_at IS NULL;
 
--- An item is a real file under its own name. **`folder_id` is not nullable**:
--- everything is somewhere, including whatever is waiting in a sorting source.
---
--- `uuid` is identity and the thumbnail cache key. It does not decide where the
--- file lives — `disk_name` and the folder do.
---
--- `source_id` repeats what the folder's ancestry already implies, so that
--- counting or forgetting a whole source is one query rather than a walk.
+-- A real file. `folder_id` is NOT NULL: everything is somewhere. `uuid` is
+-- identity, never a location; `source_id` must match the folder's ancestry.
 CREATE TABLE item (
   id           INTEGER PRIMARY KEY,
   uuid         TEXT    NOT NULL UNIQUE,
@@ -101,12 +80,8 @@ CREATE INDEX        idx_item_captured ON item(captured_at);
 CREATE INDEX        idx_item_phash    ON item(phash);
 CREATE INDEX        idx_item_favorite ON item(favorite) WHERE favorite = 1;
 
--- One row per distinct term. `key IS NULL` is a tag; a key and a value
--- together are a label, and a label belongs to a folder only — the
--- application enforces that half, since a CHECK cannot see another table.
---
--- Values are stored folded; a folder's title keeps its case and the tag
--- derived from it is what gets folded.
+-- `key IS NULL` is a tag; a key and value together are a label, which only a
+-- folder may carry — enforced in `db::tags`, since a CHECK cannot see items.
 CREATE TABLE tag (
   id    INTEGER PRIMARY KEY,
   key   TEXT,
@@ -133,10 +108,8 @@ CREATE TABLE item_tag (
 );
 CREATE INDEX idx_item_tag_rev ON item_tag(tag_id, item_id);
 
--- What an item actually carries once inheritance is resolved: its own tags
--- plus every ancestor folder's. Maintained as things change rather than
--- computed per query, because reading it is the common case by far.
--- `origin_id` is the folder a tag came from, or NULL when the item owns it.
+-- Resolved inheritance, maintained on write. `origin_id` is the folder a tag
+-- came from, NULL when the item carries it itself.
 CREATE TABLE item_effective_tag (
   item_id   INTEGER NOT NULL REFERENCES item(id) ON DELETE CASCADE,
   tag_id    INTEGER NOT NULL REFERENCES tag(id),

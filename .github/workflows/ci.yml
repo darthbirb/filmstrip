@@ -37,6 +37,9 @@ jobs:
       - name: Lint and format
         run: npx --yes pnpm@12.4.1 lint
 
+      - name: Doc pointers and comment length
+        run: npx --yes pnpm@12.4.1 check:docs
+
       - name: Typecheck
         run: npx --yes pnpm@12.4.1 check
 
@@ -50,7 +53,7 @@ jobs:
         run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
 
       - name: Rust lint
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
 
-      - name: Rust check
-        run: cargo check --manifest-path src-tauri/Cargo.toml
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked

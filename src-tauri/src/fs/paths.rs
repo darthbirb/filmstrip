@@ -1,6 +1,5 @@
-//! The only place that turns database rows into paths on disk. If path
-//! handling appears anywhere else, that is a bug even where it happens to
-//! work.
+//! The only place database rows become paths on disk. Path handling anywhere
+//! else is a bug, even where it works.
 
 use std::path::{Path, PathBuf};
 
@@ -61,9 +60,8 @@ pub fn item_path(conn: &Connection, folder_id: i64, disk_name: &str) -> Result<P
     Ok(folder_dir(conn, folder_id)?.join(disk_name))
 }
 
-/// `<uuid>` → `ab/cd/<uuid>.webp`. Two levels of sharding keep any one
-/// directory to a few hundred entries at a hundred thousand items, which is
-/// where Windows starts to struggle.
+/// `<uuid>` → `ab/cd/<uuid>.webp`: two levels keep any one directory to a few
+/// hundred entries at a hundred thousand items.
 pub fn thumb_rel(uuid: &str) -> String {
     let clean: String = uuid.chars().filter(char::is_ascii_alphanumeric).collect();
     let a = clean.get(0..2).unwrap_or("00");
@@ -71,9 +69,8 @@ pub fn thumb_rel(uuid: &str) -> String {
     format!("{a}/{b}/{uuid}.webp")
 }
 
-/// Whether two paths name the same directory. Windows is case-insensitive and
-/// takes either separator, so `==` would call `D:\Media` and `D:/media\` two
-/// different places and then refuse to open one of them.
+/// Whether two paths name one directory. Windows ignores case and takes either
+/// separator, so `==` cannot answer this.
 pub fn same_dir(a: &Path, b: &Path) -> bool {
     if let (Ok(a), Ok(b)) = (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
         return a == b;

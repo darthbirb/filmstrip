@@ -6,9 +6,8 @@ use rusqlite::{Connection, OptionalExtension, params};
 use crate::db::{now, tags};
 use crate::error::{AppError, Result};
 
-/// Where a folder sits: which source, and the titles between that source's
-/// root and the folder itself. **The source's own root contributes no title**
-/// — it names the root directory, which is already the source's `root` path.
+/// A folder's source, and the titles from that source's root down to it.
+/// **The root folder contributes no title** — it is the source's `root` path.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FolderLocation {
     pub source_id: i64,
@@ -62,9 +61,7 @@ pub fn title(conn: &Connection, id: i64) -> Result<Option<String>> {
         .optional()?)
 }
 
-/// The live child of `parent_id` with this title, case-insensitively — the
-/// same comparison `idx_folder_sibling` uses, so a lookup and the index can
-/// never disagree about what already exists.
+/// The live child with this title, compared exactly as `idx_folder_sibling` compares.
 pub fn child_id(conn: &Connection, parent_id: i64, title: &str) -> Result<Option<i64>> {
     Ok(conn
         .query_row(
@@ -115,9 +112,7 @@ pub fn create(conn: &Connection, parent_id: i64, title: &str) -> Result<i64> {
     Ok(id)
 }
 
-/// Soft-deletes a folder and everything beneath it, returning how many folders
-/// that was. The rows stay, so a restore has something to put back; a trashed
-/// folder frees its spot for a new one of the same name.
+/// Soft-deletes a folder and everything beneath it; returns how many folders.
 pub fn trash_subtree(conn: &Connection, folder_id: i64) -> Result<i64> {
     let count = conn.execute(
         "WITH RECURSIVE subtree(id) AS (

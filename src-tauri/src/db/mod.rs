@@ -16,9 +16,8 @@ use crate::error::Result;
 /// Applied in order, never edited once shipped.
 const MIGRATIONS: &[(i64, &str)] = &[(1, include_str!("migrations/001_initial.sql"))];
 
-/// A connection with the pragmas the whole app assumes. Every thread opens its
-/// own; WAL makes that safe for one writer and any number of readers, and the
-/// busy timeout absorbs the contention between them.
+/// A connection with the app's pragmas. One per thread: WAL allows one writer
+/// beside any number of readers.
 pub fn open(path: &Path) -> Result<Connection> {
     let conn = Connection::open(path)?;
     conn.busy_timeout(Duration::from_secs(20))?;
@@ -32,12 +31,7 @@ pub fn open(path: &Path) -> Result<Connection> {
 }
 
 /// **Foreign keys are off for the duration, and restored on every exit path.**
-/// SQLite gives a dropped table an implicit `DELETE FROM` first, which fires
-/// `ON DELETE CASCADE` on anything referencing it — so a migration that
-/// rebuilds a table silently empties its dependants while enforcement is on.
-/// `PRAGMA foreign_keys` cannot change inside a transaction, which is why it
-/// sits here rather than in the SQL; each migration still gets its own
-/// transaction below.
+/// DEVELOPMENT.md "Gotchas".
 pub fn migrate(conn: &mut Connection) -> Result<()> {
     conn.pragma_update(None, "foreign_keys", "OFF")?;
     let result = migrate_inner(conn);
@@ -75,9 +69,8 @@ pub fn checkpoint(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-/// Case-folded on the way in, so `Beach` and `beach` cannot both exist and
-/// split one tag's items in two. **Folder titles never call this** — a title
-/// is a name, not a vocabulary term, and keeps the case it was typed in.
+/// Folds a tag or label term. **Folder titles never go through this** — a
+/// title keeps the case it was typed in.
 pub fn fold(text: &str) -> String {
     text.to_lowercase()
 }

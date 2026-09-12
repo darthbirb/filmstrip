@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "check": "tsc --noEmit",
+    "check:docs": "node scripts/check-docs.mjs",
     "lint": "biome check .",
     "format": "biome check --write .",
     "test": "vitest run",

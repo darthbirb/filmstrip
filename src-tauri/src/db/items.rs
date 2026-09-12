@@ -9,10 +9,8 @@ use crate::error::Result;
 #[derive(Debug, Clone)]
 pub struct NewItem {
     pub uuid: String,
-    /// What the folder's ancestry already implies. The caller passes it
-    /// because a walk resolves it once per directory rather than once per
-    /// file; [`set_folder`] derives it instead, since that is where the two
-    /// could drift apart.
+    /// Must match the folder's ancestry. [`set_folder`] derives it; other
+    /// writers pass what they already resolved.
     pub source_id: i64,
     pub folder_id: i64,
     pub disk_name: String,
@@ -68,10 +66,8 @@ pub fn existing_by_disk_name(
         .optional()?)
 }
 
-/// Records what is on disk. A file already known at this name keeps its id and
-/// its uuid — and so keeps its tags, its thumbnail and anything else pointing
-/// at it — while its measurements are refreshed. A file seen again after being
-/// trashed comes back.
+/// Records what is on disk. A known name keeps its id and uuid — so its tags
+/// and thumbnail — and a trashed one comes back.
 pub fn upsert(conn: &Connection, item: &NewItem) -> Result<i64> {
     if let Some(found) = existing_by_disk_name(conn, item.folder_id, &item.disk_name)? {
         conn.execute(
@@ -138,9 +134,8 @@ pub fn folder_of(conn: &Connection, id: i64) -> Result<Option<i64>> {
         .optional()?)
 }
 
-/// Moves the row. `source_id` is derived here rather than passed, because a
-/// move across sources is exactly where a stale copy of it would go unnoticed.
-/// The file itself is moved by the caller; this only records where it went.
+/// Records a move; the caller moves the file. `source_id` is derived, never
+/// passed, because a cross-source move is where a stale copy would hide.
 pub fn set_folder(conn: &Connection, id: i64, folder_id: i64, disk_name: &str) -> Result<()> {
     let source_id = folders::location(conn, folder_id)?.source_id;
     conn.execute(
@@ -181,9 +176,8 @@ pub fn mark_seen(conn: &Connection, uuid: &str) -> Result<()> {
     Ok(())
 }
 
-/// Trashes everything in **this source** the sweep did not see, and returns
-/// how many. Scoped to one source deliberately: a walk only ever reads one
-/// root, so it can only speak for that root's files.
+/// Trashes what the sweep did not see, **in this source only**, and returns how
+/// many. DECISIONS.md "A walk only judges what it read".
 pub fn finish_sweep(conn: &Connection, source_id: i64) -> Result<usize> {
     conn.execute_batch("CREATE INDEX IF NOT EXISTS temp.idx_seen ON seen(uuid);")?;
     let gone = conn.execute(
