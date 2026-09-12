@@ -59,3 +59,11 @@
     outline-offset: calc(var(--focus-width) * -1);
   }
 }
+
+/* Thin scrollbars in the token colours, in place of the classic Windows ones with arrow buttons. */
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-fg-muted) transparent;
+  }
+}

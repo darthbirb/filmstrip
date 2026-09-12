@@ -86,3 +86,9 @@ test.each(CANDIDATES)("%s: nothing overflows at any width or text size", async (
     }
   }
 });
+
+test("scrollers use thin scrollbars in the token colours", async () => {
+  const screen = await renderFrame(FRAMES.columns);
+  const scroller = screen.getByText("grid content").element().parentElement as HTMLElement;
+  expect(getComputedStyle(scroller).scrollbarWidth).toBe("thin");
+});
