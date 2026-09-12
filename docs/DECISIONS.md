@@ -52,6 +52,18 @@ restore to put anything back.
 The Sorting Box is the one that is plural. It is several real folders the user nominates, shown
 as one surface — not one directory, and not a view over the index.
 
+## Renames made while the app was closed
+
+A directory renamed or moved while the app is closed reads, on the next walk, as one folder
+gone and another arrived. Without evidence that the files are the same, the walk cannot pair
+them, so today the old folder's items are retired and the new folder's are indexed afresh —
+their tags and thumbnails do not follow.
+
+The evidence is content. Once files are hashed, a folder whose files reappear byte-identical
+under a new directory can be recognised and reunited, keeping identity. Until hashing lands
+this is a known gap, not a choice. A rename made through the app has no such problem: the app
+moves the directory and records the move in one step.
+
 ## The window
 
 Native decorations are off, so the app draws its own chrome and the title bar is ours to

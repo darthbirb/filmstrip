@@ -58,3 +58,4 @@ collide. Stop any server you started before ending a turn.
 - [docs/PRODUCT.md](docs/PRODUCT.md) — what the app does
 - [docs/DECISIONS.md](docs/DECISIONS.md) — why it is built this way
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — how to work on it
+- [docs/SCHEMA.md](docs/SCHEMA.md) — the tables and the rules the data keeps
