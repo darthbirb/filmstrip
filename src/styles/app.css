@@ -1,12 +1,15 @@
 @import "tailwindcss";
 
 /* The token layer: every size, colour and duration a component may use. DECISIONS.md "The scale is the arbiter". */
-@theme {
+/* Static, so every token is emitted and script can read it. */
+@theme static {
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   /* Installed with Windows, never fetched. */
   --font-glyph: "Segoe Fluent Icons", "Segoe MDL2 Assets";
 
   --color-ground: oklch(0.19 0 0);
+  --color-panel: oklch(0.215 0 0);
+  --color-line: oklch(1 0 0 / 0.08);
   --color-fg: oklch(0.93 0 0);
   --color-fg-muted: oklch(0.93 0 0 / 0.45);
   --color-hover: oklch(1 0 0 / 0.06);
@@ -20,17 +23,34 @@
   --spacing-caption: 2rem;
   --spacing-caption-button: 2.875rem;
   --spacing-mark: 1rem;
+  --spacing-toolbar: 2.5rem;
+  --spacing-rail: 2.5rem;
+  --spacing-splitter: 0.375rem;
+
+  --radius-panel: 0.5rem;
+  --shadow-overlay: 0 0.5rem 2rem oklch(0 0 0 / 0.5);
 
   --text-caption: 0.75rem;
   --text-caption--line-height: 1;
   --text-glyph: 0.625rem;
   --text-glyph--line-height: 1;
+  --text-icon: 1rem;
+  --text-icon--line-height: 1;
 }
 
 :root {
   color-scheme: dark;
   --motion-quick: 120ms;
   --focus-width: 2px;
+
+  /* Panel widths in rem; the frame reads them to decide what fits. */
+  --frame-nav: 15rem;
+  --frame-nav-min: 10rem;
+  --frame-nav-max: 24rem;
+  --frame-pane: 20rem;
+  --frame-pane-min: 14rem;
+  --frame-pane-max: 40rem;
+  --frame-grid-min: 20rem;
 }
 
 @utility focus-ring {

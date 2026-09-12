@@ -1,18 +1,13 @@
-const GLYPHS = {
-  minimize: "\uE921",
-  maximize: "\uE922",
-  restore: "\uE923",
-  close: "\uE8BB",
-} as const;
+import { GLYPHS, type Glyph } from "./glyphs";
 
 type Props = {
-  glyph: keyof typeof GLYPHS;
+  glyph: Extract<Glyph, "minimize" | "maximize" | "restore" | "close">;
   label: string;
   dimmed: boolean;
   onClick: () => void;
 };
 
-/** A window control in Windows' own glyphs and proportions; close turns red under the pointer. */
+/** A window control in the glyphs and proportions Windows itself uses; close turns red under the pointer. */
 export function CaptionButton({ glyph, label, dimmed, onClick }: Props) {
   const tone =
     glyph === "close"

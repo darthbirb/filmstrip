@@ -103,8 +103,8 @@ deleted, and what won is written into DECISIONS.md.
 
 **Candidates are compared live in `tauri dev`, never by screenshot.** The dev readout at the
 bottom of the window switches between them instantly, by click or by the digit beside each, and
-its last entry, compare, puts every candidate side by side over neutral stand-in tiles, each
-still driving the real window. The choice survives a reload; a production build always takes
+its last entry, compare, shows every candidate at once, each over dev-only stand-ins and still
+driving the real window: side by side, or stacked at full width when the slice is a layout. The choice survives a reload; a production build always takes
 the first candidate. **A turn that ends on a choice leaves `tauri dev` running** with the
 candidates on it. When the user picks, the others and their picker entry are deleted.
 
