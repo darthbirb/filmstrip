@@ -115,6 +115,23 @@ pub fn create(conn: &Connection, parent_id: i64, title: &str) -> Result<i64> {
     Ok(id)
 }
 
+/// Soft-deletes a folder and everything beneath it, returning how many folders
+/// that was. The rows stay, so a restore has something to put back; a trashed
+/// folder frees its spot for a new one of the same name.
+pub fn trash_subtree(conn: &Connection, folder_id: i64) -> Result<i64> {
+    let count = conn.execute(
+        "WITH RECURSIVE subtree(id) AS (
+             SELECT ?1
+           UNION ALL
+             SELECT f.id FROM folder f JOIN subtree s ON f.parent_id = s.id
+         )
+         UPDATE folder SET deleted_at = ?2
+          WHERE id IN (SELECT id FROM subtree) AND deleted_at IS NULL",
+        params![folder_id, now()],
+    )?;
+    Ok(count as i64)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

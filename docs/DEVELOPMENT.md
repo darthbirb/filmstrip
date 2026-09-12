@@ -85,7 +85,8 @@ something has to move and close the window. The window-bar slice deletes it.
 
 Comments in the source cite headings in this file and in DECISIONS.md **by exact title**.
 Renaming a heading orphans every one of them and nothing fails, so rename and fix the callers
-in the same commit. To find them:
+in the same commit. **Keep each pointer on one line** — a title wrapped across a line break
+is invisible to this search. To find them:
 
 ```bash
 grep -rn 'DECISIONS.md "\|DEVELOPMENT.md "' src src-tauri
