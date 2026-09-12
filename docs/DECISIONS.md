@@ -17,14 +17,15 @@ queries in the core. **Biome** lints and formats, one binary instead of a toolch
 GritQL plugins can express project-specific rules later. **Vitest** for component tests,
 **Playwright** for end-to-end.
 
-**ts-rs** will carry Rust types into TypeScript when the backend lands. **tauri-specta** would
-have generated the command wrappers too, but it has been a release candidate since 2023 and
-the backend boundary is small enough to write by hand.
+**ts-rs** carries Rust types into TypeScript. **tauri-specta** would have generated the
+command wrappers too, but it has been a release candidate since 2023; the wrappers are written
+by hand instead, and a test holds them to the Rust side.
 
 ## Pinned versions and the supply chain
 
-Every dependency is pinned to an exact version, and pnpm 12 runs through `npx` at a version
-pinned with its registry checksum. pnpm holds any release younger than 24 hours, refuses to run
+npm dependencies are pinned to exact versions; Rust's are held by the committed `Cargo.lock`,
+which CI builds with `--locked`. pnpm 12 runs through `npx` at a version pinned with its
+registry checksum. pnpm holds any release younger than 24 hours, refuses to run
 a dependency's install scripts unless it has been allowed, and `trustPolicy: no-downgrade`
 rejects a package whose publishing provenance has weakened — the shape of a hijacked release.
 
@@ -63,6 +64,17 @@ The evidence is content. Once files are hashed, a folder whose files reappear by
 under a new directory can be recognised and reunited, keeping identity. Until hashing lands
 this is a known gap, not a choice. A rename made through the app has no such problem: the app
 moves the directory and records the move in one step.
+
+## A walk only judges what it read
+
+A walk retires whatever it did not find, so it may only judge what it actually read.
+**An unreachable source is skipped entirely:** an unplugged drive reads as "the directory is not
+there", and treating that as "everything in it was deleted" would empty the index for a source
+that is merely away. **A sweep is scoped to one source:** a walk reads one root, so it can only
+speak for that root's files and folders.
+
+A file whose size and modification time match its row is not opened again. That is the common
+case, and what keeps walking an unchanged library cheap.
 
 ## The window
 

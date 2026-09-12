@@ -1,17 +1,17 @@
-//! Registered roots. A **library** source holds what has been organised; a
-//! **sorting** source is where incoming files land, and the Sorting Box shows
-//! every sorting source as one surface. PRODUCT.md "The Sorting Box".
+//! Registered roots, each a library or a sorting source. PRODUCT.md "The Sorting Box".
 
 use std::path::Path;
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 use crate::db::{folders, now};
 use crate::error::Result;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "lowercase")]
+#[ts(export)]
 pub enum SourceKind {
     Library,
     Sorting,
@@ -33,8 +33,9 @@ impl SourceKind {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct Source {
     pub id: i64,
     pub root: String,
@@ -107,13 +108,8 @@ pub fn item_stats(conn: &Connection, id: i64) -> Result<(i64, i64)> {
     )?)
 }
 
-/// Forgets a source: its folders and items leave the index outright. **The
-/// directory is never touched** — adding the same root again re-reads it from
-/// scratch, which is why this is a hard delete rather than a trip through the
-/// trash.
-///
-/// A cover picture points at an item from outside the cascade, so it is
-/// cleared before the deletes it would otherwise block.
+/// Forgets a source outright; **its directory is never touched**, and adding it
+/// again re-reads it. Covers point in from outside the cascade, so go first.
 pub fn remove(conn: &Connection, id: i64) -> Result<()> {
     conn.execute(
         "UPDATE folder SET cover_item_id = NULL
@@ -128,38 +124,14 @@ pub fn remove(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
-/// The registered source `candidate` would collide with — the same directory,
-/// or either one inside the other. A root within a root gives one directory
-/// two identities and makes every move ambiguous, and this is the one cheap
-/// moment to refuse it.
+/// The registered source `candidate` collides with: the same directory, or one
+/// inside the other — which would give one directory two identities.
 pub fn nesting_conflict<'a>(existing: &'a [Source], candidate: &Path) -> Option<&'a Source> {
+    use crate::fs::paths::{contains, same_dir};
     existing.iter().find(|source| {
         let root = Path::new(&source.root);
-        crate::fs::paths::same_dir(root, candidate)
-            || contains(root, candidate)
-            || contains(candidate, root)
+        same_dir(root, candidate) || contains(root, candidate) || contains(candidate, root)
     })
-}
-
-/// Whether `ancestor` contains `path`. Canonicalised when both exist, so case
-/// and `..` cannot defeat it; otherwise a normalised prefix comparison, for a
-/// directory that does not exist yet.
-fn contains(ancestor: &Path, path: &Path) -> bool {
-    match (std::fs::canonicalize(ancestor), std::fs::canonicalize(path)) {
-        (Ok(a), Ok(p)) => p != a && p.starts_with(&a),
-        _ => {
-            let a = normalise(ancestor);
-            let p = normalise(path);
-            p != a && p.starts_with(&format!("{a}/"))
-        }
-    }
-}
-
-fn normalise(path: &Path) -> String {
-    path.to_string_lossy()
-        .replace('\\', "/")
-        .trim_end_matches('/')
-        .to_lowercase()
 }
 
 #[cfg(test)]

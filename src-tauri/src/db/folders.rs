@@ -2,13 +2,14 @@
 //! renaming a directory costs one row. DECISIONS.md "Places, not queries".
 
 use rusqlite::{Connection, OptionalExtension, params};
+use serde::Serialize;
+use ts_rs::TS;
 
 use crate::db::{now, tags};
 use crate::error::{AppError, Result};
 
-/// Where a folder sits: which source, and the titles between that source's
-/// root and the folder itself. **The source's own root contributes no title**
-/// — it names the root directory, which is already the source's `root` path.
+/// A folder's source, and the titles from that source's root down to it.
+/// **The root folder contributes no title** — it is the source's `root` path.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FolderLocation {
     pub source_id: i64,
@@ -62,9 +63,7 @@ pub fn title(conn: &Connection, id: i64) -> Result<Option<String>> {
         .optional()?)
 }
 
-/// The live child of `parent_id` with this title, case-insensitively — the
-/// same comparison `idx_folder_sibling` uses, so a lookup and the index can
-/// never disagree about what already exists.
+/// The live child with this title, compared exactly as `idx_folder_sibling` compares.
 pub fn child_id(conn: &Connection, parent_id: i64, title: &str) -> Result<Option<i64>> {
     Ok(conn
         .query_row(
@@ -76,14 +75,35 @@ pub fn child_id(conn: &Connection, parent_id: i64, title: &str) -> Result<Option
         .optional()?)
 }
 
-pub fn children(conn: &Connection, parent_id: i64) -> Result<Vec<(i64, String)>> {
+/// A folder as the navigation lists it. Counts are of live, direct contents.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct FolderNode {
+    pub id: i64,
+    pub title: String,
+    pub child_count: i64,
+    pub item_count: i64,
+}
+
+pub fn children(conn: &Connection, parent_id: i64) -> Result<Vec<FolderNode>> {
     let mut stmt = conn.prepare(
-        "SELECT id, title FROM folder
-          WHERE parent_id = ?1 AND deleted_at IS NULL
-          ORDER BY title COLLATE NOCASE",
+        "SELECT f.id, f.title,
+                (SELECT COUNT(*) FROM folder c WHERE c.parent_id = f.id AND c.deleted_at IS NULL),
+                (SELECT COUNT(*) FROM item i WHERE i.folder_id = f.id AND i.deleted_at IS NULL)
+           FROM folder f
+          WHERE f.parent_id = ?1 AND f.deleted_at IS NULL
+          ORDER BY f.title COLLATE NOCASE",
     )?;
     let rows = stmt
-        .query_map(params![parent_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .query_map(params![parent_id], |r| {
+            Ok(FolderNode {
+                id: r.get(0)?,
+                title: r.get(1)?,
+                child_count: r.get(2)?,
+                item_count: r.get(3)?,
+            })
+        })?
         .collect::<rusqlite::Result<_>>()?;
     Ok(rows)
 }
@@ -115,9 +135,7 @@ pub fn create(conn: &Connection, parent_id: i64, title: &str) -> Result<i64> {
     Ok(id)
 }
 
-/// Soft-deletes a folder and everything beneath it, returning how many folders
-/// that was. The rows stay, so a restore has something to put back; a trashed
-/// folder frees its spot for a new one of the same name.
+/// Soft-deletes a folder and everything beneath it; returns how many folders.
 pub fn trash_subtree(conn: &Connection, folder_id: i64) -> Result<i64> {
     let count = conn.execute(
         "WITH RECURSIVE subtree(id) AS (
@@ -194,6 +212,21 @@ mod tests {
         let one = create(&conn, a, "Trips").unwrap();
         let two = create(&conn, b, "Trips").unwrap();
         assert_ne!(one, two);
+    }
+
+    #[test]
+    fn children_come_sorted_whatever_the_case_and_count_only_live_folders() {
+        let (conn, root) = library();
+        let trips = create(&conn, root, "trips").unwrap();
+        create(&conn, root, "Archive").unwrap();
+        create(&conn, trips, "Cairo").unwrap();
+        let old = create(&conn, trips, "Old").unwrap();
+        trash_subtree(&conn, old).unwrap();
+
+        let listed = children(&conn, root).unwrap();
+        let titles: Vec<_> = listed.iter().map(|f| f.title.as_str()).collect();
+        assert_eq!(titles, ["Archive", "trips"]);
+        assert_eq!(listed[1].child_count, 1, "the trashed child is not counted");
     }
 
     #[test]

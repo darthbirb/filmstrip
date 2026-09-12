@@ -1,6 +1,5 @@
-//! The only place that turns database rows into paths on disk. If path
-//! handling appears anywhere else, that is a bug even where it happens to
-//! work.
+//! The only place database rows become paths on disk. Path handling anywhere
+//! else is a bug, even where it works.
 
 use std::path::{Path, PathBuf};
 
@@ -61,9 +60,8 @@ pub fn item_path(conn: &Connection, folder_id: i64, disk_name: &str) -> Result<P
     Ok(folder_dir(conn, folder_id)?.join(disk_name))
 }
 
-/// `<uuid>` → `ab/cd/<uuid>.webp`. Two levels of sharding keep any one
-/// directory to a few hundred entries at a hundred thousand items, which is
-/// where Windows starts to struggle.
+/// `<uuid>` → `ab/cd/<uuid>.webp`: two levels keep any one directory to a few
+/// hundred entries at a hundred thousand items.
 pub fn thumb_rel(uuid: &str) -> String {
     let clean: String = uuid.chars().filter(char::is_ascii_alphanumeric).collect();
     let a = clean.get(0..2).unwrap_or("00");
@@ -71,20 +69,33 @@ pub fn thumb_rel(uuid: &str) -> String {
     format!("{a}/{b}/{uuid}.webp")
 }
 
-/// Whether two paths name the same directory. Windows is case-insensitive and
-/// takes either separator, so `==` would call `D:\Media` and `D:/media\` two
-/// different places and then refuse to open one of them.
+/// Whether two paths name one directory. Windows ignores case and takes either
+/// separator, so `==` cannot answer this.
 pub fn same_dir(a: &Path, b: &Path) -> bool {
     if let (Ok(a), Ok(b)) = (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
         return a == b;
     }
-    fn key(path: &Path) -> String {
-        path.to_string_lossy()
-            .replace('\\', "/")
-            .trim_end_matches('/')
-            .to_lowercase()
-    }
     key(a) == key(b)
+}
+
+/// Whether `ancestor` strictly contains `path`: canonicalised when both exist,
+/// otherwise compared as text, for a directory not created yet.
+pub fn contains(ancestor: &Path, path: &Path) -> bool {
+    match (std::fs::canonicalize(ancestor), std::fs::canonicalize(path)) {
+        (Ok(a), Ok(p)) => p != a && p.starts_with(&a),
+        _ => {
+            let (a, p) = (key(ancestor), key(path));
+            p != a && p.starts_with(&format!("{a}/"))
+        }
+    }
+}
+
+/// A path as comparable text: one separator, no trailing slash, one case.
+fn key(path: &Path) -> String {
+    path.to_string_lossy()
+        .replace('\\', "/")
+        .trim_end_matches('/')
+        .to_lowercase()
 }
 
 /// Lowercase extension without the dot.
@@ -156,6 +167,21 @@ mod tests {
         assert_eq!(
             item_path(&conn, root, "DSC_0001.jpg").unwrap(),
             PathBuf::from("D:/incoming/DSC_0001.jpg")
+        );
+    }
+
+    #[test]
+    fn containment_is_strict_and_ignores_case_and_separators() {
+        let library = Path::new("Q:/Library");
+        assert!(contains(library, Path::new("q:\\library\\Trips")));
+        assert!(!contains(library, Path::new("Q:/Library/")), "not itself");
+        assert!(
+            !contains(library, Path::new("Q:/LibraryOld")),
+            "not a longer sibling"
+        );
+        assert!(
+            !contains(Path::new("Q:/Library/Trips"), library),
+            "not its parent"
         );
     }
 
