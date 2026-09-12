@@ -22,7 +22,7 @@ version through `npx`:
 | `npx --yes pnpm@12.4.1 test` | component tests |
 | `npx --yes pnpm@12.4.1 test:e2e` | end-to-end tests |
 | `npx --yes pnpm@12.4.1 check:docs` | doc pointers resolve, comments stay short |
-| `cargo test --manifest-path src-tauri/Cargo.toml` | the Rust gate; CI adds fmt and clippy |
+| `cargo test --manifest-path src-tauri/Cargo.toml` | the Rust gate; also writes `src/ipc/bindings` |
 
 ## Ports
 
@@ -37,7 +37,8 @@ Three ways, cheapest first.
 
 1. **A browser, against mocks.** `dev` serves the app, and `src/dev/mock.ts` installs Tauri's
    own `mockIPC` and `mockWindows` when `__TAURI_INTERNALS__` is absent and the build is a dev
-   build. Good enough for layout, states and copy. It is dev-only, and the production bundle
+   build. It answers every command from a small library typed by the Rust bindings — good
+   enough for layout, states and copy. It is dev-only, and the production bundle
    is checked to contain none of it.
 2. **The Playwright MCP.** It drives a headed browser, so time actually passes there and its
    screenshots come back as images that can be looked at. **The editor's Browser pane cannot
@@ -61,12 +62,29 @@ Three ways, cheapest first.
 - **A check proves something at more than one size.** Sweep widths, and fail on any console
   error. One size proves one size.
 
+## The command boundary
+
+The frontend reaches Rust only through the commands in `src-tauri/src/commands.rs`. Each one
+opens its own connection on a blocking thread, calls a plain function, and returns — so the
+logic is tested without Tauri.
+
+- **Types cross by generation.** A Rust type with `#[ts(export)]` is written to
+  `src/ipc/bindings/` whenever `cargo test` runs. Never edit those files; commit them. CI fails
+  when they differ from what the Rust side generates.
+- **Wrappers are written by hand** in `src/ipc/commands.ts`, one per command, each typed
+  `invoke` on one line. Tauri takes arguments in camelCase and hands them to Rust in snake_case.
+- **A Rust test reads the commands, their registration in `lib.rs`, and the wrappers**, and fails
+  when a command is missing from either or an argument name disagrees.
+- **The dev mock answers the same commands**, and a component test fails when a wrapper sends
+  one it does not know.
+
 ## Layout
 
 ```
 src/app/       composition — the shell and its surfaces
 src/ui/        primitives; they own every visual decision (created with the first one)
 src/lib/       framework-free logic
+src/ipc/       command wrappers, and bindings generated from Rust
 src/styles/    app.css — the token layer
 src/dev/       mocks, dev builds only
 src-tauri/     the Rust side

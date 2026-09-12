@@ -57,3 +57,9 @@ jobs:
 
       - name: Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+
+      - name: Bindings are current
+        shell: bash
+        run: |
+          stale="$(git status --porcelain -- src/ipc/bindings)"
+          if [ -n "$stale" ]; then echo "$stale"; echo "cargo test changed src/ipc/bindings; commit them"; exit 1; fi

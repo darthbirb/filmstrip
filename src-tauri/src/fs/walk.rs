@@ -22,7 +22,9 @@ const IMAGE_EXTS: &[&str] = &[
 ];
 const VIDEO_EXTS: &[&str] = &["mp4", "mov", "mkv", "webm", "avi", "m4v", "wmv"];
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, ts_rs::TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct WalkReport {
     /// Files whose row already matched — the cheap path.
     pub unchanged: u64,

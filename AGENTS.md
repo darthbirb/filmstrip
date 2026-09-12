@@ -53,6 +53,8 @@ collide. Stop any server you started before ending a turn.
   `docs/DEVELOPMENT.md` "Seeing the app".
 - **Tests run in the installed Edge, never jsdom.** jsdom reports every element as zero-sized,
   which hides exactly the bugs worth catching.
+- **`src/ipc/bindings/` is generated** by `cargo test`. Never edit it; rerun the tests and
+  commit what changed.
 - **Debug builds open a WebView2 debug port on 9322** so Playwright can attach to the real
   window. Release builds never do.
 

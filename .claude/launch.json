@@ -6,6 +6,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "--port", "1422"],
       "port": 1422
+    },
+    {
+      "name": "tauri",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "pnpm@12.4.1", "tauri", "dev"],
+      "port": 1420
     }
   ]
 }

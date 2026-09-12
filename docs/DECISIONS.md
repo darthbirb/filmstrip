@@ -17,9 +17,9 @@ queries in the core. **Biome** lints and formats, one binary instead of a toolch
 GritQL plugins can express project-specific rules later. **Vitest** for component tests,
 **Playwright** for end-to-end.
 
-**ts-rs** will carry Rust types into TypeScript when the backend lands. **tauri-specta** would
-have generated the command wrappers too, but it has been a release candidate since 2023 and
-the backend boundary is small enough to write by hand.
+**ts-rs** carries Rust types into TypeScript. **tauri-specta** would have generated the
+command wrappers too, but it has been a release candidate since 2023; the wrappers are written
+by hand instead, and a test holds them to the Rust side.
 
 ## Pinned versions and the supply chain
 

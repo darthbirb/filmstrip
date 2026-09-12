@@ -2,6 +2,8 @@
 //! a description of something on disk.
 
 use rusqlite::{Connection, OptionalExtension, params};
+use serde::Serialize;
+use ts_rs::TS;
 
 use crate::db::{folders, now};
 use crate::error::Result;
@@ -122,6 +124,56 @@ pub fn upsert(conn: &Connection, item: &NewItem) -> Result<i64> {
         ],
     )?;
     Ok(conn.last_insert_rowid())
+}
+
+/// An item as the grid lists it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ItemRow {
+    pub id: i64,
+    pub uuid: String,
+    pub folder_id: i64,
+    pub disk_name: String,
+    pub ext: String,
+    #[ts(type = "\"image\" | \"video\" | \"other\"")]
+    pub kind: String,
+    pub size_bytes: i64,
+    pub mtime: i64,
+    pub width: Option<i64>,
+    pub height: Option<i64>,
+    pub duration_ms: Option<i64>,
+    pub favorite: bool,
+}
+
+/// The live items directly in a folder, by name whatever the case.
+pub fn in_folder(conn: &Connection, folder_id: i64) -> Result<Vec<ItemRow>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, uuid, folder_id, disk_name, ext, kind, size_bytes, mtime, width, height,
+                duration_ms, favorite
+           FROM item
+          WHERE folder_id = ?1 AND deleted_at IS NULL
+          ORDER BY disk_name COLLATE NOCASE",
+    )?;
+    let rows = stmt
+        .query_map(params![folder_id], |r| {
+            Ok(ItemRow {
+                id: r.get(0)?,
+                uuid: r.get(1)?,
+                folder_id: r.get(2)?,
+                disk_name: r.get(3)?,
+                ext: r.get(4)?,
+                kind: r.get(5)?,
+                size_bytes: r.get(6)?,
+                mtime: r.get(7)?,
+                width: r.get(8)?,
+                height: r.get(9)?,
+                duration_ms: r.get(10)?,
+                favorite: r.get(11)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(rows)
 }
 
 pub fn folder_of(conn: &Connection, id: i64) -> Result<Option<i64>> {
@@ -283,6 +335,22 @@ mod tests {
             })
             .unwrap();
         assert!(deleted.is_none(), "it is not in the trash any more");
+    }
+
+    #[test]
+    fn a_folder_lists_its_live_items_by_name_whatever_the_case() {
+        let (conn, root) = library();
+        upsert(&conn, &sample(1, root, "b.jpg")).unwrap();
+        upsert(&conn, &sample(1, root, "A.jpg")).unwrap();
+        let gone = upsert(&conn, &sample(1, root, "c.jpg")).unwrap();
+        trash(&conn, gone).unwrap();
+
+        let names: Vec<_> = in_folder(&conn, root)
+            .unwrap()
+            .into_iter()
+            .map(|item| item.disk_name)
+            .collect();
+        assert_eq!(names, ["A.jpg", "b.jpg"]);
     }
 
     #[test]

@@ -4,12 +4,14 @@ use std::path::Path;
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
+use ts_rs::TS;
 
 use crate::db::{folders, now};
 use crate::error::Result;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "lowercase")]
+#[ts(export)]
 pub enum SourceKind {
     Library,
     Sorting,
@@ -31,8 +33,9 @@ impl SourceKind {
     }
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct Source {
     pub id: i64,
     pub root: String,
@@ -124,32 +127,11 @@ pub fn remove(conn: &Connection, id: i64) -> Result<()> {
 /// The registered source `candidate` collides with: the same directory, or one
 /// inside the other — which would give one directory two identities.
 pub fn nesting_conflict<'a>(existing: &'a [Source], candidate: &Path) -> Option<&'a Source> {
+    use crate::fs::paths::{contains, same_dir};
     existing.iter().find(|source| {
         let root = Path::new(&source.root);
-        crate::fs::paths::same_dir(root, candidate)
-            || contains(root, candidate)
-            || contains(candidate, root)
+        same_dir(root, candidate) || contains(root, candidate) || contains(candidate, root)
     })
-}
-
-/// Whether `ancestor` contains `path`: canonicalised when both exist, otherwise
-/// a normalised prefix comparison, for a directory not created yet.
-fn contains(ancestor: &Path, path: &Path) -> bool {
-    match (std::fs::canonicalize(ancestor), std::fs::canonicalize(path)) {
-        (Ok(a), Ok(p)) => p != a && p.starts_with(&a),
-        _ => {
-            let a = normalise(ancestor);
-            let p = normalise(path);
-            p != a && p.starts_with(&format!("{a}/"))
-        }
-    }
-}
-
-fn normalise(path: &Path) -> String {
-    path.to_string_lossy()
-        .replace('\\', "/")
-        .trim_end_matches('/')
-        .to_lowercase()
 }
 
 #[cfg(test)]

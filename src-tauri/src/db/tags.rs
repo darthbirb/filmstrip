@@ -3,6 +3,7 @@
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
+use ts_rs::TS;
 
 use crate::db::{fold, now};
 use crate::error::Result;
@@ -167,8 +168,9 @@ pub fn rebuild_subtree(conn: &Connection, folder_id: i64) -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
+#[ts(export)]
 pub struct EffectiveTag {
     pub tag_id: i64,
     pub key: Option<String>,

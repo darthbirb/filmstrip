@@ -75,13 +75,27 @@ pub fn same_dir(a: &Path, b: &Path) -> bool {
     if let (Ok(a), Ok(b)) = (std::fs::canonicalize(a), std::fs::canonicalize(b)) {
         return a == b;
     }
-    fn key(path: &Path) -> String {
-        path.to_string_lossy()
-            .replace('\\', "/")
-            .trim_end_matches('/')
-            .to_lowercase()
-    }
     key(a) == key(b)
+}
+
+/// Whether `ancestor` strictly contains `path`: canonicalised when both exist,
+/// otherwise compared as text, for a directory not created yet.
+pub fn contains(ancestor: &Path, path: &Path) -> bool {
+    match (std::fs::canonicalize(ancestor), std::fs::canonicalize(path)) {
+        (Ok(a), Ok(p)) => p != a && p.starts_with(&a),
+        _ => {
+            let (a, p) = (key(ancestor), key(path));
+            p != a && p.starts_with(&format!("{a}/"))
+        }
+    }
+}
+
+/// A path as comparable text: one separator, no trailing slash, one case.
+fn key(path: &Path) -> String {
+    path.to_string_lossy()
+        .replace('\\', "/")
+        .trim_end_matches('/')
+        .to_lowercase()
 }
 
 /// Lowercase extension without the dot.
@@ -153,6 +167,21 @@ mod tests {
         assert_eq!(
             item_path(&conn, root, "DSC_0001.jpg").unwrap(),
             PathBuf::from("D:/incoming/DSC_0001.jpg")
+        );
+    }
+
+    #[test]
+    fn containment_is_strict_and_ignores_case_and_separators() {
+        let library = Path::new("Q:/Library");
+        assert!(contains(library, Path::new("q:\\library\\Trips")));
+        assert!(!contains(library, Path::new("Q:/Library/")), "not itself");
+        assert!(
+            !contains(library, Path::new("Q:/LibraryOld")),
+            "not a longer sibling"
+        );
+        assert!(
+            !contains(Path::new("Q:/Library/Trips"), library),
+            "not its parent"
         );
     }
 

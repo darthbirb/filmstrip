@@ -1,11 +1,12 @@
 //! The desktop shell: one window, drawn without native chrome.
 
+pub mod commands;
 pub mod config;
 pub mod db;
 pub mod error;
 pub mod fs;
 
-use tauri::{WebviewUrl, WebviewWindowBuilder};
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 /// Tauri's defaults, which `additional_browser_args` replaces rather than extends.
 const WEBVIEW_ARGS: &str = "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection";
@@ -17,6 +18,11 @@ const DEBUG_PORT: u16 = 9322;
 pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
+            fs::paths::ensure_app_dirs()?;
+            let db_path = fs::paths::db_path()?;
+            db::migrate(&mut db::open(&db_path)?)?;
+            app.manage(commands::AppState { db: db_path });
+
             // Beside the executable, never in the user's profile.
             // DECISIONS.md "Nothing outside the app folder".
             let webview_dir = config::app_data_dir()?.join("webview");
@@ -38,6 +44,15 @@ pub fn run() {
                 .build()?;
             Ok(())
         })
+        .invoke_handler(tauri::generate_handler![
+            commands::list_sources,
+            commands::add_source,
+            commands::remove_source,
+            commands::folder_children,
+            commands::folder_items,
+            commands::item_tags,
+            commands::reconcile,
+        ])
         .run(tauri::generate_context!())
         .expect("Filmstrip failed to start");
 }
