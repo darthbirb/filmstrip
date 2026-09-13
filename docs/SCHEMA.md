@@ -3,8 +3,8 @@
 The tables, and the rules the data keeps. Facts only: why a rule exists is in the
 migration's own comments and in [DECISIONS.md](DECISIONS.md).
 
-The schema lives in `src-tauri/src/db/migrations/`. There is one migration today,
-`001_initial.sql`.
+The schema lives in `src-tauri/src/db/migrations/`, numbered and applied in order. Each
+migration arrives with the feature that needs it and is never edited once shipped.
 
 ## Tables
 
@@ -12,7 +12,7 @@ The schema lives in `src-tauri/src/db/migrations/`. There is one migration today
 | --- | --- |
 | `source` | A registered root: its absolute path, a title, and a kind — `library` or `sorting`. |
 | `folder` | A real directory: title, parent, status, favourite, notes, cover. |
-| `item` | A real file: its folder, its name on disk, its measurements, and a uuid. |
+| `item` | A real file: its folder, its name on disk, its measurements, a uuid, and when it was last read. |
 | `tag` | One distinct term: a tag (no key) or a label (a key and a value). |
 | `folder_tag` | Terms on a folder, added by its title or by hand. |
 | `item_tag` | Tags an item carries itself. |
@@ -63,6 +63,10 @@ The schema lives in `src-tauri/src/db/migrations/`. There is one migration today
 - A walk retires the items it did not find, one source at a time, and the folders whose
   directory is gone — only in sources it could actually read.
 - Removing a source deletes its rows outright. Its directory is never touched.
+- `item.probed_at` is set when the file is read for its shape and dates, and cleared when a walk
+  refreshes the row because the file changed. NULL means it is still to be read.
+- `captured_at` is only ever the file's own metadata, and `captured_src` says which: `exif` or
+  `container`. Neither is ever filled with a guess.
 
 ## Not here yet
 

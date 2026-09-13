@@ -20,7 +20,9 @@ export function Frame({ nav, location, grid, pane }: Regions) {
         {nav}
       </SidePanel>
       <main className="flex min-w-0 flex-1 flex-col">
-        <div className="flex h-toolbar shrink-0 items-center gap-2 px-2">{location}</div>
+        <div className="flex h-toolbar shrink-0 items-center gap-3 border-line border-b bg-panel pr-2 pl-3">
+          {location}
+        </div>
         <div className="min-h-0 flex-1 overflow-auto">{grid}</div>
       </main>
       <SidePanel layout={layout} side="pane">

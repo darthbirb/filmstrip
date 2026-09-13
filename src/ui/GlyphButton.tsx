@@ -1,13 +1,14 @@
-import { GLYPHS, type Glyph } from "./glyphs";
+import { Glyph } from "./Glyph";
+import type { GlyphName } from "./glyphs";
 
 type Props = {
-  glyph: Glyph;
+  glyph: GlyphName;
   label: string;
   onClick: () => void;
   pressed?: boolean;
 };
 
-/** A square, rail-sized button showing one glyph; its label is both its name and its tooltip. */
+/** A control-sized square holding one glyph, on a raised ring; its label is its name and tooltip. */
 export function GlyphButton({ glyph, label, onClick, pressed }: Props) {
   return (
     <button
@@ -16,9 +17,9 @@ export function GlyphButton({ glyph, label, onClick, pressed }: Props) {
       aria-pressed={pressed}
       title={label}
       onClick={onClick}
-      className="focus-ring flex size-rail shrink-0 items-center justify-center font-glyph text-fg-muted text-icon transition-colors duration-(--motion-quick) hover:bg-hover hover:text-fg active:bg-press motion-reduce:transition-none"
+      className="focus-ring grid size-control shrink-0 place-items-center rounded-control bg-raised text-fg-mid text-icon inset-ring inset-ring-line-control transition-colors duration-(--motion-quick) hover:bg-raised-hi hover:text-fg active:bg-inset aria-pressed:bg-raised-hi aria-pressed:text-fg motion-reduce:transition-none"
     >
-      <span aria-hidden="true">{GLYPHS[glyph]}</span>
+      <Glyph name={glyph} />
     </button>
   );
 }

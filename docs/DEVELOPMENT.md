@@ -57,6 +57,9 @@ Three ways, cheapest first.
   the test that reproduces it. CI runs every suite below on each pull request.
 - **Rust** is tested beside the code, in `#[cfg(test)]` modules. A test that needs real files
   writes them under `src-tauri/target/`, never outside the repository.
+- **A test that needs ffmpeg is `#[ignore]`d**, because CI has none. Where ffmpeg is on PATH,
+  `cargo test --manifest-path src-tauri/Cargo.toml -- --ignored` runs them; run it after touching
+  video.
 - **Component tests** run in Vitest's browser mode on Edge (`channel: "msedge"`), over
   `src/**/*.test.tsx`. **Never jsdom** — see
   DECISIONS.md "Testing in a real browser, never jsdom".
@@ -97,17 +100,19 @@ tests/e2e/     Playwright
 ## Slices
 
 The interface is built one slice at a time: **window bar → the frame (navigation, grid, pane)
-→ navigation → grid and tiles → the pane → the visual direction → selection and moving → search
+→ navigation → grid and tiles → the visual direction → the pane → selection and moving → search
 → menus and dialogs → settings and the tags screen → empty states and guidance.**
 
 Each slice builds two to four candidates that differ in **structure**, not colour. Claude
 checks them in a real browser first; the user then picks one in the real window, the rest are
 deleted, and what won is written into DECISIONS.md.
 
-**Until the visual direction, the look is deliberately plain** — Windows metrics and neutral
-greys — so each structure is judged on its own. That slice runs once the grid and the pane
-show real pictures: the design skills shape two or three directions on the token layer, the
-user picks one live, and it restyles every surface built before it.
+**Until the visual direction, the look was deliberately plain** — Windows metrics and neutral
+greys — so each structure was judged on its own. That slice ran once the grid showed real
+pictures: three looks of its own were rejected, the look was then taken from ggallery's drawing
+as a reference, and the surfaces built so far were restyled on it (DECISIONS.md "The look").
+**From then on, a feature that adds a shape adds it to `docs/DESIGN.md`**, and its states are
+checked on the real surface, in the real window.
 
 **Candidates are compared live in `tauri dev`, never by screenshot.** The dev readout at the
 bottom of the window switches between them instantly, by click or by the digit beside each, and
@@ -126,6 +131,8 @@ edited, installed or run.
 of time, so each port is exercised as soon as it lands and stays small enough to review
 properly. Interface logic that is not markup — the grid's layout maths, the query term helpers —
 ports the same way; components and styles never do (DECISIONS.md "Built in slices, not ported").
+The drawing, `docs/design/Filmstrip.dc.html`, is the reference for the look: its values are
+re-derived and checked, never lifted with its markup (DECISIONS.md "The look").
 
 **A port is a rewrite with the original open beside it**, never a copy:
 
@@ -148,7 +155,7 @@ ports the same way; components and styles never do (DECISIONS.md "Built in slice
 | Grid layout | `features/grid/useGridLayout.ts`, `layoutWorker.ts` | grid and tiles |
 | Performance fixture | `bin/synth_library.rs` | grid and tiles |
 | Probing video and capture dates | `media/probe.rs`, `sidecar/` | the pane |
-| Scrub sprites | `media/sprites.rs` | the pane |
+| Scrub sprites | `media/sprites.rs`, `sidecar/ffmpeg.rs` `frames` | not yet scheduled: nothing shows one yet |
 | Moving, renaming, undo | `fs/relocate.rs`, `fs/undo.rs`, `db/journal.rs`, `commands/triage.rs` | selection and moving |
 | Trash | `fs/trash.rs` | selection and moving |
 | Destination hotkeys | `db/hotkeys.rs`, `state/hotkeys.ts` | selection and moving |
@@ -160,14 +167,16 @@ ports the same way; components and styles never do (DECISIONS.md "Built in slice
 
 ## Keeping the docs true
 
-Comments cite headings in PRODUCT.md, DECISIONS.md, DEVELOPMENT.md and SCHEMA.md **by exact
-title**, each pointer on one line. Renaming a heading orphans its callers, so rename and fix
+Comments cite headings in PRODUCT.md, DECISIONS.md, DEVELOPMENT.md, SCHEMA.md and DESIGN.md
+**by exact title**, each pointer on one line. Renaming a heading orphans its callers, so rename and fix
 them in the same commit.
 
 **A comment runs three lines at most.** What a future edit would break silently stays in the
 source; the reasoning goes in DECISIONS.md, and the comment names the section.
 
-`check:docs` enforces both, over the source and the prose docs, and CI runs it.
+`check:docs` enforces both, over the source and the prose docs, and CI runs it. It also holds
+DESIGN.md's front matter to `src/styles/app.css`: every colour, radius, spacing and text token
+of the base look, at the same value, and every component reference pointing at a real token.
 
 ## Gotchas
 

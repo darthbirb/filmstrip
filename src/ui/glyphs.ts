@@ -1,18 +1,22 @@
-// Segoe Fluent Icons code points, so each glyph is named once. They render in --font-glyph.
+// Material Symbols Rounded ligature names, so each glyph is named once. Glyph draws them.
 export const GLYPHS = {
-  minimize: "\uE921",
-  maximize: "\uE922",
-  restore: "\uE923",
-  close: "\uE8BB",
-  dockLeft: "\uE90C",
-  dockRight: "\uE90D",
-  chevronRight: "\uE76C",
-  chevronDown: "\uE70D",
-  back: "\uE72B",
-  folder: "\uE8B7",
-  source: "\uEC50",
-  sortingBox: "\uE7B8",
-  trash: "\uE74D",
+  minimize: "remove",
+  maximize: "crop_square",
+  restore: "filter_none",
+  close: "close",
+  hideLeft: "left_panel_close",
+  showLeft: "left_panel_open",
+  hideRight: "right_panel_close",
+  showRight: "right_panel_open",
+  chevronRight: "chevron_right",
+  chevronDown: "expand_more",
+  back: "arrow_left_alt",
+  folder: "folder",
+  source: "hard_drive",
+  sortingBox: "inbox",
+  trash: "delete",
+  search: "search",
+  view: "visibility",
 } as const;
 
-export type Glyph = keyof typeof GLYPHS;
+export type GlyphName = keyof typeof GLYPHS;

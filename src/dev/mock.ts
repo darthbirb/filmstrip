@@ -1,5 +1,7 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
+import type { Crumb } from "../ipc/bindings/Crumb";
 import type { FolderNode } from "../ipc/bindings/FolderNode";
+import type { ItemDetail } from "../ipc/bindings/ItemDetail";
 import type { ItemRow } from "../ipc/bindings/ItemRow";
 import type { Progress } from "../ipc/bindings/Progress";
 import type { SourceKind } from "../ipc/bindings/SourceKind";
@@ -10,6 +12,14 @@ import type { AppError } from "../ipc/commands";
 // cannot drift from them. DEVELOPMENT.md "Seeing the app".
 
 let nextItemId = 1;
+
+/** Landscape, portrait, square and panorama, so layouts and the pane have real shapes to fit. */
+const SHAPES = [
+  [4000, 3000],
+  [3000, 4000],
+  [4000, 4000],
+  [6000, 2000],
+];
 
 function source(
   id: number,
@@ -41,6 +51,7 @@ function items(folderId: number, names: string[]): ItemRow[] {
     const id = nextItemId++;
     const ext = diskName.split(".").pop() ?? "";
     const video = ext === "mp4";
+    const [width, height] = SHAPES[id % SHAPES.length] as [number, number];
     return {
       id,
       uuid: `mock-${id}`,
@@ -50,11 +61,11 @@ function items(folderId: number, names: string[]): ItemRow[] {
       kind: video ? "video" : "image",
       sizeBytes: 2_400_000,
       mtime: 1_750_000_000,
-      width: 4000,
-      height: 3000,
+      width,
+      height,
       durationMs: video ? 12_000 : null,
       favorite: false,
-      thumb: null,
+      thumb: `thumbs\\mock-${id}.webp`,
     };
   });
 }
@@ -77,6 +88,55 @@ const ITEMS: Record<number, ItemRow[]> = {
   6: items(6, ["felucca.mp4", "pyramid.jpg", "sphinx.jpg"]),
 };
 
+/** Each folder's parent and title, read off the tree above. */
+const PARENTS = new Map(
+  Object.entries(FOLDERS).flatMap(([parent, children]) =>
+    children.map((child) => [child.id, { parent: Number(parent), title: child.title }] as const),
+  ),
+);
+
+const everyItem = () => Object.values(ITEMS).flat();
+
+/** An item in full, as `item_detail` answers: PNGs carry no capture date, as screenshots don't. */
+function detail(itemId: number): ItemDetail | null {
+  const row = everyItem().find((item) => item.id === itemId);
+  if (!row) return null;
+  const folders: Crumb[] = [];
+  let at: number | undefined = row.folderId;
+  let home: SourceSummary | undefined;
+  while (at !== undefined && !home) {
+    const id: number = at;
+    home = SOURCES.find((candidate) => candidate.rootFolderId === id);
+    const step = PARENTS.get(id);
+    folders.unshift({ id, title: home?.title ?? step?.title ?? "" });
+    at = step?.parent;
+  }
+  if (!home) return null;
+  const video = row.kind === "video";
+  const dated = row.ext !== "png";
+  return {
+    ...row,
+    codec: video ? "h264" : null,
+    bitrate: video ? 8_000_000 : null,
+    capturedAt: dated ? 1_718_188_401 : null,
+    capturedSrc: dated ? (video ? "container" : "exif") : null,
+    addedAt: 1_750_000_000,
+    sourceId: home.id,
+    sourceKind: home.kind,
+    folders,
+    path: [home.root, ...folders.slice(1).map((crumb) => crumb.title), row.diskName].join("\\"),
+  };
+}
+
+/** The mock has no files, so every path it hands out is drawn: a wash in the item's own shape. */
+function drawn(path: string) {
+  const item = everyItem().find((row) => row.thumb === path || path.endsWith(`\\${row.diskName}`));
+  const [width, height] = [item?.width ?? 4, item?.height ?? 3];
+  const hue = ((item?.id ?? 0) * 47) % 360;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}"><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue} 45% 55%)"/><stop offset="1" stop-color="hsl(${(hue + 60) % 360} 45% 25%)"/></linearGradient><rect width="100%" height="100%" fill="url(#g)"/></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
 type Args = Record<string, unknown>;
 
 let storedPreferences: unknown = null;
@@ -94,6 +154,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   folder_children: ({ folderId }) => FOLDERS[folderId as number] ?? [],
   folder_items: ({ folderId }) => ITEMS[folderId as number] ?? [],
   item_tags: () => [],
+  item_detail: ({ itemId }) => detail(itemId as number),
   sorting_items: () => ITEMS[2] ?? [],
   start_index: () => null,
   index_progress: (): Progress => ({
@@ -114,3 +175,7 @@ mockIPC((cmd, payload) => {
   if (!command) throw new Error(`the dev mock does not know the command "${cmd}"`);
   return command((payload ?? {}) as Args);
 });
+// Tauri's own mock would turn each path into an asset URL that nothing here answers.
+(
+  window as unknown as { __TAURI_INTERNALS__: { convertFileSrc: (path: string) => string } }
+).__TAURI_INTERNALS__.convertFileSrc = drawn;

@@ -44,12 +44,13 @@ way a choice is offered.
 - **Comments split three ways.** A constraint a future edit would break *silently* stays in the
   source, in three lines at most. Why the design is this shape goes in `docs/DECISIONS.md`, and the
   source names the section. Bug history and "it used to be X" go in neither; git has them.
-- **Doc pointers are load-bearing.** Comments cite headings in the four docs by exact title, on
+- **Doc pointers are load-bearing.** Comments cite headings in the five docs by exact title, on
   one line. Rename a heading and fix its callers in the same commit. `check:docs` enforces this
   and the three-line limit.
 - **Primitives own every visual decision; surfaces compose them.** Sizes, colours and durations
   come from the token layer in `src/styles/app.css`. A component may look however it looks, but
-  it may not invent a number.
+  it may not invent a number. `docs/DESIGN.md` describes the tokens and every shape; a
+  feature that adds a shape adds it there.
 
 ## Gotchas
 
@@ -69,3 +70,4 @@ way a choice is offered.
 - [docs/DECISIONS.md](docs/DECISIONS.md) — why it is built this way
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — how to work on it
 - [docs/SCHEMA.md](docs/SCHEMA.md) — the tables and the rules the data keeps
+- [docs/DESIGN.md](docs/DESIGN.md) — how it looks: the tokens and the shapes

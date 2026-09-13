@@ -95,9 +95,53 @@ changed, so a queue that empties within a tick still says so.
 
 **320px on the longest edge, lossy WebP at quality 78**, as measured in ggallery: AVIF encoded
 41 times slower for a 12% saving. A picture is decoded by what the file holds, never by its
-extension; turned upright by its EXIF orientation; and keeps its transparency. A thumbnail is
-named by the item's uuid, so a rename or a move never orphans one, and making it is where an
-image's width and height are learned.
+extension; turned upright by its EXIF orientation; and keeps its transparency. A video's is a
+frame a tenth of the way in, and never later than ten minutes: past the fades and black leaders
+most clips open with, and early enough to still be the shot the file is about. A thumbnail is
+named by the item's uuid, so a rename or a move never orphans one.
+
+**Making a thumbnail is when a file is read.** A picture's width, height and capture date come
+from the decode that makes it, a video's from ffprobe, so nothing opens a file twice.
+`item.probed_at` records that it happened. A walk that finds a file changed clears it, and the
+index job queues every live picture and video still uncleared or missing its thumbnail.
+
+## Capture dates
+
+**Only the file's own metadata dates it.** For a picture, EXIF's DateTimeOriginal, else
+DateTimeDigitized; for a video, its container's creation time. Nothing is guessed. ggallery fell
+back to the file's creation time, but copying a file on Windows stamps a new creation time and
+keeps the modification time, so an imported library's "capture dates" were the day it was
+copied. The pane shows the modification time as a row of its own, named for what it is.
+
+EXIF's plain DateTime is not a capture date: editors rewrite it on every save. **A zeroed date is
+no date** — a camera whose clock was never set writes zeros, and a container never stamped says
+1904 or 1970.
+
+**EXIF has no time zone in the common case**, so its time is kept as the camera's clock read as
+UTC, and shown in UTC: as written, wherever the viewer is. A container's creation time is real
+UTC, and is shown in local time. Sorting across the two can be out by a zone's offset, which is
+the price of never inventing one.
+
+## Video and ffmpeg
+
+**ffmpeg is found, never installed.** At launch the app looks for `ffmpeg.exe` and `ffprobe.exe`
+together in `tools\` beside the executable, then in any one directory on PATH. Reading PATH
+writes nothing, so "Nothing outside the app folder" holds. Bundling it, so that a release needs
+nothing downloaded, is under PRODUCT.md "Later". Without it videos are not queued at all, so no
+failures pile up, and the first launch that finds it picks them up.
+
+**`media::ffmpeg` is the only place the app starts another program.** Every run has a limit — 30
+seconds to probe, 60 to take a frame — and is killed past it, so one damaged file cannot hold a
+worker; ggallery had none. Each file goes in as a `file:` input, so no file name is read as one
+of ffmpeg's other protocols, and no console window flashes.
+
+**A recording's rotation turns its shape.** A phone records a landscape sensor and a note to turn
+it, and ffmpeg draws the frames upright, so the width and height the index keeps are swapped to
+match. ggallery kept them unturned, and portrait videos laid out as landscape.
+
+**The window plays what WebView2 plays**: H.264 MP4 and WebM, but not HEVC without its extension,
+MKV or AVI. A video it cannot play keeps its poster and says so. Scrub strips wait for a surface
+that shows them.
 
 ## The window
 
@@ -181,6 +225,19 @@ layout and the tile size are kept with the other preferences.
 **A picture without a thumbnail yet lays out square**, and takes its real shape once the
 thumbnail job has read its size.
 
+## The pane
+
+**None of the first three structures**, compared live on 13 September 2026: the picture over its
+details scrolling together, the picture filling the pane with details on request, and a fixed
+split. The direction instead is the predecessor's, described by the user: the picture, a
+collapsible row holding its size and dimensions that opens to the rest of what is known, and a
+filmstrip along the bottom. It is the next feature built on the look; until then the pane shows
+the picture over its details.
+
+**What the pane knows comes from the file.** Capture dates, a video's length and codec, and a
+rotated recording's true shape are read when the thumbnail is made; "Capture dates" and "Video
+and ffmpeg" above say how.
+
 ## Testing in a real browser, never jsdom
 
 jsdom reports every element as zero-sized, so anything about size, overflow, position or
@@ -209,6 +266,54 @@ measured, never enumerated:** no hand-written pixel breakpoints. A control that 
 collapses because it did not fit, not because the window crossed a number somebody wrote down
 once and never re-measured.
 
+**Tailwind's own palette, radii, text sizes and shadows are cleared**, set on 13 September
+2026, so a class from them does nothing and a stray number cannot slip in through a familiar
+name. Contrast is measured by a test rather than trusted.
+
+## The design file
+
+**`docs/DESIGN.md` describes the look, in Google's open DESIGN.md format** (Apache-2.0, opened
+on 21 April 2026): tokens as front matter, then fixed sections from the overview to do's and
+don'ts. It is the convention coding agents now read for a design system, and it keeps the look
+in the same repository as the code, in plain text.
+
+**`app.css` stays the one place a value lives.** DESIGN.md repeats the base look's tokens so an
+agent can read them without parsing CSS, and `check:docs` fails the moment the two differ.
+Google's CLI for the format could lint and export it, but it is alpha and would be a dependency;
+the few checks that matter here are a page of our own script.
+
+**It grows with the app.** Each feature that adds a shape adds it there: the primitive, its
+states, its tokens. Nothing is described ahead of the feature that uses it.
+
+## The look
+
+**Taken from ggallery's drawing, re-derived rather than copied**, set on 13 September 2026 once
+three looks of this repository's own had been rejected. `docs/design/Filmstrip.dc.html` in
+ggallery, frozen there, is the reference for how Filmstrip looks. Its values are re-measured
+here and its markup is never lifted; each feature restyles on it as that feature is built.
+
+**What it holds:** warm near-neutral surfaces a step apart; warm grey ink in four weights; **no
+accent**, selection being a neutral pewter plate so that colour can mean something; controls a
+fixed height on a hairline ring, with one generous corner; a sunk trough for a choice between
+a few; a hatch where a picture is still to come.
+
+**Where this departs from it:**
+
+- **Dimmed ink is lighter**, `#908c86` for the drawing's `#77746f`, which measures 3.6:1 on the
+  drawing's own panel and fails AA for the counts and captions it sets.
+- **Every column's header row is one height**, 44px. The drawing used 44 for the side panels and
+  48 for the grid, so the rules beneath them never met.
+- **One corner for every control.** The drawing gave the same 32px buttons 8px in one place and
+  10px in another.
+- **Every navigation row's glyph is filled**, not only a folder's: a filled glyph names a thing,
+  and a control's outlined one names an action.
+
+**Its two fonts ship inside the app**, since the content security policy forbids fetching one:
+Material Symbols Rounded for every glyph (Apache 2.0, the `material-symbols` package) and Archivo
+ExtraBold for the wordmark alone (SIL OFL 1.1, `@fontsource/archivo`, its Latin file only). Both
+licences allow bundling in an open-source app. The icon font is whole, 5.4 MB, so any icon is a
+name away; subsetting it to the names in use is the way to shrink it once the set settles.
+
 ## Built in slices, not ported
 
 The interface is built from scratch rather than carried across from its predecessor.
@@ -220,3 +325,5 @@ hand and written them down. A drawing shows one width, one state, one text size 
 express what a window does at another width, at 200% zoom, or on the third click.
 
 What carries over is the backend, the product decisions, and those lessons. Not the markup.
+Since 13 September 2026 its drawing is the reference for the look, re-derived value by value;
+see "The look".

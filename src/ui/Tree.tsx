@@ -1,6 +1,7 @@
 import { type KeyboardEvent, useRef, useState } from "react";
 
-import { GLYPHS, type Glyph } from "./glyphs";
+import { Glyph } from "./Glyph";
+import type { GlyphName } from "./glyphs";
 
 export type TreeRow = {
   id: string;
@@ -9,7 +10,7 @@ export type TreeRow = {
   level: number;
   expandable: boolean;
   expanded?: boolean;
-  glyph?: Glyph;
+  glyph?: GlyphName;
   /** Muted text at the row's end: a count, or why the row is muted. */
   detail?: string;
   muted?: boolean;
@@ -85,54 +86,68 @@ export function Tree({ label, rows, selectedId, onSelect, onExpand, onCollapse }
   };
 
   return (
-    <div role="tree" aria-label={label} className="flex flex-col py-1">
-      {rows.map((row, index) => (
-        <div
-          key={row.id}
-          ref={(element) => {
-            if (element) elements.current.set(row.id, element);
-            else elements.current.delete(row.id);
-          }}
-          role="treeitem"
-          aria-level={row.level}
-          aria-expanded={row.expandable ? Boolean(row.expanded) : undefined}
-          aria-selected={row.id === selectedId}
-          tabIndex={row.id === tabStop ? 0 : -1}
-          onClick={(event) => {
-            setFocusId(row.id);
-            const onChevron = (event.target as Element).closest("[data-chevron]");
-            if (onChevron && row.expandable) toggle(row);
-            else onSelect(row.id);
-          }}
-          onDoubleClick={() => {
-            if (row.expandable) toggle(row);
-          }}
-          onKeyDown={(event) => onKeyDown(event, index)}
-          className={`focus-ring flex h-row shrink-0 cursor-default select-none items-center gap-1 pr-2 pl-1 text-ui transition-colors duration-(--motion-quick) motion-reduce:transition-none ${row.id === selectedId ? "bg-selected text-fg" : "hover:bg-hover"} ${row.muted ? "text-fg-muted" : ""} ${row.separated ? "mt-3" : ""}`}
-        >
-          <span
-            aria-hidden="true"
-            className="shrink-0"
-            style={{ width: `calc(var(--spacing-indent) * ${row.level - 1})` }}
-          />
-          <span
-            data-chevron
-            aria-hidden="true"
-            className="flex size-chevron shrink-0 items-center justify-center font-glyph text-glyph text-fg-muted"
+    <div role="tree" aria-label={label} className="flex flex-col gap-row-gap py-2">
+      {rows.map((row, index) => {
+        const selected = row.id === selectedId;
+        // A selected row is a filled plate; its hover washes over the plate rather than replacing it.
+        const tone = selected
+          ? "bg-plate text-on-plate hover-wash"
+          : `${row.muted ? "text-fg-dim" : "text-fg-mid"} hover:bg-wash hover:text-fg`;
+        const quiet = selected ? "text-on-plate" : "text-fg-dim";
+        return (
+          <div
+            key={row.id}
+            ref={(element) => {
+              if (element) elements.current.set(row.id, element);
+              else elements.current.delete(row.id);
+            }}
+            role="treeitem"
+            aria-level={row.level}
+            aria-expanded={row.expandable ? Boolean(row.expanded) : undefined}
+            aria-selected={selected}
+            tabIndex={row.id === tabStop ? 0 : -1}
+            onClick={(event) => {
+              setFocusId(row.id);
+              const onChevron = (event.target as Element).closest("[data-chevron]");
+              if (onChevron && row.expandable) toggle(row);
+              else onSelect(row.id);
+            }}
+            onDoubleClick={() => {
+              if (row.expandable) toggle(row);
+            }}
+            onKeyDown={(event) => onKeyDown(event, index)}
+            className={`focus-ring mx-row-inset flex h-row shrink-0 cursor-default select-none items-center gap-2 rounded-control pr-2 pl-1 text-row transition-colors duration-(--motion-quick) motion-reduce:transition-none ${tone} ${row.separated ? "mt-3" : ""}`}
           >
-            {row.expandable ? GLYPHS[row.expanded ? "chevronDown" : "chevronRight"] : null}
-          </span>
-          {row.glyph && (
-            <span aria-hidden="true" className="shrink-0 font-glyph text-icon text-fg-muted">
-              {GLYPHS[row.glyph]}
+            <span
+              aria-hidden="true"
+              className="shrink-0"
+              style={{ width: `calc(var(--spacing-indent) * ${row.level - 1})` }}
+            />
+            <span
+              data-chevron
+              aria-hidden="true"
+              className={`flex size-chevron shrink-0 items-center justify-center ${quiet}`}
+            >
+              {row.expandable && (
+                <Glyph
+                  name={row.expanded ? "chevronDown" : "chevronRight"}
+                  className="text-glyph"
+                />
+              )}
             </span>
-          )}
-          <span className="min-w-0 flex-1 truncate pl-1">{row.label}</span>
-          {row.detail && (
-            <span className="shrink-0 text-caption text-fg-muted tabular-nums">{row.detail}</span>
-          )}
-        </div>
-      ))}
+            {/* Filled, so a row reads as a thing; a control's outlined glyph reads as an action. */}
+            {row.glyph && <Glyph name={row.glyph} filled className={`text-icon ${quiet}`} />}
+            <span className="min-w-0 flex-1 truncate">{row.label}</span>
+            {row.detail && (
+              <span
+                className={`shrink-0 text-small tabular-nums ${selected ? "text-on-plate-dim" : "text-fg-dim"}`}
+              >
+                {row.detail}
+              </span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

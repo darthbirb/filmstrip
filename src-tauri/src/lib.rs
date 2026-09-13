@@ -35,10 +35,18 @@ pub fn run() {
                 scope.allow_directory(&source.root, true)?;
             }
 
+            // Looked for once, at launch. DECISIONS.md "Video and ffmpeg".
+            let ffmpeg = media::ffmpeg::Ffmpeg::discover(&config::app_dir()?.join("tools"));
+            match &ffmpeg {
+                Some(found) => eprintln!("ffmpeg: {}", found.location().display()),
+                None => eprintln!("ffmpeg: not found, so videos wait"),
+            }
+
             let handle = app.handle().clone();
             let queue = jobs::JobQueue::start(
                 db_path.clone(),
                 thumbs.clone(),
+                ffmpeg,
                 Box::new(move |progress| {
                     let _ = handle.emit(jobs::PROGRESS_EVENT, progress);
                 }),
@@ -77,6 +85,7 @@ pub fn run() {
             commands::folder_items,
             commands::sorting_items,
             commands::item_tags,
+            commands::item_detail,
             commands::start_index,
             commands::index_progress,
             commands::index_failures,

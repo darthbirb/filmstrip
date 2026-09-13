@@ -5,8 +5,11 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::db::{folders, now};
+use crate::db::folders::{self, Crumb};
+use crate::db::now;
+use crate::db::sources::SourceKind;
 use crate::error::Result;
+use crate::media::probe::Probe;
 
 #[derive(Debug, Clone)]
 pub struct NewItem {
@@ -76,7 +79,7 @@ pub fn upsert(conn: &Connection, item: &NewItem) -> Result<i64> {
             "UPDATE item
                 SET ext = ?1, hash = ?2, size_bytes = ?3, mtime = ?4, kind = ?5,
                     width = ?6, height = ?7, duration_ms = ?8, codec = ?9, bitrate = ?10,
-                    captured_at = ?11, captured_src = ?12, deleted_at = NULL
+                    captured_at = ?11, captured_src = ?12, probed_at = NULL, deleted_at = NULL
               WHERE id = ?13",
             params![
                 item.ext,
@@ -148,33 +151,37 @@ pub struct ItemRow {
     pub thumb: Option<String>,
 }
 
+/// The columns [`row`] reads, in its order, from `item` named `i`.
+const ROW: &str = "i.id, i.uuid, i.folder_id, i.disk_name, i.ext, i.kind, i.size_bytes, i.mtime,
+                   i.width, i.height, i.duration_ms, i.favorite";
+
+fn row(r: &rusqlite::Row) -> rusqlite::Result<ItemRow> {
+    Ok(ItemRow {
+        id: r.get(0)?,
+        uuid: r.get(1)?,
+        folder_id: r.get(2)?,
+        disk_name: r.get(3)?,
+        ext: r.get(4)?,
+        kind: r.get(5)?,
+        size_bytes: r.get(6)?,
+        mtime: r.get(7)?,
+        width: r.get(8)?,
+        height: r.get(9)?,
+        duration_ms: r.get(10)?,
+        favorite: r.get(11)?,
+        thumb: None,
+    })
+}
+
 /// The live items directly in a folder, by name whatever the case.
 pub fn in_folder(conn: &Connection, folder_id: i64) -> Result<Vec<ItemRow>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, uuid, folder_id, disk_name, ext, kind, size_bytes, mtime, width, height,
-                duration_ms, favorite
-           FROM item
-          WHERE folder_id = ?1 AND deleted_at IS NULL
-          ORDER BY disk_name COLLATE NOCASE",
-    )?;
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {ROW} FROM item i
+          WHERE i.folder_id = ?1 AND i.deleted_at IS NULL
+          ORDER BY i.disk_name COLLATE NOCASE"
+    ))?;
     let rows = stmt
-        .query_map(params![folder_id], |r| {
-            Ok(ItemRow {
-                id: r.get(0)?,
-                uuid: r.get(1)?,
-                folder_id: r.get(2)?,
-                disk_name: r.get(3)?,
-                ext: r.get(4)?,
-                kind: r.get(5)?,
-                size_bytes: r.get(6)?,
-                mtime: r.get(7)?,
-                width: r.get(8)?,
-                height: r.get(9)?,
-                duration_ms: r.get(10)?,
-                favorite: r.get(11)?,
-                thumb: None,
-            })
-        })?
+        .query_map(params![folder_id], row)?
         .collect::<rusqlite::Result<_>>()?;
     Ok(rows)
 }
@@ -248,74 +255,142 @@ pub fn finish_sweep(conn: &Connection, source_id: i64) -> Result<usize> {
 
 /// The live items in every sorting source, which the Sorting Box shows as one place.
 pub fn in_sorting(conn: &Connection) -> Result<Vec<ItemRow>> {
-    let mut stmt = conn.prepare(
-        "SELECT i.id, i.uuid, i.folder_id, i.disk_name, i.ext, i.kind, i.size_bytes, i.mtime,
-                i.width, i.height, i.duration_ms, i.favorite
-           FROM item i
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {ROW} FROM item i
            JOIN source s ON s.id = i.source_id
           WHERE s.kind = 'sorting' AND i.deleted_at IS NULL
-          ORDER BY i.disk_name COLLATE NOCASE",
-    )?;
-    let rows = stmt
-        .query_map([], |r| {
-            Ok(ItemRow {
-                id: r.get(0)?,
-                uuid: r.get(1)?,
-                folder_id: r.get(2)?,
-                disk_name: r.get(3)?,
-                ext: r.get(4)?,
-                kind: r.get(5)?,
-                size_bytes: r.get(6)?,
-                mtime: r.get(7)?,
-                width: r.get(8)?,
-                height: r.get(9)?,
-                duration_ms: r.get(10)?,
-                favorite: r.get(11)?,
-                thumb: None,
-            })
-        })?
-        .collect::<rusqlite::Result<_>>()?;
+          ORDER BY i.disk_name COLLATE NOCASE"
+    ))?;
+    let rows = stmt.query_map([], row)?.collect::<rusqlite::Result<_>>()?;
     Ok(rows)
 }
 
-/// Where an item's file is, and the uuid its thumbnail is named by.
+/// One item in full, as the pane shows it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ItemDetail {
+    #[serde(flatten)]
+    pub row: ItemRow,
+    pub codec: Option<String>,
+    pub bitrate: Option<i64>,
+    /// Seconds since 1970; from EXIF, the camera's clock read as UTC. DECISIONS.md "Capture dates".
+    pub captured_at: Option<i64>,
+    #[ts(type = "\"exif\" | \"container\" | null")]
+    pub captured_src: Option<String>,
+    pub added_at: i64,
+    pub source_id: i64,
+    pub source_kind: SourceKind,
+    /// From the source's own folder down to the item's.
+    pub folders: Vec<Crumb>,
+    /// The file, for the window to load. Empty until the command layer fills it in.
+    pub path: String,
+}
+
+/// The live item with this id, in full, or `None` once it is gone.
+pub fn detail(conn: &Connection, id: i64) -> Result<Option<ItemDetail>> {
+    let found = conn
+        .query_row(
+            &format!(
+                "SELECT {ROW}, i.codec, i.bitrate, i.captured_at, i.captured_src, i.added_at,
+                        s.id, s.kind
+                   FROM item i JOIN source s ON s.id = i.source_id
+                  WHERE i.id = ?1 AND i.deleted_at IS NULL"
+            ),
+            params![id],
+            |r| {
+                Ok(ItemDetail {
+                    row: row(r)?,
+                    codec: r.get(12)?,
+                    bitrate: r.get(13)?,
+                    captured_at: r.get(14)?,
+                    captured_src: r.get(15)?,
+                    added_at: r.get(16)?,
+                    source_id: r.get(17)?,
+                    source_kind: SourceKind::parse(&r.get::<_, String>(18)?),
+                    folders: Vec::new(),
+                    path: String::new(),
+                })
+            },
+        )
+        .optional()?;
+    let Some(mut detail) = found else {
+        return Ok(None);
+    };
+    detail.folders = folders::ancestry(conn, detail.row.folder_id)?;
+    Ok(Some(detail))
+}
+
+/// Where an item's file is, what kind it is, and the uuid its thumbnail is named by.
 #[derive(Debug, Clone)]
 pub struct ItemFile {
     pub folder_id: i64,
     pub disk_name: String,
     pub uuid: String,
+    pub kind: String,
 }
 
 pub fn file_of(conn: &Connection, id: i64) -> Result<Option<ItemFile>> {
     Ok(conn
         .query_row(
-            "SELECT folder_id, disk_name, uuid FROM item WHERE id = ?1",
+            "SELECT folder_id, disk_name, uuid, kind FROM item WHERE id = ?1",
             params![id],
             |r| {
                 Ok(ItemFile {
                     folder_id: r.get(0)?,
                     disk_name: r.get(1)?,
                     uuid: r.get(2)?,
+                    kind: r.get(3)?,
                 })
             },
         )
         .optional()?)
 }
 
-pub fn set_dimensions(conn: &Connection, id: i64, width: i64, height: i64) -> Result<()> {
+/// Records what reading the file taught, and that it has been read.
+pub fn record_media(conn: &Connection, id: i64, media: &Probe) -> Result<()> {
     conn.execute(
-        "UPDATE item SET width = ?1, height = ?2 WHERE id = ?3",
-        params![width, height, id],
+        "UPDATE item SET width = ?1, height = ?2, duration_ms = ?3, codec = ?4, bitrate = ?5,
+                         captured_at = ?6, captured_src = ?7, probed_at = ?8
+          WHERE id = ?9",
+        params![
+            media.width,
+            media.height,
+            media.duration_ms,
+            media.codec,
+            media.bitrate,
+            media.captured_at,
+            media.captured_src,
+            now(),
+            id,
+        ],
     )?;
     Ok(())
 }
 
-/// Every live image, with the uuid its thumbnail is named by.
-pub fn live_images(conn: &Connection) -> Result<Vec<(i64, String)>> {
-    let mut stmt =
-        conn.prepare("SELECT id, uuid FROM item WHERE kind = 'image' AND deleted_at IS NULL")?;
+/// A live picture or video, and whether its file has been read since it last changed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LiveMedia {
+    pub id: i64,
+    pub uuid: String,
+    pub read: bool,
+}
+
+/// Every live picture, and every live video too when `videos` is set.
+pub fn live_media(conn: &Connection, videos: bool) -> Result<Vec<LiveMedia>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, uuid, probed_at IS NOT NULL FROM item
+          WHERE deleted_at IS NULL AND (kind = 'image' OR (?1 AND kind = 'video'))
+          ORDER BY id",
+    )?;
     let rows = stmt
-        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .query_map(params![videos], |r| {
+            Ok(LiveMedia {
+                id: r.get(0)?,
+                uuid: r.get(1)?,
+                read: r.get(2)?,
+            })
+        })?
         .collect::<rusqlite::Result<_>>()?;
     Ok(rows)
 }
@@ -512,5 +587,58 @@ mod tests {
             "unseen in the walked source, so retired"
         );
         assert!(!deleted(in_incoming), "another source was never walked");
+    }
+
+    #[test]
+    fn a_file_changed_on_disk_must_be_read_again() {
+        let (conn, root) = library();
+        let picture = upsert(&conn, &sample(1, root, "a.jpg")).unwrap();
+        let clip = upsert(
+            &conn,
+            &NewItem {
+                kind: "video".into(),
+                ..sample(1, root, "b.mp4")
+            },
+        )
+        .unwrap();
+        let notes = NewItem {
+            kind: "other".into(),
+            ..sample(1, root, "c.txt")
+        };
+        upsert(&conn, &notes).unwrap();
+        let unread = |videos| -> Vec<i64> {
+            live_media(&conn, videos)
+                .unwrap()
+                .into_iter()
+                .filter(|media| !media.read)
+                .map(|media| media.id)
+                .collect()
+        };
+
+        assert_eq!(
+            unread(false),
+            [picture],
+            "videos wait for ffmpeg; other files are never read"
+        );
+        assert_eq!(unread(true), [picture, clip]);
+
+        let learned = Probe {
+            width: Some(4),
+            height: Some(3),
+            ..Probe::default()
+        };
+        record_media(&conn, picture, &learned).unwrap();
+        assert!(unread(false).is_empty());
+
+        let changed = NewItem {
+            size_bytes: 5,
+            ..sample(1, root, "a.jpg")
+        };
+        upsert(&conn, &changed).unwrap();
+        assert_eq!(
+            unread(false),
+            [picture],
+            "a refreshed row forgets it was read"
+        );
     }
 }

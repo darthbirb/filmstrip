@@ -14,11 +14,11 @@ export function WindowBar({ search }: { search?: ReactNode }) {
   return (
     <header
       data-tauri-drag-region
-      className="grid h-caption shrink-0 select-none grid-cols-[1fr_minmax(0,var(--spacing-bar-search))_1fr] items-center"
+      className="grid h-caption shrink-0 select-none grid-cols-[1fr_minmax(0,var(--spacing-bar-search))_1fr] items-center bg-panel"
     >
       {/* Ignores the pointer, so the bar beneath it still drags. */}
       <span
-        className={`pointer-events-none flex items-center gap-3 justify-self-start px-3 text-caption ${dimmed ? "text-fg-muted" : ""}`}
+        className={`pointer-events-none flex items-center gap-2.25 justify-self-start pr-3 pl-2.5 font-brand text-wordmark ${dimmed ? "text-fg-dim" : "text-fg"}`}
       >
         <img src={mark} alt="" className="size-mark" />
         Filmstrip

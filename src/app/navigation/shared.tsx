@@ -95,5 +95,5 @@ export function rowFolder(id: string) {
 }
 
 export function NoSources() {
-  return <p className="px-3 py-2 text-fg-muted text-ui">No sources yet.</p>;
+  return <p className="px-3 py-2 text-fg-dim text-ui">No sources yet.</p>;
 }

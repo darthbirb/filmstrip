@@ -1,55 +1,24 @@
 @import "tailwindcss";
+/* Bundled with the app and never fetched, as the CSP requires. DECISIONS.md "The look". */
+@import "material-symbols/rounded.css";
+@import "@fontsource/archivo/latin-800.css";
 
-/* The token layer: every size, colour and duration a component may use. DECISIONS.md "The scale is the arbiter". */
-/* Static, so every token is emitted and script can read it. */
-@theme static {
-  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  /* Installed with Windows, never fetched. */
-  --font-glyph: "Segoe Fluent Icons", "Segoe MDL2 Assets";
-
-  --color-ground: oklch(0.19 0 0);
-  --color-panel: oklch(0.215 0 0);
-  --color-line: oklch(1 0 0 / 0.08);
-  --color-fg: oklch(0.93 0 0);
-  --color-fg-muted: oklch(0.93 0 0 / 0.45);
-  --color-hover: oklch(1 0 0 / 0.06);
-  --color-press: oklch(1 0 0 / 0.04);
-  --color-selected: oklch(1 0 0 / 0.1);
-  --color-danger: #c42b1c;
-  --color-danger-press: rgb(196 43 28 / 0.9);
-  --color-on-danger: #fff;
-  --color-focus: oklch(0.93 0 0);
-
-  /* Windows 11 caption buttons and glyphs, 46px and 10px; the strip is 36px to seat search. */
-  --spacing-caption: 2.25rem;
-  --spacing-caption-button: 2.875rem;
-  --spacing-mark: 1rem;
-  --spacing-toolbar: 2.5rem;
-  --spacing-rail: 2.5rem;
-  --spacing-splitter: 0.375rem;
-  --spacing-bar-field: 1.75rem;
-  --spacing-bar-search: 36rem;
-  --spacing-row: 2rem;
-  --spacing-indent: 1rem;
-  --spacing-chevron: 1rem;
-  --spacing-tile-gap: 0.25rem;
-
-  --shadow-overlay: 0 0.5rem 2rem oklch(0 0 0 / 0.5);
-
-  --text-caption: 0.8125rem;
-  --text-caption--line-height: 1;
-  --text-ui: 0.875rem;
-  --text-ui--line-height: calc(1.25 / 0.875);
-  --text-glyph: 0.625rem;
-  --text-glyph--line-height: 1;
-  --text-icon: 1rem;
-  --text-icon--line-height: 1;
-}
-
+/* The token layer: every size, colour and duration a component may use. DESIGN.md "Colors". */
+/* docs/DESIGN.md lists these values, and check:docs holds the two equal. */
 :root {
   color-scheme: dark;
+
   --motion-quick: 120ms;
   --focus-width: 2px;
+  --focus-gap: 2px;
+  --z-overlay: 20;
+  /* The width of one band in the hatch that stands in for a picture not made yet. */
+  --hatch-band: 0.5rem;
+  /* Material Symbols' weight axis: the drawing's hairline glyphs, one weight at every size. */
+  --glyph-weight: 300;
+
+  /* The tallest a picture stands in the pane at its own shape, so a panorama never runs away. */
+  --pane-media-max: 70dvh;
 
   /* Panel widths in rem; the frame reads them to decide what fits. */
   --frame-nav: 15rem;
@@ -66,17 +35,193 @@
   --tile-default: 10rem;
 }
 
+/* Static, so every token is emitted and script can read it. Tailwind's own scales are cleared. */
+@theme static {
+  --color-*: initial;
+  --radius-*: initial;
+  --text-*: initial;
+  --shadow-*: initial;
+  --font-*: initial;
+
+  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  /* The wordmark's face and nowhere else. */
+  --font-brand: "Archivo", "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  --font-glyph: "Material Symbols Rounded";
+
+  /* Surfaces, darkest first, each a warm neutral one step from the next. */
+  --color-well: #0e0e0e;
+  --color-ground: #141414;
+  --color-panel: #1b1b1b;
+  --color-inset: #1f1f1f;
+  --color-raised: #242424;
+  --color-raised-hi: #2e2e2e;
+  --color-plate: #b9b6b0;
+  --color-hatch: #3c3a37;
+  --color-hatch-alt: #333130;
+
+  --color-line: #262626;
+  --color-line-control: #303030;
+  --color-line-control-hi: #3a3a3a;
+  --color-line-strong: #6b6863;
+
+  --color-fg-hi: #f4f3f1;
+  --color-fg: #eceae7;
+  --color-fg-mid: #a8a5a0;
+  --color-fg-dim: #908c86;
+  --color-fg-faint: #5c5a56;
+  --color-on-plate: #17181a;
+  --color-on-plate-dim: rgb(23 24 26 / 0.62);
+  --color-focus: #f2f2f2;
+
+  --color-wash: rgb(255 255 255 / 0.09);
+  --color-badge: rgb(242 242 242 / 0.94);
+
+  --color-danger: #c25a4a;
+  --color-danger-press: #a94f41;
+  --color-on-danger: #f2f2f2;
+
+  --radius-badge: 6px;
+  --radius-nested: 8px;
+  --radius-control: 10px;
+
+  --shadow-overlay: 0 18px 44px rgb(0 0 0 / 0.6);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+
+  /* Windows 11 caption buttons and glyphs, 46px and 10px; the strip is 36px to seat search. */
+  --spacing-caption: 2.25rem;
+  --spacing-caption-button: 2.875rem;
+  --spacing-mark: 1.125rem;
+  --spacing-toolbar: 2.75rem;
+  --spacing-rail: 2.75rem;
+  --spacing-splitter: 0.25rem;
+  --spacing-grip: 1.625rem;
+  --spacing-grip-width: 0.125rem;
+  --spacing-bar-field: 1.75rem;
+  --spacing-bar-search: 36rem;
+  --spacing-row: 2.125rem;
+  --spacing-row-inset: 0.5rem;
+  --spacing-row-gap: 0.1875rem;
+  --spacing-indent: 1rem;
+  --spacing-chevron: 1.25rem;
+  --spacing-control: 2rem;
+  --spacing-segment-inset: 0.1875rem;
+  --spacing-chip: 1.625rem;
+  --spacing-badge: 1.25rem;
+  --spacing-tile-gap: 0.375rem;
+  --spacing-tile-inset: 0.5rem;
+  --spacing-slider: 6rem;
+  --spacing-slider-track: 0.1875rem;
+  --spacing-slider-thumb: 0.875rem;
+
+  --text-title: 1.0625rem;
+  --text-title--line-height: 1.5rem;
+  --text-title--font-weight: 600;
+  --text-title--letter-spacing: -0.02em;
+  --text-row: 0.875rem;
+  --text-row--line-height: 1.25rem;
+  --text-ui: 0.8125rem;
+  --text-ui--line-height: 1.25rem;
+  --text-small: 0.75rem;
+  --text-small--line-height: 1rem;
+  --text-eyebrow: 0.6875rem;
+  --text-eyebrow--line-height: 1rem;
+  --text-eyebrow--font-weight: 600;
+  --text-eyebrow--letter-spacing: 0.12em;
+  --text-wordmark: 0.875rem;
+  --text-wordmark--line-height: 1.25rem;
+  --text-wordmark--font-weight: 800;
+  --text-wordmark--letter-spacing: -0.035em;
+  --text-glyph-small: 0.75rem;
+  --text-glyph-small--line-height: 1;
+  --text-glyph: 0.9375rem;
+  --text-glyph--line-height: 1;
+  --text-icon: 1.125rem;
+  --text-icon--line-height: 1;
+}
+
+/* Outside the element, clear of what it sits on; flush controls take the inset form instead. */
 @utility focus-ring {
+  &:focus-visible {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: var(--focus-gap);
+  }
+}
+
+@utility focus-ring-inset {
   &:focus-visible {
     outline: var(--focus-width) solid var(--color-focus);
     outline-offset: calc(var(--focus-width) * -1);
   }
 }
 
+/* A ligature: the icon's name as text, drawn as one square. Capitals or spacing would spell it out. */
+@utility glyph {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 1em;
+  height: 1em;
+  overflow: hidden;
+  font-family: var(--font-glyph);
+  font-weight: normal;
+  font-style: normal;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  direction: ltr;
+  font-feature-settings: "liga";
+  font-variation-settings:
+    "wght" var(--glyph-weight),
+    "FILL" var(--glyph-fill, 0);
+  -webkit-font-smoothing: antialiased;
+}
+
+@utility glyph-fill {
+  --glyph-fill: 1;
+}
+
+/* The hover of something that is already filled: a wash over its fill rather than a new one. */
+@utility hover-wash {
+  &:hover {
+    box-shadow: inset 0 0 0 100vmax var(--color-wash);
+  }
+}
+
+/* Stands in for a picture that has no thumbnail yet: content to come, not a surface. */
+@utility hatch {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-hatch) 0 var(--hatch-band),
+    var(--color-hatch-alt) var(--hatch-band) calc(var(--hatch-band) * 2)
+  );
+}
+
 /* Thin scrollbars in the token colours, in place of the classic Windows ones with arrow buttons. */
 @layer base {
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-fg-muted) transparent;
+    scrollbar-color: var(--color-line-control-hi) transparent;
+  }
+}
+
+/* The slider's track fills up to its value; the Slider primitive sets --fill. */
+@layer components {
+  .slider {
+    appearance: none;
+    height: var(--spacing-slider-track);
+    border-radius: calc(infinity * 1px);
+    background: linear-gradient(
+      to right,
+      var(--color-fg-mid) var(--fill, 0%),
+      var(--color-line-control-hi) var(--fill, 0%)
+    );
+  }
+
+  .slider::-webkit-slider-thumb {
+    appearance: none;
+    width: var(--spacing-slider-thumb);
+    height: var(--spacing-slider-thumb);
+    border-radius: calc(infinity * 1px);
+    background: var(--color-fg);
+    box-shadow: 0 0 0 var(--focus-gap) var(--color-panel);
   }
 }

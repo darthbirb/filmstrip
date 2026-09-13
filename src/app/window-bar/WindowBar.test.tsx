@@ -48,16 +48,33 @@ test("the bar dims while another window has focus", async () => {
   const screen = await render(<WindowBar />);
   const close = screen.getByRole("button", { name: "Close" }).element();
   const colour = () => getComputedStyle(close).color;
-  const token = (name: string) =>
-    getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  // A token as the browser paints it, so its spelling in the stylesheet does not matter.
+  const token = (name: string) => {
+    const probe = document.createElement("span");
+    probe.style.color = `var(${name})`;
+    document.body.append(probe);
+    const painted = getComputedStyle(probe).color;
+    probe.remove();
+    return painted;
+  };
   // Rest the pointer on the bar itself, so no button is hovered.
   await userEvent.hover(screen.getByRole("banner"));
 
-  await expect.poll(colour).toBe(token("--color-fg"));
+  await expect.poll(colour).toBe(token("--color-fg-mid"));
   await emit("tauri://blur");
-  await expect.poll(colour).toBe(token("--color-fg-muted"));
+  await expect.poll(colour).toBe(token("--color-fg-faint"));
   await emit("tauri://focus");
-  await expect.poll(colour).toBe(token("--color-fg"));
+  await expect.poll(colour).toBe(token("--color-fg-mid"));
+});
+
+test("the name is set in the bundled Archivo", async () => {
+  recordIPC();
+  const faces = await document.fonts.load("800 14px Archivo", "Filmstrip");
+  expect(faces.length).toBeGreaterThan(0);
+  const screen = await render(<WindowBar />);
+  const name = screen.getByText("Filmstrip").element();
+  expect(getComputedStyle(name).fontFamily).toMatch(/^"?Archivo/);
+  expect(getComputedStyle(name).fontWeight).toBe("800");
 });
 
 test("the bar is sized in rem, so it follows the text size", async () => {
