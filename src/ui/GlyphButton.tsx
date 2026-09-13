@@ -6,18 +6,20 @@ type Props = {
   label: string;
   onClick: () => void;
   pressed?: boolean;
+  disabled?: boolean;
 };
 
 /** A control-sized square holding one glyph, on a raised ring; its label is its name and tooltip. */
-export function GlyphButton({ glyph, label, onClick, pressed }: Props) {
+export function GlyphButton({ glyph, label, onClick, pressed, disabled = false }: Props) {
   return (
     <button
       type="button"
       aria-label={label}
       aria-pressed={pressed}
       title={label}
+      disabled={disabled}
       onClick={onClick}
-      className="focus-ring grid size-control shrink-0 place-items-center rounded-control bg-raised text-fg-mid text-icon inset-ring inset-ring-line-control transition-colors duration-(--motion-quick) hover:bg-raised-hi hover:text-fg active:bg-inset aria-pressed:bg-raised-hi aria-pressed:text-fg motion-reduce:transition-none"
+      className="focus-ring grid size-control shrink-0 place-items-center rounded-control bg-raised text-fg-mid text-icon inset-ring inset-ring-line-control transition-colors duration-(--motion-quick) enabled:hover:bg-raised-hi enabled:hover:text-fg enabled:active:bg-inset disabled:bg-inset disabled:text-fg-faint disabled:inset-ring-line aria-pressed:bg-raised-hi aria-pressed:text-fg motion-reduce:transition-none"
     >
       <Glyph name={glyph} />
     </button>

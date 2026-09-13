@@ -6,6 +6,7 @@ import { Chip } from "./Chip";
 import { Glyph } from "./Glyph";
 import { Segmented } from "./Segmented";
 import { Slider } from "./Slider";
+import { THUMB_FRAME, ThumbFace } from "./Thumb";
 
 test("a segmented control raises the choice made and reports the next one", async () => {
   const chose = vi.fn();
@@ -46,6 +47,22 @@ test("a glyph draws as one bundled icon a square across, even inside capitals", 
   ink.selectNodeContents(glyph);
   // Spelt out as letters, the name would run several times wider than the icon.
   await expect.poll(() => ink.getBoundingClientRect().width).toBeCloseTo(18, 0);
+});
+
+test("a tile too narrow for the in-pane words keeps the mark alone", async () => {
+  const screen = await render(
+    <>
+      <button type="button" className={THUMB_FRAME} style={{ width: 80, height: 120 }}>
+        <ThumbFace current />
+      </button>
+      <button type="button" className={THUMB_FRAME} style={{ width: 240, height: 120 }}>
+        <ThumbFace current />
+      </button>
+    </>,
+  );
+  const words = screen.getByText("In pane").elements();
+  const shown = words.map((word) => getComputedStyle(word).display !== "none");
+  expect(shown).toEqual([false, true]);
 });
 
 test("a label chip always shows its key, and a tag has none", async () => {

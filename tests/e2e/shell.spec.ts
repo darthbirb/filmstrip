@@ -52,7 +52,9 @@ test("a clicked picture shows in the pane at every size", async ({ page }, testI
       const show = page.getByRole("button", { name: "Show pane" });
       if (await show.isVisible()) await show.click();
       const pane = page.getByRole("complementary", { name: "Pane" });
-      await expect(pane.getByRole("heading", { name: "cover.jpg" })).toBeVisible();
+      await expect(pane.getByRole("heading", { name: "cover.jpg" })).toBeAttached();
+      await expect(pane.getByRole("img", { name: "cover.jpg" })).toBeVisible();
+      await expect(pane.getByRole("button", { name: /×/ })).toBeInViewport();
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
       );

@@ -33,6 +33,19 @@ test("a wide window docks navigation, grid and pane", async () => {
   expect(screen.getByRole("button", { name: "Show pane" }).elements()).toHaveLength(0);
 });
 
+test("the pane's header row holds what the pane puts there, beside its fold button", async () => {
+  await page.viewport(1600, 900);
+  const screen = await render(
+    <div className="flex h-dvh flex-col">
+      <Frame pane={<p>pane content</p>} paneHeader={<p>pane header</p>} />
+    </div>,
+  );
+  const header = screen.getByText("pane header");
+  await expect.element(header).toBeVisible();
+  const row = screen.getByRole("button", { name: "Hide pane" }).element().parentElement;
+  expect(row?.contains(header.element())).toBe(true);
+});
+
 test("the pane folds first as room runs out, then navigation", async () => {
   await page.viewport(640, 480);
   const screen = await renderFrame();

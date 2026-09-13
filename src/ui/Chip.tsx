@@ -1,3 +1,16 @@
+import type { ReactNode } from "react";
+
+/** A measured value as a chip: a shape, a length, a size. Quiet for what only names a kind. */
+export function Stat({ children, quiet = false }: { children: ReactNode; quiet?: boolean }) {
+  return (
+    <span
+      className={`inline-flex h-chip items-center rounded-nested bg-raised px-2 text-small tabular-nums ${quiet ? "text-fg-mid" : "text-fg"}`}
+    >
+      {children}
+    </span>
+  );
+}
+
 type Props = {
   value: string;
   /** A label's key. A label is never shown without it. PRODUCT.md "Tags and labels". */

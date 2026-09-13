@@ -25,10 +25,16 @@ const COPY = {
   },
 } as const;
 
-type Props = { layout: FrameLayout; side: Side; children?: ReactNode };
+type Props = {
+  layout: FrameLayout;
+  side: Side;
+  /** What the panel puts in its header row, beside the fold button. */
+  header?: ReactNode;
+  children?: ReactNode;
+};
 
 /** Navigation or the pane: docked beside a splitter, or folded to a rail that opens it over the grid. */
-export function SidePanel({ layout, side, children }: Props) {
+export function SidePanel({ layout, side, header, children }: Props) {
   const copy = COPY[side];
   const width = `${layout.widths[side]}rem`;
   const limits = layout.metrics[side];
@@ -39,12 +45,13 @@ export function SidePanel({ layout, side, children }: Props) {
 
   const body = (
     <>
-      <div className="flex h-toolbar shrink-0 items-center justify-end gap-1 border-line border-b pr-1.5 pl-3">
+      <div className="flex h-toolbar shrink-0 items-center justify-end gap-1.5 border-line border-b px-1.5">
         {copy.caption && (
-          <span className="min-w-0 flex-1 truncate text-eyebrow text-fg-dim uppercase">
+          <span className="min-w-0 flex-1 truncate pl-1.5 text-eyebrow text-fg-dim uppercase">
             {copy.caption}
           </span>
         )}
+        {header && <div className="min-w-0 flex-1">{header}</div>}
         <GlyphButton glyph={copy.hideGlyph} label={copy.hide} onClick={() => layout.hide(side)} />
       </div>
       <div className="min-h-0 flex-1 overflow-auto">{children}</div>

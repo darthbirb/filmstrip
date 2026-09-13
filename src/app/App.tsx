@@ -8,7 +8,8 @@ import { DEFAULT_LAYOUT } from "./grid/layout";
 import { TileSize } from "./grid/TileSize";
 import { Breadcrumb } from "./navigation/Breadcrumb";
 import { Navigation } from "./navigation/Navigation";
-import { Pane } from "./pane/Pane";
+import { Pane, PaneHeader } from "./pane/Pane";
+import { PaneDetailProvider } from "./pane/pane-detail";
 import { usePreferences, useScaleHotkeys } from "./preferences";
 import { WindowBar } from "./window-bar/WindowBar";
 
@@ -22,18 +23,21 @@ export function App() {
   return (
     <div className="flex h-dvh flex-col bg-ground text-fg">
       <WindowBar search={SEARCH} />
-      <Frame
-        nav={<Navigation />}
-        location={
-          <>
-            <Breadcrumb />
-            <LayoutToggle />
-            <TileSize />
-          </>
-        }
-        grid={<Grid mode={layout} />}
-        pane={<Pane />}
-      />
+      <PaneDetailProvider>
+        <Frame
+          nav={<Navigation />}
+          location={
+            <>
+              <Breadcrumb />
+              <LayoutToggle />
+              <TileSize />
+            </>
+          }
+          grid={<Grid mode={layout} />}
+          pane={<Pane />}
+          paneHeader={<PaneHeader />}
+        />
+      </PaneDetailProvider>
       {import.meta.env.DEV && (
         <footer className="flex items-center gap-4 border-line border-t px-3 py-1 text-fg-dim text-small">
           <DisplayReadout />

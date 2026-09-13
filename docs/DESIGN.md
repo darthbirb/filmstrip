@@ -72,6 +72,10 @@ typography:
     fontFamily: Material Symbols Rounded
     fontSize: 1.125rem
     lineHeight: "1"
+  glyph-large:
+    fontFamily: Material Symbols Rounded
+    fontSize: 2rem
+    lineHeight: "1"
 rounded:
   badge: 6px
   nested: 8px
@@ -101,6 +105,8 @@ spacing:
   slider: 6rem
   slider-track: 0.1875rem
   slider-thumb: 0.875rem
+  strip: 6rem
+  strip-inset: 0.375rem
 components:
   window-bar:
     backgroundColor: "{colors.panel}"
@@ -193,6 +199,34 @@ components:
   media-well:
     backgroundColor: "{colors.well}"
     rounded: "{rounded.control}"
+  pane-disclosure:
+    textColor: "{colors.fg-mid}"
+    typography: "{typography.ui}"
+    rounded: "{rounded.control}"
+    height: "{spacing.control}"
+  pane-disclosure-hover:
+    backgroundColor: "{colors.wash}"
+    textColor: "{colors.fg}"
+  pane-disclosure-open:
+    backgroundColor: "{colors.raised}"
+  pane-empty-glyph:
+    textColor: "{colors.fg-faint}"
+    typography: "{typography.glyph-large}"
+  filmstrip:
+    backgroundColor: "{colors.panel}"
+    height: "{spacing.strip}"
+    padding: "{spacing.strip-inset}"
+  filmstrip-frame:
+    rounded: "{rounded.control}"
+  glyph-button-disabled:
+    backgroundColor: "{colors.inset}"
+    textColor: "{colors.fg-faint}"
+  stat-chip:
+    backgroundColor: "{colors.raised}"
+    textColor: "{colors.fg}"
+    typography: "{typography.small}"
+    rounded: "{rounded.nested}"
+    height: "{spacing.chip}"
   facts-term:
     textColor: "{colors.fg-dim}"
     typography: "{typography.eyebrow}"
@@ -272,13 +306,14 @@ fetched. Counts, sizes and dates set in tabular figures.
 
 | Role | Size and line | For |
 | --- | --- | --- |
-| `title` | 17 on 24, semibold, tight | The place the grid shows; the pane's heading. |
+| `title` | 17 on 24, semibold, tight | The place the grid shows. |
 | `row` | 14 on 20 | A navigation row; a step back in the breadcrumb. |
 | `ui` | 13 on 20 | The working size: a control's label, a fact's value, prose. |
 | `small` | 12 on 16 | A count, a chip. |
 | `eyebrow` | 11 on 16, semibold, spaced, capitals | A panel's caption, a fact's term, the in-pane mark. |
 | `wordmark` | 14 on 20, extra bold, tight | The name beside the mark in the bar. |
 | `glyph-small`, `glyph`, `icon` | 12, 15 and 18 | A small mark: the maximise square, a chevron in a fact, the in-pane eye. Caption glyphs and chevrons. A control's or a row's glyph. |
+| `glyph-large` | 32 | The picture that stands in an empty pane. |
 
 ## Layout
 
@@ -291,6 +326,9 @@ measured, never a breakpoint. DECISIONS.md "The interface size" has the reasonin
 - **Controls** are `control` tall. **Navigation rows** are `row` tall, inset from the panel edge by
   `row-inset`, `row-gap` apart.
 - **Tiles** are `tile-gap` apart; what sits on a tile sits `tile-inset` from its corner.
+- **The pane** stacks its details when opened, at most half its height; the picture, taking the
+  rest; and a `strip`-tall filmstrip, its frames `strip-inset` in from its edges and `tile-gap`
+  apart, each the `--aspect-strip` shape whatever the picture's own.
 
 ## Elevation & Depth
 
@@ -319,7 +357,8 @@ edge takes it inside. Pressing steps back toward the rest surface.
   pointer; close turns `danger`. While another window has focus they fall to `fg-faint`.
 - **Panels.** `panel`, a `line` at the edge facing the grid, a header row with the panel's name in
   `eyebrow` capitals and its fold button.
-- **Glyph button.** A `control` square on `raised` with a `line-control` ring.
+- **Glyph button.** A `control` square on `raised` with a `line-control` ring. Disabled, it sinks
+  to `inset` on a `line` ring, its glyph `fg-faint`.
 - **Tree row.** Chevron, glyph, name and count. At rest the name is `fg-mid`; under the pointer a
   `wash`; selected, a `plate` with `on-plate` ink, its count dimmed.
 - **Breadcrumb.** Folders above as quiet `row` steps back, the place itself as the `title`.
@@ -328,14 +367,25 @@ edge takes it inside. Pressing steps back toward the rest surface.
 - **Slider.** A thin track, filled in `fg-mid` up to its value, and a round thumb.
 - **Tile.** The picture cropped to a `control`-cornered cell, over the hatch until its thumbnail
   exists. A `line-strong` ring under the pointer; the tile the pane shows carries a `focus` ring
-  and an *In pane* badge.
+  and an *In pane* badge, which never wraps and drops its words on a tile narrower than
+  `--container-badge`.
+- **Pane disclosure.** The pane's header row: a chevron and the item's shape, length and size in
+  tabular `ui` figures. A `wash` under the pointer; opened, it rests on `raised` and the chevron
+  turns down.
+- **Filmstrip.** A frame for each item in the place, stepped through between two glyph buttons.
+  The frame shown is centred and carries the `focus` ring; the rest sit back at `--strip-rest`
+  until the pointer is on one.
+- **Empty pane.** A `glyph-large` picture in `fg-faint` over a line of `ui` and one of `small`.
+- **Stat chip.** A measured value, a shape, a length or a size, on `raised` at `nested` corners.
+  The kind of file after them is the same chip in `fg-mid`.
 - **Facts.** Terms in `eyebrow` capitals, in a column as wide as the longest of them, values in
   `fg-mid`, each row the height of a chip.
 - **Chip.** A tag is a pill, raised with a ring; inherited, it sinks to `inset`. A label splits into
   a sunk key and its value, and is never shown without the key.
 
-**Motion is filtered by frequency.** Colour changes take `--motion-quick` (120ms) ease-out and
-turn off under reduced motion. Nothing the keyboard does animates.
+**Motion is filtered by frequency.** Colour changes and the disclosure's chevron take
+`--motion-quick` (120ms) ease-out; opened details drop in over `--motion-reveal` (180ms). Both
+turn off under reduced motion, and scrolling the strip to its frame never animates.
 
 ## Do's and Don'ts
 

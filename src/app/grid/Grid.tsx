@@ -4,7 +4,7 @@ import { type ReactElement, type RefObject, useLayoutEffect, useRef, useState } 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
 import { showInPane, usePaneItem } from "../pane/pane-store";
-import { usePlace } from "../place";
+import { type Place, usePlace } from "../place";
 import { usePreferences } from "../preferences";
 import { type LayoutMode, rowAt } from "./layout";
 import { tileSize } from "./TileSize";
@@ -13,7 +13,8 @@ import { useLayout } from "./useLayout";
 
 /** The current place's pictures, laid out in rows and drawn only where they can be seen. */
 export function Grid({ mode }: { mode: LayoutMode }) {
-  const items = useGridItems(usePlace());
+  const place = usePlace();
+  const items = useGridItems(place);
   const inPane = usePaneItem();
   const { tile } = usePreferences();
   const scroller = useRef<HTMLDivElement>(null);
@@ -36,6 +37,7 @@ export function Grid({ mode }: { mode: LayoutMode }) {
           <Tile
             key={item.id}
             item={item}
+            from={place}
             shown={item.id === inPane}
             left={(result.itemLeft[index] ?? 0) + gap}
             top={(result.rowTops[row] ?? 0) + gap}
@@ -62,6 +64,8 @@ export function Grid({ mode }: { mode: LayoutMode }) {
 
 type TileProps = {
   item: ItemRow;
+  /** The place it is listed in, which the pane's filmstrip then runs through. */
+  from: Place | null;
   /** Whether the pane is showing it. */
   shown: boolean;
   left: number;
@@ -70,14 +74,14 @@ type TileProps = {
   height: number;
 };
 
-function Tile({ item, shown, left, top, width, height }: TileProps) {
+function Tile({ item, from, shown, left, top, width, height }: TileProps) {
   return (
     <figure title={item.diskName} className="absolute m-0" style={{ left, top, width, height }}>
       <button
         type="button"
         aria-label={item.diskName}
         aria-current={shown || undefined}
-        onClick={() => showInPane(item.id)}
+        onClick={() => showInPane(item.id, from)}
         className={`focus-ring block size-full ${THUMB_FRAME}`}
       >
         <ThumbFace src={item.thumb ? convertFileSrc(item.thumb) : undefined} current={shown} />

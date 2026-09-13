@@ -9,10 +9,12 @@ export type Regions = {
   location?: ReactNode;
   grid?: ReactNode;
   pane?: ReactNode;
+  /** Beside the pane's fold button, in its header row. */
+  paneHeader?: ReactNode;
 };
 
 /** Navigation, the grid and the pane as docked columns, each with its own header row. DECISIONS.md "The frame". */
-export function Frame({ nav, location, grid, pane }: Regions) {
+export function Frame({ nav, location, grid, pane, paneHeader }: Regions) {
   const layout = useFrameLayout();
   return (
     <div ref={layout.frameRef} className="relative flex min-h-0 flex-1 border-line border-t">
@@ -25,7 +27,7 @@ export function Frame({ nav, location, grid, pane }: Regions) {
         </div>
         <div className="min-h-0 flex-1 overflow-auto">{grid}</div>
       </main>
-      <SidePanel layout={layout} side="pane">
+      <SidePanel layout={layout} side="pane" header={paneHeader}>
         {pane}
       </SidePanel>
     </div>
