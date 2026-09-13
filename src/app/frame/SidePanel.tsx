@@ -10,7 +10,8 @@ const COPY = {
     caption: "Library",
     show: "Show navigation",
     hide: "Hide navigation",
-    glyph: "dockLeft",
+    showGlyph: "showLeft",
+    hideGlyph: "hideLeft",
     edge: "border-r",
   },
   pane: {
@@ -18,7 +19,8 @@ const COPY = {
     caption: undefined,
     show: "Show pane",
     hide: "Hide pane",
-    glyph: "dockRight",
+    showGlyph: "showRight",
+    hideGlyph: "hideRight",
     edge: "border-l",
   },
 } as const;
@@ -43,7 +45,7 @@ export function SidePanel({ layout, side, children }: Props) {
             {copy.caption}
           </span>
         )}
-        <GlyphButton glyph={copy.glyph} label={copy.hide} onClick={() => layout.hide(side)} />
+        <GlyphButton glyph={copy.hideGlyph} label={copy.hide} onClick={() => layout.hide(side)} />
       </div>
       <div className="min-h-0 flex-1 overflow-auto">{children}</div>
     </>
@@ -59,7 +61,7 @@ export function SidePanel({ layout, side, children }: Props) {
         >
           <div className="grid h-toolbar w-full place-items-center border-line border-b">
             <GlyphButton
-              glyph={copy.glyph}
+              glyph={copy.showGlyph}
               label={copy.show}
               pressed={open}
               onClick={() => (open ? layout.close() : layout.show(side))}

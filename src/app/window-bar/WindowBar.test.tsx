@@ -67,6 +67,16 @@ test("the bar dims while another window has focus", async () => {
   await expect.poll(colour).toBe(token("--color-fg-mid"));
 });
 
+test("the name is set in the bundled Archivo", async () => {
+  recordIPC();
+  const faces = await document.fonts.load("800 14px Archivo", "Filmstrip");
+  expect(faces.length).toBeGreaterThan(0);
+  const screen = await render(<WindowBar />);
+  const name = screen.getByText("Filmstrip").element();
+  expect(getComputedStyle(name).fontFamily).toMatch(/^"?Archivo/);
+  expect(getComputedStyle(name).fontWeight).toBe("800");
+});
+
 test("the bar is sized in rem, so it follows the text size", async () => {
   recordIPC();
   const screen = await render(<WindowBar />);

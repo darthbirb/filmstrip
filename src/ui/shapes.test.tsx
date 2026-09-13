@@ -3,6 +3,7 @@ import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { Chip } from "./Chip";
+import { Glyph } from "./Glyph";
 import { Segmented } from "./Segmented";
 import { Slider } from "./Slider";
 
@@ -30,6 +31,21 @@ test("a slider steps with the arrow keys and fills its track to its value", asyn
   await slider.click();
   await userEvent.keyboard("{ArrowRight}");
   expect(moved).toHaveBeenLastCalledWith(14);
+});
+
+test("a glyph draws as one bundled icon a square across, even inside capitals", async () => {
+  const faces = await document.fonts.load('18px "Material Symbols Rounded"', "folder");
+  expect(faces.length).toBeGreaterThan(0);
+  const screen = await render(
+    <span className="text-eyebrow uppercase">
+      <Glyph name="folder" className="text-icon" />
+    </span>,
+  );
+  const glyph = screen.container.querySelector(".glyph") as HTMLElement;
+  const ink = document.createRange();
+  ink.selectNodeContents(glyph);
+  // Spelt out as letters, the name would run several times wider than the icon.
+  await expect.poll(() => ink.getBoundingClientRect().width).toBeCloseTo(18, 0);
 });
 
 test("a label chip always shows its key, and a tag has none", async () => {

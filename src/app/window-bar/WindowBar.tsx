@@ -18,7 +18,7 @@ export function WindowBar({ search }: { search?: ReactNode }) {
     >
       {/* Ignores the pointer, so the bar beneath it still drags. */}
       <span
-        className={`pointer-events-none flex items-center gap-2 justify-self-start pr-3 pl-2.5 font-semibold text-row tracking-tight ${dimmed ? "text-fg-dim" : "text-fg"}`}
+        className={`pointer-events-none flex items-center gap-2.25 justify-self-start pr-3 pl-2.5 font-brand text-wordmark ${dimmed ? "text-fg-dim" : "text-fg"}`}
       >
         <img src={mark} alt="" className="size-mark" />
         Filmstrip

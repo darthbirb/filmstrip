@@ -5,7 +5,7 @@ import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import { formatBytes, formatDate, formatDimensions, formatDuration } from "../../lib/format";
 import { Chip } from "../../ui/Chip";
 import { type Fact, Facts } from "../../ui/Facts";
-import { GLYPHS } from "../../ui/glyphs";
+import { Glyph } from "../../ui/Glyph";
 import { setPlace } from "../place";
 
 /** The item's name, heading whatever the pane shows of it. */
@@ -46,9 +46,7 @@ function Where({ item }: { item: ItemDetail }) {
       {item.folders.map((folder, index) => (
         <Fragment key={folder.id}>
           {(sorting || index > 0) && (
-            <span aria-hidden="true" className="font-glyph text-fg-faint text-glyph">
-              {GLYPHS.chevronRight}
-            </span>
+            <Glyph name="chevronRight" className="text-fg-faint text-glyph-small" />
           )}
           {sorting ? (
             <span>{folder.title}</span>

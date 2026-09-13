@@ -1,4 +1,4 @@
-import { GLYPHS } from "../../ui/glyphs";
+import { Glyph } from "../../ui/Glyph";
 import { setPlace, usePlace } from "../place";
 
 const TITLES = { sorting: "Sorting Box", trash: "Trash" } as const;
@@ -18,11 +18,7 @@ export function Breadcrumb() {
       <ol className="flex min-w-0 items-center gap-1">
         {steps.map((step, index) => (
           <li key={step.key} className="flex min-w-0 items-center gap-1">
-            {index > 0 && (
-              <span aria-hidden="true" className="font-glyph text-fg-faint text-glyph">
-                {GLYPHS.chevronRight}
-              </span>
-            )}
+            {index > 0 && <Glyph name="chevronRight" className="text-fg-faint text-glyph" />}
             {index === steps.length - 1 ? (
               <span aria-current="location" className="truncate px-1 text-fg-hi text-title">
                 {step.title}

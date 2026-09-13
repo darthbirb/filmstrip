@@ -1,4 +1,4 @@
-import { GLYPHS } from "./glyphs";
+import { Glyph } from "./Glyph";
 
 /** The classes a thumbnail's own element needs: its corner, and the hatch until a picture covers it. */
 export const THUMB_FRAME = "group relative overflow-hidden rounded-control hatch";
@@ -22,9 +22,7 @@ export function ThumbFace({ src, current = false }: { src?: string; current?: bo
       />
       {current && (
         <span className="pointer-events-none absolute bottom-tile-inset left-tile-inset flex h-badge items-center gap-1 rounded-badge bg-badge px-1.5 text-eyebrow text-on-plate uppercase">
-          <span aria-hidden="true" className="font-glyph text-glyph">
-            {GLYPHS.view}
-          </span>
+          <Glyph name="view" className="text-glyph-small" />
           In pane
         </span>
       )}

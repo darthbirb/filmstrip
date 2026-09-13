@@ -1,7 +1,8 @@
-import { GLYPHS, type Glyph } from "./glyphs";
+import { Glyph } from "./Glyph";
+import type { GlyphName } from "./glyphs";
 
 type Props = {
-  glyph: Glyph;
+  glyph: GlyphName;
   label: string;
   onClick: () => void;
   pressed?: boolean;
@@ -16,9 +17,9 @@ export function GlyphButton({ glyph, label, onClick, pressed }: Props) {
       aria-pressed={pressed}
       title={label}
       onClick={onClick}
-      className="focus-ring grid size-control shrink-0 place-items-center rounded-control bg-raised font-glyph text-fg-mid text-icon inset-ring inset-ring-line-control transition-colors duration-(--motion-quick) hover:bg-raised-hi hover:text-fg active:bg-inset aria-pressed:bg-raised-hi aria-pressed:text-fg motion-reduce:transition-none"
+      className="focus-ring grid size-control shrink-0 place-items-center rounded-control bg-raised text-fg-mid text-icon inset-ring inset-ring-line-control transition-colors duration-(--motion-quick) hover:bg-raised-hi hover:text-fg active:bg-inset aria-pressed:bg-raised-hi aria-pressed:text-fg motion-reduce:transition-none"
     >
-      <span aria-hidden="true">{GLYPHS[glyph]}</span>
+      <Glyph name={glyph} />
     </button>
   );
 }

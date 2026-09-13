@@ -54,13 +54,23 @@ typography:
     lineHeight: 1rem
     fontWeight: 600
     letterSpacing: 0.12em
+  wordmark:
+    fontFamily: Archivo
+    fontSize: 0.875rem
+    lineHeight: 1.25rem
+    fontWeight: 800
+    letterSpacing: -0.035em
+  glyph-small:
+    fontFamily: Material Symbols Rounded
+    fontSize: 0.75rem
+    lineHeight: "1"
   glyph:
-    fontFamily: Segoe Fluent Icons
-    fontSize: 0.625rem
+    fontFamily: Material Symbols Rounded
+    fontSize: 0.9375rem
     lineHeight: "1"
   icon:
-    fontFamily: Segoe Fluent Icons
-    fontSize: 1rem
+    fontFamily: Material Symbols Rounded
+    fontSize: 1.125rem
     lineHeight: "1"
 rounded:
   badge: 6px
@@ -95,6 +105,9 @@ components:
   window-bar:
     backgroundColor: "{colors.panel}"
     height: "{spacing.caption}"
+  wordmark:
+    textColor: "{colors.fg}"
+    typography: "{typography.wordmark}"
   caption-button:
     textColor: "{colors.fg-mid}"
     typography: "{typography.glyph}"
@@ -251,8 +264,11 @@ the plate. `src/styles/tokens.test.ts` paints each and fails below.
 
 ## Typography
 
-Segoe UI Variable Text, installed with every copy of Windows 11 and never fetched. Glyphs are
-Segoe Fluent Icons. Counts, sizes and dates set in tabular figures.
+Segoe UI Variable Text, installed with every copy of Windows 11. **The wordmark alone** is
+Archivo ExtraBold. **Glyphs** are Material Symbols Rounded, drawn by name at one hairline
+weight, `--glyph-weight`: filled in a navigation row, where the glyph names a thing, and
+outlined on a control, where it names an action. Both fonts ship inside the app and are never
+fetched. Counts, sizes and dates set in tabular figures.
 
 | Role | Size and line | For |
 | --- | --- | --- |
@@ -261,7 +277,8 @@ Segoe Fluent Icons. Counts, sizes and dates set in tabular figures.
 | `ui` | 13 on 20 | The working size: a control's label, a fact's value, prose. |
 | `small` | 12 on 16 | A count, a chip. |
 | `eyebrow` | 11 on 16, semibold, spaced, capitals | A panel's caption, a fact's term, the in-pane mark. |
-| `glyph`, `icon` | 10 and 16 | Chevrons and caption glyphs; control glyphs. |
+| `wordmark` | 14 on 20, extra bold, tight | The name beside the mark in the bar. |
+| `glyph-small`, `glyph`, `icon` | 12, 15 and 18 | A small mark: the maximise square, a chevron in a fact, the in-pane eye. Caption glyphs and chevrons. A control's or a row's glyph. |
 
 ## Layout
 
@@ -294,6 +311,10 @@ chosen where it applies. **Hover is one step lighter in the same neutral, never 
 a 2px `focus` ring outside the element, only for the keyboard; a control flush to the window's
 edge takes it inside. Pressing steps back toward the rest surface.
 
+- **Glyph.** A square 1em across, whose ligature holds inside capitals; it takes its size and
+  ink from where it sits.
+- **Wordmark.** The mark and the name in `wordmark`, in `fg`, falling to `fg-dim` while another
+  window has focus.
 - **Caption buttons.** Windows' own proportions, glyphs in `fg-mid`, one step lighter under the
   pointer; close turns `danger`. While another window has focus they fall to `fg-faint`.
 - **Panels.** `panel`, a `line` at the edge facing the grid, a header row with the panel's name in

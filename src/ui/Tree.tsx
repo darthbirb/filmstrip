@@ -1,6 +1,7 @@
 import { type KeyboardEvent, useRef, useState } from "react";
 
-import { GLYPHS, type Glyph } from "./glyphs";
+import { Glyph } from "./Glyph";
+import type { GlyphName } from "./glyphs";
 
 export type TreeRow = {
   id: string;
@@ -9,7 +10,7 @@ export type TreeRow = {
   level: number;
   expandable: boolean;
   expanded?: boolean;
-  glyph?: Glyph;
+  glyph?: GlyphName;
   /** Muted text at the row's end: a count, or why the row is muted. */
   detail?: string;
   muted?: boolean;
@@ -125,15 +126,17 @@ export function Tree({ label, rows, selectedId, onSelect, onExpand, onCollapse }
             <span
               data-chevron
               aria-hidden="true"
-              className={`flex size-chevron shrink-0 items-center justify-center font-glyph text-glyph ${quiet}`}
+              className={`flex size-chevron shrink-0 items-center justify-center ${quiet}`}
             >
-              {row.expandable ? GLYPHS[row.expanded ? "chevronDown" : "chevronRight"] : null}
+              {row.expandable && (
+                <Glyph
+                  name={row.expanded ? "chevronDown" : "chevronRight"}
+                  className="text-glyph"
+                />
+              )}
             </span>
-            {row.glyph && (
-              <span aria-hidden="true" className={`shrink-0 font-glyph text-icon ${quiet}`}>
-                {GLYPHS[row.glyph]}
-              </span>
-            )}
+            {/* Filled, so a row reads as a thing; a control's outlined glyph reads as an action. */}
+            {row.glyph && <Glyph name={row.glyph} filled className={`text-icon ${quiet}`} />}
             <span className="min-w-0 flex-1 truncate">{row.label}</span>
             {row.detail && (
               <span

@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* Bundled with the app and never fetched, as the CSP requires. DECISIONS.md "The look". */
+@import "material-symbols/rounded.css";
+@import "@fontsource/archivo/latin-800.css";
 
 /* The token layer: every size, colour and duration a component may use. DESIGN.md "Colors". */
 /* docs/DESIGN.md lists these values, and check:docs holds the two equal. */
@@ -11,6 +14,8 @@
   --z-overlay: 20;
   /* The width of one band in the hatch that stands in for a picture not made yet. */
   --hatch-band: 0.5rem;
+  /* Material Symbols' weight axis: the drawing's hairline glyphs, one weight at every size. */
+  --glyph-weight: 300;
 
   /* The tallest a picture stands in the pane at its own shape, so a panorama never runs away. */
   --pane-media-max: 70dvh;
@@ -39,8 +44,9 @@
   --font-*: initial;
 
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  /* Installed with Windows, never fetched. */
-  --font-glyph: "Segoe Fluent Icons", "Segoe MDL2 Assets";
+  /* The wordmark's face and nowhere else. */
+  --font-brand: "Archivo", "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  --font-glyph: "Material Symbols Rounded";
 
   /* Surfaces, darkest first, each a warm neutral one step from the next. */
   --color-well: #0e0e0e;
@@ -121,9 +127,15 @@
   --text-eyebrow--line-height: 1rem;
   --text-eyebrow--font-weight: 600;
   --text-eyebrow--letter-spacing: 0.12em;
-  --text-glyph: 0.625rem;
+  --text-wordmark: 0.875rem;
+  --text-wordmark--line-height: 1.25rem;
+  --text-wordmark--font-weight: 800;
+  --text-wordmark--letter-spacing: -0.035em;
+  --text-glyph-small: 0.75rem;
+  --text-glyph-small--line-height: 1;
+  --text-glyph: 0.9375rem;
   --text-glyph--line-height: 1;
-  --text-icon: 1rem;
+  --text-icon: 1.125rem;
   --text-icon--line-height: 1;
 }
 
@@ -140,6 +152,31 @@
     outline: var(--focus-width) solid var(--color-focus);
     outline-offset: calc(var(--focus-width) * -1);
   }
+}
+
+/* A ligature: the icon's name as text, drawn as one square. Capitals or spacing would spell it out. */
+@utility glyph {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 1em;
+  height: 1em;
+  overflow: hidden;
+  font-family: var(--font-glyph);
+  font-weight: normal;
+  font-style: normal;
+  letter-spacing: normal;
+  text-transform: none;
+  white-space: nowrap;
+  direction: ltr;
+  font-feature-settings: "liga";
+  font-variation-settings:
+    "wght" var(--glyph-weight),
+    "FILL" var(--glyph-fill, 0);
+  -webkit-font-smoothing: antialiased;
+}
+
+@utility glyph-fill {
+  --glyph-fill: 1;
 }
 
 /* The hover of something that is already filled: a wash over its fill rather than a new one. */

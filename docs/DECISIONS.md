@@ -305,10 +305,14 @@ a few; a hatch where a picture is still to come.
   48 for the grid, so the rules beneath them never met.
 - **One corner for every control.** The drawing gave the same 32px buttons 8px in one place and
   10px in another.
-- **Icons stay Segoe Fluent Icons**, installed with Windows. The drawing's Material Symbols is a
-  hosted font, which the app's content security policy forbids.
-- **The wordmark stays in Segoe UI** until bundling the drawing's Archivo is agreed: a font file
-  is a dependency like any other.
+- **Every navigation row's glyph is filled**, not only a folder's: a filled glyph names a thing,
+  and a control's outlined one names an action.
+
+**Its two fonts ship inside the app**, since the content security policy forbids fetching one:
+Material Symbols Rounded for every glyph (Apache 2.0, the `material-symbols` package) and Archivo
+ExtraBold for the wordmark alone (SIL OFL 1.1, `@fontsource/archivo`, its Latin file only). Both
+licences allow bundling in an open-source app. The icon font is whole, 5.4 MB, so any icon is a
+name away; subsetting it to the names in use is the way to shrink it once the set settles.
 
 ## Built in slices, not ported
 
