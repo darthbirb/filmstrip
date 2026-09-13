@@ -1,4 +1,9 @@
-/** What every thumbnail draws inside its own button or option: the picture, a veil under the pointer, the accent ring when current. */
+import { GLYPHS } from "./glyphs";
+
+/** The classes a thumbnail's own element needs: its corner, and the hatch until a picture covers it. */
+export const THUMB_FRAME = "group relative overflow-hidden rounded-control hatch";
+
+/** What a thumbnail draws inside its own button: the picture, a ring under the pointer, and the in-pane mark. */
 export function ThumbFace({ src, current = false }: { src?: string; current?: boolean }) {
   return (
     <>
@@ -13,11 +18,16 @@ export function ThumbFace({ src, current = false }: { src?: string; current?: bo
       )}
       <span
         aria-hidden="true"
-        className={`pointer-events-none absolute inset-0 rounded-tile group-hover:bg-hover ${current ? "shadow-[inset_0_0_0_var(--focus-width)_var(--color-accent)]" : ""}`}
+        className={`pointer-events-none absolute inset-0 rounded-control ${current ? "inset-ring-2 inset-ring-focus" : "group-hover:inset-ring group-hover:inset-ring-line-strong"}`}
       />
+      {current && (
+        <span className="pointer-events-none absolute bottom-tile-inset left-tile-inset flex h-badge items-center gap-1 rounded-badge bg-badge px-1.5 text-eyebrow text-on-plate uppercase">
+          <span aria-hidden="true" className="font-glyph text-glyph">
+            {GLYPHS.view}
+          </span>
+          In pane
+        </span>
+      )}
     </>
   );
 }
-
-/** The classes a thumbnail's own element needs, so the face inside it can draw. */
-export const THUMB_FRAME = "group relative overflow-hidden rounded-tile bg-hover";

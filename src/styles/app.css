@@ -1,33 +1,16 @@
 @import "tailwindcss";
 
-/* The token layer, in two tiers: raw values here, the roles components use in @theme below. */
-/* docs/DESIGN.md mirrors the base look's values, and check:docs holds the two equal. */
+/* The token layer: every size, colour and duration a component may use. DESIGN.md "Colors". */
+/* docs/DESIGN.md lists these values, and check:docs holds the two equal. */
 :root {
   color-scheme: dark;
 
-  /* The neutral ramp, dark to light, faintly tinted toward the accent's hue. */
-  --ref-n-0: oklch(0.16 0.006 205);
-  --ref-n-1: oklch(0.2 0.006 205);
-  --ref-n-2: oklch(0.235 0.006 205);
-  --ref-n-3: oklch(0.28 0.006 205);
-  --ref-n-4: oklch(0.34 0.006 205);
-  --ref-n-5: oklch(0.52 0.006 205);
-  --ref-n-6: oklch(0.72 0.006 205);
-  --ref-n-7: oklch(0.82 0.006 205);
-  --ref-n-8: oklch(0.9 0.006 205);
-  --ref-n-9: oklch(0.95 0.006 205);
-
-  /* The mark's five frames. DECISIONS.md "The mark". */
-  --ref-mark-yellow: #e3d84a;
-  --ref-mark-cyan: #3fb8c5;
-  --ref-mark-green: #0c7c59;
-  --ref-mark-magenta: #a8478f;
-  --ref-mark-red: #d72638;
-
   --motion-quick: 120ms;
   --focus-width: 2px;
-  --press-scale: 0.97;
+  --focus-gap: 2px;
   --z-overlay: 20;
+  /* The width of one band in the hatch that stands in for a picture not made yet. */
+  --hatch-band: 0.5rem;
 
   /* The tallest a picture stands in the pane at its own shape, so a panorama never runs away. */
   --pane-media-max: 70dvh;
@@ -56,149 +39,134 @@
   --font-*: initial;
 
   --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
-  --font-title: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
-  --font-numeric: var(--font-sans);
   /* Installed with Windows, never fetched. */
   --font-glyph: "Segoe Fluent Icons", "Segoe MDL2 Assets";
 
-  --color-ground: var(--ref-n-1);
-  --color-panel: var(--ref-n-2);
-  --color-raised: var(--ref-n-3);
-  --color-well: var(--ref-n-0);
-  --color-line: oklch(1 0 0 / 0.08);
-  --color-line-strong: oklch(1 0 0 / 0.18);
-  --color-fg: var(--ref-n-9);
-  --color-fg-muted: var(--ref-n-6);
-  --color-fg-faint: var(--ref-n-5);
-  --color-hover: oklch(1 0 0 / 0.06);
-  --color-press: oklch(1 0 0 / 0.04);
-  --color-selected: oklch(1 0 0 / 0.1);
-  --color-accent: var(--ref-mark-cyan);
-  --color-accent-hover: #6ccdd6;
-  --color-on-accent: var(--ref-n-0);
-  --color-focus: var(--ref-n-9);
-  --color-danger: #c42b1c;
-  --color-danger-press: rgb(196 43 28 / 0.9);
-  --color-on-danger: #fafafa;
+  /* Surfaces, darkest first, each a warm neutral one step from the next. */
+  --color-well: #0e0e0e;
+  --color-ground: #141414;
+  --color-panel: #1b1b1b;
+  --color-inset: #1f1f1f;
+  --color-raised: #242424;
+  --color-raised-hi: #2e2e2e;
+  --color-plate: #b9b6b0;
+  --color-hatch: #3c3a37;
+  --color-hatch-alt: #333130;
 
-  --radius-control: 4px;
-  --radius-surface: 8px;
-  --radius-tile: 2px;
+  --color-line: #262626;
+  --color-line-control: #303030;
+  --color-line-control-hi: #3a3a3a;
+  --color-line-strong: #6b6863;
 
-  --shadow-overlay: 0 0.5rem 2rem oklch(0 0 0 / 0.5);
+  --color-fg-hi: #f4f3f1;
+  --color-fg: #eceae7;
+  --color-fg-mid: #a8a5a0;
+  --color-fg-dim: #908c86;
+  --color-fg-faint: #5c5a56;
+  --color-on-plate: #17181a;
+  --color-on-plate-dim: rgb(23 24 26 / 0.62);
+  --color-focus: #f2f2f2;
+
+  --color-wash: rgb(255 255 255 / 0.09);
+  --color-badge: rgb(242 242 242 / 0.94);
+
+  --color-danger: #c25a4a;
+  --color-danger-press: #a94f41;
+  --color-on-danger: #f2f2f2;
+
+  --radius-badge: 6px;
+  --radius-nested: 8px;
+  --radius-control: 10px;
+
+  --shadow-overlay: 0 18px 44px rgb(0 0 0 / 0.6);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 
   /* Windows 11 caption buttons and glyphs, 46px and 10px; the strip is 36px to seat search. */
   --spacing-caption: 2.25rem;
   --spacing-caption-button: 2.875rem;
-  --spacing-mark: 1rem;
-  --spacing-toolbar: 2.5rem;
-  --spacing-rail: 2.5rem;
-  --spacing-splitter: 0.375rem;
+  --spacing-mark: 1.125rem;
+  --spacing-toolbar: 2.75rem;
+  --spacing-rail: 2.75rem;
+  --spacing-splitter: 0.25rem;
+  --spacing-grip: 1.625rem;
+  --spacing-grip-width: 0.125rem;
   --spacing-bar-field: 1.75rem;
   --spacing-bar-search: 36rem;
-  --spacing-row: 2rem;
-  --spacing-row-inset: 0.25rem;
+  --spacing-row: 2.125rem;
+  --spacing-row-inset: 0.5rem;
+  --spacing-row-gap: 0.1875rem;
   --spacing-indent: 1rem;
-  --spacing-chevron: 1rem;
+  --spacing-chevron: 1.25rem;
   --spacing-control: 2rem;
-  --spacing-chip: 1.375rem;
-  --spacing-tile-gap: 0.25rem;
-  --spacing-strip: 4rem;
+  --spacing-segment-inset: 0.1875rem;
+  --spacing-chip: 1.625rem;
+  --spacing-badge: 1.25rem;
+  --spacing-tile-gap: 0.375rem;
+  --spacing-tile-inset: 0.5rem;
   --spacing-slider: 6rem;
-  --spacing-slider-track: 0.25rem;
+  --spacing-slider-track: 0.1875rem;
   --spacing-slider-thumb: 0.875rem;
 
-  --text-title: 1.125rem;
+  --text-title: 1.0625rem;
   --text-title--line-height: 1.5rem;
   --text-title--font-weight: 600;
-  --text-ui: 0.875rem;
+  --text-title--letter-spacing: -0.02em;
+  --text-row: 0.875rem;
+  --text-row--line-height: 1.25rem;
+  --text-ui: 0.8125rem;
   --text-ui--line-height: 1.25rem;
-  --text-caption: 0.8125rem;
-  --text-caption--line-height: 1rem;
-  --text-label: 0.75rem;
-  --text-label--line-height: 1rem;
+  --text-small: 0.75rem;
+  --text-small--line-height: 1rem;
+  --text-eyebrow: 0.6875rem;
+  --text-eyebrow--line-height: 1rem;
+  --text-eyebrow--font-weight: 600;
+  --text-eyebrow--letter-spacing: 0.12em;
   --text-glyph: 0.625rem;
   --text-glyph--line-height: 1;
   --text-icon: 1rem;
   --text-icon--line-height: 1;
 }
 
-/* The directions compared live in dev; the base above is the first. */
-/* DESIGN.md "Directions under consideration". */
-:root[data-look="darkroom"] {
-  --ref-n-0: oklch(0.12 0.004 60);
-  --ref-n-1: oklch(0.15 0.004 60);
-  --ref-n-2: oklch(0.165 0.004 60);
-  --ref-n-3: oklch(0.21 0.004 60);
-  --ref-n-4: oklch(0.27 0.004 60);
-  --ref-n-5: oklch(0.48 0.004 60);
-  --ref-n-6: oklch(0.66 0.004 60);
-  --ref-n-7: oklch(0.76 0.004 60);
-  --ref-n-8: oklch(0.84 0.004 60);
-  --ref-n-9: oklch(0.9 0.004 60);
-
-  --font-title: Bahnschrift, "Segoe UI Variable Text", "Segoe UI", sans-serif;
-  --font-numeric: Bahnschrift, "Segoe UI Variable Text", "Segoe UI", sans-serif;
-  --color-line: oklch(1 0 0 / 0.07);
-  --color-accent: var(--ref-mark-yellow);
-  --color-accent-hover: #ece47a;
-  --color-focus: var(--ref-mark-yellow);
-  --radius-control: 2px;
-  --radius-surface: 2px;
-  --radius-tile: 0px;
-  --shadow-overlay: 0 0 0 1px oklch(1 0 0 / 0.12);
-  --spacing-row-inset: 0rem;
-  --spacing-tile-gap: 0.125rem;
-  --text-title--font-weight: 500;
-}
-
-:root[data-look="greycard"] {
-  --ref-n-0: oklch(0.24 0 0);
-  --ref-n-1: oklch(0.28 0 0);
-  --ref-n-2: oklch(0.33 0 0);
-  --ref-n-3: oklch(0.38 0 0);
-  --ref-n-4: oklch(0.44 0 0);
-  --ref-n-5: oklch(0.6 0 0);
-  --ref-n-6: oklch(0.8 0 0);
-  --ref-n-7: oklch(0.87 0 0);
-  --ref-n-8: oklch(0.92 0 0);
-  --ref-n-9: oklch(0.965 0 0);
-
-  --color-ground: var(--ref-n-2);
-  --color-panel: var(--ref-n-1);
-  --color-well: var(--ref-n-2);
-  --color-line: oklch(0 0 0 / 0.25);
-  --color-line-strong: oklch(1 0 0 / 0.22);
-  --color-hover: oklch(1 0 0 / 0.08);
-  --color-press: oklch(0 0 0 / 0.1);
-  --color-selected: oklch(1 0 0 / 0.14);
-  --color-accent: oklch(0.8 0.11 165);
-  --color-accent-hover: oklch(0.85 0.1 165);
-  --radius-control: 6px;
-  --radius-surface: 10px;
-  --radius-tile: 4px;
-  --shadow-overlay: 0 0.75rem 2rem oklch(0 0 0 / 0.35);
-  --spacing-row-inset: 0.375rem;
-  --spacing-tile-gap: 0.5rem;
-}
-
+/* Outside the element, clear of what it sits on; flush controls take the inset form instead. */
 @utility focus-ring {
+  &:focus-visible {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: var(--focus-gap);
+  }
+}
+
+@utility focus-ring-inset {
   &:focus-visible {
     outline: var(--focus-width) solid var(--color-focus);
     outline-offset: calc(var(--focus-width) * -1);
   }
 }
 
+/* The hover of something that is already filled: a wash over its fill rather than a new one. */
+@utility hover-wash {
+  &:hover {
+    box-shadow: inset 0 0 0 100vmax var(--color-wash);
+  }
+}
+
+/* Stands in for a picture that has no thumbnail yet: content to come, not a surface. */
+@utility hatch {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-hatch) 0 var(--hatch-band),
+    var(--color-hatch-alt) var(--hatch-band) calc(var(--hatch-band) * 2)
+  );
+}
+
 /* Thin scrollbars in the token colours, in place of the classic Windows ones with arrow buttons. */
 @layer base {
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-fg-faint) transparent;
+    scrollbar-color: var(--color-line-control-hi) transparent;
   }
 }
 
-/* The slider's track fills with the accent up to its value; the Slider primitive sets --fill. */
+/* The slider's track fills up to its value; the Slider primitive sets --fill. */
 @layer components {
   .slider {
     appearance: none;
@@ -206,8 +174,8 @@
     border-radius: calc(infinity * 1px);
     background: linear-gradient(
       to right,
-      var(--color-accent) var(--fill, 0%),
-      var(--color-line-strong) var(--fill, 0%)
+      var(--color-fg-mid) var(--fill, 0%),
+      var(--color-line-control-hi) var(--fill, 0%)
     );
   }
 
@@ -217,5 +185,6 @@
     height: var(--spacing-slider-thumb);
     border-radius: calc(infinity * 1px);
     background: var(--color-fg);
+    box-shadow: 0 0 0 var(--focus-gap) var(--color-panel);
   }
 }

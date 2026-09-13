@@ -231,7 +231,7 @@ thumbnail job has read its size.
 details scrolling together, the picture filling the pane with details on request, and a fixed
 split. The direction instead is the predecessor's, described by the user: the picture, a
 collapsible row holding its size and dimensions that opens to the rest of what is known, and a
-filmstrip along the bottom. It is built on the look once one is chosen; until then the pane shows
+filmstrip along the bottom. It is the next feature built on the look; until then the pane shows
 the picture over its details.
 
 **What the pane knows comes from the file.** Capture dates, a video's length and codec, and a
@@ -266,11 +266,9 @@ measured, never enumerated:** no hand-written pixel breakpoints. A control that 
 collapses because it did not fit, not because the window crossed a number somebody wrote down
 once and never re-measured.
 
-**Tokens come in two tiers**, set on 13 September 2026: raw values (a neutral ramp and the mark's
-colours) and the roles components use. A look changes the first tier or the mapping, never a
-component. Tailwind's own palette, radii, text sizes and shadows are cleared, so a class from
-them does nothing and a stray number cannot slip in through a familiar name. Contrast is
-measured by a test in every look rather than trusted.
+**Tailwind's own palette, radii, text sizes and shadows are cleared**, set on 13 September
+2026, so a class from them does nothing and a stray number cannot slip in through a familiar
+name. Contrast is measured by a test rather than trusted.
 
 ## The design file
 
@@ -284,8 +282,33 @@ agent can read them without parsing CSS, and `check:docs` fails the moment the t
 Google's CLI for the format could lint and export it, but it is alpha and would be a dependency;
 the few checks that matter here are a page of our own script.
 
-**It grows with the app.** Each slice that adds a shape adds it there: the primitive, its
-states, its tokens.
+**It grows with the app.** Each feature that adds a shape adds it there: the primitive, its
+states, its tokens. Nothing is described ahead of the feature that uses it.
+
+## The look
+
+**Taken from ggallery's drawing, re-derived rather than copied**, set on 13 September 2026 once
+three looks of this repository's own had been rejected. `docs/design/Filmstrip.dc.html` in
+ggallery, frozen there, is the reference for how Filmstrip looks. Its values are re-measured
+here and its markup is never lifted; each feature restyles on it as that feature is built.
+
+**What it holds:** warm near-neutral surfaces a step apart; warm grey ink in four weights; **no
+accent**, selection being a neutral pewter plate so that colour can mean something; controls a
+fixed height on a hairline ring, with one generous corner; a sunk trough for a choice between
+a few; a hatch where a picture is still to come.
+
+**Where this departs from it:**
+
+- **Dimmed ink is lighter**, `#908c86` for the drawing's `#77746f`, which measures 3.6:1 on the
+  drawing's own panel and fails AA for the counts and captions it sets.
+- **Every column's header row is one height**, 44px. The drawing used 44 for the side panels and
+  48 for the grid, so the rules beneath them never met.
+- **One corner for every control.** The drawing gave the same 32px buttons 8px in one place and
+  10px in another.
+- **Icons stay Segoe Fluent Icons**, installed with Windows. The drawing's Material Symbols is a
+  hosted font, which the app's content security policy forbids.
+- **The wordmark stays in Segoe UI** until bundling the drawing's Archivo is agreed: a font file
+  is a dependency like any other.
 
 ## Built in slices, not ported
 
@@ -298,3 +321,5 @@ hand and written them down. A drawing shows one width, one state, one text size 
 express what a window does at another width, at 200% zoom, or on the third click.
 
 What carries over is the backend, the product decisions, and those lessons. Not the markup.
+Since 13 September 2026 its drawing is the reference for the look, re-derived value by value;
+see "The look".

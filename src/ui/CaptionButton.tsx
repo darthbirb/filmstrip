@@ -12,7 +12,7 @@ export function CaptionButton({ glyph, label, dimmed, onClick }: Props) {
   const tone =
     glyph === "close"
       ? "hover:bg-danger hover:text-on-danger active:bg-danger-press"
-      : "hover:bg-hover hover:text-fg active:bg-press";
+      : "hover:bg-raised-hi hover:text-fg active:bg-raised";
 
   return (
     <button
@@ -20,7 +20,7 @@ export function CaptionButton({ glyph, label, dimmed, onClick }: Props) {
       aria-label={label}
       title={label}
       onClick={onClick}
-      className={`focus-ring flex h-full w-caption-button shrink-0 items-center justify-center font-glyph text-glyph transition-colors duration-(--motion-quick) motion-reduce:transition-none ${dimmed ? "text-fg-muted" : "text-fg"} ${tone}`}
+      className={`focus-ring-inset flex h-full w-caption-button shrink-0 items-center justify-center font-glyph text-glyph transition-colors duration-(--motion-quick) motion-reduce:transition-none ${dimmed ? "text-fg-faint" : "text-fg-mid"} ${tone}`}
     >
       <span aria-hidden="true">{GLYPHS[glyph]}</span>
     </button>

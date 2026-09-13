@@ -14,6 +14,7 @@ export const GLYPHS = {
   sortingBox: "\uE7B8",
   trash: "\uE74D",
   search: "\uE721",
+  view: "\uE890",
 } as const;
 
 export type Glyph = keyof typeof GLYPHS;

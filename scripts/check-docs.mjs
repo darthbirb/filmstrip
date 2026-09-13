@@ -130,7 +130,12 @@ function checkDesignTokens() {
       .filter(([name]) => name.startsWith("--font-"))
       .map(([, value]) => firstFamily(value)),
   );
-  const fields = { fontSize: "", lineHeight: "--line-height", fontWeight: "--font-weight" };
+  const fields = {
+    fontSize: "",
+    lineHeight: "--line-height",
+    fontWeight: "--font-weight",
+    letterSpacing: "--letter-spacing",
+  };
   for (const [key, style] of Object.entries(design.typography ?? {})) {
     for (const [field, suffix] of Object.entries(fields)) {
       if (style[field] !== undefined)

@@ -5,8 +5,22 @@ import { Splitter } from "../../ui/Splitter";
 import type { FrameLayout, Side } from "./useFrameLayout";
 
 const COPY = {
-  nav: { label: "Navigation", show: "Show navigation", hide: "Hide navigation", glyph: "dockLeft" },
-  pane: { label: "Pane", show: "Show pane", hide: "Hide pane", glyph: "dockRight" },
+  nav: {
+    label: "Navigation",
+    caption: "Library",
+    show: "Show navigation",
+    hide: "Hide navigation",
+    glyph: "dockLeft",
+    edge: "border-r",
+  },
+  pane: {
+    label: "Pane",
+    caption: undefined,
+    show: "Show pane",
+    hide: "Hide pane",
+    glyph: "dockRight",
+    edge: "border-l",
+  },
 } as const;
 
 type Props = { layout: FrameLayout; side: Side; children?: ReactNode };
@@ -23,9 +37,12 @@ export function SidePanel({ layout, side, children }: Props) {
 
   const body = (
     <>
-      <div
-        className={`flex h-toolbar shrink-0 items-center ${side === "pane" ? "justify-end" : ""}`}
-      >
+      <div className="flex h-toolbar shrink-0 items-center justify-end gap-1 border-line border-b pr-1.5 pl-3">
+        {copy.caption && (
+          <span className="min-w-0 flex-1 truncate text-eyebrow text-fg-dim uppercase">
+            {copy.caption}
+          </span>
+        )}
         <GlyphButton glyph={copy.glyph} label={copy.hide} onClick={() => layout.hide(side)} />
       </div>
       <div className="min-h-0 flex-1 overflow-auto">{children}</div>
@@ -36,19 +53,24 @@ export function SidePanel({ layout, side, children }: Props) {
     const edge = side === "nav" ? "left" : "right";
     return (
       <>
-        <div data-frame-toggle={side} className="flex w-rail shrink-0 flex-col bg-panel">
-          <GlyphButton
-            glyph={copy.glyph}
-            label={copy.show}
-            pressed={open}
-            onClick={() => (open ? layout.close() : layout.show(side))}
-          />
+        <div
+          data-frame-toggle={side}
+          className={`flex w-rail shrink-0 flex-col items-center border-line bg-panel ${copy.edge}`}
+        >
+          <div className="grid h-toolbar w-full place-items-center border-line border-b">
+            <GlyphButton
+              glyph={copy.glyph}
+              label={copy.show}
+              pressed={open}
+              onClick={() => (open ? layout.close() : layout.show(side))}
+            />
+          </div>
         </div>
         {open && (
           <Region
             ref={overlayRef}
             aria-label={copy.label}
-            className="absolute inset-y-0 z-(--z-overlay) flex flex-col bg-panel shadow-overlay"
+            className={`absolute inset-y-0 z-(--z-overlay) flex flex-col border-line bg-panel shadow-overlay ${copy.edge}`}
             style={{ width, [edge]: "var(--spacing-rail)" }}
           >
             {body}
@@ -70,7 +92,11 @@ export function SidePanel({ layout, side, children }: Props) {
     />
   );
   const panel = (
-    <Region aria-label={copy.label} className="flex shrink-0 flex-col bg-panel" style={{ width }}>
+    <Region
+      aria-label={copy.label}
+      className={`flex shrink-0 flex-col border-line bg-panel ${copy.edge}`}
+      style={{ width }}
+    >
       {body}
     </Region>
   );

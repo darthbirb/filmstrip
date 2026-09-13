@@ -1,9 +1,10 @@
-import { afterEach, expect, test } from "vitest";
+import { expect, test } from "vitest";
 
-import { LOOKS } from "../app/look";
 import { contrast, type Rgb } from "../lib/contrast";
 
-// Every look is held to WCAG AA by measurement, as the browser draws it. DESIGN.md "Colors".
+// The foundation is held to WCAG AA by measurement, as the browser paints it. DESIGN.md "Colors".
+
+const SURFACES = ["well", "ground", "panel", "raised"];
 
 /** A role as the browser paints it, read back from one canvas pixel. */
 function painted(role: string): Rgb {
@@ -22,30 +23,26 @@ function painted(role: string): Rgb {
   return [red, green, blue];
 }
 
-afterEach(() => {
-  delete document.documentElement.dataset.look;
-});
-
-test.each(LOOKS)("the %s look can be read on every surface it paints", (look) => {
-  if (look !== LOOKS[0]) document.documentElement.dataset.look = look;
-  for (const surface of ["ground", "panel", "raised", "well"]) {
-    for (const text of ["fg", "fg-muted"]) {
+test("every ink that sets text can be read on every surface", () => {
+  for (const surface of SURFACES) {
+    for (const ink of ["fg-hi", "fg", "fg-mid", "fg-dim"]) {
       expect(
-        contrast(painted(text), painted(surface)),
-        `${text} on ${surface}`,
+        contrast(painted(ink), painted(surface)),
+        `${ink} on ${surface}`,
       ).toBeGreaterThanOrEqual(4.5);
     }
-    for (const mark of ["accent", "focus"]) {
-      expect(
-        contrast(painted(mark), painted(surface)),
-        `${mark} on ${surface}`,
-      ).toBeGreaterThanOrEqual(3);
-    }
+    expect(
+      contrast(painted("focus"), painted(surface)),
+      `focus on ${surface}`,
+    ).toBeGreaterThanOrEqual(3);
   }
-  expect(contrast(painted("on-accent"), painted("accent")), "on-accent").toBeGreaterThanOrEqual(
-    4.5,
-  );
-  expect(contrast(painted("on-danger"), painted("danger")), "on-danger").toBeGreaterThanOrEqual(
-    4.5,
-  );
+});
+
+test("text on the selection plate can be read", () => {
+  expect(contrast(painted("on-plate"), painted("plate"))).toBeGreaterThanOrEqual(4.5);
+});
+
+test("the close glyph stands out from the red it turns under the pointer", () => {
+  // A glyph, not text, so the bar is 3:1.
+  expect(contrast(painted("on-danger"), painted("danger"))).toBeGreaterThanOrEqual(3);
 });

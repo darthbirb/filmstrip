@@ -49,8 +49,8 @@ way a choice is offered.
   and the three-line limit.
 - **Primitives own every visual decision; surfaces compose them.** Sizes, colours and durations
   come from the token layer in `src/styles/app.css`. A component may look however it looks, but
-  it may not invent a number. `docs/DESIGN.md` describes the tokens and every shape; a slice
-  that adds a shape adds it there and to the dev specimen sheet.
+  it may not invent a number. `docs/DESIGN.md` describes the tokens and every shape; a
+  feature that adds a shape adds it there.
 
 ## Gotchas
 

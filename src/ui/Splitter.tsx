@@ -57,9 +57,9 @@ export function Splitter({ label, value, min, max, initial, panel, onChange }: P
         else return;
         event.preventDefault();
       }}
-      className="focus-ring group relative w-splitter shrink-0 cursor-col-resize touch-none select-none"
+      className="focus-ring-inset group flex w-splitter shrink-0 cursor-col-resize touch-none select-none items-center justify-center bg-ground"
     >
-      <span className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-line transition-colors duration-(--motion-quick) group-hover:bg-fg-muted group-active:bg-fg motion-reduce:transition-none" />
+      <span className="h-grip w-grip-width rounded-full bg-line-control transition-colors duration-(--motion-quick) group-hover:bg-fg-dim group-active:bg-fg-mid motion-reduce:transition-none" />
     </div>
   );
 }

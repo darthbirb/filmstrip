@@ -9,7 +9,7 @@ export function Pane() {
   if (shown.status === "loading") return null;
   if (shown.status !== "ready") {
     return (
-      <p className="m-0 px-3 py-2 text-fg-muted text-ui">
+      <p className="m-0 px-3 py-2 text-fg-dim text-ui">
         {shown.status === "gone"
           ? "This file is no longer here."
           : "Click a picture to see it here."}

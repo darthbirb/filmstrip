@@ -13,7 +13,7 @@ export function Title({ item, className = "" }: { item: ItemDetail; className?: 
   return (
     <h2
       title={item.diskName}
-      className={`m-0 min-w-0 break-all font-title text-title ${className}`}
+      className={`m-0 min-w-0 break-all text-fg-hi text-title ${className}`}
     >
       {item.diskName}
     </h2>
@@ -41,12 +41,12 @@ export function Details({ item, tags }: { item: ItemDetail; tags: EffectiveTag[]
 function Where({ item }: { item: ItemDetail }) {
   const sorting = item.sourceKind === "sorting";
   return (
-    <span className="flex flex-wrap items-center gap-x-1 font-sans">
+    <span className="flex flex-wrap items-center gap-x-1.5">
       {sorting && <Step onClick={() => setPlace({ kind: "sorting" })}>Sorting Box</Step>}
       {item.folders.map((folder, index) => (
         <Fragment key={folder.id}>
           {(sorting || index > 0) && (
-            <span aria-hidden="true" className="font-glyph text-fg-muted text-glyph">
+            <span aria-hidden="true" className="font-glyph text-fg-faint text-glyph">
               {GLYPHS.chevronRight}
             </span>
           )}
@@ -76,7 +76,7 @@ function Step({ onClick, children }: { onClick: () => void; children: ReactNode 
     <button
       type="button"
       onClick={onClick}
-      className="focus-ring rounded-control text-left underline-offset-2 hover:underline"
+      className="focus-ring rounded-badge text-left text-fg-mid transition-colors duration-(--motion-quick) hover:text-fg motion-reduce:transition-none"
     >
       {children}
     </button>
@@ -86,7 +86,7 @@ function Step({ onClick, children }: { onClick: () => void; children: ReactNode 
 /** A label is never shown without its key. PRODUCT.md "Tags and labels". */
 function Tags({ tags }: { tags: EffectiveTag[] }) {
   return (
-    <span className="flex flex-wrap gap-1 font-sans">
+    <span className="flex flex-wrap gap-1.5 py-px">
       {tags.map((tag) => (
         <Chip
           key={`${tag.tagId}-${tag.originId ?? "own"}`}

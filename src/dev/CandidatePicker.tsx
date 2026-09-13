@@ -31,7 +31,7 @@ export function CandidatePicker<T extends string>({ slice, names, current, onCho
           type="button"
           aria-pressed={name === current}
           onClick={() => onChoose(name)}
-          className={`focus-ring px-2 ${name === current ? "bg-hover text-fg" : "opacity-60"}`}
+          className={`focus-ring px-2 ${name === current ? "bg-raised-hi text-fg" : "opacity-60"}`}
         >
           {index + 1} {name}
         </button>

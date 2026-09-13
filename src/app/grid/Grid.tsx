@@ -49,7 +49,7 @@ export function Grid({ mode }: { mode: LayoutMode }) {
 
   return (
     <div ref={scroller} className="h-full overflow-auto">
-      {items?.length === 0 && <p className="px-3 py-2 text-fg-muted text-ui">No pictures here.</p>}
+      {items?.length === 0 && <p className="px-3 py-2 text-fg-dim text-ui">No pictures here.</p>}
       <div
         className="relative"
         style={{ height: result && items?.length ? result.totalHeight + gap * 2 : 0 }}

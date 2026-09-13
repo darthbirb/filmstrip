@@ -7,14 +7,28 @@ type Props = {
   title?: string;
 };
 
-/** A tag, or a label with its key, filled when the item carries it and outlined when inherited. */
+/** A tag is a pill; a label is a split chip, its key sunk. Inherited ones sit quieter than an item's own. */
 export function Chip({ value, tagKey, inherited = false, title }: Props) {
+  if (tagKey) {
+    return (
+      <span
+        title={title}
+        className="inline-flex h-chip max-w-full overflow-hidden rounded-nested text-small"
+      >
+        <span className="flex items-center bg-well px-2 text-fg-dim">{tagKey}</span>
+        <span
+          className={`flex min-w-0 items-center px-2 ${inherited ? "bg-inset text-fg-mid" : "bg-raised text-fg"}`}
+        >
+          <span className="truncate">{value}</span>
+        </span>
+      </span>
+    );
+  }
   return (
     <span
       title={title}
-      className={`inline-flex h-chip max-w-full items-center gap-1 rounded-control px-2 text-caption ${inherited ? "border border-line-strong text-fg-muted" : "bg-hover text-fg"}`}
+      className={`inline-flex h-chip max-w-full items-center rounded-full px-2.5 text-small inset-ring ${inherited ? "bg-inset text-fg-dim inset-ring-line" : "bg-raised text-fg inset-ring-line-control-hi"}`}
     >
-      {tagKey && <span className="text-fg-muted">{tagKey}:</span>}
       <span className="truncate">{value}</span>
     </span>
   );

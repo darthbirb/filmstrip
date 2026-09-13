@@ -44,7 +44,7 @@ export function Media({ item, fill = false }: Props) {
     );
   } else {
     body = (
-      <span className="absolute inset-0 flex items-center justify-center text-fg-muted text-ui">
+      <span className="absolute inset-0 flex items-center justify-center text-fg-dim text-ui">
         {item.ext.toUpperCase() || "File"}
       </span>
     );
@@ -53,13 +53,13 @@ export function Media({ item, fill = false }: Props) {
   return (
     <figure className={`m-0 flex flex-col ${fill ? "min-h-0 min-w-0 flex-1" : "w-full"}`}>
       <div
-        className={`relative rounded-tile bg-well ${fill ? "min-h-0 flex-1" : "max-h-(--pane-media-max) w-full"}`}
+        className={`relative overflow-hidden rounded-control bg-well ${fill ? "min-h-0 flex-1" : "max-h-(--pane-media-max) w-full"}`}
         style={fill ? undefined : { aspectRatio: aspect(item) }}
       >
         {body}
       </div>
       {state === "failed" && (
-        <figcaption className="px-3 py-1 text-caption text-fg-muted">
+        <figcaption className="px-1 pt-1 text-fg-dim text-small">
           {thumb
             ? `The window can't open .${item.ext} files, so this is its thumbnail.`
             : `The window can't open .${item.ext} files.`}
