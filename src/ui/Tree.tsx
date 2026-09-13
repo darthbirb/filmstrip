@@ -108,7 +108,7 @@ export function Tree({ label, rows, selectedId, onSelect, onExpand, onCollapse }
             if (row.expandable) toggle(row);
           }}
           onKeyDown={(event) => onKeyDown(event, index)}
-          className={`focus-ring flex h-row shrink-0 cursor-default select-none items-center gap-1 pr-2 pl-1 text-ui transition-colors duration-(--motion-quick) motion-reduce:transition-none ${row.id === selectedId ? "bg-selected text-fg" : "hover:bg-hover"} ${row.muted ? "text-fg-muted" : ""} ${row.separated ? "mt-3" : ""}`}
+          className={`focus-ring mx-row-inset flex h-row shrink-0 cursor-default select-none items-center gap-1 rounded-control pr-2 pl-1 text-ui transition-colors duration-(--motion-quick) motion-reduce:transition-none ${row.id === selectedId ? "bg-selected text-fg" : "hover:bg-hover"} ${row.muted ? "text-fg-muted" : ""} ${row.separated ? "mt-3" : ""}`}
         >
           <span
             aria-hidden="true"
@@ -129,7 +129,9 @@ export function Tree({ label, rows, selectedId, onSelect, onExpand, onCollapse }
           )}
           <span className="min-w-0 flex-1 truncate pl-1">{row.label}</span>
           {row.detail && (
-            <span className="shrink-0 text-caption text-fg-muted tabular-nums">{row.detail}</span>
+            <span className="shrink-0 font-numeric text-caption text-fg-muted tabular-nums">
+              {row.detail}
+            </span>
           )}
         </div>
       ))}

@@ -100,17 +100,19 @@ tests/e2e/     Playwright
 ## Slices
 
 The interface is built one slice at a time: **window bar → the frame (navigation, grid, pane)
-→ navigation → grid and tiles → the pane → the visual direction → selection and moving → search
+→ navigation → grid and tiles → the visual direction → the pane → selection and moving → search
 → menus and dialogs → settings and the tags screen → empty states and guidance.**
 
 Each slice builds two to four candidates that differ in **structure**, not colour. Claude
 checks them in a real browser first; the user then picks one in the real window, the rest are
 deleted, and what won is written into DECISIONS.md.
 
-**Until the visual direction, the look is deliberately plain** — Windows metrics and neutral
-greys — so each structure is judged on its own. That slice runs once the grid and the pane
-show real pictures: the design skills shape two or three directions on the token layer, the
-user picks one live, and it restyles every surface built before it.
+**Until the visual direction, the look was deliberately plain** — Windows metrics and neutral
+greys — so each structure was judged on its own. That slice ran once the grid showed real
+pictures, before the pane's structure was settled: the design skill shaped three looks on the
+token layer, the user picks one live, and it restyles every surface built before it. **From then
+on, a slice that adds a shape adds it to `docs/DESIGN.md`** and to the specimen sheet, the dev
+footer's `specimen`, which shows every primitive in its states over the current look.
 
 **Candidates are compared live in `tauri dev`, never by screenshot.** The dev readout at the
 bottom of the window switches between them instantly, by click or by the digit beside each, and
@@ -163,14 +165,16 @@ ports the same way; components and styles never do (DECISIONS.md "Built in slice
 
 ## Keeping the docs true
 
-Comments cite headings in PRODUCT.md, DECISIONS.md, DEVELOPMENT.md and SCHEMA.md **by exact
-title**, each pointer on one line. Renaming a heading orphans its callers, so rename and fix
+Comments cite headings in PRODUCT.md, DECISIONS.md, DEVELOPMENT.md, SCHEMA.md and DESIGN.md
+**by exact title**, each pointer on one line. Renaming a heading orphans its callers, so rename and fix
 them in the same commit.
 
 **A comment runs three lines at most.** What a future edit would break silently stays in the
 source; the reasoning goes in DECISIONS.md, and the comment names the section.
 
-`check:docs` enforces both, over the source and the prose docs, and CI runs it.
+`check:docs` enforces both, over the source and the prose docs, and CI runs it. It also holds
+DESIGN.md's front matter to `src/styles/app.css`: every colour, radius, spacing and text token
+of the base look, at the same value, and every component reference pointing at a real token.
 
 ## Gotchas
 

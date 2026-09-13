@@ -1,38 +1,34 @@
 import { useEffect, useState } from "react";
 
 import { CandidatePicker } from "../dev/CandidatePicker";
-import { CompareCandidates } from "../dev/CompareCandidates";
 import { SearchStandIn } from "../dev/FrameStandIns";
-import { COMPARE, useCandidate } from "./candidates";
+import { Specimen } from "../dev/Specimen";
 import { Frame } from "./frame/Frame";
 import { Grid } from "./grid/Grid";
 import { LayoutToggle } from "./grid/LayoutToggle";
 import { DEFAULT_LAYOUT } from "./grid/layout";
 import { TileSize } from "./grid/TileSize";
+import { LOOKS, useLook } from "./look";
 import { Breadcrumb } from "./navigation/Breadcrumb";
 import { Navigation } from "./navigation/Navigation";
-import { PANE_CANDIDATES, Pane } from "./pane/Pane";
+import { Pane } from "./pane/Pane";
 import { usePreferences, useScaleHotkeys } from "./preferences";
 import { WindowBar } from "./window-bar/WindowBar";
 
 // Until the search slice lands, the bar holds a dev stand-in, and nothing in production.
 const SEARCH = import.meta.env.DEV ? <SearchStandIn /> : undefined;
 
-const PANE_CHOICES = [...PANE_CANDIDATES, COMPARE] as const;
-const COMPARED_PANES = {
-  stack: () => <Pane candidate="stack" />,
-  viewer: () => <Pane candidate="viewer" />,
-  split: () => <Pane candidate="split" />,
-};
-
 export function App() {
   useScaleHotkeys();
   const layout = usePreferences().layout ?? DEFAULT_LAYOUT;
-  const [pane, choosePane] = useCandidate("pane", PANE_CANDIDATES);
+  const [look, chooseLook] = useLook();
+  const [specimen, showSpecimen] = useDevFlag("filmstrip:specimen");
 
-  return (
-    <div className="flex h-dvh flex-col bg-ground text-fg">
-      <WindowBar search={SEARCH} />
+  // What measures a token once is keyed by the look, so a new look is measured afresh.
+  const body =
+    import.meta.env.DEV && specimen ? (
+      <Specimen key={look} />
+    ) : (
       <Frame
         nav={<Navigation />}
         location={
@@ -42,23 +38,51 @@ export function App() {
             <TileSize />
           </>
         }
-        grid={<Grid mode={layout} />}
-        pane={
-          import.meta.env.DEV && pane === COMPARE ? (
-            <CompareCandidates candidates={COMPARED_PANES} layout="rows" />
-          ) : (
-            <Pane candidate={pane === COMPARE ? PANE_CANDIDATES[0] : pane} />
-          )
-        }
+        grid={<Grid key={look} mode={layout} />}
+        pane={<Pane />}
       />
+    );
+
+  return (
+    <div className="flex h-dvh flex-col bg-ground text-fg">
+      <WindowBar search={SEARCH} />
+      {body}
       {import.meta.env.DEV && (
-        <footer className="flex items-center gap-4 px-3 py-1 text-xs">
-          <CandidatePicker slice="pane" names={PANE_CHOICES} current={pane} onChoose={choosePane} />
+        <footer className="flex items-center gap-4 px-3 py-1 text-label">
+          <CandidatePicker slice="look" names={LOOKS} current={look} onChoose={chooseLook} />
+          <button
+            type="button"
+            aria-pressed={specimen}
+            onClick={() => showSpecimen(!specimen)}
+            className={`focus-ring px-2 ${specimen ? "bg-hover text-fg" : "opacity-60"}`}
+          >
+            specimen
+          </button>
           <DisplayReadout />
         </footer>
       )}
     </div>
   );
+}
+
+/** A dev switch that survives a reload. */
+function useDevFlag(key: string) {
+  const [on, setOn] = useState(() => {
+    try {
+      return localStorage.getItem(key) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const set = (next: boolean) => {
+    try {
+      localStorage.setItem(key, next ? "1" : "0");
+    } catch {
+      // The switch holds until the next reload.
+    }
+    setOn(next);
+  };
+  return [on, set] as const;
 }
 
 // What the display settings actually reach: zoom, Windows text size, display scaling.

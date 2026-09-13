@@ -225,6 +225,19 @@ layout and the tile size are kept with the other preferences.
 **A picture without a thumbnail yet lays out square**, and takes its real shape once the
 thumbnail job has read its size.
 
+## The pane
+
+**None of the first three structures**, compared live on 13 September 2026: the picture over its
+details scrolling together, the picture filling the pane with details on request, and a fixed
+split. The direction instead is the predecessor's, described by the user: the picture, a
+collapsible row holding its size and dimensions that opens to the rest of what is known, and a
+filmstrip along the bottom. It is built on the look once one is chosen; until then the pane shows
+the picture over its details.
+
+**What the pane knows comes from the file.** Capture dates, a video's length and codec, and a
+rotated recording's true shape are read when the thumbnail is made; "Capture dates" and "Video
+and ffmpeg" above say how.
+
 ## Testing in a real browser, never jsdom
 
 jsdom reports every element as zero-sized, so anything about size, overflow, position or
@@ -252,6 +265,27 @@ Sizes are in `rem`, so one root font-size moves everything at once. **"Does it f
 measured, never enumerated:** no hand-written pixel breakpoints. A control that does not fit
 collapses because it did not fit, not because the window crossed a number somebody wrote down
 once and never re-measured.
+
+**Tokens come in two tiers**, set on 13 September 2026: raw values (a neutral ramp and the mark's
+colours) and the roles components use. A look changes the first tier or the mapping, never a
+component. Tailwind's own palette, radii, text sizes and shadows are cleared, so a class from
+them does nothing and a stray number cannot slip in through a familiar name. Contrast is
+measured by a test in every look rather than trusted.
+
+## The design file
+
+**`docs/DESIGN.md` describes the look, in Google's open DESIGN.md format** (Apache-2.0, opened
+on 21 April 2026): tokens as front matter, then fixed sections from the overview to do's and
+don'ts. It is the convention coding agents now read for a design system, and it keeps the look
+in the same repository as the code, in plain text.
+
+**`app.css` stays the one place a value lives.** DESIGN.md repeats the base look's tokens so an
+agent can read them without parsing CSS, and `check:docs` fails the moment the two differ.
+Google's CLI for the format could lint and export it, but it is alpha and would be a dependency;
+the few checks that matter here are a page of our own script.
+
+**It grows with the app.** Each slice that adds a shape adds it there: the primitive, its
+states, its tokens.
 
 ## Built in slices, not ported
 

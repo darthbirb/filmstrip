@@ -48,7 +48,7 @@ export function SidePanel({ layout, side, children }: Props) {
           <Region
             ref={overlayRef}
             aria-label={copy.label}
-            className="absolute inset-y-0 z-20 flex flex-col bg-panel shadow-overlay"
+            className="absolute inset-y-0 z-(--z-overlay) flex flex-col bg-panel shadow-overlay"
             style={{ width, [edge]: "var(--spacing-rail)" }}
           >
             {body}

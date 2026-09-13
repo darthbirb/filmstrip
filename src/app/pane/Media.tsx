@@ -53,7 +53,7 @@ export function Media({ item, fill = false }: Props) {
   return (
     <figure className={`m-0 flex flex-col ${fill ? "min-h-0 min-w-0 flex-1" : "w-full"}`}>
       <div
-        className={`relative bg-ground ${fill ? "min-h-0 flex-1" : "max-h-(--pane-media-max) w-full"}`}
+        className={`relative rounded-tile bg-well ${fill ? "min-h-0 flex-1" : "max-h-(--pane-media-max) w-full"}`}
         style={fill ? undefined : { aspectRatio: aspect(item) }}
       >
         {body}

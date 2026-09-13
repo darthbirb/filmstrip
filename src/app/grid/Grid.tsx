@@ -2,6 +2,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { type ReactElement, type RefObject, useLayoutEffect, useRef, useState } from "react";
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
+import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
 import { showInPane, usePaneItem } from "../pane/pane-store";
 import { usePlace } from "../place";
 import { usePreferences } from "../preferences";
@@ -71,33 +72,15 @@ type TileProps = {
 
 function Tile({ item, shown, left, top, width, height }: TileProps) {
   return (
-    <figure
-      title={item.diskName}
-      className="absolute m-0 overflow-hidden bg-hover"
-      style={{ left, top, width, height }}
-    >
+    <figure title={item.diskName} className="absolute m-0" style={{ left, top, width, height }}>
       <button
         type="button"
         aria-label={item.diskName}
         aria-current={shown || undefined}
         onClick={() => showInPane(item.id)}
-        className="focus-ring relative block size-full"
+        className={`focus-ring block size-full ${THUMB_FRAME}`}
       >
-        {item.thumb && (
-          <img
-            src={convertFileSrc(item.thumb)}
-            alt=""
-            draggable={false}
-            decoding="async"
-            className="size-full object-cover"
-          />
-        )}
-        {shown && (
-          <span
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 shadow-[inset_0_0_0_var(--focus-width)_var(--color-fg)]"
-          />
-        )}
+        <ThumbFace src={item.thumb ? convertFileSrc(item.thumb) : undefined} current={shown} />
       </button>
     </figure>
   );

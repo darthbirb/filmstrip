@@ -30,7 +30,7 @@ export function Breadcrumb() {
             ) : (
               <button
                 type="button"
-                className="focus-ring flex h-row min-w-0 items-center px-1 text-fg-muted transition-colors duration-(--motion-quick) hover:bg-hover hover:text-fg motion-reduce:transition-none"
+                className="focus-ring flex h-row min-w-0 items-center rounded-control px-1 text-fg-muted transition-colors duration-(--motion-quick) hover:bg-hover hover:text-fg motion-reduce:transition-none"
                 onClick={() => {
                   if (place.kind === "folder")
                     setPlace({ ...place, path: place.path.slice(0, index + 1) });

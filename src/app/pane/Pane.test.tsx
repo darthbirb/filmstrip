@@ -7,7 +7,7 @@ import { render } from "vitest-browser-react";
 import { folderItems, itemDetail } from "../../ipc/commands";
 import { Grid } from "../grid/Grid";
 import { type Place, setPlace } from "../place";
-import { PANE_CANDIDATES, Pane, type PaneCandidate } from "./Pane";
+import { Pane } from "./Pane";
 import { showInPane } from "./pane-store";
 
 // These run against the dev mock's library, until the last test replaces it.
@@ -29,14 +29,14 @@ async function inCairo(name: string) {
 }
 
 /** The grid and the pane side by side, joined by the click as the app joins them. */
-function Harness({ candidate }: { candidate: PaneCandidate }) {
+function Harness() {
   return (
     <div style={{ display: "flex", width: 1100, height: 700 }}>
       <div style={{ width: 700, height: 700 }}>
         <Grid mode="justified" />
       </div>
       <aside aria-label="Pane" style={{ display: "flex", flexDirection: "column", width: 400 }}>
-        <Pane candidate={candidate} />
+        <Pane />
       </aside>
     </div>
   );
@@ -49,7 +49,7 @@ beforeEach(async () => {
 });
 
 test("the pane shows the picture clicked, and the next click replaces it", async () => {
-  const screen = await render(<Harness candidate="stack" />);
+  const screen = await render(<Harness />);
   const pane = screen.getByRole("complementary", { name: "Pane" });
   await expect.element(pane.getByText("Click a picture to see it here.")).toBeVisible();
 
@@ -63,29 +63,25 @@ test("the pane shows the picture clicked, and the next click replaces it", async
   await expect.element(pyramid).not.toHaveAttribute("aria-current");
 });
 
-test.each(PANE_CANDIDATES)(
-  "the %s candidate tells everything known about a picture",
-  async (candidate) => {
-    const pyramid = await inCairo("pyramid.jpg");
-    showInPane(pyramid.id);
-    const screen = await render(<Harness candidate={candidate} />);
-    const pane = screen.getByRole("complementary", { name: "Pane" });
-    await expect.element(pane.getByRole("heading", { name: "pyramid.jpg" })).toBeVisible();
-    if (candidate === "viewer") await pane.getByRole("button", { name: "Details" }).click();
+test("the pane tells everything known about a picture", async () => {
+  const pyramid = await inCairo("pyramid.jpg");
+  showInPane(pyramid.id);
+  const screen = await render(<Harness />);
+  const pane = screen.getByRole("complementary", { name: "Pane" });
+  await expect.element(pane.getByRole("heading", { name: "pyramid.jpg" })).toBeVisible();
 
-    for (const term of ["Where", "Taken", "Modified", "Dimensions", "File"]) {
-      await expect.element(pane.getByText(term, { exact: true })).toBeVisible();
-    }
-    await expect.element(pane.getByText(`${pyramid.width} × ${pyramid.height}`)).toBeVisible();
-    await expect.element(pane.getByText(/^JPG · 2[.,]3 MB$/)).toBeVisible();
-  },
-);
+  for (const term of ["Where", "Taken", "Modified", "Dimensions", "File"]) {
+    await expect.element(pane.getByText(term, { exact: true })).toBeVisible();
+  }
+  await expect.element(pane.getByText(`${pyramid.width} × ${pyramid.height}`)).toBeVisible();
+  await expect.element(pane.getByText(/^JPG · 2[.,]3 MB$/)).toBeVisible();
+});
 
 test("the folders the picture sits in each lead there", async () => {
   const pyramid = await inCairo("pyramid.jpg");
   showInPane(pyramid.id);
   setPlace({ kind: "sorting" });
-  const screen = await render(<Harness candidate="stack" />);
+  const screen = await render(<Harness />);
   const pane = screen.getByRole("complementary", { name: "Pane" });
 
   await pane.getByRole("button", { name: "Trips" }).click();
@@ -95,7 +91,7 @@ test("the folders the picture sits in each lead there", async () => {
 test("a video plays in the pane over its poster, and says how long it runs", async () => {
   const felucca = await inCairo("felucca.mp4");
   showInPane(felucca.id);
-  const screen = await render(<Harness candidate="stack" />);
+  const screen = await render(<Harness />);
   const pane = screen.getByRole("complementary", { name: "Pane" });
 
   await expect.element(pane.getByText("0:12")).toBeVisible();
@@ -106,7 +102,7 @@ test("a video plays in the pane over its poster, and says how long it runs", asy
 
 test("an item that has gone says so", async () => {
   showInPane(9999);
-  const screen = await render(<Harness candidate="stack" />);
+  const screen = await render(<Harness />);
   await expect.element(screen.getByText("This file is no longer here.")).toBeVisible();
 });
 
@@ -125,7 +121,7 @@ test("the pane reads the item again when background work moves on", async () => 
     { shouldMockEvents: true },
   );
   showInPane(pyramid.id);
-  await render(<Pane candidate="stack" />);
+  await render(<Pane />);
   await expect.poll(() => asked).toBe(1);
 
   await emit("job-progress", { phase: "working", pending: 1, running: 1, failed: 0, completed: 3 });
