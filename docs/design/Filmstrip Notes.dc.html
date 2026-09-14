@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Archivo:wght@800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/fill/style.css">
+<style>
+  html { background: #0b0b0b; }
+  body { margin: 0; background: #0b0b0b; color: #eceae7; font-family: "IBM Plex Sans", "Segoe UI Variable Text", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  a { color: #d6d2cc; text-decoration: underline; text-decoration-color: #5c5a56; }
+  a:hover { color: #f4f3f1; }
+</style>
+</helmet>
+
+<section style="display:flex; flex-direction:column; gap:34px; padding:44px 56px 96px; box-sizing:border-box; max-width:1180px">
+
+  <div style="display:flex; flex-direction:column; gap:12px; max-width:74ch">
+    <div style="font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:#6e6e6e">Filmstrip · notes · 5 of 5</div>
+    <div style="font-size:27px; font-weight:600; letter-spacing:-.02em; color:#f4f3f1">Why each surface is the way it is</div>
+    <div style="font-size:15px; line-height:1.65; color:#a8a5a0; text-wrap:pretty">One note per surface, and the reasoning rather than the description — the drawings say what it looks like. Where a decision was already made in DECISIONS.md the note says what the look does about it; where this design departs, it says so plainly, and where something is genuinely open it is listed at the foot rather than quietly settled.</div>
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:16px">
+
+    <div style="display:grid; grid-template-columns:190px minmax(0,1fr); gap:26px; padding:22px 24px; border-radius:12px; background:#1b1b1b; box-shadow:inset 0 0 0 1px #262626">
+      <div style="display:flex; flex-direction:column; gap:6px"><span style="font-size:17px; font-weight:600; letter-spacing:-.01em; color:#f4f3f1">The window bar</span><span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#5c5a56">36px · panel · caption buttons 46</span></div>
+      <div style="display:flex; flex-direction:column; gap:12px; font-size:13px; line-height:1.75; color:#a8a5a0">
+        <span style="text-wrap:pretty">The app draws its own chrome, so the bar has to be recognisably Windows' and not a web header. It keeps Windows' caption-button width and its glyph proportions, and close turns red under the pointer — the one place a hue appears in the chrome, and the one people reach for without looking.</span>
+        <span style="text-wrap:pretty">Search sits in the bar rather than in the frame because the frame's three header rows are already spoken for, and because the bar is the only strip that spans the whole window: scoping a search by folder is a library-wide act, not something the grid's column does. <span style="color:#eceae7">It is centred on the window, not on the gap</span>, so it does not slide about as the title changes, and it narrows before anything else in the bar gives. It narrows and keeps its word, ellipsing it only when the field is genuinely too small to hold it — nothing in this interface sheds a label to save room it has.</span>
+        <span style="text-wrap:pretty">36 rather than Windows' 32, because a 28-tall field needs the room — a 4px concession that buys the field a resting place instead of a floating one.</span>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:190px minmax(0,1fr); gap:26px; padding:22px 24px; border-radius:12px; background:#1b1b1b; box-shadow:inset 0 0 0 1px #262626">
+      <div style="display:flex; flex-direction:column; gap:6px"><span style="font-size:17px; font-weight:600; letter-spacing:-.01em; color:#f4f3f1">The frame</span><span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#5c5a56">three columns · header 44 · rail 44</span></div>
+      <div style="display:flex; flex-direction:column; gap:12px; font-size:13px; line-height:1.75; color:#a8a5a0">
+        <span style="text-wrap:pretty">Each column owns its header row, so each column owns its own controls: the grid's header holds where you are and how the pictures are laid out, and the side panels' hold the button that folds them. One toolbar across the window would put the pane's fold button next to the grid's tile size, which are not the same kind of thing.</span>
+        <span style="text-wrap:pretty">All three headers are <span style="color:#eceae7">44 tall, where the reference used 44 and 48</span>, so the rules beneath them meet in a single line across the window. That line is the only horizontal structure the interface has, and it was broken in the drawing.</span>
+        <span style="text-wrap:pretty">A folded panel leaves a rail as wide as a header is tall — a square at the window's edge, so the geometry of the corner stays legible, and so the button does not move when the panel folds. It keeps the same button in the same place, which is the difference between a panel that folded and a control that vanished.</span>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:190px minmax(0,1fr); gap:26px; padding:22px 24px; border-radius:12px; background:#1b1b1b; box-shadow:inset 0 0 0 1px #262626">
+      <div style="display:flex; flex-direction:column; gap:6px"><span style="font-size:17px; font-weight:600; letter-spacing:-.01em; color:#f4f3f1">Navigation</span><span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#5c5a56">one tree · rows 34 · glyphs filled</span></div>
+      <div style="display:flex; flex-direction:column; gap:12px; font-size:13px; line-height:1.75; color:#a8a5a0">
+        <span style="text-wrap:pretty">Everything in it is a real place on disk, so everything in it can highlight, hold an empty state, and receive a restore. That is why the Sorting Box gets a row with a count rather than being a filter, and why the Trash is a folder rather than a flag. <span style="color:#eceae7">Both sit together at the top, above a rule</span> — they are the app’s own two places, they never move and they never nest, and a person looking for one of them should not have to read past a tree to find it.</span>
+        <span style="text-wrap:pretty">Every row's glyph is filled, <span style="color:#eceae7">not only a folder's</span> — a filled glyph names a thing, an outlined one names an action, and the reference mixed the two inside one column. The chevron keeps its square whether or not a row has children, so the glyphs line up down the panel. <span style="color:#eceae7">Nesting is indentation and nothing else.</span> A guide line per level put two or three hairlines down a 15rem column, competing with the panel's own edge and with the rule under the header for the little structure the chrome has; and it marked what the chevron column already says. One step of 1.75rem per level, the glyphs still aligned within a level, and the panel stays quiet.</span>
+        <span style="text-wrap:pretty">Selection is a filled pewter plate and it is the only filled light surface in the chrome. It has to win against a hovered row two lines away, and against whatever colour the pictures are putting on screen — a ring or a tint would not.</span>
+        <span style="text-wrap:pretty">A source that cannot be read is muted and says <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#eceae7">offline</span> in words, and keeps its folders. A walk never empties a source it could not read, so the interface must not imply it did.</span>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:190px minmax(0,1fr); gap:26px; padding:22px 24px; border-radius:12px; background:#1b1b1b; box-shadow:inset 0 0 0 1px #262626">
+      <div style="display:flex; flex-direction:column; gap:6px"><span style="font-size:17px; font-weight:600; letter-spacing:-.01em; color:#f4f3f1">The grid</span><span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#5c5a56">tiles 6px apart · one corner · nothing written on a tile</span></div>
+      <div style="display:flex; flex-direction:column; gap:12px; font-size:13px; line-height:1.75; color:#a8a5a0">
+        <span style="text-wrap:pretty">The pictures are the only colour on screen, so the grid's job is to get out of the way: 6px of ground between tiles, no captions, no shadows, no filename under each one. The chrome around it is three steps of warm near-neutral, which is enough to separate the panels and not enough to compete with a photograph.</span>
+        <span style="text-wrap:pretty">Hover is a hairline ring rather than a lift, because a grid of six hundred tiles cannot afford a shadow per cell and because a tile that grows shifts its neighbours. <span style="color:#eceae7">The only thing ever written on a tile is the in-pane badge</span>, at most one at a time, and it drops its words on a tile too narrow to hold them rather than wrapping.</span>
+        <span style="text-wrap:pretty">Rows and squares are both drawn because they answer different questions — rows for looking at what the shapes are, squares for scanning a lot of them — but <span style="color:#eceae7">the choice between them has moved into Settings</span>: it is made once and then left alone, and two words for two shapes were the widest thing in a header that has to hold the place’s name first. <span style="color:#eceae7">Tile size stays in the header</span>, because it is the one view preference people change while looking — but as a single button that names the step it is on rather than as two magnifiers. The size is quantized to four steps, so there is a name to show; two nudge buttons made a person click to find out where they were, and spent 70px never saying it.</span>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:190px minmax(0,1fr); gap:26px; padding:22px 24px; border-radius:12px; background:#1b1b1b; box-shadow:inset 0 0 0 1px #262626">
+      <div style="display:flex; flex-direction:column; gap:6px"><span style="font-size:17px; font-weight:600; letter-spacing:-.01em; color:#f4f3f1">The pane</span><span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#5c5a56">disclosure · well · strip 96</span></div>
+      <div style="display:flex; flex-direction:column; gap:12px; font-size:13px; line-height:1.75; color:#a8a5a0">
+        <span style="text-wrap:pretty">Three parts and one mode. The header row is a disclosure because a 20rem column has no room for both a title and a summary, and because the shape and the size are what a person actually checks — so they take the row that is always there and double as the handle for the rest. The file's name is the last of the details rather than a headline.</span>
+        <span style="text-wrap:pretty">The picture sits in the one recessed surface in the app, which is what makes it read as a stage rather than as another panel. Details take at most half the pane's height, so the picture is never squeezed into a strip by a file with many tags.</span>
+        <span style="text-wrap:pretty">Its two steps float over the frames with the panel colour fading in behind them, rather than taking a 32 square each: 88px of a 320-wide pane spent on two arrows that stood on nothing, when the fade says the same thing and shows two more frames. The filmstrip runs through the place the item was clicked in, and stays there while you navigate elsewhere. That is the whole point of having one pane instead of two modes: you can look at a picture from Cairo while browsing the Sorting Box, and stepping along the strip still steps through Cairo.</span>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:190px minmax(0,1fr); gap:26px; padding:22px 24px; border-radius:12px; background:#1b1b1b; box-shadow:inset 0 0 0 1px #262626">
+      <div style="display:flex; flex-direction:column; gap:6px"><span style="font-size:17px; font-weight:600; letter-spacing:-.01em; color:#f4f3f1">Settings</span><span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#5c5a56">a dialog · 41rem · rail of sections</span></div>
+      <div style="display:flex; flex-direction:column; gap:12px; font-size:13px; line-height:1.75; color:#a8a5a0">
+        <span style="text-wrap:pretty">A dialog over the window, not a fourth column and not a screen. The frame is three columns and stays three columns; a preference set once a month should not cost the grid a permanent surface, and a dialog can be dismissed with Escape and leaves nothing behind. It is the only thing in the app that sits over the window, and the only use of the scrim.</span>
+        <span style="text-wrap:pretty">Its shape is built for the app this will be, not for the two rows it holds today: a rail of named sections down the left, grouped under headings, with a filter above it. Tabs across the top were the cheaper drawing and they cap out — six or seven names fill the row and the eighth scrolls, and a tab cannot be called <span style="color:#eceae7">Tags and aliases</span> without crowding its neighbours. A rail takes twenty sections without changing shape, and a section with nothing in it yet is simply not in the rail.<br><br>What earns a row is unchanged: a preference belongs here when there is nowhere on screen to set it. The interface size has no control of its own; the grid’s layout is one choice about every place at once, and it arrives as a named dropdown because in a list of preferences there are no pictures beside it to say what two glyphs mean — which leaves <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#eceae7">Segmented.tsx</span> with no user. Everything with a control on screen stays there: the panel widths, which panels are folded, the tile size, and whether the pane’s details are open. No help text — a settings row that needs a sentence is a row whose label is wrong.</span>
+        <span style="text-wrap:pretty"><span style="color:#eceae7">There is no Save and no Cancel.</span> Every control writes as you touch it, 400ms after the last change, exactly as dragging a splitter already does. A dialog you can cancel implies a draft, and there is no draft. The gear sits in the window bar at caption-button width, so it belongs to the window rather than to a column — the same reason search is there.</span>
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns:190px minmax(0,1fr); gap:26px; padding:22px 24px; border-radius:12px; background:#1b1b1b; box-shadow:inset 0 0 0 1px #262626">
+      <div style="display:flex; flex-direction:column; gap:6px"><span style="font-size:17px; font-weight:600; letter-spacing:-.01em; color:#f4f3f1">The interface size</span><span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#5c5a56">80% to 200% · everything in rem</span></div>
+      <div style="display:flex; flex-direction:column; gap:12px; font-size:13px; line-height:1.75; color:#a8a5a0">
+        <span style="text-wrap:pretty">It is a dropdown of five named steps — 80, 100, 125, 150, 200% — not a range: the value is the root font size, people pick a size and leave it, and a slider would offer a precision that does not exist. No drawing in this set carries a pixel of its own except the focus ring's 2px and the hairlines, which must not blur. Every other number is <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#eceae7">calc(var(--u) × n)</span> — the artboards' stand-in for rem — so artboard D is literally artboard A with one number doubled, and any value that could not survive that is visible as a defect rather than hidden in a screenshot.</span>
+        <span style="text-wrap:pretty">Nothing folds at a breakpoint — and nothing is dropped at one either. The frame measures its own width against the columns' actual widths and the grid's 20rem minimum, and the order is fixed: the pane goes, then navigation, and the grid never does. Inside a header the same rule applies to its controls: a control is dropped when what remains would be narrower than its content, not at a width picked in advance, which is why the 640 window keeps a header the 200% window keeps too. <span style="color:#eceae7">The same rule handles a small window and a large text size</span>, which is why 200% at 1440 behaves like 100% at 1024.</span>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:190px minmax(0,1fr); gap:26px; padding:22px 24px; border-radius:12px; background:#1b1b1b; box-shadow:inset 0 0 0 1px #262626">
+      <div style="display:flex; flex-direction:column; gap:6px"><span style="font-size:17px; font-weight:600; letter-spacing:-.01em; color:#f4f3f1">The two marks</span><span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#5c5a56">no accent · white and red</span></div>
+      <div style="display:flex; flex-direction:column; gap:14px; font-size:13px; line-height:1.75; color:#a8a5a0">
+        <span style="text-wrap:pretty">One white ring was carrying two meanings: where the keyboard is, and which tile the pane is showing. Both can be on screen at once, on two different tiles, and they were identical. <span style="color:#eceae7">They are split by shape and place rather than by a hue</span> — the app has no accent, because the pictures are the only colour it should have.</span>
+        <div style="display:flex; gap:16px; flex-wrap:wrap; padding:14px; border-radius:10px; background:#141414; box-shadow:inset 0 0 0 1px #262626">
+          <div style="display:flex; flex-direction:column; gap:8px"><span style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5c5a56">Before · which is which?</span><div style="display:flex; gap:10px"><div style="width:104px; height:78px; border-radius:10px; background:linear-gradient(135deg,hsl(63 45% 55%),hsl(123 45% 25%)); box-shadow:inset 0 0 0 2px #f2f2f2"></div><div style="width:104px; height:78px; border-radius:10px; background:linear-gradient(135deg,hsl(16 45% 55%),hsl(76 45% 25%)); outline:2px solid #f2f2f2; outline-offset:2px"></div></div></div>
+          <div style="display:flex; flex-direction:column; gap:8px"><span style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5c5a56">Now · in the pane · keyboard · selected</span><div style="display:flex; gap:10px"><div style="position:relative; width:104px; height:78px; border-radius:10px; overflow:hidden; background:linear-gradient(135deg,hsl(63 45% 55%),hsl(123 45% 25%)); box-shadow:inset 0 0 0 2px #f2f2f2"><span style="position:absolute; left:6px; bottom:6px; width:20px; height:20px; display:grid; place-items:center; border-radius:6px; background:#f2f2f2; color:#141414"><i class="ph-fill ph-eye" style="font-size:12px"></i></span></div><div style="width:104px; height:78px; border-radius:10px; background:linear-gradient(135deg,hsl(16 45% 55%),hsl(76 45% 25%)); outline:2px solid #c25a4a; outline-offset:2px"></div><div style="position:relative; width:104px; height:78px; border-radius:10px; background:linear-gradient(135deg,hsl(329 45% 55%),hsl(29 45% 25%))"><span style="position:absolute; top:6px; right:6px; width:20px; height:20px; display:grid; place-items:center; border-radius:6px; background:#f2f2f2; color:#141414"><i class="ph-bold ph-check" style="font-size:13px"></i></span></div></div></div>
+        </div>
+        <span style="text-wrap:pretty"><span style="color:#eceae7">In the pane is drawn on the tile</span>: a white ring inside its edge and a small white plate in a corner, so it holds over any photograph and needs no hue to be found. <span style="color:#eceae7">Keyboard focus is a red ring offset clear of the tile</span> — red because it is the app's one existing hue, on close, and because keyboard navigation is not the main way this app is used: it should be unmistakable when it is there and absent the rest of the time. Two rings, one drawn in and one drawn out, and only ever one of each on screen.</span>
+        <span style="text-wrap:pretty">Selection is the third state and it is neither ring. <span style="color:#eceae7">A checkbox at the tile's top-right</span>, appearing under the pointer and on every tile once one is checked. It is a checkbox because selection is a set rather than a place, because clicking the picture has to keep meaning <em>open this in the pane</em>, and because a checked box is the one mark that stays legible at the smallest tile. A folder's selection in the tree stays the pewter plate.</span>
+      </div>
+    </div>
+
+    <div style="display:grid; grid-template-columns:190px minmax(0,1fr); gap:26px; padding:22px 24px; border-radius:12px; background:#1b1b1b; box-shadow:inset 0 0 0 1px #262626">
+      <div style="display:flex; flex-direction:column; gap:6px"><span style="font-size:17px; font-weight:600; letter-spacing:-.01em; color:#f4f3f1">Type and glyphs</span><span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#5c5a56">IBM Plex Sans · Archivo · Phosphor</span></div>
+      <div style="display:flex; flex-direction:column; gap:12px; font-size:13px; line-height:1.75; color:#a8a5a0">
+        <span style="text-wrap:pretty">Plex Sans instead of Segoe UI Variable: the app cannot fetch a font, and a face it ships is a face it can rely on at every size and on every machine. It has real tabular figures, which matters in an interface made mostly of counts, sizes, dimensions and dates, and its slightly technical voice suits a tool that reads your disk. Archivo ExtraBold keeps the wordmark, as it already did.</span>
+        <span style="text-wrap:pretty">Phosphor instead of Material Symbols: 5.4 MB of variable icon font, whole, for about twenty glyphs — and its hairline weight disappears at 100% on a dark ground. <span style="color:#eceae7">Phosphor's two families make the filled-versus-outlined rule physical</span> rather than an axis value nobody can audit, and its geometry is closer to Windows' own than Material's rounded terminals are.</span>
+        <span style="text-wrap:pretty">Both are open licences that permit bundling — OFL for the two faces, MIT for the icons — so the content security policy can keep forbidding fetches.</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px">
+    <div style="display:flex; flex-direction:column; gap:12px; padding:20px 22px; border-radius:12px; background:#1b1b1b; box-shadow:inset 0 0 0 1px #262626">
+      <div style="font-size:15px; font-weight:600; color:#f4f3f1">Left deliberately empty</div>
+      <div style="font-size:13px; line-height:1.75; color:#a8a5a0; text-wrap:pretty">Triage, compression review, duplicates, storage, a tags screen, trash limits, a blur toggle, favourites. All of it is in PRODUCT.md; none of it is drawn. Selection is the exception — it has a mark now, because it needed one before anything could act on it — but what can be done with a set of selected files is not drawn, and the room it will need is a bar along the grid's foot.</div>
+      <div style="font-size:13px; line-height:1.75; color:#908c86; text-wrap:pretty">Also not drawn, though the shapes exist in the component sheet: the search results surface, and where the indexing readout finally sits. Both are marked <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#a8a5a0">not built</span> there.</div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:12px; padding:20px 22px; border-radius:12px; background:#1b1b1b; box-shadow:inset 0 0 0 1px #262626">
+      <div style="font-size:15px; font-weight:600; color:#f4f3f1">Open, and worth deciding before building</div>
+      <div style="display:flex; flex-direction:column; gap:9px; font-size:13px; line-height:1.7; color:#a8a5a0">
+        <span><span style="color:#eceae7">A video tile says nothing today.</span> The grid draws the same cell for a photograph and a twelve-second clip. A duration in the corner is the obvious answer and it is the second thing ever written on a tile, so it needs deciding rather than assuming.</span>
+        <span><span style="color:#eceae7">What the grid's header drops first</span> when it genuinely runs out of room. It drops from the right, measured rather than at a chosen width, and the place's name is last — but with the button down to 112px there may be no window small enough to make it drop, which is the answer worth checking against a real build.</span>
+        <span><span style="color:#eceae7">Whether Settings should also hold the tile size</span>, as a saved number rather than only as two steps in the header. It is saved either way; the question is whether it is worth a row.</span>
+                <span><span style="color:#eceae7">640 × 480 fits</span>, with the whole header intact. Whether that is the true minimum or whether 560 also holds is a measurement, not a drawing.</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:12px; padding:20px 22px; border-radius:12px; background:#141414; box-shadow:inset 0 0 0 1px #262626">
+    <div style="font-size:15px; font-weight:600; color:#f4f3f1">The five files</div>
+    <div style="display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:12px; font-size:12px; line-height:1.6; color:#908c86">
+      <span><span style="font-family:'IBM Plex Mono',monospace; color:#eceae7">Tokens</span><br>Colour, type, space, corners, motion, and the CSS to paste into <span style="font-family:'IBM Plex Mono',monospace">app.css</span>.</span>
+      <span><span style="font-family:'IBM Plex Mono',monospace; color:#eceae7">Components</span><br>Every primitive built today, in every state, plus the stand-ins and the two not-built shapes.</span>
+      <span><span style="font-family:'IBM Plex Mono',monospace; color:#eceae7">Artboards</span><br>The whole window: wide, narrow, 640 × 480, and 200%.</span>
+      <span><span style="font-family:'IBM Plex Mono',monospace; color:#eceae7">Pane</span><br>Nine states, at the pane's own width.</span>
+      <span><span style="font-family:'IBM Plex Mono',monospace; color:#eceae7">Notes</span><br>This file.</span>
+    </div>
+  </div>
+
+</section>
+</x-dc>
+</body>
+</html>
