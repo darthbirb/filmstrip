@@ -1,4 +1,4 @@
-import { type KeyboardEvent, useRef, useState } from "react";
+import { Fragment, type KeyboardEvent, useRef, useState } from "react";
 
 import { Glyph } from "./Glyph";
 import type { GlyphName } from "./glyphs";
@@ -14,7 +14,7 @@ export type TreeRow = {
   /** Muted text at the row's end: a count, or why the row is muted. */
   detail?: string;
   muted?: boolean;
-  /** Set apart from the row above it. */
+  /** Set apart from the rows above it by a rule. */
   separated?: boolean;
 };
 
@@ -94,58 +94,63 @@ export function Tree({ label, rows, selectedId, onSelect, onExpand, onCollapse }
           ? "bg-plate text-on-plate hover-wash"
           : `${row.muted ? "text-fg-dim" : "text-fg-mid"} hover:bg-wash hover:text-fg`;
         const quiet = selected ? "text-on-plate" : "text-fg-dim";
+        const ink = row.muted && !selected ? "text-fg-faint" : quiet;
         return (
-          <div
-            key={row.id}
-            ref={(element) => {
-              if (element) elements.current.set(row.id, element);
-              else elements.current.delete(row.id);
-            }}
-            role="treeitem"
-            aria-level={row.level}
-            aria-expanded={row.expandable ? Boolean(row.expanded) : undefined}
-            aria-selected={selected}
-            tabIndex={row.id === tabStop ? 0 : -1}
-            onClick={(event) => {
-              setFocusId(row.id);
-              const onChevron = (event.target as Element).closest("[data-chevron]");
-              if (onChevron && row.expandable) toggle(row);
-              else onSelect(row.id);
-            }}
-            onDoubleClick={() => {
-              if (row.expandable) toggle(row);
-            }}
-            onKeyDown={(event) => onKeyDown(event, index)}
-            className={`focus-ring mx-row-inset flex h-row shrink-0 cursor-default select-none items-center gap-2 rounded-control pr-2 pl-1 text-row transition-colors duration-(--motion-quick) motion-reduce:transition-none ${tone} ${row.separated ? "mt-3" : ""}`}
-          >
-            <span
-              aria-hidden="true"
-              className="shrink-0"
-              style={{ width: `calc(var(--spacing-indent) * ${row.level - 1})` }}
-            />
-            <span
-              data-chevron
-              aria-hidden="true"
-              className={`flex size-chevron shrink-0 items-center justify-center ${quiet}`}
-            >
-              {row.expandable && (
-                <Glyph
-                  name={row.expanded ? "chevronDown" : "chevronRight"}
-                  className="text-glyph"
-                />
-              )}
-            </span>
-            {/* Filled, so a row reads as a thing; a control's outlined glyph reads as an action. */}
-            {row.glyph && <Glyph name={row.glyph} filled className={`text-icon ${quiet}`} />}
-            <span className="min-w-0 flex-1 truncate">{row.label}</span>
-            {row.detail && (
-              <span
-                className={`shrink-0 text-small tabular-nums ${selected ? "text-on-plate-dim" : "text-fg-dim"}`}
-              >
-                {row.detail}
-              </span>
+          <Fragment key={row.id}>
+            {row.separated && (
+              <span aria-hidden="true" className="mx-row-inset my-1.5 h-px shrink-0 bg-line" />
             )}
-          </div>
+            <div
+              ref={(element) => {
+                if (element) elements.current.set(row.id, element);
+                else elements.current.delete(row.id);
+              }}
+              role="treeitem"
+              aria-level={row.level}
+              aria-expanded={row.expandable ? Boolean(row.expanded) : undefined}
+              aria-selected={selected}
+              tabIndex={row.id === tabStop ? 0 : -1}
+              onClick={(event) => {
+                setFocusId(row.id);
+                const onChevron = (event.target as Element).closest("[data-chevron]");
+                if (onChevron && row.expandable) toggle(row);
+                else onSelect(row.id);
+              }}
+              onDoubleClick={() => {
+                if (row.expandable) toggle(row);
+              }}
+              onKeyDown={(event) => onKeyDown(event, index)}
+              className={`focus-ring mx-row-inset flex h-row shrink-0 cursor-default select-none items-center gap-2 rounded-control pr-2 pl-1 text-row transition-colors duration-(--motion-quick) motion-reduce:transition-none ${tone}`}
+            >
+              <span
+                aria-hidden="true"
+                className="shrink-0"
+                style={{ width: `calc(var(--spacing-indent) * ${row.level - 1})` }}
+              />
+              <span
+                data-chevron
+                aria-hidden="true"
+                className={`flex size-chevron shrink-0 items-center justify-center ${quiet}`}
+              >
+                {row.expandable && (
+                  <Glyph
+                    name={row.expanded ? "chevronDown" : "chevronRight"}
+                    className="text-glyph"
+                  />
+                )}
+              </span>
+              {/* Filled, so a row reads as a thing; a control's outlined glyph reads as an action. */}
+              {row.glyph && <Glyph name={row.glyph} filled className={`text-icon ${ink}`} />}
+              <span className="min-w-0 flex-1 truncate">{row.label}</span>
+              {row.detail && (
+                <span
+                  className={`shrink-0 text-small tabular-nums ${selected ? "text-on-plate-dim" : "text-fg-dim"}`}
+                >
+                  {row.detail}
+                </span>
+              )}
+            </div>
+          </Fragment>
         );
       })}
     </div>

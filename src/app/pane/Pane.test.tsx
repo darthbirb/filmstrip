@@ -257,3 +257,35 @@ test("a long place draws only the frames near the one shown, with that one centr
     )
     .toBeLessThan(1);
 });
+
+test("the strip's steps float over its ends, and the first frame sits clear of them", async () => {
+  const rows: ItemRow[] = Array.from({ length: 20 }, (_, at) => ({
+    ...sample,
+    id: at + 1,
+    diskName: `frame-${at + 1}.jpg`,
+  }));
+  mockIPC(
+    (cmd, payload) => {
+      if (cmd === "folder_items") return rows;
+      if (cmd === "item_detail") {
+        const id = (payload as { itemId: number }).itemId;
+        return { ...sampleDetail, id, diskName: `frame-${id}.jpg` };
+      }
+      return cmd === "item_tags" ? [] : undefined;
+    },
+    { shouldMockEvents: true },
+  );
+  showInPane(1, CAIRO);
+  const screen = await render(<Harness grid={false} />);
+  const strip = screen.getByRole("listbox", { name: "Filmstrip" });
+  const first = strip.getByRole("option", { name: "frame-1.jpg" });
+  await expect.element(first).toBeVisible();
+
+  const box = (element: Element) => element.getBoundingClientRect();
+  const track = box(strip.element());
+  const previous = box(screen.getByRole("button", { name: "Previous" }).element());
+  const next = box(screen.getByRole("button", { name: "Next" }).element());
+  expect(previous.left).toBeGreaterThan(track.left);
+  expect(next.right).toBeLessThan(track.right);
+  expect(box(first.element()).left).toBeGreaterThanOrEqual(previous.right);
+});

@@ -1,6 +1,6 @@
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC } from "@tauri-apps/api/mocks";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, test, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
@@ -35,6 +35,17 @@ test("each caption button asks Tauri for its action", async () => {
       "plugin:window|close",
     ]),
   );
+});
+
+test("the gear opens Settings, and says so while it is open", async () => {
+  recordIPC();
+  const opened = vi.fn();
+  const screen = await render(<WindowBar onSettings={opened} settingsOpen />);
+  const gear = screen.getByRole("button", { name: "Settings" });
+  await expect.element(gear).toHaveAttribute("aria-haspopup", "dialog");
+  await expect.element(gear).toHaveAttribute("aria-expanded", "true");
+  await gear.click();
+  expect(opened).toHaveBeenCalledOnce();
 });
 
 test("a maximised window offers Restore instead", async () => {
@@ -89,7 +100,7 @@ test("the bar is sized in rem, so it follows the text size", async () => {
 test("nothing is cut off in the narrowest window", async () => {
   recordIPC();
   await page.viewport(640, 480);
-  const screen = await render(<WindowBar />);
+  const screen = await render(<WindowBar onSettings={() => undefined} />);
   const bar = screen.getByRole("banner").element();
   expect(bar.scrollWidth).toBeLessThanOrEqual(bar.clientWidth);
   for (const button of screen.getByRole("button").elements()) {
@@ -101,7 +112,10 @@ test("search sits centred on the window, and narrows before anything is cut off"
   recordIPC();
   await page.viewport(1600, 400);
   const screen = await render(
-    <WindowBar search={<div data-testid="search" className="h-full w-full" />} />,
+    <WindowBar
+      search={<div data-testid="search" className="h-full w-full" />}
+      onSettings={() => undefined}
+    />,
   );
   const search = screen.getByTestId("search").element();
   const wide = search.getBoundingClientRect();

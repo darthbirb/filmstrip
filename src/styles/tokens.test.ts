@@ -42,6 +42,13 @@ test("text on the selection plate can be read", () => {
   expect(contrast(painted("on-plate"), painted("plate"))).toBeGreaterThanOrEqual(4.5);
 });
 
+test("the in-pane plate's words can be read, and its ring stands out from every surface", () => {
+  expect(contrast(painted("on-mark"), painted("in-pane"))).toBeGreaterThanOrEqual(4.5);
+  for (const surface of SURFACES) {
+    expect(contrast(painted("in-pane"), painted(surface)), surface).toBeGreaterThanOrEqual(3);
+  }
+});
+
 test("the close glyph stands out from the red it turns under the pointer", () => {
   // A glyph, not text, so the bar is 3:1.
   expect(contrast(painted("on-danger"), painted("danger"))).toBeGreaterThanOrEqual(3);

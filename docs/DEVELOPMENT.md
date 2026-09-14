@@ -109,10 +109,18 @@ deleted, and what won is written into DECISIONS.md.
 
 **Until the visual direction, the look was deliberately plain** — Windows metrics and neutral
 greys — so each structure was judged on its own. That slice ran once the grid showed real
-pictures: three looks of its own were rejected, the look was then taken from ggallery's drawing
-as a reference, and the surfaces built so far were restyled on it (DECISIONS.md "The look").
-**From then on, a feature that adds a shape adds it to `docs/DESIGN.md`**, and its states are
-checked on the real surface, in the real window.
+pictures: three looks of its own were rejected, and so was one taken from ggallery's drawing.
+**Since 14 September 2026 each new surface is drawn in Claude Design** from a prompt Claude
+writes, and built from the files in `docs/design/` (DECISIONS.md "The look"). **A feature that
+adds a shape adds it to `docs/DESIGN.md`**, and its states are checked on the real surface, in
+the real window.
+
+## Designs
+
+Claude Design's files live in `docs/design/`, one per sheet, beside the `support.js` that renders
+them; open one in a browser. Claude imports them from the project itself, and only the files a
+build needs. They load fonts and icons from the network to draw, which suits a reference and is
+never true of the app. Biome skips the folder, and nothing in `src/` imports from it.
 
 **Candidates are compared live in `tauri dev`, never by screenshot.** The dev readout at the
 bottom of the window switches between them instantly, by click or by the digit beside each, and
@@ -131,8 +139,7 @@ edited, installed or run.
 of time, so each port is exercised as soon as it lands and stays small enough to review
 properly. Interface logic that is not markup — the grid's layout maths, the query term helpers —
 ports the same way; components and styles never do (DECISIONS.md "Built in slices, not ported").
-The drawing, `docs/design/Filmstrip.dc.html`, is the reference for the look: its values are
-re-derived and checked, never lifted with its markup (DECISIONS.md "The look").
+Its interface is never read for the look, which comes from Claude Design (DECISIONS.md "The look").
 
 **A port is a rewrite with the original open beside it**, never a copy:
 

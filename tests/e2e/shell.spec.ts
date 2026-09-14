@@ -32,6 +32,30 @@ test("the shell fits at every width and text size", async ({ page }, testInfo) =
   expect(errors).toEqual([]);
 });
 
+test("Settings opens from the gear and fits at every width and text size", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+
+  for (const width of WIDTHS) {
+    for (const rootSize of ROOT_SIZES) {
+      await page.setViewportSize({ width, height: 700 });
+      await page.goto("/");
+      await page.evaluate((size) => {
+        document.documentElement.style.fontSize = size;
+      }, rootSize);
+
+      await page.getByRole("button", { name: "Settings" }).click();
+      const dialog = page.getByRole("dialog", { name: "Settings" });
+      await expect(dialog).toBeInViewport({ ratio: 1 });
+      await expect(dialog.getByRole("button", { name: /^Grid layout/ })).toBeInViewport();
+      await page.keyboard.press("Escape");
+      await expect(dialog).toBeHidden();
+    }
+  }
+
+  expect(errors).toEqual([]);
+});
+
 test("a clicked picture shows in the pane at every size", async ({ page }, testInfo) => {
   const errors: string[] = [];
   page.on("console", (message) => {

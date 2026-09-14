@@ -2,6 +2,8 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { type ReactElement, type RefObject, useLayoutEffect, useRef, useState } from "react";
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
+import { formatDuration } from "../../lib/format";
+import { EmptyState } from "../../ui/EmptyState";
 import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
 import { showInPane, usePaneItem } from "../pane/pane-store";
 import { type Place, usePlace } from "../place";
@@ -51,13 +53,20 @@ export function Grid({ mode }: { mode: LayoutMode }) {
 
   return (
     <div ref={scroller} className="h-full overflow-auto">
-      {items?.length === 0 && <p className="px-3 py-2 text-fg-dim text-ui">No pictures here.</p>}
-      <div
-        className="relative"
-        style={{ height: result && items?.length ? result.totalHeight + gap * 2 : 0 }}
-      >
-        {tiles}
-      </div>
+      {items?.length === 0 ? (
+        <EmptyState
+          glyph="folderOpen"
+          title="No pictures here."
+          note={place?.kind === "folder" ? "Folders inside it are in the tree." : undefined}
+        />
+      ) : (
+        <div
+          className="relative"
+          style={{ height: result && items?.length ? result.totalHeight + gap * 2 : 0 }}
+        >
+          {tiles}
+        </div>
+      )}
     </div>
   );
 }
@@ -84,7 +93,15 @@ function Tile({ item, from, shown, left, top, width, height }: TileProps) {
         onClick={() => showInPane(item.id, from)}
         className={`focus-ring block size-full ${THUMB_FRAME}`}
       >
-        <ThumbFace src={item.thumb ? convertFileSrc(item.thumb) : undefined} current={shown} />
+        <ThumbFace
+          src={item.thumb ? convertFileSrc(item.thumb) : undefined}
+          current={shown}
+          duration={
+            item.kind === "video" && item.durationMs !== null
+              ? formatDuration(item.durationMs)
+              : undefined
+          }
+        />
       </button>
     </figure>
   );

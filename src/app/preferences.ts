@@ -16,8 +16,8 @@ export type Preferences = {
   details?: boolean;
 };
 
-/** The interface sizes Ctrl+= and Ctrl+- step through; 1 is the root size Windows gives. */
-export const SCALES = [0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2];
+/** The interface sizes Settings offers and Ctrl+= and Ctrl+- step through; 1 is Windows' root size. */
+export const SCALES = [0.8, 1, 1.25, 1.5, 2];
 const DEFAULTS: Preferences = { scale: 1 };
 // A write waits this long after the last change, so dragging a splitter saves once.
 const SAVE_DELAY_MS = 400;
@@ -81,7 +81,7 @@ function validated(value: unknown): Partial<Preferences> {
   if (typeof value !== "object" || value === null) return {};
   const { scale, widths, hidden, tile, layout, details } = value as Record<string, unknown>;
   const valid: Partial<Preferences> = {};
-  if (typeof scale === "number" && SCALES.includes(scale)) valid.scale = scale;
+  if (typeof scale === "number" && Number.isFinite(scale)) valid.scale = nearestScale(scale);
   const savedWidths = pair<number>(widths, "number");
   if (savedWidths) valid.widths = savedWidths;
   const savedHidden = pair<boolean>(hidden, "boolean");
@@ -90,6 +90,13 @@ function validated(value: unknown): Partial<Preferences> {
   if (layout === "justified" || layout === "uniform") valid.layout = layout;
   if (typeof details === "boolean") valid.details = details;
   return valid;
+}
+
+/** The step a saved size is nearest, so a size saved under older steps still lands on one. */
+function nearestScale(scale: number) {
+  return SCALES.reduce((best, step) =>
+    Math.abs(step - scale) < Math.abs(best - scale) ? step : best,
+  );
 }
 
 function pair<T>(value: unknown, type: "number" | "boolean") {
