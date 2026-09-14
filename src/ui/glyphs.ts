@@ -8,6 +8,7 @@ export const GLYPHS = {
   showLeft: "left_panel_open",
   hideRight: "right_panel_close",
   showRight: "right_panel_open",
+  chevronLeft: "chevron_left",
   chevronRight: "chevron_right",
   chevronDown: "expand_more",
   back: "arrow_left_alt",
@@ -17,6 +18,7 @@ export const GLYPHS = {
   trash: "delete",
   search: "search",
   view: "visibility",
+  image: "image",
 } as const;
 
 export type GlyphName = keyof typeof GLYPHS;

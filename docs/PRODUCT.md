@@ -59,6 +59,9 @@ Navigation on one side, the grid in the middle, the pane on the other. The pane 
 you clicked; clicking another replaces it, and dragging items onto it adds them, up to a limit.
 One mode, not a preview mode and a grid mode.
 
+Along the pane's foot, a filmstrip steps through the place the item was clicked in. The pane
+keeps both while the user looks somewhere else.
+
 ## Triage
 
 Not a screen. Select in any grid — a folder, the Sorting Box, the trash — and move the

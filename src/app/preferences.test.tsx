@@ -52,16 +52,18 @@ test("saved preferences come back, and anything malformed falls back to the defa
     widths: { nav: 18, pane: 22 },
     hidden: { nav: false, pane: true },
     layout: "uniform",
+    details: true,
   };
   await loadPreferences();
   expect(getPreferences()).toMatchObject({
     scale: 1.25,
     widths: { nav: 18, pane: 22 },
     layout: "uniform",
+    details: true,
   });
   expect(document.documentElement.style.fontSize).toBe("125%");
 
-  stored = { scale: 7, widths: { nav: "wide" }, hidden: "yes", layout: "masonry" };
+  stored = { scale: 7, widths: { nav: "wide" }, hidden: "yes", layout: "masonry", details: "open" };
   await loadPreferences();
   expect(getPreferences()).toEqual({ scale: 1 });
 });

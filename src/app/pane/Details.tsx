@@ -3,37 +3,28 @@ import { Fragment, type ReactNode } from "react";
 import type { EffectiveTag } from "../../ipc/bindings/EffectiveTag";
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import { formatBytes, formatDate, formatDimensions, formatDuration } from "../../lib/format";
-import { Chip } from "../../ui/Chip";
+import { Chip, Stat } from "../../ui/Chip";
 import { type Fact, Facts } from "../../ui/Facts";
 import { Glyph } from "../../ui/Glyph";
 import { setPlace } from "../place";
 
-/** The item's name, heading whatever the pane shows of it. */
-export function Title({ item, className = "" }: { item: ItemDetail; className?: string }) {
-  return (
-    <h2
-      title={item.diskName}
-      className={`m-0 min-w-0 break-all text-fg-hi text-title ${className}`}
-    >
-      {item.diskName}
-    </h2>
-  );
-}
-
-/** Where the item is, when it was taken, its shape and its file, and its tags. */
+/** Where the item is, its file, its dates, its labels and tags, and the name it has on disk. */
 export function Details({ item, tags }: { item: ItemDetail; tags: EffectiveTag[] }) {
-  const facts: Fact[] = [["Where", <Where key="where" item={item} />]];
-  if (item.capturedAt !== null) {
-    facts.push(["Taken", formatDate(item.capturedAt, item.capturedSrc === "exif")]);
-  }
-  facts.push(["Modified", formatDate(item.mtime)]);
-  if (item.width !== null && item.height !== null) {
-    facts.push(["Dimensions", formatDimensions(item.width, item.height)]);
-  }
-  if (item.durationMs !== null) facts.push(["Length", formatDuration(item.durationMs)]);
-  const file = [item.ext.toUpperCase(), item.codec?.toUpperCase(), formatBytes(item.sizeBytes)];
-  facts.push(["File", file.filter(Boolean).join(" · ")]);
-  if (tags.length > 0) facts.push(["Tags", <Tags key="tags" tags={tags} />]);
+  const facts: Fact[] = [
+    ["Where", <Where key="where" item={item} />],
+    ["File", <File key="file" item={item} />],
+    ["Dates", <Dates key="dates" item={item} />],
+  ];
+  const labels = tags.filter((tag) => tag.key);
+  const plain = tags.filter((tag) => !tag.key);
+  if (labels.length > 0) facts.push(["Labels", <Tags key="labels" tags={labels} />]);
+  if (plain.length > 0) facts.push(["Tags", <Tags key="tags" tags={plain} />]);
+  facts.push([
+    "Name",
+    <span key="name" className="break-all">
+      {item.diskName}
+    </span>,
+  ]);
   return <Facts facts={facts} />;
 }
 
@@ -78,6 +69,39 @@ function Step({ onClick, children }: { onClick: () => void; children: ReactNode 
     >
       {children}
     </button>
+  );
+}
+
+/** The measured facts as chips, and the kind of file after them, quieter. */
+function File({ item }: { item: ItemDetail }) {
+  const kind = [item.ext.toUpperCase(), item.codec?.toUpperCase()].filter(Boolean).join(" · ");
+  return (
+    <span className="flex flex-wrap gap-1.5 py-px">
+      {item.width !== null && item.height !== null && (
+        <Stat>{formatDimensions(item.width, item.height)}</Stat>
+      )}
+      {item.durationMs !== null && <Stat>{formatDuration(item.durationMs)}</Stat>}
+      <Stat>{formatBytes(item.sizeBytes)}</Stat>
+      {kind && <Stat quiet>{kind}</Stat>}
+    </span>
+  );
+}
+
+/** When it was taken, if known, then changed and added; the first known stands out. */
+function Dates({ item }: { item: ItemDetail }) {
+  const dates: [string, string][] = [];
+  if (item.capturedAt !== null) {
+    dates.push(["Taken", formatDate(item.capturedAt, item.capturedSrc === "exif")]);
+  }
+  dates.push(["Modified", formatDate(item.mtime)], ["Added", formatDate(item.addedAt)]);
+  return (
+    <span className="flex flex-col">
+      {dates.map(([what, when], index) => (
+        <span key={what} className="text-fg-dim">
+          {what} <span className={index === 0 ? "text-fg" : ""}>{when}</span>
+        </span>
+      ))}
+    </span>
   );
 }
 

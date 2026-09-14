@@ -227,12 +227,24 @@ thumbnail job has read its size.
 
 ## The pane
 
-**None of the first three structures**, compared live on 13 September 2026: the picture over its
-details scrolling together, the picture filling the pane with details on request, and a fixed
-split. The direction instead is the predecessor's, described by the user: the picture, a
-collapsible row holding its size and dimensions that opens to the rest of what is known, and a
-filmstrip along the bottom. It is the next feature built on the look; until then the pane shows
-the picture over its details.
+**The picture, a row that opens onto what is known, and a filmstrip**: the predecessor's
+arrangement, described by the user once three structures of this repository's own had been
+turned down live on 13 September 2026, and re-derived from ggallery's drawing.
+
+- **The header row carries the item's shape and size**, beside the fold button. It is a
+  disclosure: opened, the details push down from under it, and whether it is open is a saved
+  preference, so it holds from one item to the next.
+- **The file's name is the last of the details, not a headline.** An item is a real file under
+  its own name, so there is one name to show; a heading only assistive technology reads keeps
+  the pane findable.
+- **The picture takes the rest**, at its own shape in the well.
+- **The filmstrip runs through the place the item was clicked in**, not whatever the grid shows
+  now: the pane keeps what it shows while the user looks elsewhere, and its strip keeps with it.
+  Like the grid, it draws only the frames near the scroll, so a folder of thousands costs what a
+  folder of ten does.
+- **Nothing is drawn with nothing behind it.** The drawing's back arrow, mode switch and action
+  bar wait for history, sets and actions to exist, and PRODUCT.md "The three panels" keeps one
+  mode.
 
 **What the pane knows comes from the file.** Capture dates, a video's length and codec, and a
 rotated recording's true shape are read when the thumbnail is made; "Capture dates" and "Video

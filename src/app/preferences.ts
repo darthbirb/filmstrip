@@ -12,6 +12,8 @@ export type Preferences = {
   tile?: number;
   /** The grid's layout: rows that keep each picture's shape, or squares. */
   layout?: LayoutMode;
+  /** Whether the pane's details are open, for every item it shows. */
+  details?: boolean;
 };
 
 /** The interface sizes Ctrl+= and Ctrl+- step through; 1 is the root size Windows gives. */
@@ -77,7 +79,7 @@ function applyScale() {
 
 function validated(value: unknown): Partial<Preferences> {
   if (typeof value !== "object" || value === null) return {};
-  const { scale, widths, hidden, tile, layout } = value as Record<string, unknown>;
+  const { scale, widths, hidden, tile, layout, details } = value as Record<string, unknown>;
   const valid: Partial<Preferences> = {};
   if (typeof scale === "number" && SCALES.includes(scale)) valid.scale = scale;
   const savedWidths = pair<number>(widths, "number");
@@ -86,6 +88,7 @@ function validated(value: unknown): Partial<Preferences> {
   if (savedHidden) valid.hidden = savedHidden;
   if (typeof tile === "number" && Number.isFinite(tile) && tile > 0) valid.tile = tile;
   if (layout === "justified" || layout === "uniform") valid.layout = layout;
+  if (typeof details === "boolean") valid.details = details;
   return valid;
 }
 

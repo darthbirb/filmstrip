@@ -9,6 +9,9 @@
   color-scheme: dark;
 
   --motion-quick: 120ms;
+  --motion-reveal: 180ms;
+  /* How far a filmstrip frame other than the one shown sits back. */
+  --strip-rest: 0.5;
   --focus-width: 2px;
   --focus-gap: 2px;
   --z-overlay: 20;
@@ -86,6 +89,12 @@
 
   --shadow-overlay: 0 18px 44px rgb(0 0 0 / 0.6);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  /* Something opened drops in from just above where it settles. */
+  --animate-reveal: reveal var(--motion-reveal) var(--ease-out);
+  /* A tile narrower than this shows the in-pane mark without its words. */
+  --container-badge: 7rem;
+  /* A filmstrip frame's shape, whatever the picture's own. */
+  --aspect-strip: 4 / 3;
 
   /* Windows 11 caption buttons and glyphs, 46px and 10px; the strip is 36px to seat search. */
   --spacing-caption: 2.25rem;
@@ -112,6 +121,8 @@
   --spacing-slider: 6rem;
   --spacing-slider-track: 0.1875rem;
   --spacing-slider-thumb: 0.875rem;
+  --spacing-strip: 6rem;
+  --spacing-strip-inset: 0.375rem;
 
   --text-title: 1.0625rem;
   --text-title--line-height: 1.5rem;
@@ -137,6 +148,16 @@
   --text-glyph--line-height: 1;
   --text-icon: 1.125rem;
   --text-icon--line-height: 1;
+  --text-glyph-large: 2rem;
+  --text-glyph-large--line-height: 1;
+}
+
+/* Outside @theme, where check:docs reads the tokens line by line; --animate-reveal runs it. */
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+  }
 }
 
 /* Outside the element, clear of what it sits on; flush controls take the inset form instead. */
