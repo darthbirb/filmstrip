@@ -1,5 +1,6 @@
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import { formatBytes, formatDimensions, formatDuration } from "../../lib/format";
+import { EmptyState } from "../../ui/EmptyState";
 import { Glyph } from "../../ui/Glyph";
 import { updatePreferences, usePreferences } from "../preferences";
 import { Details } from "./Details";
@@ -20,7 +21,7 @@ export function PaneHeader() {
       aria-expanded={open}
       aria-controls={DETAILS_ID}
       onClick={() => updatePreferences({ details: !open })}
-      className="focus-ring flex h-control w-full min-w-0 items-center gap-2 rounded-control px-2 text-left text-fg-mid text-ui tabular-nums transition-colors duration-(--motion-quick) hover:bg-wash hover:text-fg aria-expanded:bg-raised motion-reduce:transition-none"
+      className="focus-ring flex h-control w-full min-w-0 items-center gap-2 rounded-control px-2 text-left text-fg-mid text-ui tabular-nums transition-colors duration-(--motion-quick) hover:bg-wash hover:text-fg aria-expanded:bg-raised aria-expanded:text-fg motion-reduce:transition-none"
     >
       <Glyph
         name="chevronRight"
@@ -59,16 +60,14 @@ export function Pane() {
 }
 
 function Empty({ gone }: { gone: boolean }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
-      <Glyph name="image" className="text-fg-faint text-glyph-large" />
-      <p className="m-0 font-semibold text-fg-mid text-ui">
-        {gone ? "This file is no longer here." : "Click a picture to see it here."}
-      </p>
-      {!gone && (
-        <p className="m-0 text-fg-dim text-small">The pane keeps it while you look elsewhere.</p>
-      )}
-    </div>
+  return gone ? (
+    <EmptyState glyph="image" title="This file is no longer here." />
+  ) : (
+    <EmptyState
+      glyph="image"
+      title="Click a picture to see it here."
+      note="The pane keeps it while you look elsewhere."
+    />
   );
 }
 

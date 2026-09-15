@@ -10,7 +10,7 @@ import {
 } from "react";
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
-import { GlyphButton } from "../../ui/GlyphButton";
+import { StepButton } from "../../ui/StepButton";
 import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
 import { useGridItems } from "../grid/useGridItems";
 import type { Place } from "../place";
@@ -115,13 +115,7 @@ function Track({ items, current, from }: TrackProps) {
   }
 
   return (
-    <div className="flex h-strip shrink-0 items-center gap-1.5 border-line border-t px-1.5">
-      <GlyphButton
-        glyph="chevronLeft"
-        label="Previous"
-        disabled={index <= 0}
-        onClick={() => show(index - 1)}
-      />
+    <div className="relative h-strip shrink-0 border-line border-t">
       <div
         ref={scroller}
         role="listbox"
@@ -133,10 +127,11 @@ function Track({ items, current, from }: TrackProps) {
           if (scroller.current && Math.abs(event.deltaY) > Math.abs(event.deltaX))
             scroller.current.scrollLeft += event.deltaY;
         }}
-        className="h-full min-w-0 flex-1 overflow-x-auto overflow-y-hidden p-strip-inset [scrollbar-width:none]"
+        // The ends are padded clear of the steps, so the first and last frames can be reached.
+        className="size-full overflow-x-auto overflow-y-hidden px-[calc(var(--spacing-strip-step)+var(--spacing-strip-inset)*2)] py-strip-inset [scrollbar-width:none]"
       >
         <div
-          className="relative h-full"
+          className="relative mx-auto h-full"
           style={{ width: Math.max(0, items.length * step - view.gap) }}
         >
           <span
@@ -148,8 +143,23 @@ function Track({ items, current, from }: TrackProps) {
           {frames}
         </div>
       </div>
-      <GlyphButton
-        glyph="chevronRight"
+      {/* The panel fades in over each end, so the steps stand on something and the strip runs on. */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 left-0 w-strip-fade bg-linear-to-r from-15% from-panel to-transparent"
+      />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 right-0 w-strip-fade bg-linear-to-l from-15% from-panel to-transparent"
+      />
+      <StepButton
+        side="start"
+        label="Previous"
+        disabled={index <= 0}
+        onClick={() => show(index - 1)}
+      />
+      <StepButton
+        side="end"
         label="Next"
         disabled={index < 0 || index >= items.length - 1}
         onClick={() => show(index + 1)}

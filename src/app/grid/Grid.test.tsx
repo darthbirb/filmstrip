@@ -127,10 +127,30 @@ test("clicking a picture puts it in the pane, and the grid marks which one it is
   await expect.element(third).not.toHaveAttribute("aria-current");
 });
 
-test("a folder with nothing in it says so", async () => {
-  serve(0);
+test("a place with nothing in it says so, and only a folder points to the folders inside it", async () => {
+  mockIPC((cmd) => (cmd === "folder_items" || cmd === "sorting_items" ? [] : undefined), {
+    shouldMockEvents: true,
+  });
   const screen = await renderGrid("justified");
+  const note = () => screen.getByText("Folders inside it are in the tree.");
   await expect.element(screen.getByText("No pictures here.")).toBeVisible();
+  await expect.element(note()).toBeVisible();
+
+  setPlace({ kind: "sorting" });
+  await expect.poll(() => note().elements().length).toBe(0);
+  await expect.element(screen.getByText("No pictures here.")).toBeVisible();
+});
+
+test("a video's tile writes its length in the corner, and a picture's writes nothing", async () => {
+  const [picture, other] = rows(2) as [ItemRow, ItemRow];
+  const clip: ItemRow = { ...other, diskName: "clip.mp4", ext: "mp4", kind: "video" };
+  mockIPC(
+    (cmd) => (cmd === "folder_items" ? [picture, { ...clip, durationMs: 12_000 }] : undefined),
+    { shouldMockEvents: true },
+  );
+  const screen = await renderGrid("justified");
+  await expect.element(screen.getByRole("button", { name: "clip.mp4" })).toHaveTextContent("0:12");
+  expect(screen.getByRole("button", { name: picture.diskName }).element().textContent).toBe("");
 });
 
 test("the grid fetches its items again when background work moves on", async () => {
@@ -143,7 +163,7 @@ test("the grid fetches its items again when background work moves on", async () 
 });
 
 test("two grids on one page each keep their own layout", async () => {
-  serve(20);
+  serve(12);
   await page.viewport(1000, 700);
   await render(
     <div style={{ display: "flex", width: 1000, height: 600 }}>
@@ -159,8 +179,8 @@ test("two grids on one page each keep their own layout", async () => {
     [...document.querySelectorAll(`section[aria-label="${name}"] figure`)].map(
       (tile) => (tile as HTMLElement).style.width,
     );
-  await expect.poll(() => widths("justified").length).toBe(20);
-  await expect.poll(() => widths("uniform").length).toBe(20);
+  await expect.poll(() => widths("justified").length).toBe(12);
+  await expect.poll(() => widths("uniform").length).toBe(12);
 
   expect(new Set(widths("uniform")).size).toBe(1);
   expect(new Set(widths("justified")).size).toBeGreaterThan(1);

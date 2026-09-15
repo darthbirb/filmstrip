@@ -17,7 +17,7 @@ import {
   trashRow,
 } from "./shared";
 
-/** The Sorting Box, each library source with its folders opening in place, the Trash. DECISIONS.md "Navigation". */
+/** The Sorting Box and the Trash, then each library source with its folders opening in place. DECISIONS.md "Navigation". */
 export function Navigation() {
   const { sources, children } = useIndex();
   const place = usePlace();
@@ -30,7 +30,7 @@ export function Navigation() {
   if (!sources) return null;
   if (sources.length === 0) return <NoSources />;
 
-  const rows: TreeRow[] = [sortingRow(sources)];
+  const rows: TreeRow[] = [sortingRow(sources), trashRow()];
   const places = new Map<string, Place>([
     [SORTING_ID, { kind: "sorting" }],
     [TRASH_ID, { kind: "trash" }],
@@ -49,7 +49,6 @@ export function Navigation() {
       addFolderRows({ children, expanded, sourceId: source.id, rows, places }, at.path, 2);
     }
   });
-  rows.push(trashRow(true));
 
   const setOpen = (id: string, open: boolean) => {
     const folder = rowFolder(id);

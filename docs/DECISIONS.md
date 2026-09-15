@@ -159,10 +159,15 @@ over the content until the pointer reached the top.
 buttons, and it narrows before anything else has to give. Everything else the app shows sits in
 the frame below.
 
+**The gear for Settings sits in the bar**, before the caption buttons and at their width, as
+Claude Design drew it on 14 September 2026: Settings belongs to the window rather than to any one
+column, the same reason search is there.
+
 Drawing our own buttons costs two things a native title bar has: the snap-layout panel on
 hovering maximise, and the system menu on right-clicking the bar.
 
-The 640×480 minimum is provisional until the frame slice measures what actually fits.
+**The 640×480 minimum holds**: the bar, the grid's header and the Settings dialog fit it at
+200%, as the tests measure. Whether a smaller window would also hold is not yet measured.
 
 ## The frame
 
@@ -191,15 +196,22 @@ text size and display scaling, which reach the WebView on their own.
 **WebView2's zoom is off**, because two zooms would stack and make every measured size
 ambiguous. The app's own is the one that is remembered.
 
-The settings slice will give it a control on screen; until then it is keyboard only.
+**Five named steps: 80, 100, 125, 150 and 200%**, chosen in Settings as well as stepped with the
+keys, since 14 September 2026. People pick a size and leave it, and a finer range would offer a
+precision nothing uses. A size saved under the older eight steps lands on the nearest of the five.
 
 ## Navigation
 
 **One tree, as Explorer's navigation pane is**, picked from three candidates on 13 September
-2026: the Sorting Box first, with the number of files waiting in it; then each library source,
-its folders opening in place beneath it; then the Trash. The candidates it beat were a list of
-places with the chosen source's folders in a second tree beneath, and a list that showed one
-level at a time.
+2026: the Sorting Box, with the number of files waiting in it, and each library source, its
+folders opening in place beneath it. The candidates it beat were a list of places with the chosen
+source's folders in a second tree beneath, and a list that showed one level at a time.
+
+**The Sorting Box and the Trash sit together at the top, above a rule**, as Claude Design drew
+them on 14 September 2026. They are the app's own two places: they never move and never nest, and
+nobody looking for one should have to read past a tree to find it. **Nesting is indentation
+alone**, one step a level; a guide line per level competed with the panel's edge for the little
+structure the chrome has, and the chevrons already say which rows have children.
 
 **Choosing a row goes there; only its chevron, Right or a double-click opens it.** The tree is
 one tab stop and follows the ARIA tree pattern: the arrow keys move and open, Enter goes. A
@@ -214,8 +226,18 @@ back to that folder.
 
 **Two layouts, and the user chooses**, decided on 13 September 2026 after comparing both live:
 justified rows, where every picture keeps its shape and each row runs edge to edge, and uniform
-squares, cropped to fill. Rows are the default. Whether the choice ends up as an always-visible
-toggle or a setting is open; until then it sits in the grid's header beside the tile size.
+squares, cropped to fill. Rows are the default. **The choice lives in Settings**, since 14
+September 2026: it is made once and left alone, and the grid's header has the place's name to
+hold first.
+
+**The tile size stays in the header**, the one view preference people change while looking, as
+one button naming the step it is on: Small, Medium, Large or Extra large, 8, 11, 15 and 20rem. A
+named step says where the size is without a click, which two nudge buttons and a slider never
+did. A size saved before the steps existed lands on the nearest.
+
+**A video's tile writes its length** in the corner opposite the in-pane plate, decided on 14
+September 2026, so a clip and a photograph no longer draw the same cell. Nothing else is written
+on a tile.
 
 **Only the rows near the view are drawn**, a screen's height above and below, so a folder of
 thousands scrolls like one of ten. The layout is computed off the main thread, and every grid on
@@ -242,6 +264,9 @@ turned down live on 13 September 2026, and re-derived from ggallery's drawing.
   now: the pane keeps what it shows while the user looks elsewhere, and its strip keeps with it.
   Like the grid, it draws only the frames near the scroll, so a folder of thousands costs what a
   folder of ten does.
+- **Its steps float over its ends**, with the panel fading in behind them, as Claude Design drew
+  it on 14 September 2026. Two buttons beside the strip took 88px of a 320px pane and stood on
+  nothing; the fade says the strip runs on, and shows two more frames.
 - **Nothing is drawn with nothing behind it.** The drawing's back arrow, mode switch and action
   bar wait for history, sets and actions to exist, and PRODUCT.md "The three panels" keeps one
   mode.
@@ -249,6 +274,24 @@ turned down live on 13 September 2026, and re-derived from ggallery's drawing.
 **What the pane knows comes from the file.** Capture dates, a video's length and codec, and a
 rotated recording's true shape are read when the thumbnail is made; "Capture dates" and "Video
 and ffmpeg" above say how.
+
+## Settings
+
+**A dialog over the window**, drawn by Claude Design and built on 14 September 2026. The frame is
+three columns and stays three; a preference set once a month should not cost the grid a surface,
+and Escape or a click outside leaves nothing behind. It is the only thing over the window, and
+the only use of the scrim.
+
+**A preference belongs there only when there is nowhere on screen to set it.** Today that is the
+interface size and the grid's layout. The panel widths, which panels are folded, the tile size
+and whether the pane's details are open all keep their controls where they are: a second control
+for the same thing is a second thing to keep in sync.
+
+**A rail of sections, grouped and filtered**, because it will grow: tabs hold six or seven names
+and then scroll, and a rail takes twenty. A section with nothing in it yet is not in the rail.
+
+**No Save and no Cancel.** Every control writes as it is touched, 400ms after the last change, as
+a splitter does. A dialog that can be cancelled implies a draft, and there is none.
 
 ## Testing in a real browser, never jsdom
 
@@ -299,32 +342,38 @@ states, its tokens. Nothing is described ahead of the feature that uses it.
 
 ## The look
 
-**Taken from ggallery's drawing, re-derived rather than copied**, set on 13 September 2026 once
-three looks of this repository's own had been rejected. `docs/design/Filmstrip.dc.html` in
-ggallery, frozen there, is the reference for how Filmstrip looks. Its values are re-measured
-here and its markup is never lifted; each feature restyles on it as that feature is built.
+**Drawn in Claude Design and built from its files**, since 14 September 2026, after the look
+taken from ggallery's drawing was turned down. For each new surface Claude writes a prompt
+carrying its features, states and decisions; Claude Design, which reads this repository but never
+changes it, draws the surface; its files land in `docs/design/` and are built from there. The
+earlier drawing stays beside them as `old-ggallery-design.html`.
 
 **What it holds:** warm near-neutral surfaces a step apart; warm grey ink in four weights; **no
-accent**, selection being a neutral pewter plate so that colour can mean something; controls a
-fixed height on a hairline ring, with one generous corner; a sunk trough for a choice between
-a few; a hatch where a picture is still to come.
+accent**, since the pictures are the colour; controls one height on a hairline ring, with one
+corner; a hatch where a picture is still to come. **Two marks, told apart by shape rather than
+hue:** the item the pane shows carries a white ring drawn inside its tile and a white plate with
+an eye; keyboard focus is a red ring outside, the same red as close. One white ring used to mean
+both, and both can be on screen at once.
 
-**Where this departs from it:**
+**Where the build departs from the drawings:**
 
-- **Dimmed ink is lighter**, `#908c86` for the drawing's `#77746f`, which measures 3.6:1 on the
-  drawing's own panel and fails AA for the counts and captions it sets.
-- **Every column's header row is one height**, 44px. The drawing used 44 for the side panels and
-  48 for the grid, so the rules beneath them never met.
-- **One corner for every control.** The drawing gave the same 32px buttons 8px in one place and
-  10px in another.
-- **Every navigation row's glyph is filled**, not only a folder's: a filled glyph names a thing,
-  and a control's outlined one names an action.
+- **Every control is 2rem tall**, the dropdowns in Settings and every menu option included,
+  where the drawings used 28px in places. The token sheet says no other control height exists.
+- **A chosen option wears the selection plate in every menu**; the tile-size drawing used a check
+  on a lighter row instead.
+- **Settings' rail sits on the panel and its captions are Plex**: the drawing's `#181818` and Plex
+  Mono are in no scale, and the second would be a third bundled face.
+- **The dialog takes the control's 10px corner**, not a fourth radius of 12.
+- **One dark glass, `veil`, for everything over a picture**: a video's length, which the drawings
+  left open, and the filmstrip's steps.
+- **Filmstrip frames fill the strip less its inset**, as the component sheet has them.
 
-**Its two fonts ship inside the app**, since the content security policy forbids fetching one:
-Material Symbols Rounded for every glyph (Apache 2.0, the `material-symbols` package) and Archivo
-ExtraBold for the wordmark alone (SIL OFL 1.1, `@fontsource/archivo`, its Latin file only). Both
-licences allow bundling in an open-source app. The icon font is whole, 5.4 MB, so any icon is a
-name away; subsetting it to the names in use is the way to shrink it once the set settles.
+**Its fonts ship inside the app**, since the content security policy forbids fetching one: IBM
+Plex Sans in two weights (SIL OFL 1.1, `@fontsource/ibm-plex-sans`, Latin), Archivo ExtraBold for
+the wordmark alone (SIL OFL 1.1, `@fontsource/archivo`), and Phosphor's regular and fill icons
+(MIT, `@phosphor-icons/web`). All allow bundling in an open-source app. Only Phosphor's two woff2
+files are bundled, about 280 KB, where its own stylesheets would bring every fallback format;
+glyphs are drawn by codepoint, and a test holds each to the package's stylesheet.
 
 ## Built in slices, not ported
 
@@ -336,6 +385,5 @@ a toolbar cut buttons that would have fitted because someone had measured pixel 
 hand and written them down. A drawing shows one width, one state, one text size — it cannot
 express what a window does at another width, at 200% zoom, or on the third click.
 
-What carries over is the backend, the product decisions, and those lessons. Not the markup.
-Since 13 September 2026 its drawing is the reference for the look, re-derived value by value;
-see "The look".
+What carries over is the backend, the product decisions, and those lessons. Not the markup, and
+not the look: since 14 September 2026 that comes from Claude Design; see "The look".

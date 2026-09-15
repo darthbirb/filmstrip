@@ -28,6 +28,22 @@ test("shows the Sorting Box with its count, every library source, and the Trash"
   await expect.element(screen.getByRole("treeitem", { name: "Trash" })).toBeVisible();
 });
 
+test("the app's own two places sit together at the top, above a rule, then the sources", async () => {
+  const screen = await render(<Navigation />);
+  const trash = screen.getByRole("treeitem", { name: "Trash" });
+  await expect.element(trash).toBeVisible();
+  const order = screen
+    .getByRole("treeitem")
+    .elements()
+    .map((row) => row.querySelector(".truncate")?.textContent);
+  expect(order).toEqual(["Sorting Box", "Trash", "Pictures", "Archive"]);
+
+  const rule = trash.element().nextElementSibling as HTMLElement;
+  expect(rule.getAttribute("role")).toBeNull();
+  expect(rule.getBoundingClientRect().height).toBe(1);
+  expect(rule.nextElementSibling?.getAttribute("role")).toBe("treeitem");
+});
+
 test("a source opens in place, and choosing a folder goes there", async () => {
   const screen = await render(<Navigation />);
   const row = (name: string) => screen.getByRole("treeitem", { name });

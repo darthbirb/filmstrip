@@ -4,14 +4,14 @@ import { GlyphButton } from "../../ui/GlyphButton";
 import { Splitter } from "../../ui/Splitter";
 import type { FrameLayout, Side } from "./useFrameLayout";
 
+// One glyph for both panels, mirrored for the pane; whether it is pressed says which way it acts.
 const COPY = {
   nav: {
     label: "Navigation",
     caption: "Library",
     show: "Show navigation",
     hide: "Hide navigation",
-    showGlyph: "showLeft",
-    hideGlyph: "hideLeft",
+    flip: false,
     edge: "border-r",
   },
   pane: {
@@ -19,8 +19,7 @@ const COPY = {
     caption: undefined,
     show: "Show pane",
     hide: "Hide pane",
-    showGlyph: "showRight",
-    hideGlyph: "hideRight",
+    flip: true,
     edge: "border-l",
   },
 } as const;
@@ -52,7 +51,12 @@ export function SidePanel({ layout, side, header, children }: Props) {
           </span>
         )}
         {header && <div className="min-w-0 flex-1">{header}</div>}
-        <GlyphButton glyph={copy.hideGlyph} label={copy.hide} onClick={() => layout.hide(side)} />
+        <GlyphButton
+          glyph="panel"
+          flip={copy.flip}
+          label={copy.hide}
+          onClick={() => layout.hide(side)}
+        />
       </div>
       <div className="min-h-0 flex-1 overflow-auto">{children}</div>
     </>
@@ -68,7 +72,8 @@ export function SidePanel({ layout, side, header, children }: Props) {
         >
           <div className="grid h-toolbar w-full place-items-center border-line border-b">
             <GlyphButton
-              glyph={copy.showGlyph}
+              glyph="panel"
+              flip={copy.flip}
               label={copy.show}
               pressed={open}
               onClick={() => (open ? layout.close() : layout.show(side))}

@@ -34,8 +34,8 @@ export function sortingRow(sources: SourceSummary[]): TreeRow {
   };
 }
 
-export function trashRow(separated = false): TreeRow {
-  return { id: TRASH_ID, label: "Trash", level: 1, expandable: false, glyph: "trash", separated };
+export function trashRow(): TreeRow {
+  return { id: TRASH_ID, label: "Trash", level: 1, expandable: false, glyph: "trash" };
 }
 
 /** A source's own row. One that cannot be read is muted and says so, but keeps its folders. */

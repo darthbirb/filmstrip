@@ -5,8 +5,15 @@ import mark from "../../assets/mark.svg";
 import { CaptionButton } from "../../ui/CaptionButton";
 import { useWindowState } from "./useWindowState";
 
+type Props = {
+  search?: ReactNode;
+  /** Opens Settings, from the gear beside the caption buttons. */
+  onSettings?: () => void;
+  settingsOpen?: boolean;
+};
+
 /** The caption strip, with search centred on the window. DECISIONS.md "The window". */
-export function WindowBar({ search }: { search?: ReactNode }) {
+export function WindowBar({ search, onSettings, settingsOpen = false }: Props) {
   const { maximized, focused } = useWindowState();
   const win = getCurrentWindow();
   const dimmed = !focused;
@@ -25,6 +32,15 @@ export function WindowBar({ search }: { search?: ReactNode }) {
       </span>
       <div className="flex h-bar-field min-w-0 px-2">{search}</div>
       <div className="flex h-full justify-self-end">
+        {onSettings && (
+          <CaptionButton
+            glyph="settings"
+            label="Settings"
+            dimmed={dimmed}
+            expanded={settingsOpen}
+            onClick={onSettings}
+          />
+        )}
         <CaptionButton
           glyph="minimize"
           label="Minimise"

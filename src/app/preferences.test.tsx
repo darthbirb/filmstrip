@@ -27,12 +27,12 @@ function Hotkeys() {
 test("Ctrl+= and Ctrl+- step the interface size, Ctrl+0 resets it, and the choice is saved", async () => {
   await render(<Hotkeys />);
   await userEvent.keyboard("{Control>}={/Control}");
-  expect(document.documentElement.style.fontSize).toBe("110%");
+  expect(document.documentElement.style.fontSize).toBe("125%");
   await userEvent.keyboard("{Control>}={/Control}");
-  expect(getPreferences().scale).toBe(1.25);
+  expect(getPreferences().scale).toBe(1.5);
   await userEvent.keyboard("{Control>}-{/Control}");
-  expect(getPreferences().scale).toBe(1.1);
-  await expect.poll(() => saved.at(-1)).toMatchObject({ scale: 1.1 });
+  expect(getPreferences().scale).toBe(1.25);
+  await expect.poll(() => saved.at(-1)).toMatchObject({ scale: 1.25 });
 
   await userEvent.keyboard("{Control>}0{/Control}");
   expect(document.documentElement.style.fontSize).toBe("");
@@ -63,7 +63,23 @@ test("saved preferences come back, and anything malformed falls back to the defa
   });
   expect(document.documentElement.style.fontSize).toBe("125%");
 
-  stored = { scale: 7, widths: { nav: "wide" }, hidden: "yes", layout: "masonry", details: "open" };
+  stored = {
+    scale: "huge",
+    widths: { nav: "wide" },
+    hidden: "yes",
+    layout: "masonry",
+    details: "open",
+  };
   await loadPreferences();
   expect(getPreferences()).toEqual({ scale: 1 });
+});
+
+test("a size saved under older steps lands on the nearest step there is now", async () => {
+  stored = { scale: 1.1 };
+  await loadPreferences();
+  expect(getPreferences().scale).toBe(1);
+
+  stored = { scale: 1.8 };
+  await loadPreferences();
+  expect(getPreferences().scale).toBe(2);
 });

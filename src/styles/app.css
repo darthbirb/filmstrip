@@ -1,7 +1,21 @@
 @import "tailwindcss";
 /* Bundled with the app and never fetched, as the CSP requires. DECISIONS.md "The look". */
-@import "material-symbols/rounded.css";
+@import "@fontsource/ibm-plex-sans/latin-400.css";
+@import "@fontsource/ibm-plex-sans/latin-600.css";
 @import "@fontsource/archivo/latin-800.css";
+
+/* Phosphor's woff2 files alone: its own stylesheets would bundle three fallback formats too. */
+@font-face {
+  font-family: "Phosphor";
+  src: url("@phosphor-icons/web/regular/Phosphor.woff2") format("woff2");
+  font-display: block;
+}
+
+@font-face {
+  font-family: "Phosphor-Fill";
+  src: url("@phosphor-icons/web/fill/Phosphor-Fill.woff2") format("woff2");
+  font-display: block;
+}
 
 /* The token layer: every size, colour and duration a component may use. DESIGN.md "Colors". */
 /* docs/DESIGN.md lists these values, and check:docs holds the two equal. */
@@ -17,8 +31,6 @@
   --z-overlay: 20;
   /* The width of one band in the hatch that stands in for a picture not made yet. */
   --hatch-band: 0.5rem;
-  /* Material Symbols' weight axis: the drawing's hairline glyphs, one weight at every size. */
-  --glyph-weight: 300;
 
   /* The tallest a picture stands in the pane at its own shape, so a panorama never runs away. */
   --pane-media-max: 70dvh;
@@ -32,10 +44,11 @@
   --frame-pane-max: 40rem;
   --frame-grid-min: 20rem;
 
-  /* Tile sizes the grid's size control allows, in rem. */
-  --tile-min: 6rem;
-  --tile-max: 20rem;
-  --tile-default: 10rem;
+  /* The four tile sizes the grid's size control offers, in rem. */
+  --tile-small: 8rem;
+  --tile-medium: 11rem;
+  --tile-large: 15rem;
+  --tile-extra-large: 20rem;
 }
 
 /* Static, so every token is emitted and script can read it. Tailwind's own scales are cleared. */
@@ -46,10 +59,12 @@
   --shadow-*: initial;
   --font-*: initial;
 
-  --font-sans: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-sans: "IBM Plex Sans", "Segoe UI Variable Text", system-ui, sans-serif;
   /* The wordmark's face and nowhere else. */
-  --font-brand: "Archivo", "Segoe UI Variable Text", "Segoe UI", sans-serif;
-  --font-glyph: "Material Symbols Rounded";
+  --font-brand: "Archivo", "IBM Plex Sans", sans-serif;
+  /* Outlined names an action; filled names a thing. */
+  --font-glyph: "Phosphor";
+  --font-glyph-fill: "Phosphor-Fill";
 
   /* Surfaces, darkest first, each a warm neutral one step from the next. */
   --color-well: #0e0e0e;
@@ -74,10 +89,16 @@
   --color-fg-faint: #5c5a56;
   --color-on-plate: #17181a;
   --color-on-plate-dim: rgb(23 24 26 / 0.62);
-  --color-focus: #f2f2f2;
+
+  /* The two marks, told apart by shape rather than hue. DESIGN.md "Colors". */
+  --color-focus: #c25a4a;
+  --color-in-pane: #f2f2f2;
+  --color-on-mark: #141414;
 
   --color-wash: rgb(255 255 255 / 0.09);
-  --color-badge: rgb(242 242 242 / 0.94);
+  /* Dark glass over a picture, for what has to read on any photograph. */
+  --color-veil: rgb(10 10 10 / 0.82);
+  --color-scrim: rgb(10 10 10 / 0.55);
 
   --color-danger: #c25a4a;
   --color-danger-press: #a94f41;
@@ -110,19 +131,21 @@
   --spacing-row: 2.125rem;
   --spacing-row-inset: 0.5rem;
   --spacing-row-gap: 0.1875rem;
-  --spacing-indent: 1rem;
+  --spacing-indent: 1.75rem;
   --spacing-chevron: 1.25rem;
   --spacing-control: 2rem;
-  --spacing-segment-inset: 0.1875rem;
   --spacing-chip: 1.625rem;
   --spacing-badge: 1.25rem;
   --spacing-tile-gap: 0.375rem;
   --spacing-tile-inset: 0.5rem;
-  --spacing-slider: 6rem;
-  --spacing-slider-track: 0.1875rem;
-  --spacing-slider-thumb: 0.875rem;
   --spacing-strip: 6rem;
   --spacing-strip-inset: 0.375rem;
+  --spacing-strip-step: 1.5rem;
+  --spacing-strip-step-height: 3.25rem;
+  --spacing-strip-fade: 3rem;
+  --spacing-dialog: 41rem;
+  --spacing-dialog-height: 27rem;
+  --spacing-dialog-rail: 12rem;
 
   --text-title: 1.0625rem;
   --text-title--line-height: 1.5rem;
@@ -175,29 +198,26 @@
   }
 }
 
-/* A ligature: the icon's name as text, drawn as one square. Capitals or spacing would spell it out. */
+/* One icon, drawn from its codepoint as one square; glyph-fill swaps in the filled family. */
 @utility glyph {
   display: inline-block;
   flex-shrink: 0;
   width: 1em;
   height: 1em;
   overflow: hidden;
-  font-family: var(--font-glyph);
+  font-family: var(--glyph-face, var(--font-glyph));
   font-weight: normal;
   font-style: normal;
+  line-height: 1;
   letter-spacing: normal;
+  text-align: center;
   text-transform: none;
   white-space: nowrap;
-  direction: ltr;
-  font-feature-settings: "liga";
-  font-variation-settings:
-    "wght" var(--glyph-weight),
-    "FILL" var(--glyph-fill, 0);
   -webkit-font-smoothing: antialiased;
 }
 
 @utility glyph-fill {
-  --glyph-fill: 1;
+  --glyph-face: var(--font-glyph-fill);
 }
 
 /* The hover of something that is already filled: a wash over its fill rather than a new one. */
@@ -221,28 +241,5 @@
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--color-line-control-hi) transparent;
-  }
-}
-
-/* The slider's track fills up to its value; the Slider primitive sets --fill. */
-@layer components {
-  .slider {
-    appearance: none;
-    height: var(--spacing-slider-track);
-    border-radius: calc(infinity * 1px);
-    background: linear-gradient(
-      to right,
-      var(--color-fg-mid) var(--fill, 0%),
-      var(--color-line-control-hi) var(--fill, 0%)
-    );
-  }
-
-  .slider::-webkit-slider-thumb {
-    appearance: none;
-    width: var(--spacing-slider-thumb);
-    height: var(--spacing-slider-thumb);
-    border-radius: calc(infinity * 1px);
-    background: var(--color-fg);
-    box-shadow: 0 0 0 var(--focus-gap) var(--color-panel);
   }
 }
