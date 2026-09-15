@@ -9,6 +9,7 @@ import { Breadcrumb } from "./navigation/Breadcrumb";
 import { Navigation } from "./navigation/Navigation";
 import { Pane, PaneHeader } from "./pane/Pane";
 import { PaneDetailProvider } from "./pane/pane-detail";
+import { whenShownInPane } from "./pane/pane-store";
 import { usePreferences, useScaleHotkeys } from "./preferences";
 import { Settings } from "./settings/Settings";
 import { WindowBar } from "./window-bar/WindowBar";
@@ -36,6 +37,7 @@ export function App() {
           grid={<Grid mode={layout} />}
           pane={<Pane />}
           paneHeader={<PaneHeader />}
+          revealPane={whenShownInPane}
         />
       </PaneDetailProvider>
       <Settings open={settings} onClose={() => setSettings(false)} />

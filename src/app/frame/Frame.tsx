@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useEffectEvent } from "react";
 
 import { SidePanel } from "./SidePanel";
 import { useFrameLayout } from "./useFrameLayout";
@@ -11,11 +11,16 @@ export type Regions = {
   pane?: ReactNode;
   /** Beside the pane's fold button, in its header row. */
   paneHeader?: ReactNode;
+  /** Subscribes to the pane being given something to show, which opens it if folded or hidden. */
+  revealPane?: (listener: () => void) => () => void;
 };
 
 /** Navigation, the grid and the pane as docked columns, each with its own header row. DECISIONS.md "The frame". */
-export function Frame({ nav, location, grid, pane, paneHeader }: Regions) {
+export function Frame({ nav, location, grid, pane, paneHeader, revealPane }: Regions) {
   const layout = useFrameLayout();
+  const reveal = useEffectEvent(() => layout.show("pane"));
+  useEffect(() => revealPane?.(reveal), [revealPane]);
+
   return (
     <div ref={layout.frameRef} className="relative flex min-h-0 flex-1 border-line border-t">
       <SidePanel layout={layout} side="nav">

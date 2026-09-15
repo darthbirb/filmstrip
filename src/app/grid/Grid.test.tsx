@@ -141,6 +141,34 @@ test("a place with nothing in it says so, and only a folder points to the folder
   await expect.element(screen.getByText("No pictures here.")).toBeVisible();
 });
 
+test("while a place is read, stand-ins fill the rows, and its tiles replace them", async () => {
+  let answer: (rows: ItemRow[]) => void = () => undefined;
+  mockIPC(
+    (cmd) =>
+      cmd === "folder_items"
+        ? new Promise<ItemRow[]>((resolve) => {
+            answer = resolve;
+          })
+        : undefined,
+    { shouldMockEvents: true },
+  );
+  const screen = await renderGrid("justified");
+  const reading = screen.getByTestId("reading");
+  await expect.poll(() => reading.elements().length).toBe(1);
+  expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
+  expect(tiles()).toHaveLength(0);
+  // Each row of stand-ins runs edge to edge, as the rows that replace it will.
+  const row = reading.element().firstElementChild as HTMLElement;
+  const last = row.lastElementChild as HTMLElement;
+  expect(row.children.length).toBeGreaterThan(1);
+  expect(last.getBoundingClientRect().right).toBeCloseTo(row.getBoundingClientRect().right, 0);
+
+  answer(rows(6));
+  await expect.poll(() => tiles().length).toBe(6);
+  expect(reading.elements()).toHaveLength(0);
+  expect(document.querySelector('[aria-busy="true"]')).toBeNull();
+});
+
 test("a video's tile writes its length in the corner, and a picture's writes nothing", async () => {
   const [picture, other] = rows(2) as [ItemRow, ItemRow];
   const clip: ItemRow = { ...other, diskName: "clip.mp4", ext: "mp4", kind: "video" };

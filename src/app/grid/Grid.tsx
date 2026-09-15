@@ -4,6 +4,7 @@ import { type ReactElement, type RefObject, useLayoutEffect, useRef, useState } 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { formatDuration } from "../../lib/format";
 import { EmptyState } from "../../ui/EmptyState";
+import { SkeletonTile } from "../../ui/Skeleton";
 import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
 import { showInPane, usePaneItem } from "../pane/pane-store";
 import { type Place, usePlace } from "../place";
@@ -22,7 +23,9 @@ export function Grid({ mode }: { mode: LayoutMode }) {
   const scroller = useRef<HTMLDivElement>(null);
   const view = useViewport(scroller);
   const gap = view.gap;
-  const result = useLayout(items ?? [], view.width - gap * 2, tileSize(tile) * view.rem, gap, mode);
+  const rowHeight = tileSize(tile) * view.rem;
+  const result = useLayout(items ?? [], view.width - gap * 2, rowHeight, gap, mode);
+  const reading = place !== null && items === null;
 
   const tiles: ReactElement[] = [];
   if (items && result) {
@@ -52,8 +55,16 @@ export function Grid({ mode }: { mode: LayoutMode }) {
   }
 
   return (
-    <div ref={scroller} className="h-full overflow-auto">
-      {items?.length === 0 ? (
+    <div ref={scroller} aria-busy={reading || undefined} className="h-full overflow-auto">
+      {reading ? (
+        <Reading
+          width={view.width}
+          height={view.height}
+          rowHeight={rowHeight}
+          gap={gap}
+          mode={mode}
+        />
+      ) : items?.length === 0 ? (
         <EmptyState
           glyph="folderOpen"
           title="No pictures here."
@@ -69,6 +80,60 @@ export function Grid({ mode }: { mode: LayoutMode }) {
       )}
     </div>
   );
+}
+
+// Common photograph shapes, so the stand-ins look like the rows that replace them.
+const STAND_IN_SHAPES = [4 / 3, 3 / 2, 2 / 3, 16 / 9, 1, 3 / 4];
+
+type ReadingProps = {
+  width: number;
+  height: number;
+  rowHeight: number;
+  gap: number;
+  mode: LayoutMode;
+};
+
+/** While a place is read, rows of stand-ins fill the view in the shape of what is coming. */
+function Reading({ width, height, rowHeight, gap, mode }: ReadingProps) {
+  if (width <= 0 || rowHeight <= 0) return null;
+  const count = Math.max(1, Math.ceil(height / (rowHeight + gap)));
+  const rows = Array.from({ length: count }, (_, row) => ({
+    key: `row-${row}`,
+    shapes: standIns(row, width - gap * 2, rowHeight, gap, mode),
+  }));
+  return (
+    <div
+      data-testid="reading"
+      aria-hidden="true"
+      className="flex flex-col"
+      style={{ padding: gap, gap }}
+    >
+      {rows.map((row) => (
+        <div key={row.key} className="flex" style={{ height: rowHeight, gap }}>
+          {row.shapes.map((shape) => (
+            <SkeletonTile key={shape.key} grow={shape.grow} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A row's stand-ins: squares for the uniform layout, else photograph shapes until the row is full. */
+function standIns(row: number, width: number, rowHeight: number, gap: number, mode: LayoutMode) {
+  const grows: number[] = [];
+  if (mode === "uniform") {
+    const across = Math.max(1, Math.floor((width + gap) / (rowHeight + gap)));
+    for (let at = 0; at < across; at += 1) grows.push(1);
+  } else {
+    let used = -gap;
+    for (let at = row * 2; used < width || grows.length === 0; at += 1) {
+      const shape = STAND_IN_SHAPES[at % STAND_IN_SHAPES.length] ?? 1;
+      grows.push(shape);
+      used += shape * rowHeight + gap;
+    }
+  }
+  return grows.map((grow, at) => ({ key: `${row}-${at}`, grow }));
 }
 
 type TileProps = {

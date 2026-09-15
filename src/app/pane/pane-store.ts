@@ -6,10 +6,20 @@ import type { Place } from "../place";
 // Clicking a picture replaces both. DECISIONS.md "The pane".
 let shown: { itemId: number; from: Place | null } | null = null;
 const listeners = new Set<() => void>();
+const requests = new Set<() => void>();
 
 export function showInPane(itemId: number | null, from: Place | null = null) {
   shown = itemId === null ? null : { itemId, from };
   for (const listener of listeners) listener();
+  if (itemId !== null) for (const request of requests) request();
+}
+
+/** Calls back each time something is put in the pane, the same item again included. */
+export function whenShownInPane(listener: () => void) {
+  requests.add(listener);
+  return () => {
+    requests.delete(listener);
+  };
 }
 
 export function getPaneItem() {

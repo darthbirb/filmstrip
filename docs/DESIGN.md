@@ -230,6 +230,9 @@ components:
   empty-state-glyph:
     textColor: "{colors.fg-faint}"
     typography: "{typography.glyph-large}"
+  stand-in:
+    backgroundColor: "{colors.inset}"
+    rounded: "{rounded.control}"
   filmstrip:
     backgroundColor: "{colors.panel}"
     height: "{spacing.strip}"
@@ -325,7 +328,7 @@ thing and is never decoration:** where the keyboard is, and close.
 | `well` | A recess: the stage behind a picture shown large; a label chip's key. |
 | `ground` | The window body, the grid's surround, the gap a splitter sits in, the filter field. |
 | `panel` | The bar, navigation, the pane, the grid's header row, the filmstrip, Settings. |
-| `inset` | A sunk trough: a disabled control, an inherited chip, a group of settings. |
+| `inset` | A sunk trough: a disabled control, an inherited chip, a group of settings, a tile still being read. |
 | `raised`, `raised-hi` | A control at rest, and its hover, open or chosen state. |
 | `plate`, `on-plate`, `on-plate-dim` | Selection, and only selection: a chosen place or option, its ink, its count. |
 | `hatch`, `hatch-alt` | The stand-in for a picture whose thumbnail is not made yet. |
@@ -437,6 +440,8 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   frame its step falls to `fg-faint`.
 - **Empty state.** A `glyph-large` glyph in `fg-faint` over a semibold line of `ui` and a note in
   `small`: the pane with nothing clicked or a file gone, and a place with no pictures.
+- **Stand-in.** A tile still being read: `inset` at the `control` corner, in rows of photograph
+  shapes at the tile size, filling the view until the place's tiles arrive. Never a spinner.
 - **Stat chip.** A measured value, a shape, a length or a size, on `raised` at `nested` corners.
   The kind of file after them is the same chip in `fg-mid`.
 - **Facts.** Terms in `eyebrow` capitals, in a column as wide as the longest of them, values in

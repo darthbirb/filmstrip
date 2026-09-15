@@ -186,6 +186,10 @@ navigation, and the grid never does. A folded panel leaves a rail at the window'
 button opens the panel over the grid until Escape or a click elsewhere. A panel hidden by hand
 behaves the same way.
 
+**Clicking a picture opens the pane** when it is folded or hidden, since showing something in a
+pane nobody can see does nothing: it docks where it fits, and opens over the grid where it does
+not.
+
 ## The interface size
 
 **Everything is sized in rem, so one number scales the whole interface.** The interface size is
@@ -246,6 +250,10 @@ layout and the tile size are kept with the other preferences.
 
 **A picture without a thumbnail yet lays out square**, and takes its real shape once the
 thumbnail job has read its size.
+
+**While a place is read, stand-ins hold its shape**: rows of trough-coloured blocks in
+photograph shapes at the tile size, as the component sheet draws them, never a spinner over the
+grid. A place read again because background work moved on keeps its tiles meanwhile.
 
 ## The pane
 

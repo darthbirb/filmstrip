@@ -43,6 +43,11 @@ export function useFrameLayout() {
   const paneFits = !hidden.pane && navSpace + gridMin + splitter + widths.pane <= room;
   const folded = { nav: !navFits, pane: !paneFits };
   const open = overlay && folded[overlay] ? overlay : null;
+  // Whether a panel would dock if it were not hidden.
+  const fitsShown = (side: Side) =>
+    side === "nav"
+      ? widths.nav + splitter + gridMin + rail <= room
+      : navSpace + gridMin + splitter + widths.pane <= room;
 
   useEffect(() => {
     if (!open) return;
@@ -64,11 +69,15 @@ export function useFrameLayout() {
       setWidths(next);
       updatePreferences({ widths: next });
     },
+    /** Docks the panel where it fits, and opens it over the grid where it does not. */
     show: (side: Side) => {
-      const next = { ...hidden, [side]: false };
-      setHidden(next);
-      updatePreferences({ hidden: next });
-      setOverlay(side);
+      if (hidden[side]) {
+        const next = { ...hidden, [side]: false };
+        setHidden(next);
+        updatePreferences({ hidden: next });
+      }
+      // An overlay left set on a docked panel would spring open the moment the window narrowed.
+      setOverlay(fitsShown(side) ? null : side);
     },
     hide: (side: Side) => {
       const next = { ...hidden, [side]: true };
