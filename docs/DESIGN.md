@@ -16,6 +16,7 @@ colors:
   line-control: "#303030"
   line-control-hi: "#3a3a3a"
   line-strong: "#6b6863"
+  line-danger: "rgb(194 90 74 / 0.45)"
   fg-hi: "#f4f3f1"
   fg: "#eceae7"
   fg-mid: "#a8a5a0"
@@ -58,6 +59,11 @@ typography:
     lineHeight: 1rem
     fontWeight: 600
     letterSpacing: 0.12em
+  micro:
+    fontFamily: IBM Plex Sans
+    fontSize: 0.625rem
+    lineHeight: "1"
+    fontWeight: 600
   wordmark:
     fontFamily: Archivo
     fontSize: 0.875rem
@@ -81,6 +87,7 @@ typography:
     fontSize: 2rem
     lineHeight: "1"
 rounded:
+  mark-badge: 5px
   badge: 6px
   nested: 8px
   control: 10px
@@ -90,6 +97,8 @@ spacing:
   mark: 1.125rem
   toolbar: 2.75rem
   rail: 2.75rem
+  foot: 2.25rem
+  progress: 0.1875rem
   splitter: 0.25rem
   grip: 1.625rem
   grip-width: 0.125rem
@@ -103,6 +112,7 @@ spacing:
   control: 2rem
   chip: 1.625rem
   badge: 1.25rem
+  mark-badge: 0.875rem
   tile-gap: 0.375rem
   tile-inset: 0.5rem
   strip: 6rem
@@ -180,6 +190,40 @@ components:
     textColor: "{colors.on-plate}"
   tree-rule:
     backgroundColor: "{colors.line}"
+  panel-foot:
+    textColor: "{colors.fg-dim}"
+    typography: "{typography.small}"
+    height: "{spacing.foot}"
+  progress-track:
+    backgroundColor: "{colors.raised}"
+    height: "{spacing.progress}"
+  progress-fill:
+    backgroundColor: "{colors.plate}"
+  rail-button:
+    textColor: "{colors.fg-mid}"
+    typography: "{typography.icon}"
+    rounded: "{rounded.control}"
+    size: "{spacing.control}"
+  rail-button-selected:
+    backgroundColor: "{colors.plate}"
+    textColor: "{colors.on-plate}"
+  rail-badge:
+    backgroundColor: "{colors.raised-hi}"
+    textColor: "{colors.fg}"
+    typography: "{typography.micro}"
+    rounded: "{rounded.mark-badge}"
+    height: "{spacing.mark-badge}"
+  rail-badge-selected:
+    backgroundColor: "{colors.fg}"
+    textColor: "{colors.on-plate}"
+  notice:
+    backgroundColor: "{colors.panel}"
+    textColor: "{colors.fg}"
+    typography: "{typography.ui}"
+    rounded: "{rounded.control}"
+  notice-warning:
+    textColor: "{colors.danger}"
+    borderColor: "{colors.line-danger}"
   breadcrumb-step:
     textColor: "{colors.fg-mid}"
     typography: "{typography.row}"
@@ -437,6 +481,17 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Count pill.** A row's own item count, `badge` tall at the `badge` corner, on `raised` with a
   `line-control` ring; on a selected row it sinks to `on-plate-wash` with `on-plate` ink. A place
   with no items of its own carries no pill, and an offline source shows its word instead.
+- **Rail button.** A folded panel's place: a `control` square holding a filled glyph, `plate` with
+  `on-plate` ink when it is where you are, a `wash` under the pointer otherwise. Its count rides the
+  glyph's top-right corner as a `mark-badge` plate in `micro` figures, ringed in the panel's own
+  colour to hold it off the glyph; on the selected square it inverts to `fg` with `on-plate` ink.
+- **Panel foot.** Pinned under a panel: a `foot`-tall baseline of what the library holds, in
+  `small` `fg-dim`, and above it, only while a walk runs, its line and a `progress`-thin track on
+  `raised` filling with `plate`. The baseline never moves; the line appears above it and leaves.
+- **Notice.** A banner above the grid on `panel` at the `control` corner, holding a glyph, a line,
+  its actions and a dismiss. What needs a decision takes a `line-danger` hairline and a `danger`
+  glyph, never a fill; what is only worth knowing takes the ordinary `line-control` ring. Its list
+  opens in place beneath it rather than in a dialog.
 - **Breadcrumb.** Folders above as quiet `row` steps back, the place itself as the `title`.
 - **Dropdown.** One named choice: a `control`-tall button on `raised` naming what it is on, a
   caret after it, opening a menu of every choice beneath it on `raised` with the overlay shadow.

@@ -25,6 +25,8 @@ export const GLYPHS = {
   squares: { icon: "squares-four", code: 0xe464 },
   appearance: { icon: "monitor", code: 0xe32e },
   search: { icon: "magnifying-glass", code: 0xe30c },
+  tree: { icon: "tree-structure", code: 0xe67c },
+  warning: { icon: "warning-circle", code: 0xe4e2 },
 } as const;
 
 export type GlyphName = keyof typeof GLYPHS;

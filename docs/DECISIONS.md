@@ -91,6 +91,14 @@ decoder that panics on one file fails that job and nothing else.
 **Progress is pushed**, one `job-progress` event per half second and only when something
 changed, so a queue that empties within a tick still says so.
 
+**Work in progress shows at the foot of the panel doing it**, drawn on 15 September 2026 and built
+the day after: the walk's line grows above a baseline of what the library holds, and the baseline
+never moves, so nothing in the tree shifts as the line comes and goes. Its bar is pewter rather
+than red, because progress states a fact rather than raising an alarm. **What could not be read
+goes above the grid instead**, where it stays in the way until it is dealt with: a banner on a
+danger hairline, never a fill, that counts the failures, offers to try them again, and opens its
+list in place rather than in a dialog. Neither is a dialog, and both leave when they are done.
+
 ## Thumbnails
 
 **320px on the longest edge, lossy WebP at quality 78**, as measured in ggallery: AVIF encoded
@@ -229,6 +237,14 @@ one tab stop and follows the ARIA tree pattern: the arrow keys move and open, En
 source that cannot be read is muted and marked offline but keeps its folders, since a walk never
 empties it — see "A walk only judges what it read". Which folders are open is not yet kept
 between sessions.
+
+**Folded, navigation keeps the app's own two places**, drawn on 15 September 2026 and built the
+day after. A rail holding nothing but its unfold button makes folding a trap for anyone who folded
+to see more pictures, so the Sorting Box and the Trash stay as squares of glyph, each wearing its
+count on the glyph's corner where a row would wear a pill. **Folders do not come with them**: an
+arbitrary slice of a tree in a rail as wide as a header is tall would be a worse tree, not a
+shorter one. A third square lays the whole tree over the grid instead, closing on a pick or on
+Escape; the header's button is still the one that docks the panel for good.
 
 **Where you are shows as a breadcrumb** in the grid's header, and every step above the last goes
 back to that folder.

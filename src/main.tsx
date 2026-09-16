@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "./app/App";
 import { startIndex } from "./app/navigation/index-store";
+import { watchWork } from "./app/navigation/work-store";
 import { loadPreferences } from "./app/preferences";
 import "./styles/app.css";
 
@@ -12,6 +13,7 @@ if (import.meta.env.DEV && !("__TAURI_INTERNALS__" in window)) {
 }
 await loadPreferences();
 void startIndex();
+void watchWork();
 
 const root = document.getElementById("root");
 if (!root) throw new Error("index.html has no #root");
