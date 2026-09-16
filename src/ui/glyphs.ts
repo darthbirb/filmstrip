@@ -29,6 +29,10 @@ export const GLYPHS = {
   expand: { icon: "corners-out", code: 0xe1d0 },
   collapse: { icon: "corners-in", code: 0xe1ce },
   warning: { icon: "warning-circle", code: 0xe4e2 },
+  star: { icon: "star", code: 0xe46a },
+  copy: { icon: "copy", code: 0xe1ca },
+  openExternal: { icon: "arrow-square-out", code: 0xe5de },
+  more: { icon: "dots-three", code: 0xe1fe },
 } as const;
 
 export type GlyphName = keyof typeof GLYPHS;

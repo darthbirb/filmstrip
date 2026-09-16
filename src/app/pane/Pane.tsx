@@ -3,6 +3,7 @@ import { formatBytes, formatDimensions, formatDuration } from "../../lib/format"
 import { EmptyState } from "../../ui/EmptyState";
 import { Glyph } from "../../ui/Glyph";
 import { updatePreferences, usePreferences } from "../preferences";
+import { Actions } from "./Actions";
 import { Details } from "./Details";
 import { Media } from "./Media";
 import { usePaneDetail } from "./pane-detail";
@@ -55,6 +56,7 @@ export function Pane() {
       <div className="flex min-h-0 flex-1 p-2">
         <Media key={item.id} item={item} fill />
       </div>
+      <Actions key={item.id} item={item} />
       <Strip />
     </div>
   );

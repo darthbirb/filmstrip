@@ -130,3 +130,20 @@ shortcut". No key is named there or anywhere else in the set, and the only key d
 which leaves. The build has the double-click and Escape, and no key that enters.
 
 Name the key that enters full screen, or drop the mention so the double-click stands alone.
+
+## Move To… is drawn with nowhere to move to
+
+The action bar carries a Move To… button, and the entry names it one of the two that always show,
+but nothing in the set draws what pressing it opens. There is no destination picker, no folder
+chooser and no drop target on any of the five sheets, so the action cannot be built as drawn.
+
+Draw what Move To… opens: how a destination is chosen, what it says when the name is already taken
+there, and what happens to a move that fails part way through a selection.
+
+## Rename… is drawn with no dialog
+
+The ⋯ menu carries Rename…, which the notes call a suggestion rather than a spec. As with Move To…,
+nothing draws what it opens: no field, no rule about the extension, and nothing for the case where
+the name is already taken in that folder.
+
+Draw the rename, or drop it from the menu so the menu's contents are all things that can happen.

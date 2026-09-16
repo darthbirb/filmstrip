@@ -223,6 +223,15 @@ pub fn restore(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
+/// Favourite is binary and acts on a whole selection, so one call covers any number of items.
+pub fn set_favorite(conn: &Connection, ids: &[i64], favorite: bool) -> Result<()> {
+    let mut set = conn.prepare("UPDATE item SET favorite = ?1 WHERE id = ?2")?;
+    for id in ids {
+        set.execute(params![favorite, id])?;
+    }
+    Ok(())
+}
+
 /// Starts a sweep: a walk marks what it finds, and [`finish_sweep`] trashes
 /// whatever it never saw.
 pub fn begin_sweep(conn: &Connection) -> Result<()> {

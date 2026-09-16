@@ -312,9 +312,20 @@ turned down live on 13 September 2026, and re-derived from ggallery's drawing.
 - **Its steps float over its ends**, with the panel fading in behind them, as Claude Design drew
   it on 14 September 2026. Two buttons beside the strip took 88px of a 320px pane and stood on
   nothing; the fade says the strip runs on, and shows two more frames.
-- **Nothing is drawn with nothing behind it.** The drawing's back arrow, mode switch and action
-  bar wait for history, sets and actions to exist, and PRODUCT.md "The three panels" keeps one
-  mode.
+- **Nothing is drawn with nothing behind it.** The drawing's back arrow and mode switch still
+  wait for history and sets to exist, and PRODUCT.md "The three panels" keeps one mode. The action
+  bar no longer waits.
+
+**The action bar holds what the app can do to the file**, drawn by Claude Design and built on 16
+September 2026: favourite at the left, and reveal, copy and open filling in from the right.
+**What fits is measured, never written down** — each button that does not fit moves into a menu
+under a ⋯ glyph, so the list of what the app can do to a file never depends on the width of the
+window. The drawing keeps that menu on screen always, because Rename lives in it; until Rename has
+a command behind it the menu appears only when it holds something, since a control that cannot act
+is worse than an absence. **Favourite is not yellow:** the predecessor's amber star is an accent
+this app does not have, so the state is carried by the filled glyph and the raised plate, as every
+other toggle carries it. Move To…, Rename… and Delete are drawn but absent, each waiting on a
+command and two of them on a drawing of what they open.
 
 **Full screen is a state of the pane, not a place you go**, drawn on 15 September 2026 and built
 the day after. The pane takes the frame below the bar and keeps every part it has; the bar stays,

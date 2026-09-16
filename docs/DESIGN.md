@@ -278,6 +278,26 @@ components:
   pane-disclosure-open:
     backgroundColor: "{colors.raised}"
     textColor: "{colors.fg}"
+  action-bar:
+    backgroundColor: "{colors.panel}"
+    height: "{spacing.toolbar}"
+  action-button:
+    backgroundColor: "{colors.raised}"
+    textColor: "{colors.fg-mid}"
+    typography: "{typography.icon}"
+    rounded: "{rounded.control}"
+    size: "{spacing.control}"
+  action-button-on:
+    backgroundColor: "{colors.raised-hi}"
+    textColor: "{colors.fg}"
+  menu:
+    backgroundColor: "{colors.raised}"
+    rounded: "{rounded.control}"
+  menu-item:
+    textColor: "{colors.fg-mid}"
+    typography: "{typography.ui}"
+    rounded: "{rounded.nested}"
+    height: "{spacing.control}"
   empty-state-glyph:
     textColor: "{colors.fg-faint}"
     typography: "{typography.glyph-large}"
@@ -507,6 +527,14 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Pane disclosure.** The pane's header row: a chevron and the item's shape, length and size in
   tabular `ui` figures. A `wash` under the pointer; opened, it rests on `raised` in `fg` and the
   chevron turns down.
+- **Action bar.** A `toolbar`-tall row between the picture and the filmstrip, holding what the app
+  can do to the file. Favourite sits at the left and never leaves; the rest fill from the right, and
+  each one that does not fit moves into a menu under a `more` glyph. What fits is measured against
+  the real width, never a width written down. Favourite marks itself with the filled glyph on a
+  `raised-hi` plate and never a hue: a flag needing a colour to be legible is drawn too small.
+- **Menu.** A list of actions on `raised` at the `control` corner under the overlay shadow, opened from
+  a glyph button and anchored to it. A dropdown offers a choice and marks the one taken; a menu
+  marks nothing, because every row in it is a thing to do rather than a thing to be.
 - **Full screen.** The pane takes the frame below the bar, keeping its header, picture and
   filmstrip and losing only the columns beside it. Its control is a glyph button in the pane's
   header, before the fold button; in full screen it wears the pressed state and the fold button is

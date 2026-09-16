@@ -6,6 +6,7 @@ use std::path::{Component, Path, PathBuf};
 use rusqlite::Connection;
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
+use tauri_plugin_opener::OpenerExt;
 use ts_rs::TS;
 
 use crate::db::folders::{self, FolderNode};
@@ -108,6 +109,45 @@ pub async fn item_detail(state: State<'_, AppState>, item_id: i64) -> Result<Opt
     run(&state, move |conn| detail_of(conn, item_id, &thumbs)).await
 }
 
+/// Favourite is binary and acts on a selection, so one call covers any number of items.
+#[tauri::command]
+pub async fn set_item_favorite(
+    state: State<'_, AppState>,
+    item_ids: Vec<i64>,
+    favorite: bool,
+) -> Result<()> {
+    run(&state, move |conn| {
+        items::set_favorite(conn, &item_ids, favorite)
+    })
+    .await
+}
+
+/// The two escape hatches an app that indexes someone elses files owes them: show me where it is,
+/// and open it in whatever I normally use. DECISIONS.md "The pane".
+#[tauri::command]
+pub async fn reveal_item(app: AppHandle, state: State<'_, AppState>, item_id: i64) -> Result<()> {
+    let path = run(&state, move |conn| item_abs_path(conn, item_id)).await?;
+    app.opener()
+        .reveal_item_in_dir(path)
+        .map_err(AppError::invalid)
+}
+
+#[tauri::command]
+pub async fn open_item(app: AppHandle, state: State<'_, AppState>, item_id: i64) -> Result<()> {
+    let path = run(&state, move |conn| item_abs_path(conn, item_id)).await?;
+    app.opener()
+        .open_path(path.to_string_lossy().to_string(), None::<String>)
+        .map_err(AppError::invalid)
+}
+
+#[tauri::command]
+pub async fn copy_item_file(state: State<'_, AppState>, item_id: i64) -> Result<()> {
+    run(&state, move |conn| {
+        crate::fs::clipboard::copy_file(&item_abs_path(conn, item_id)?)
+    })
+    .await
+}
+
 /// Queues a walk of every source; asking again while one waits or runs does nothing.
 #[tauri::command]
 pub async fn start_index(state: State<'_, AppState>) -> Result<()> {
@@ -166,6 +206,13 @@ pub fn with_thumbnails(mut rows: Vec<ItemRow>, thumbs: &Path) -> Vec<ItemRow> {
 fn thumb_of(uuid: &str, thumbs: &Path) -> Option<String> {
     let path = thumbs.join(paths::thumb_rel(uuid));
     path.is_file().then(|| path.to_string_lossy().into_owned())
+}
+
+/// Where an item file actually is, or an error once the index no longer holds it.
+fn item_abs_path(conn: &Connection, item_id: i64) -> Result<PathBuf> {
+    let file = items::file_of(conn, item_id)?
+        .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
+    paths::item_path(conn, file.folder_id, &file.disk_name)
 }
 
 /// An item in full, with the paths to its file and its thumbnail.
