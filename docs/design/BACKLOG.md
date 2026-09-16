@@ -23,16 +23,6 @@ pane in "The main screen"): the 44px action bar under the picture, and its video
 play and pause, a frame back and forward, a progress track, the time, mute and speed. Draw every
 action; each button is built when the action behind it exists.
 
-## Full-screen pane · DRAWN
-
-There is no way to look at one picture with nothing else on screen.
-
-A full-screen mode: the pane takes the whole window below the bar, with no navigation and no
-grid, keeping its header, picture, action bar and filmstrip. One control in the pane's header
-enters and leaves it, and Escape leaves; it works whether the pane is docked, folded or hidden.
-The old drawing's "Full-window — the pane maximised" frame is the starting point. How it enters
-and leaves belongs with "Motion" below.
-
 ## A folder's details · DRAWN
 
 The grid's header says only where you are. A folder has more to know, and nowhere to show it:
