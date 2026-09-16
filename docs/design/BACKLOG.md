@@ -11,15 +11,6 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## The pane: black bars around the picture · DRAWN
-
-When a picture's shape differs from the pane's, the dark well shows above and below it, or on
-either side, as black bars. They read as letterboxing rather than as part of the pane.
-
-Let the picture sit straight on the panel, with its own rounded corners, so the space around it
-is the pane itself rather than a darker box. Investigate whether the well should instead hug the
-picture's shape.
-
 ## The pane: an action bar, and its own video controls · DRAWN
 
 The pane has no actions. The old drawing had a bar under the picture: favourite and Move To… on
@@ -54,15 +45,6 @@ drops a band with the cover beside rows for Path, Status, Labels, Tags and Note,
 rhythm as the pane's details. The Sorting Box and the Trash keep a plain header with no
 disclosure.
 
-## Counts in navigation · DRAWN
-
-Only the Sorting Box shows a count, as plain text, though every folder knows how many items it
-holds.
-
-Every row with items carries its count in a small pill at its end, as the old drawing's top rows
-do: 20px tall, the badge corner, raised on a hairline ring; on the selected plate, a dark wash
-with on-plate ink. A folder counts its own items, not the ones below it.
-
 ## Motion · DRAWN
 
 Navigation and the pane snap open and shut, the pane's details only fade in, and full screen
@@ -82,23 +64,6 @@ through it, left to right.
 Moving the pointer across a video's tile shows the frame at that point in the clip. Draw what
 shows while it scrubs, a thin position line along the tile's foot and the time under the pointer
 in the length plate, and what a video with no scrub frames shows, since they need ffmpeg.
-
-## Indexing progress and failures · DRAWN
-
-Nothing on screen says the library is being read, or that files failed to be. The app already
-tracks both, and can retry the failures.
-
-Place the old drawing's two answers. A progress line at the foot of navigation, "Indexing
-4,120… 62%", growing above a footer that never moves. And the banners above the grid: "31 files
-could not be indexed" with Retry These and Show The 31, opening onto the failure list, and the
-notice for a missing ffmpeg.
-
-## Folded navigation still goes places · DRAWN
-
-Folded, navigation leaves a rail holding only its unfold button.
-
-As in the old drawing, the folded rail keeps the app's own places, the Sorting Box and the
-Trash, as glyph buttons carrying their count pills, so a folded panel still gets you there.
 
 ## A scrubber for the grid · DRAWN
 
