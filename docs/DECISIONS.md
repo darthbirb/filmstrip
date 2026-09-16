@@ -217,6 +217,13 @@ nobody looking for one should have to read past a tree to find it. **Nesting is 
 alone**, one step a level; a guide line per level competed with the panel's edge for the little
 structure the chrome has, and the chevrons already say which rows have children.
 
+**A row's count is a pill, and counts its own items only**, drawn on 15 September 2026 and built
+the day after. A bare number at the end of a row runs into the title beside it, where a plate
+ends the row and groups itself. A place with nothing of its own carries no pill at all: a nought
+in a plate is a number to read and dismiss on every empty folder in the tree, and an absence says
+the same thing in no ink. A source's row has no pill either, because the index counts a source
+whole rather than counting what sits loose in its root.
+
 **Choosing a row goes there; only its chevron, Right or a double-click opens it.** The tree is
 one tab stop and follows the ARIA tree pattern: the arrow keys move and open, Enter goes. A
 source that cannot be read is muted and marked offline but keeps its folders, since a walk never
@@ -267,7 +274,11 @@ turned down live on 13 September 2026, and re-derived from ggallery's drawing.
 - **The file's name is the last of the details, not a headline.** An item is a real file under
   its own name, so there is one name to show; a heading only assistive technology reads keeps
   the pane findable.
-- **The picture takes the rest**, at its own shape in the well.
+- **The picture takes the rest**, at its own shape, standing on the panel. It had sat in a
+  recessed well until 16 September 2026; the well was a fixed box, so a picture of another shape
+  showed it as black bars above and below, and a well sized to the picture would be a mount board
+  around someone's photograph. The picture carries the app's one corner and nothing is drawn
+  behind it.
 - **The filmstrip runs through the place the item was clicked in**, not whatever the grid shows
   now: the pane keeps what it shows while the user looks elsewhere, and its strip keeps with it.
   Like the grid, it draws only the frames near the scroll, so a folder of thousands costs what a

@@ -23,6 +23,7 @@ colors:
   fg-faint: "#5c5a56"
   on-plate: "#17181a"
   on-plate-dim: "rgb(23 24 26 / 0.62)"
+  on-plate-wash: "rgb(23 24 26 / 0.14)"
   focus: "#c25a4a"
   in-pane: "#f2f2f2"
   on-mark: "#141414"
@@ -168,8 +169,14 @@ components:
     backgroundColor: "{colors.plate}"
     textColor: "{colors.on-plate}"
   tree-row-count:
-    textColor: "{colors.fg-dim}"
+    backgroundColor: "{colors.raised}"
+    textColor: "{colors.fg-mid}"
     typography: "{typography.small}"
+    rounded: "{rounded.badge}"
+    height: "{spacing.badge}"
+  tree-row-count-selected:
+    backgroundColor: "{colors.on-plate-wash}"
+    textColor: "{colors.on-plate}"
   tree-rule:
     backgroundColor: "{colors.line}"
   breadcrumb-step:
@@ -213,8 +220,7 @@ components:
     typography: "{typography.small}"
     rounded: "{rounded.badge}"
     height: "{spacing.badge}"
-  media-well:
-    backgroundColor: "{colors.well}"
+  pane-picture:
     rounded: "{rounded.control}"
   pane-disclosure:
     textColor: "{colors.fg-mid}"
@@ -325,12 +331,12 @@ thing and is never decoration:** where the keyboard is, and close.
 
 | Role | For |
 | --- | --- |
-| `well` | A recess: the stage behind a picture shown large; a label chip's key. |
+| `well` | A recess: a label chip's key half. |
 | `ground` | The window body, the grid's surround, the gap a splitter sits in, the filter field. |
 | `panel` | The bar, navigation, the pane, the grid's header row, the filmstrip, Settings. |
 | `inset` | A sunk trough: a disabled control, an inherited chip, a group of settings, a tile still being read. |
 | `raised`, `raised-hi` | A control at rest, and its hover, open or chosen state. |
-| `plate`, `on-plate`, `on-plate-dim` | Selection, and only selection: a chosen place or option, its ink, its count. |
+| `plate`, `on-plate`, `on-plate-dim`, `on-plate-wash` | Selection, and only selection: a chosen place or option, its ink, its count, and the count pill's sunk plate. |
 | `hatch`, `hatch-alt` | The stand-in for a picture whose thumbnail is not made yet. |
 | `line`, `line-control`, `line-control-hi` | A panel's edge and the rule under a header; a control's ring; a ring on a raised-hi control. |
 | `line-strong` | The ring a tile shows under the pointer; a strip step's under the pointer. |
@@ -380,7 +386,7 @@ measured, never a breakpoint. DECISIONS.md "The interface size" has the reasonin
   `indent` and nothing else.
 - **Tiles** are `tile-gap` apart; what sits on a tile sits `tile-inset` from its corner.
 - **The pane** stacks its details when opened, at most half its height; the picture, taking the
-  rest; and a `strip`-tall filmstrip, its frames `strip-inset` from its top and bottom and
+  rest and standing on the panel; and a `strip`-tall filmstrip, its frames `strip-inset` from its top and bottom and
   `tile-gap` apart, each the `--aspect-strip` shape whatever the picture's own. Its ends are
   padded clear of the steps that float over them.
 - **Settings** is `dialog` wide and `dialog-height` tall, never more than the window, with a
@@ -419,8 +425,11 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Glyph button.** A `control` square on `raised` with a `line-control` ring. Disabled, it sinks
   to `inset` on a `line` ring, its glyph `fg-faint`.
 - **Tree row.** Chevron, glyph, name and count. At rest the name is `fg-mid`; under the pointer a
-  `wash`; selected, a `plate` with `on-plate` ink, its count dimmed. An offline source is `fg-dim`
-  with an `fg-faint` glyph. The app's own places sit above a `line` rule.
+  `wash`; selected, a `plate` with `on-plate` ink. An offline source is `fg-dim` with an
+  `fg-faint` glyph. The app's own places sit above a `line` rule.
+- **Count pill.** A row's own item count, `badge` tall at the `badge` corner, on `raised` with a
+  `line-control` ring; on a selected row it sinks to `on-plate-wash` with `on-plate` ink. A place
+  with no items of its own carries no pill, and an offline source shows its word instead.
 - **Breadcrumb.** Folders above as quiet `row` steps back, the place itself as the `title`.
 - **Dropdown.** One named choice: a `control`-tall button on `raised` naming what it is on, a
   caret after it, opening a menu of every choice beneath it on `raised` with the overlay shadow.
@@ -431,6 +440,8 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   ring drawn inside its edge and an *In pane* plate with an eye, which never wraps and drops its
   words on a tile narrower than `--container-badge`. A video's tile writes its length on `veil`
   in the opposite corner. Keyboard focus is the `focus` ring outside, so both can show at once.
+- **The pane's picture.** Sized by its own shape and centred in what the pane has left, at the
+  `control` corner, with nothing drawn behind it: the space around it is the pane.
 - **Pane disclosure.** The pane's header row: a chevron and the item's shape, length and size in
   tabular `ui` figures. A `wash` under the pointer; opened, it rests on `raised` in `fg` and the
   chevron turns down.

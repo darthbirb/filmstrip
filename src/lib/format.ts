@@ -3,6 +3,11 @@
 const UNITS = ["KB", "MB", "GB", "TB"];
 
 /** Bytes as Windows counts them: steps of 1024, under the familiar names. */
+/** A count as the machine groups its figures, so four of them read as one number. */
+export function formatCount(count: number) {
+  return count.toLocaleString();
+}
+
 export function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} bytes`;
   let value = bytes / 1024;

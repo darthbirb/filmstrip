@@ -1,5 +1,6 @@
 import { Fragment, type KeyboardEvent, useRef, useState } from "react";
 
+import { formatCount } from "../lib/format";
 import { Glyph } from "./Glyph";
 import type { GlyphName } from "./glyphs";
 
@@ -11,7 +12,9 @@ export type TreeRow = {
   expandable: boolean;
   expanded?: boolean;
   glyph?: GlyphName;
-  /** Muted text at the row's end: a count, or why the row is muted. */
+  /** How many items the row's own place holds; none at all shows no pill. */
+  count?: number;
+  /** Muted words at the row's end, where a count would be: why the row is muted. */
   detail?: string;
   muted?: boolean;
   /** Set apart from the rows above it by a rule. */
@@ -142,6 +145,13 @@ export function Tree({ label, rows, selectedId, onSelect, onExpand, onCollapse }
               {/* Filled, so a row reads as a thing; a control's outlined glyph reads as an action. */}
               {row.glyph && <Glyph name={row.glyph} filled className={`text-icon ${ink}`} />}
               <span className="min-w-0 flex-1 truncate">{row.label}</span>
+              {row.count !== undefined && (
+                <span
+                  className={`flex h-badge shrink-0 items-center rounded-badge px-1.5 text-small tabular-nums ${selected ? "bg-on-plate-wash text-on-plate" : "bg-raised text-fg-mid inset-ring inset-ring-line-control"}`}
+                >
+                  {formatCount(row.count)}
+                </span>
+              )}
               {row.detail && (
                 <span
                   className={`shrink-0 text-small tabular-nums ${selected ? "text-on-plate-dim" : "text-fg-dim"}`}

@@ -35,7 +35,7 @@ test("the app's own two places sit together at the top, above a rule, then the s
   const order = screen
     .getByRole("treeitem")
     .elements()
-    .map((row) => row.querySelector(".truncate")?.textContent);
+    .map((item) => item.querySelector(".truncate")?.textContent);
   expect(order).toEqual(["Sorting Box", "Trash", "Pictures", "Archive"]);
 
   const rule = trash.element().nextElementSibling as HTMLElement;
@@ -51,15 +51,34 @@ test("a source opens in place, and choosing a folder goes there", async () => {
 
   await row("Pictures").click();
   await userEvent.keyboard("{ArrowRight}");
-  await row("Trips").click();
+  await row("Trips 2").click();
   expect(titles()).toEqual(["Pictures", "Trips"]);
   await userEvent.keyboard("{ArrowRight}");
-  await row("Cairo").click();
+  await row("Cairo 3").click();
   expect(titles()).toEqual(["Pictures", "Trips", "Cairo"]);
-  await expect.element(row("Cairo")).toHaveAttribute("aria-selected", "true");
+  await expect.element(row("Cairo 3")).toHaveAttribute("aria-selected", "true");
 
   await row("Sorting Box 3").click();
   expect(titles()).toBe("sorting");
+});
+
+test("a place with items ends in a count pill, and one without carries none", async () => {
+  const screen = await render(<Navigation />);
+  const row = (name: string) => screen.getByRole("treeitem", { name });
+  const pill = (name: string) => row(name).element().querySelector(".rounded-badge");
+  await expect.element(row("Sorting Box 3")).toBeVisible();
+
+  const sorting = pill("Sorting Box 3") as HTMLElement;
+  expect(sorting.textContent).toBe("3");
+  expect(sorting.getBoundingClientRect().height).toBe(20);
+  // An offline source keeps its word where the pill would be, and shows no count it cannot stand behind.
+  expect(pill("Archive offline")).toBeNull();
+  expect(pill("Trash")).toBeNull();
+
+  await row("Pictures").click();
+  await userEvent.keyboard("{ArrowRight}");
+  await expect.element(row("Trips 2")).toBeVisible();
+  expect(pill("People")).toBeNull();
 });
 
 test("the breadcrumb goes back up to any folder on the path", async () => {

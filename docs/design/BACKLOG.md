@@ -118,6 +118,14 @@ to jump anywhere; the position is the information. Investigate whether it replac
 scrollbar or sits beside it. The pass that drew it recommends building the other ten first, and
 only building this if the largest folders still feel unnavigable afterwards.
 
+## Large numbers are drawn with a gap, and should have a comma
+
+The count pills, the panel's footer and the indexing line all write four figures as "41 236",
+grouped with a space. Windows writes that number "41,236", and so should the app.
+
+Group every number in the drawings with a comma. The build already writes them the way the
+machine does, which is the comma here, so this is the sheets catching up.
+
 ## The pane's state with no capture date kept the well
 
 Entry 01 took the well out of the pane, and its block says the well is gone from every state on

@@ -51,7 +51,8 @@ export function Pane() {
           <Details item={item} tags={tags} />
         </section>
       )}
-      <div className="flex min-h-0 flex-1 p-1">
+      {/* The gap around the picture is the pane itself, so it is the pane's own inset. */}
+      <div className="flex min-h-0 flex-1 p-2">
         <Media key={item.id} item={item} fill />
       </div>
       <Strip />
