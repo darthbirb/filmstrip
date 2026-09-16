@@ -148,6 +148,8 @@
   --spacing-dialog: 41rem;
   --spacing-dialog-height: 27rem;
   --spacing-dialog-rail: 12rem;
+  /* The measure of the line under an empty state's title, so it never runs the grid's width. */
+  --spacing-note: 34ch;
 
   --text-title: 1.0625rem;
   --text-title--line-height: 1.5rem;

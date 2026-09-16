@@ -3,12 +3,12 @@ import { type ReactElement, type RefObject, useLayoutEffect, useRef, useState } 
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { formatDuration } from "../../lib/format";
-import { EmptyState } from "../../ui/EmptyState";
 import { SkeletonTile } from "../../ui/Skeleton";
 import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
 import { showInPane, usePaneItem } from "../pane/pane-store";
 import { type Place, usePlace } from "../place";
 import { usePreferences } from "../preferences";
+import { EmptyPlace } from "./EmptyPlace";
 import { type LayoutMode, rowAt } from "./layout";
 import { tileSize } from "./TileSize";
 import { useGridItems } from "./useGridItems";
@@ -64,12 +64,8 @@ export function Grid({ mode }: { mode: LayoutMode }) {
           gap={gap}
           mode={mode}
         />
-      ) : items?.length === 0 ? (
-        <EmptyState
-          glyph="folderOpen"
-          title="No pictures here."
-          note={place?.kind === "folder" ? "Folders inside it are in the tree." : undefined}
-        />
+      ) : items?.length === 0 && place ? (
+        <EmptyPlace place={place} />
       ) : (
         <div
           className="relative"

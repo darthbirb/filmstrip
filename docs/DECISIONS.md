@@ -262,6 +262,16 @@ thumbnail job has read its size.
 photograph shapes at the tile size, as the component sheet draws them, never a spinner over the
 grid. A place read again because background work moved on keeps its tiles meanwhile.
 
+**Empty is several different facts, and each says its own**, drawn on 15 September 2026 and built
+the day after. A cleared Sorting Box, an emptied Trash, a folder holding only folders, a folder
+holding nothing and a source that cannot be reached are five situations, and only the fourth is
+really "no pictures here". They keep one shape so they do not read as five designs, and each
+names the folder or source it is talking about. **Only a folder of folders offers an action**,
+listing them as buttons, because going into one is the obvious next move and the counts are
+already known; a button that only restates the situation is worse than no button. A place whose
+folders are not known yet says nothing at all rather than guessing at "empty", and an unreachable
+source says what it last held — see "A walk only judges what it read".
+
 ## The pane
 
 **The picture, a row that opens onto what is known, and a filmstrip**: the predecessor's

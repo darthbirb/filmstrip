@@ -100,14 +100,6 @@ Folded, navigation leaves a rail holding only its unfold button.
 As in the old drawing, the folded rail keeps the app's own places, the Sorting Box and the
 Trash, as glyph buttons carrying their count pills, so a folded panel still gets you there.
 
-## Empty places say what they are · DRAWN
-
-Every empty place says the same "No pictures here."
-
-Give each its own, from the old drawing: an empty Sorting Box is the goal reached, "Nothing To
-Sort"; an empty Trash says "Trash Is Empty"; a folder holding only folders points to them. Keep
-the one empty-state shape.
-
 ## A scrubber for the grid · DRAWN
 
 A large folder scrolls with a thin scrollbar, and reaching the middle of forty thousand pictures
@@ -134,23 +126,26 @@ box, at the old `0.25` inset rather than the new `0.5`.
 
 Redraw that one state like the other eight: the picture on the panel, at the same inset.
 
-## The empty states draw a glyph size the scale does not have
+## The empty states draw two glyph sizes the scale does not have
 
 The six empty places are drawn with a `2.5rem` glyph, and the block says the shape of
 `EmptyState.tsx` does not change — but that shape uses `glyph-large`, which the token sheet sets
-at `2rem`, and the pane's own two empty states are drawn at `2rem`.
+at `2rem`, and the pane's own two empty states are drawn at `2rem`. The folder buttons under
+"No Pictures Here" have the same trouble one size down: their folder glyph is `0.875rem`, where
+the glyph scale names only `0.75`, `0.9375` and `1.125rem`. Both were built at the nearest named
+size.
 
-Either draw all of them at `2rem`, or add the larger size to the token sheet with a name and say
-which surfaces use it.
+Either draw both at sizes the scale already names, or add the sizes to the token sheet with
+names and say which surfaces use them.
 
-## Two voices for the same kind of sentence
+## The pane's two empty states break the rule the components sheet states
 
-The new empty states are Title Case: "Nothing To Sort", "Trash Is Empty", "No Pictures Here".
-The pane's empty states, on the pane sheet, are ordinary sentences: "Click a picture to see it
-here." Both are this design, and the built app follows the pane.
+The empty-places block settles the voice outright: Title Case on the title, an ordinary sentence
+underneath. The pane sheet's own two empty states do not follow it — "Click a picture to see it
+here." and "This file is no longer here." are sentences in the title's place. The built app
+follows each sheet as drawn, so it now speaks both ways.
 
-Pick one voice for the title line of every empty state, and apply it to the pane's two as well,
-so the same shape never speaks two ways.
+Redraw the pane's two titles in Title Case, so the one shape has one voice.
 
 ## The motion entry left no tokens behind
 

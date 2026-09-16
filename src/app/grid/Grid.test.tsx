@@ -127,18 +127,18 @@ test("clicking a picture puts it in the pane, and the grid marks which one it is
   await expect.element(third).not.toHaveAttribute("aria-current");
 });
 
-test("a place with nothing in it says so, and only a folder points to the folders inside it", async () => {
+test("an empty place says which kind of empty it is, in its own words", async () => {
   mockIPC((cmd) => (cmd === "folder_items" || cmd === "sorting_items" ? [] : undefined), {
     shouldMockEvents: true,
   });
   const screen = await renderGrid("justified");
-  const note = () => screen.getByText("Folders inside it are in the tree.");
-  await expect.element(screen.getByText("No pictures here.")).toBeVisible();
-  await expect.element(note()).toBeVisible();
+  await expect.element(screen.getByText("This Folder Is Empty")).toBeVisible();
+  await expect
+    .element(screen.getByText("Nothing is in Pictures, on disk or in the index."))
+    .toBeVisible();
 
   setPlace({ kind: "sorting" });
-  await expect.poll(() => note().elements().length).toBe(0);
-  await expect.element(screen.getByText("No pictures here.")).toBeVisible();
+  await expect.element(screen.getByText("Nothing To Sort")).toBeVisible();
 });
 
 test("while a place is read, stand-ins fill the rows, and its tiles replace them", async () => {

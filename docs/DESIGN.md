@@ -113,6 +113,7 @@ spacing:
   dialog: 41rem
   dialog-height: 27rem
   dialog-rail: 12rem
+  note: 34ch
 components:
   window-bar:
     backgroundColor: "{colors.panel}"
@@ -236,6 +237,12 @@ components:
   empty-state-glyph:
     textColor: "{colors.fg-faint}"
     typography: "{typography.glyph-large}"
+  empty-state-action:
+    backgroundColor: "{colors.raised}"
+    textColor: "{colors.fg}"
+    typography: "{typography.ui}"
+    rounded: "{rounded.control}"
+    height: "{spacing.control}"
   stand-in:
     backgroundColor: "{colors.inset}"
     rounded: "{rounded.control}"
@@ -450,7 +457,10 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   fades in over both ends, and a pill-shaped step floats on `veil` over each; at the first or last
   frame its step falls to `fg-faint`.
 - **Empty state.** A `glyph-large` glyph in `fg-faint` over a semibold line of `ui` and a note in
-  `small`: the pane with nothing clicked or a file gone, and a place with no pictures.
+  `small`, the note held to a `note` measure. One shape for every empty place, with its own glyph
+  and its own words: a cleared Sorting Box, an emptied Trash, a folder of folders, an empty folder,
+  an unreachable source, and the pane with nothing clicked or a file gone. Where there is one move
+  worth offering it follows as `control`-tall buttons on `raised`; most places have none.
 - **Stand-in.** A tile still being read: `inset` at the `control` corner, in rows of photograph
   shapes at the tile size, filling the view until the place's tiles arrive. Never a spinner.
 - **Stat chip.** A measured value, a shape, a length or a size, on `raised` at `nested` corners.
