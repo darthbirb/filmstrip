@@ -53,121 +53,22 @@ to jump anywhere; the position is the information. Investigate whether it replac
 scrollbar or sits beside it. The pass that drew it recommends building the other ten first, and
 only building this if the largest folders still feel unnavigable afterwards.
 
-## Large numbers are drawn with a gap, and should have a comma
+## The video plate draws its glyphs at two sizes, and neither is in the scale
 
-The count pills, the panel's footer and the indexing line all write four figures as "41 236",
-grouped with a space. Windows writes that number "41,236", and so should the app.
+The frame steps and the mute are `0.8125rem` in the plate drawn at the pane's own width and
+`0.875rem` in the wide rows beside it — the same two controls, drawn at two sizes. Neither size is
+in the glyph scale, which names `0.75`, `0.9375` and `1.125rem`. The empty states were redrawn at
+named sizes this pass, but glyphs at `0.875rem` still appear about thirty times across the pane and
+artboard sheets, and `0.8125rem` about seven, including in the controls this pass drew.
 
-Group every number in the drawings with a comma. The build already writes them the way the
-machine does, which is the comma here, so this is the sheets catching up.
+Pick one size for the plate's glyphs, and either move every glyph onto a size the scale names or
+add the missing sizes to the token sheet and say which surfaces use them.
 
-## The pane's state with no capture date kept the well
+## The narrow video plate drops the total time, and no rule says it may
 
-Entry 01 took the well out of the pane, and its block says the well is gone from every state on
-the sheet. The state drawn for a file with no capture date still puts its picture in a `#0e0e0e`
-box, at the old `0.25` inset rather than the new `0.5`.
+The plate at the pane's own width reads `0:03`; every wider plate reads `0:03 / 0:12`. The block
+gives the order things leave — the speed first, then the frame steps, then the mute — and says play,
+the track and the time never leave. Losing half the time is not in that order, so either it is an
+oversight or the time abbreviates and the rule has to say so.
 
-Redraw that one state like the other eight: the picture on the panel, at the same inset.
-
-## The empty states draw two glyph sizes the scale does not have
-
-The six empty places are drawn with a `2.5rem` glyph, and the block says the shape of
-`EmptyState.tsx` does not change — but that shape uses `glyph-large`, which the token sheet sets
-at `2rem`, and the pane's own two empty states are drawn at `2rem`. The folder buttons under
-"No Pictures Here" have the same trouble one size down: their folder glyph is `0.875rem`, where
-the glyph scale names only `0.75`, `0.9375` and `1.125rem`. Both were built at the nearest named
-size.
-
-Either draw both at sizes the scale already names, or add the sizes to the token sheet with
-names and say which surfaces use them.
-
-## The pane's two empty states break the rule the components sheet states
-
-The empty-places block settles the voice outright: Title Case on the title, an ordinary sentence
-underneath. The pane sheet's own two empty states do not follow it — "Click a picture to see it
-here." and "This file is no longer here." are sentences in the title's place. The built app
-follows each sheet as drawn, so it now speaks both ways.
-
-Redraw the pane's two titles in Title Case, so the one shape has one voice.
-
-## The motion entry left no tokens behind
-
-The Notes sheet says the Tokens sheet gained `size` and `swap` rows for the motion entry. The
-Tokens sheet is unchanged: it still names only `quick` at 120ms and `reveal` at 180ms, and
-defines `reveal` as the pane's details dropping in. The artboards then use 180ms for a panel
-folding and for the folder band opening, and no drawing uses the 220ms cross-fade the entry
-asked for.
-
-Name, in the token sheet, the durations a panel's fold and the folder band actually use, and say
-whether one duration covers the details, the fold and the band, or the fold takes its own.
-
-## A button with nothing behind it, and a wrong cross-reference
-
-Two smaller things in the same pass. The missing-ffmpeg banner carries a "How To Install It"
-button, though the app cannot install ffmpeg or point anywhere that explains it, which breaks
-the sheets' own rule that nothing is drawn with nothing behind it. And the folded rail's block
-cites "the overlay from 06", where 06 is the motion entry, not the panel overlay.
-
-Decide what the ffmpeg button does, or draw the banner without it; and point the rail's note at
-the folded-panel overlay the frame already has.
-
-## Full screen names a shortcut that is never given
-
-The full-screen block says that, folded or hidden, the way in is a double-click on a tile "or the
-shortcut". No key is named there or anywhere else in the set, and the only key drawn is Escape,
-which leaves. The build has the double-click and Escape, and no key that enters.
-
-Name the key that enters full screen, or drop the mention so the double-click stands alone.
-
-## Move To… is drawn with nowhere to move to
-
-The action bar carries a Move To… button, and the entry names it one of the two that always show,
-but nothing in the set draws what pressing it opens. There is no destination picker, no folder
-chooser and no drop target on any of the five sheets, so the action cannot be built as drawn.
-
-Draw what Move To… opens: how a destination is chosen, what it says when the name is already taken
-there, and what happens to a move that fails part way through a selection.
-
-## Rename… is drawn with no dialog
-
-The ⋯ menu carries Rename…, which the notes call a suggestion rather than a spec. As with Move To…,
-nothing draws what it opens: no field, no rule about the extension, and nothing for the case where
-the name is already taken in that folder.
-
-Draw the rename, or drop it from the menu so the menu's contents are all things that can happen.
-
-## The video track is drawn without saying whether it seeks
-
-The track is 0.1875rem and the block justifies that by calling it a proportion, "neither is a
-slider". That reads as a statement about its weight, not about what it does, and nothing in the set
-draws a clip being scrubbed. A player whose track only reports is a real choice, but it has to be
-the drawn one.
-
-Draw seeking: the hit area a 3px track gets, what it looks like under the pointer and while being
-dragged, and where the time reads while scrubbing. Or say the track only reports, and draw how a
-clip is scrubbed instead.
-
-## A frame step has no frame to step by
-
-The row carries a frame back and a frame forward, but nothing in the app knows a frame rate:
-`media/probe.rs` records duration, codec and bitrate and no fps, so there is no size for the step to
-be. Building it means inventing one.
-
-Say what the step is without needing the frame rate, or say that the probe has to record the frame
-rate first and that the two buttons wait for it.
-
-## The speed control never says what the speeds are
-
-Two states are drawn, 1× and 1.5×, and the block explains their ink. Neither says what set they
-come from, nor whether pressing it cycles, opens a menu, or something else.
-
-Name the speeds and draw how one is chosen.
-
-## The 20rem video row contradicts the 20rem pane
-
-The row labelled "At 20rem · frame steps and speed have gone" is 270px wide and drops both. The
-pane frame beside it is 320px, its picture narrower still, and its plate keeps the frame steps. The
-narrower drawing carries more controls than the wider one, so the two cannot both be right.
-
-Settle which is right, and say at what measured point each control leaves, as the header already
-does: dropped when what remains would be narrower than its content, never at a written-down width.
+Say what the time does as the plate narrows.
