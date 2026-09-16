@@ -2,8 +2,26 @@ import { afterEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
+import { showInPane, whenShownInPane } from "../pane/pane-store";
 import { getPreferences, updatePreferences } from "../preferences";
 import { Frame } from "./Frame";
+
+/** A frame whose grid holds one picture, joined to the pane as the app joins them. */
+function renderRevealing() {
+  return render(
+    <div className="flex h-dvh flex-col">
+      <Frame
+        grid={
+          <button type="button" onClick={() => showInPane(1)}>
+            picture
+          </button>
+        }
+        pane={<p>pane content</p>}
+        revealPane={whenShownInPane}
+      />
+    </div>,
+  );
+}
 
 function renderFrame() {
   return render(
@@ -78,6 +96,41 @@ test("a panel can be hidden while it fits, and shown again", async () => {
   await expect.element(screen.getByRole("navigation", { name: "Navigation" })).toBeVisible();
 });
 
+test("clicking a picture docks a pane hidden by hand, where it fits", async () => {
+  await page.viewport(1600, 900);
+  updatePreferences({ hidden: { nav: false, pane: true } });
+  const screen = await renderRevealing();
+  expect(screen.getByText("pane content").elements()).toHaveLength(0);
+
+  await screen.getByRole("button", { name: "picture" }).click();
+  await expect.element(screen.getByRole("complementary", { name: "Pane" })).toBeVisible();
+  expect(getPreferences().hidden?.pane).toBe(false);
+  expect(screen.getByRole("button", { name: "Show pane" }).elements()).toHaveLength(0);
+});
+
+test("clicking a picture opens a pane that did not fit, over the grid", async () => {
+  await page.viewport(640, 480);
+  const screen = await renderRevealing();
+  expect(screen.getByText("pane content").elements()).toHaveLength(0);
+
+  await screen.getByRole("button", { name: "picture" }).click();
+  await expect.element(screen.getByText("pane content")).toBeVisible();
+  await expect
+    .element(screen.getByRole("button", { name: "Show pane" }))
+    .toHaveAttribute("aria-pressed", "true");
+});
+
+test("a pane shown where it fits stays folded when the window then narrows", async () => {
+  await page.viewport(1600, 900);
+  updatePreferences({ hidden: { nav: false, pane: true } });
+  const screen = await renderRevealing();
+  await screen.getByRole("button", { name: "picture" }).click();
+  await expect.element(screen.getByText("pane content")).toBeVisible();
+
+  await page.viewport(640, 480);
+  await expect.poll(() => screen.getByText("pane content").elements().length).toBe(0);
+});
+
 test("nothing overflows at any width or text size", async () => {
   const screen = await renderFrame();
   const frame = screen.container.firstElementChild as HTMLElement;
@@ -103,6 +156,48 @@ test("panel widths and hidden panels come back from the saved preferences", asyn
   const nav = screen.getByRole("navigation", { name: "Navigation" }).element();
   expect(nav.getBoundingClientRect().width).toBe(320);
   expect(screen.getByRole("complementary", { name: "Pane" }).elements()).toHaveLength(0);
+});
+
+test("a folded rail keeps its places, and its way back to the tree has a name of its own", async () => {
+  await page.viewport(1600, 900);
+  updatePreferences({ hidden: { nav: true, pane: false } });
+  const screen = await render(
+    <div className="flex h-dvh flex-col">
+      <Frame nav={<p>nav content</p>} navRail={<p>rail places</p>} />
+    </div>,
+  );
+  await expect.element(screen.getByText("rail places")).toBeVisible();
+  // Two controls in one rail may not answer to a single name.
+  await expect.element(screen.getByRole("button", { name: "Show navigation" })).toBeVisible();
+
+  await screen.getByRole("button", { name: "Show the tree" }).click();
+  await expect.element(screen.getByText("nav content")).toBeVisible();
+  expect(screen.getByText("rail places").elements()).toHaveLength(0);
+});
+
+test("full screen gives the pane the window, and leaves the columns standing behind it", async () => {
+  await page.viewport(1600, 900);
+  const screen = await render(
+    <div className="flex h-dvh flex-col">
+      <Frame
+        nav={<p>nav content</p>}
+        grid={<p>grid content</p>}
+        pane={<p>pane content</p>}
+        full
+        onToggleFull={() => undefined}
+      />
+    </div>,
+  );
+  await expect.element(screen.getByText("pane content")).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "Leave full screen" })).toBeVisible();
+  // There is nothing left to fold away from, so the fold button goes rather than moves.
+  expect(screen.getByRole("button", { name: "Hide pane" }).elements()).toHaveLength(0);
+
+  // Both columns stay in the tree, so nothing they hold is rebuilt on the way back out.
+  expect(screen.getByText("grid content").elements()).toHaveLength(1);
+  expect(screen.getByText("nav content").elements()).toHaveLength(1);
+  expect(screen.getByText("grid content").element().checkVisibility()).toBe(false);
+  expect(screen.getByText("nav content").element().checkVisibility()).toBe(false);
 });
 
 test("resizing a panel is saved to the preferences", async () => {

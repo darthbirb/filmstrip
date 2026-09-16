@@ -3,6 +3,7 @@ import { formatBytes, formatDimensions, formatDuration } from "../../lib/format"
 import { EmptyState } from "../../ui/EmptyState";
 import { Glyph } from "../../ui/Glyph";
 import { updatePreferences, usePreferences } from "../preferences";
+import { Actions } from "./Actions";
 import { Details } from "./Details";
 import { Media } from "./Media";
 import { usePaneDetail } from "./pane-detail";
@@ -51,9 +52,11 @@ export function Pane() {
           <Details item={item} tags={tags} />
         </section>
       )}
-      <div className="flex min-h-0 flex-1 p-1">
+      {/* The gap around the picture is the pane itself, so it is the pane's own inset. */}
+      <div className="flex min-h-0 flex-1 p-2">
         <Media key={item.id} item={item} fill />
       </div>
+      <Actions key={item.id} item={item} />
       <Strip />
     </div>
   );

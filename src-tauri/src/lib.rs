@@ -19,6 +19,7 @@ const DEBUG_PORT: u16 = 9322;
 
 pub fn run() {
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             fs::paths::ensure_app_dirs()?;
             let db_path = fs::paths::db_path()?;
@@ -86,6 +87,10 @@ pub fn run() {
             commands::sorting_items,
             commands::item_tags,
             commands::item_detail,
+            commands::set_item_favorite,
+            commands::reveal_item,
+            commands::open_item,
+            commands::copy_item_file,
             commands::start_index,
             commands::index_progress,
             commands::index_failures,

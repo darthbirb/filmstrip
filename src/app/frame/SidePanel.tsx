@@ -1,6 +1,7 @@
 import { type ReactNode, type RefObject, useEffect, useRef } from "react";
 
 import { GlyphButton } from "../../ui/GlyphButton";
+import { RailButton } from "../../ui/RailButton";
 import { Splitter } from "../../ui/Splitter";
 import type { FrameLayout, Side } from "./useFrameLayout";
 
@@ -11,6 +12,8 @@ const COPY = {
     caption: "Library",
     show: "Show navigation",
     hide: "Hide navigation",
+    /** The rail's own way back to the tree, which must not answer to the unfold button's name. */
+    tree: "Show the tree",
     flip: false,
     edge: "border-r",
   },
@@ -19,6 +22,7 @@ const COPY = {
     caption: undefined,
     show: "Show pane",
     hide: "Hide pane",
+    tree: undefined,
     flip: true,
     edge: "border-l",
   },
@@ -29,11 +33,29 @@ type Props = {
   side: Side;
   /** What the panel puts in its header row, beside the fold button. */
   header?: ReactNode;
+  /** Pinned under the panel, so nothing above it moves when it changes. */
+  foot?: ReactNode;
+  /** Beside the fold button, which goes when the panel has the window to itself. */
+  headerControl?: ReactNode;
+  full?: boolean;
+  /** The places the rail keeps while the panel is folded, and that foot's narrower shape. */
+  rail?: ReactNode;
+  railFoot?: ReactNode;
   children?: ReactNode;
 };
 
 /** Navigation or the pane: docked beside a splitter, or folded to a rail that opens it over the grid. */
-export function SidePanel({ layout, side, header, children }: Props) {
+export function SidePanel({
+  layout,
+  side,
+  header,
+  foot,
+  headerControl,
+  full = false,
+  rail,
+  railFoot,
+  children,
+}: Props) {
   const copy = COPY[side];
   const width = `${layout.widths[side]}rem`;
   const limits = layout.metrics[side];
@@ -51,16 +73,33 @@ export function SidePanel({ layout, side, header, children }: Props) {
           </span>
         )}
         {header && <div className="min-w-0 flex-1">{header}</div>}
-        <GlyphButton
-          glyph="panel"
-          flip={copy.flip}
-          label={copy.hide}
-          onClick={() => layout.hide(side)}
-        />
+        {headerControl}
+        {/* In full screen there is nothing to fold away from, so the button goes rather than moves. */}
+        {!full && (
+          <GlyphButton
+            glyph="panel"
+            flip={copy.flip}
+            label={copy.hide}
+            onClick={() => layout.hide(side)}
+          />
+        )}
       </div>
       <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+      {foot}
     </>
   );
+
+  // The panel takes the frame whole, keeping every part it has; only the columns beside it go.
+  if (full) {
+    return (
+      <Region
+        aria-label={copy.label}
+        className="absolute inset-0 z-(--z-overlay) flex flex-col bg-panel"
+      >
+        {body}
+      </Region>
+    );
+  }
 
   if (layout.folded[side]) {
     const edge = side === "nav" ? "left" : "right";
@@ -79,6 +118,20 @@ export function SidePanel({ layout, side, header, children }: Props) {
               onClick={() => (open ? layout.close() : layout.show(side))}
             />
           </div>
+          {rail && (
+            <div className="flex min-h-0 flex-1 flex-col items-center gap-2 p-1.5">
+              {rail}
+              <span aria-hidden="true" className="my-1.5 h-px w-full shrink-0 bg-line" />
+              {/* Without it the tree is simply gone until you unfold, which makes folding a trap. */}
+              <RailButton
+                glyph="tree"
+                label={copy.tree ?? copy.show}
+                pressed={open}
+                onClick={() => (open ? layout.close() : layout.show(side))}
+              />
+            </div>
+          )}
+          {railFoot}
         </div>
         {open && (
           <Region

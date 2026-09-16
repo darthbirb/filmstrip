@@ -16,6 +16,7 @@ colors:
   line-control: "#303030"
   line-control-hi: "#3a3a3a"
   line-strong: "#6b6863"
+  line-danger: "rgb(194 90 74 / 0.45)"
   fg-hi: "#f4f3f1"
   fg: "#eceae7"
   fg-mid: "#a8a5a0"
@@ -23,6 +24,7 @@ colors:
   fg-faint: "#5c5a56"
   on-plate: "#17181a"
   on-plate-dim: "rgb(23 24 26 / 0.62)"
+  on-plate-wash: "rgb(23 24 26 / 0.14)"
   focus: "#c25a4a"
   in-pane: "#f2f2f2"
   on-mark: "#141414"
@@ -57,6 +59,11 @@ typography:
     lineHeight: 1rem
     fontWeight: 600
     letterSpacing: 0.12em
+  micro:
+    fontFamily: IBM Plex Sans
+    fontSize: 0.625rem
+    lineHeight: "1"
+    fontWeight: 600
   wordmark:
     fontFamily: Archivo
     fontSize: 0.875rem
@@ -80,6 +87,7 @@ typography:
     fontSize: 2rem
     lineHeight: "1"
 rounded:
+  mark-badge: 5px
   badge: 6px
   nested: 8px
   control: 10px
@@ -89,6 +97,8 @@ spacing:
   mark: 1.125rem
   toolbar: 2.75rem
   rail: 2.75rem
+  foot: 2.25rem
+  progress: 0.1875rem
   splitter: 0.25rem
   grip: 1.625rem
   grip-width: 0.125rem
@@ -102,6 +112,7 @@ spacing:
   control: 2rem
   chip: 1.625rem
   badge: 1.25rem
+  mark-badge: 0.875rem
   tile-gap: 0.375rem
   tile-inset: 0.5rem
   strip: 6rem
@@ -112,6 +123,7 @@ spacing:
   dialog: 41rem
   dialog-height: 27rem
   dialog-rail: 12rem
+  note: 34ch
 components:
   window-bar:
     backgroundColor: "{colors.panel}"
@@ -168,10 +180,50 @@ components:
     backgroundColor: "{colors.plate}"
     textColor: "{colors.on-plate}"
   tree-row-count:
-    textColor: "{colors.fg-dim}"
+    backgroundColor: "{colors.raised}"
+    textColor: "{colors.fg-mid}"
     typography: "{typography.small}"
+    rounded: "{rounded.badge}"
+    height: "{spacing.badge}"
+  tree-row-count-selected:
+    backgroundColor: "{colors.on-plate-wash}"
+    textColor: "{colors.on-plate}"
   tree-rule:
     backgroundColor: "{colors.line}"
+  panel-foot:
+    textColor: "{colors.fg-dim}"
+    typography: "{typography.small}"
+    height: "{spacing.foot}"
+  progress-track:
+    backgroundColor: "{colors.raised}"
+    height: "{spacing.progress}"
+  progress-fill:
+    backgroundColor: "{colors.plate}"
+  rail-button:
+    textColor: "{colors.fg-mid}"
+    typography: "{typography.icon}"
+    rounded: "{rounded.control}"
+    size: "{spacing.control}"
+  rail-button-selected:
+    backgroundColor: "{colors.plate}"
+    textColor: "{colors.on-plate}"
+  rail-badge:
+    backgroundColor: "{colors.raised-hi}"
+    textColor: "{colors.fg}"
+    typography: "{typography.micro}"
+    rounded: "{rounded.mark-badge}"
+    height: "{spacing.mark-badge}"
+  rail-badge-selected:
+    backgroundColor: "{colors.fg}"
+    textColor: "{colors.on-plate}"
+  notice:
+    backgroundColor: "{colors.panel}"
+    textColor: "{colors.fg}"
+    typography: "{typography.ui}"
+    rounded: "{rounded.control}"
+  notice-warning:
+    textColor: "{colors.danger}"
+    borderColor: "{colors.line-danger}"
   breadcrumb-step:
     textColor: "{colors.fg-mid}"
     typography: "{typography.row}"
@@ -213,8 +265,7 @@ components:
     typography: "{typography.small}"
     rounded: "{rounded.badge}"
     height: "{spacing.badge}"
-  media-well:
-    backgroundColor: "{colors.well}"
+  pane-picture:
     rounded: "{rounded.control}"
   pane-disclosure:
     textColor: "{colors.fg-mid}"
@@ -227,9 +278,38 @@ components:
   pane-disclosure-open:
     backgroundColor: "{colors.raised}"
     textColor: "{colors.fg}"
+  action-bar:
+    backgroundColor: "{colors.panel}"
+    height: "{spacing.toolbar}"
+  action-button:
+    backgroundColor: "{colors.raised}"
+    textColor: "{colors.fg-mid}"
+    typography: "{typography.icon}"
+    rounded: "{rounded.control}"
+    size: "{spacing.control}"
+  action-button-on:
+    backgroundColor: "{colors.raised-hi}"
+    textColor: "{colors.fg}"
+  menu:
+    backgroundColor: "{colors.raised}"
+    rounded: "{rounded.control}"
+  menu-item:
+    textColor: "{colors.fg-mid}"
+    typography: "{typography.ui}"
+    rounded: "{rounded.nested}"
+    height: "{spacing.control}"
   empty-state-glyph:
     textColor: "{colors.fg-faint}"
     typography: "{typography.glyph-large}"
+  empty-state-action:
+    backgroundColor: "{colors.raised}"
+    textColor: "{colors.fg}"
+    typography: "{typography.ui}"
+    rounded: "{rounded.control}"
+    height: "{spacing.control}"
+  stand-in:
+    backgroundColor: "{colors.inset}"
+    rounded: "{rounded.control}"
   filmstrip:
     backgroundColor: "{colors.panel}"
     height: "{spacing.strip}"
@@ -322,12 +402,12 @@ thing and is never decoration:** where the keyboard is, and close.
 
 | Role | For |
 | --- | --- |
-| `well` | A recess: the stage behind a picture shown large; a label chip's key. |
+| `well` | A recess: a label chip's key half. |
 | `ground` | The window body, the grid's surround, the gap a splitter sits in, the filter field. |
 | `panel` | The bar, navigation, the pane, the grid's header row, the filmstrip, Settings. |
-| `inset` | A sunk trough: a disabled control, an inherited chip, a group of settings. |
+| `inset` | A sunk trough: a disabled control, an inherited chip, a group of settings, a tile still being read. |
 | `raised`, `raised-hi` | A control at rest, and its hover, open or chosen state. |
-| `plate`, `on-plate`, `on-plate-dim` | Selection, and only selection: a chosen place or option, its ink, its count. |
+| `plate`, `on-plate`, `on-plate-dim`, `on-plate-wash` | Selection, and only selection: a chosen place or option, its ink, its count, and the count pill's sunk plate. |
 | `hatch`, `hatch-alt` | The stand-in for a picture whose thumbnail is not made yet. |
 | `line`, `line-control`, `line-control-hi` | A panel's edge and the rule under a header; a control's ring; a ring on a raised-hi control. |
 | `line-strong` | The ring a tile shows under the pointer; a strip step's under the pointer. |
@@ -377,7 +457,7 @@ measured, never a breakpoint. DECISIONS.md "The interface size" has the reasonin
   `indent` and nothing else.
 - **Tiles** are `tile-gap` apart; what sits on a tile sits `tile-inset` from its corner.
 - **The pane** stacks its details when opened, at most half its height; the picture, taking the
-  rest; and a `strip`-tall filmstrip, its frames `strip-inset` from its top and bottom and
+  rest and standing on the panel; and a `strip`-tall filmstrip, its frames `strip-inset` from its top and bottom and
   `tile-gap` apart, each the `--aspect-strip` shape whatever the picture's own. Its ends are
   padded clear of the steps that float over them.
 - **Settings** is `dialog` wide and `dialog-height` tall, never more than the window, with a
@@ -416,8 +496,22 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Glyph button.** A `control` square on `raised` with a `line-control` ring. Disabled, it sinks
   to `inset` on a `line` ring, its glyph `fg-faint`.
 - **Tree row.** Chevron, glyph, name and count. At rest the name is `fg-mid`; under the pointer a
-  `wash`; selected, a `plate` with `on-plate` ink, its count dimmed. An offline source is `fg-dim`
-  with an `fg-faint` glyph. The app's own places sit above a `line` rule.
+  `wash`; selected, a `plate` with `on-plate` ink. An offline source is `fg-dim` with an
+  `fg-faint` glyph. The app's own places sit above a `line` rule.
+- **Count pill.** A row's own item count, `badge` tall at the `badge` corner, on `raised` with a
+  `line-control` ring; on a selected row it sinks to `on-plate-wash` with `on-plate` ink. A place
+  with no items of its own carries no pill, and an offline source shows its word instead.
+- **Rail button.** A folded panel's place: a `control` square holding a filled glyph, `plate` with
+  `on-plate` ink when it is where you are, a `wash` under the pointer otherwise. Its count rides the
+  glyph's top-right corner as a `mark-badge` plate in `micro` figures, ringed in the panel's own
+  colour to hold it off the glyph; on the selected square it inverts to `fg` with `on-plate` ink.
+- **Panel foot.** Pinned under a panel: a `foot`-tall baseline of what the library holds, in
+  `small` `fg-dim`, and above it, only while a walk runs, its line and a `progress`-thin track on
+  `raised` filling with `plate`. The baseline never moves; the line appears above it and leaves.
+- **Notice.** A banner above the grid on `panel` at the `control` corner, holding a glyph, a line,
+  its actions and a dismiss. What needs a decision takes a `line-danger` hairline and a `danger`
+  glyph, never a fill; what is only worth knowing takes the ordinary `line-control` ring. Its list
+  opens in place beneath it rather than in a dialog.
 - **Breadcrumb.** Folders above as quiet `row` steps back, the place itself as the `title`.
 - **Dropdown.** One named choice: a `control`-tall button on `raised` naming what it is on, a
   caret after it, opening a menu of every choice beneath it on `raised` with the overlay shadow.
@@ -428,15 +522,34 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   ring drawn inside its edge and an *In pane* plate with an eye, which never wraps and drops its
   words on a tile narrower than `--container-badge`. A video's tile writes its length on `veil`
   in the opposite corner. Keyboard focus is the `focus` ring outside, so both can show at once.
+- **The pane's picture.** Sized by its own shape and centred in what the pane has left, at the
+  `control` corner, with nothing drawn behind it: the space around it is the pane.
 - **Pane disclosure.** The pane's header row: a chevron and the item's shape, length and size in
   tabular `ui` figures. A `wash` under the pointer; opened, it rests on `raised` in `fg` and the
   chevron turns down.
+- **Action bar.** A `toolbar`-tall row between the picture and the filmstrip, holding what the app
+  can do to the file. Favourite sits at the left and never leaves; the rest fill from the right, and
+  each one that does not fit moves into a menu under a `more` glyph. What fits is measured against
+  the real width, never a width written down. Favourite marks itself with the filled glyph on a
+  `raised-hi` plate and never a hue: a flag needing a colour to be legible is drawn too small.
+- **Menu.** A list of actions on `raised` at the `control` corner under the overlay shadow, opened from
+  a glyph button and anchored to it. A dropdown offers a choice and marks the one taken; a menu
+  marks nothing, because every row in it is a thing to do rather than a thing to be.
+- **Full screen.** The pane takes the frame below the bar, keeping its header, picture and
+  filmstrip and losing only the columns beside it. Its control is a glyph button in the pane's
+  header, before the fold button; in full screen it wears the pressed state and the fold button is
+  gone. The header row keeps its height, its disclosure and its figures either way.
 - **Filmstrip.** A frame for each item in the place, the one shown centred and carrying the
   `in-pane` ring, the rest sitting back at `--strip-rest` until the pointer is on one. The panel
   fades in over both ends, and a pill-shaped step floats on `veil` over each; at the first or last
   frame its step falls to `fg-faint`.
 - **Empty state.** A `glyph-large` glyph in `fg-faint` over a semibold line of `ui` and a note in
-  `small`: the pane with nothing clicked or a file gone, and a place with no pictures.
+  `small`, the note held to a `note` measure. One shape for every empty place, with its own glyph
+  and its own words: a cleared Sorting Box, an emptied Trash, a folder of folders, an empty folder,
+  an unreachable source, and the pane with nothing clicked or a file gone. Where there is one move
+  worth offering it follows as `control`-tall buttons on `raised`; most places have none.
+- **Stand-in.** A tile still being read: `inset` at the `control` corner, in rows of photograph
+  shapes at the tile size, filling the view until the place's tiles arrive. Never a spinner.
 - **Stat chip.** A measured value, a shape, a length or a size, on `raised` at `nested` corners.
   The kind of file after them is the same chip in `fg-mid`.
 - **Facts.** Terms in `eyebrow` capitals, in a column as wide as the longest of them, values in

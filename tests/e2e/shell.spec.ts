@@ -71,10 +71,8 @@ test("a clicked picture shows in the pane at every size", async ({ page }, testI
         document.documentElement.style.fontSize = size;
       }, rootSize);
 
+      // The click opens the pane itself: docked, or over the grid where it did not fit.
       await page.getByRole("button", { name: "cover.jpg" }).click();
-      // A pane that did not fit is folded to its rail, and opens over the grid.
-      const show = page.getByRole("button", { name: "Show pane" });
-      if (await show.isVisible()) await show.click();
       const pane = page.getByRole("complementary", { name: "Pane" });
       await expect(pane.getByRole("heading", { name: "cover.jpg" })).toBeAttached();
       await expect(pane.getByRole("img", { name: "cover.jpg" })).toBeVisible();

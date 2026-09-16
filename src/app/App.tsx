@@ -4,11 +4,16 @@ import { SearchStandIn } from "../dev/FrameStandIns";
 import { Frame } from "./frame/Frame";
 import { Grid } from "./grid/Grid";
 import { DEFAULT_LAYOUT } from "./grid/layout";
+import { Notices } from "./grid/Notices";
 import { TileSize } from "./grid/TileSize";
 import { Breadcrumb } from "./navigation/Breadcrumb";
+import { Foot } from "./navigation/Foot";
 import { Navigation } from "./navigation/Navigation";
+import { Rail } from "./navigation/Rail";
+import { setFullScreen, useEscapeLeavesFullScreen, useFullScreen } from "./pane/full-screen";
 import { Pane, PaneHeader } from "./pane/Pane";
 import { PaneDetailProvider } from "./pane/pane-detail";
+import { whenShownInPane } from "./pane/pane-store";
 import { usePreferences, useScaleHotkeys } from "./preferences";
 import { Settings } from "./settings/Settings";
 import { WindowBar } from "./window-bar/WindowBar";
@@ -20,6 +25,8 @@ export function App() {
   useScaleHotkeys();
   const layout = usePreferences().layout ?? DEFAULT_LAYOUT;
   const [settings, setSettings] = useState(false);
+  const full = useFullScreen();
+  useEscapeLeavesFullScreen();
 
   return (
     <div className="flex h-dvh flex-col bg-ground text-fg">
@@ -27,15 +34,22 @@ export function App() {
       <PaneDetailProvider>
         <Frame
           nav={<Navigation />}
+          navFoot={<Foot />}
+          navRail={<Rail />}
+          navRailFoot={<Foot rail />}
           location={
             <>
               <Breadcrumb />
               <TileSize />
             </>
           }
+          notices={<Notices />}
           grid={<Grid mode={layout} />}
           pane={<Pane />}
           paneHeader={<PaneHeader />}
+          revealPane={whenShownInPane}
+          full={full}
+          onToggleFull={() => setFullScreen(!full)}
         />
       </PaneDetailProvider>
       <Settings open={settings} onClose={() => setSettings(false)} />

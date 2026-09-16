@@ -30,7 +30,7 @@ export function sortingRow(sources: SourceSummary[]): TreeRow {
     level: 1,
     expandable: false,
     glyph: "sortingBox",
-    detail: waiting > 0 ? String(waiting) : undefined,
+    count: waiting > 0 ? waiting : undefined,
   };
 }
 
@@ -74,6 +74,8 @@ export function addFolderRows(walk: Walk, parent: Crumb[], level: number) {
       expandable: node.childCount > 0,
       expanded: walk.expanded.has(node.id),
       glyph: "folder",
+      // Its own items, not the ones below it: the grid's header says both when both are wanted.
+      count: node.itemCount > 0 ? node.itemCount : undefined,
     });
     walk.places.set(id, { kind: "folder", sourceId: walk.sourceId, path });
     if (walk.expanded.has(node.id)) addFolderRows(walk, path, level + 1);

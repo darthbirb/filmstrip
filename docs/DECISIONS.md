@@ -91,6 +91,14 @@ decoder that panics on one file fails that job and nothing else.
 **Progress is pushed**, one `job-progress` event per half second and only when something
 changed, so a queue that empties within a tick still says so.
 
+**Work in progress shows at the foot of the panel doing it**, drawn on 15 September 2026 and built
+the day after: the walk's line grows above a baseline of what the library holds, and the baseline
+never moves, so nothing in the tree shifts as the line comes and goes. Its bar is pewter rather
+than red, because progress states a fact rather than raising an alarm. **What could not be read
+goes above the grid instead**, where it stays in the way until it is dealt with: a banner on a
+danger hairline, never a fill, that counts the failures, offers to try them again, and opens its
+list in place rather than in a dialog. Neither is a dialog, and both leave when they are done.
+
 ## Thumbnails
 
 **320px on the longest edge, lossy WebP at quality 78**, as measured in ggallery: AVIF encoded
@@ -186,6 +194,10 @@ navigation, and the grid never does. A folded panel leaves a rail at the window'
 button opens the panel over the grid until Escape or a click elsewhere. A panel hidden by hand
 behaves the same way.
 
+**Clicking a picture opens the pane** when it is folded or hidden, since showing something in a
+pane nobody can see does nothing: it docks where it fits, and opens over the grid where it does
+not.
+
 ## The interface size
 
 **Everything is sized in rem, so one number scales the whole interface.** The interface size is
@@ -213,11 +225,26 @@ nobody looking for one should have to read past a tree to find it. **Nesting is 
 alone**, one step a level; a guide line per level competed with the panel's edge for the little
 structure the chrome has, and the chevrons already say which rows have children.
 
+**A row's count is a pill, and counts its own items only**, drawn on 15 September 2026 and built
+the day after. A bare number at the end of a row runs into the title beside it, where a plate
+ends the row and groups itself. A place with nothing of its own carries no pill at all: a nought
+in a plate is a number to read and dismiss on every empty folder in the tree, and an absence says
+the same thing in no ink. A source's row has no pill either, because the index counts a source
+whole rather than counting what sits loose in its root.
+
 **Choosing a row goes there; only its chevron, Right or a double-click opens it.** The tree is
 one tab stop and follows the ARIA tree pattern: the arrow keys move and open, Enter goes. A
 source that cannot be read is muted and marked offline but keeps its folders, since a walk never
 empties it — see "A walk only judges what it read". Which folders are open is not yet kept
 between sessions.
+
+**Folded, navigation keeps the app's own two places**, drawn on 15 September 2026 and built the
+day after. A rail holding nothing but its unfold button makes folding a trap for anyone who folded
+to see more pictures, so the Sorting Box and the Trash stay as squares of glyph, each wearing its
+count on the glyph's corner where a row would wear a pill. **Folders do not come with them**: an
+arbitrary slice of a tree in a rail as wide as a header is tall would be a worse tree, not a
+shorter one. A third square lays the whole tree over the grid instead, closing on a pick or on
+Escape; the header's button is still the one that docks the panel for good.
 
 **Where you are shows as a breadcrumb** in the grid's header, and every step above the last goes
 back to that folder.
@@ -247,6 +274,20 @@ layout and the tile size are kept with the other preferences.
 **A picture without a thumbnail yet lays out square**, and takes its real shape once the
 thumbnail job has read its size.
 
+**While a place is read, stand-ins hold its shape**: rows of trough-coloured blocks in
+photograph shapes at the tile size, as the component sheet draws them, never a spinner over the
+grid. A place read again because background work moved on keeps its tiles meanwhile.
+
+**Empty is several different facts, and each says its own**, drawn on 15 September 2026 and built
+the day after. A cleared Sorting Box, an emptied Trash, a folder holding only folders, a folder
+holding nothing and a source that cannot be reached are five situations, and only the fourth is
+really "no pictures here". They keep one shape so they do not read as five designs, and each
+names the folder or source it is talking about. **Only a folder of folders offers an action**,
+listing them as buttons, because going into one is the obvious next move and the counts are
+already known; a button that only restates the situation is worse than no button. A place whose
+folders are not known yet says nothing at all rather than guessing at "empty", and an unreachable
+source says what it last held — see "A walk only judges what it read".
+
 ## The pane
 
 **The picture, a row that opens onto what is known, and a filmstrip**: the predecessor's
@@ -259,7 +300,11 @@ turned down live on 13 September 2026, and re-derived from ggallery's drawing.
 - **The file's name is the last of the details, not a headline.** An item is a real file under
   its own name, so there is one name to show; a heading only assistive technology reads keeps
   the pane findable.
-- **The picture takes the rest**, at its own shape in the well.
+- **The picture takes the rest**, at its own shape, standing on the panel. It had sat in a
+  recessed well until 16 September 2026; the well was a fixed box, so a picture of another shape
+  showed it as black bars above and below, and a well sized to the picture would be a mount board
+  around someone's photograph. The picture carries the app's one corner and nothing is drawn
+  behind it.
 - **The filmstrip runs through the place the item was clicked in**, not whatever the grid shows
   now: the pane keeps what it shows while the user looks elsewhere, and its strip keeps with it.
   Like the grid, it draws only the frames near the scroll, so a folder of thousands costs what a
@@ -267,9 +312,30 @@ turned down live on 13 September 2026, and re-derived from ggallery's drawing.
 - **Its steps float over its ends**, with the panel fading in behind them, as Claude Design drew
   it on 14 September 2026. Two buttons beside the strip took 88px of a 320px pane and stood on
   nothing; the fade says the strip runs on, and shows two more frames.
-- **Nothing is drawn with nothing behind it.** The drawing's back arrow, mode switch and action
-  bar wait for history, sets and actions to exist, and PRODUCT.md "The three panels" keeps one
-  mode.
+- **Nothing is drawn with nothing behind it.** The drawing's back arrow and mode switch still
+  wait for history and sets to exist, and PRODUCT.md "The three panels" keeps one mode. The action
+  bar no longer waits.
+
+**The action bar holds what the app can do to the file**, drawn by Claude Design and built on 16
+September 2026: favourite at the left, and reveal, copy and open filling in from the right.
+**What fits is measured, never written down** — each button that does not fit moves into a menu
+under a ⋯ glyph, so the list of what the app can do to a file never depends on the width of the
+window. The drawing keeps that menu on screen always, because Rename lives in it; until Rename has
+a command behind it the menu appears only when it holds something, since a control that cannot act
+is worse than an absence. **Favourite is not yellow:** the predecessor's amber star is an accent
+this app does not have, so the state is carried by the filled glyph and the raised plate, as every
+other toggle carries it. Move To…, Rename… and Delete are drawn but absent, each waiting on a
+command and two of them on a drawing of what they open.
+
+**Full screen is a state of the pane, not a place you go**, drawn on 15 September 2026 and built
+the day after. The pane takes the frame below the bar and keeps every part it has; the bar stays,
+because native decorations are off and it is the only way left to close or minimise the window.
+**The columns are hidden rather than dropped**, so the pane element survives the trip and its
+picture is never reloaded, and the grid comes back where it was. The control sits in the pane's
+header beside the fold button, and in full screen the fold button goes rather than moves, since
+there is nothing left to fold away from. Escape leaves, and leaving puts the pane back in exactly
+the state it was in. Folded or hidden there is no header row to hold a control, so a double-click
+on a tile is the way in; a single click still only shows it.
 
 **What the pane knows comes from the file.** Capture dates, a video's length and codec, and a
 rotated recording's true shape are read when the thumbnail is made; "Capture dates" and "Video

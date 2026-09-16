@@ -34,6 +34,15 @@ export const itemDetail = (itemId: number) => invoke<ItemDetail | null>("item_de
 
 export const sortingItems = () => invoke<ItemRow[]>("sorting_items");
 
+export const setItemFavorite = (itemIds: number[], favorite: boolean) =>
+  invoke<void>("set_item_favorite", { itemIds, favorite });
+
+export const revealItem = (itemId: number) => invoke<void>("reveal_item", { itemId });
+
+export const openItem = (itemId: number) => invoke<void>("open_item", { itemId });
+
+export const copyItemFile = (itemId: number) => invoke<void>("copy_item_file", { itemId });
+
 export const startIndex = () => invoke<void>("start_index");
 
 export const indexProgress = () => invoke<Progress>("index_progress");

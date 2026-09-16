@@ -11,9 +11,13 @@ export const GLYPHS = {
   chevronDown: { icon: "caret-down", code: 0xe136 },
   folder: { icon: "folder", code: 0xe24a },
   folderOpen: { icon: "folder-open", code: 0xe256 },
+  folders: { icon: "folders", code: 0xe260 },
+  folderDashed: { icon: "folder-simple-dashed", code: 0xec2a },
   source: { icon: "hard-drives", code: 0xe2a0 },
   sortingBox: { icon: "tray", code: 0xe4aa },
   trash: { icon: "trash", code: 0xe4a6 },
+  checkCircle: { icon: "check-circle", code: 0xe184 },
+  unplugged: { icon: "plugs", code: 0xeb56 },
   view: { icon: "eye", code: 0xe220 },
   image: { icon: "image", code: 0xe2ca },
   tileSize: { icon: "grid-four", code: 0xe296 },
@@ -21,6 +25,14 @@ export const GLYPHS = {
   squares: { icon: "squares-four", code: 0xe464 },
   appearance: { icon: "monitor", code: 0xe32e },
   search: { icon: "magnifying-glass", code: 0xe30c },
+  tree: { icon: "tree-structure", code: 0xe67c },
+  expand: { icon: "corners-out", code: 0xe1d0 },
+  collapse: { icon: "corners-in", code: 0xe1ce },
+  warning: { icon: "warning-circle", code: 0xe4e2 },
+  star: { icon: "star", code: 0xe46a },
+  copy: { icon: "copy", code: 0xe1ca },
+  openExternal: { icon: "arrow-square-out", code: 0xe5de },
+  more: { icon: "dots-three", code: 0xe1fe },
 } as const;
 
 export type GlyphName = keyof typeof GLYPHS;

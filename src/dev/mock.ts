@@ -156,6 +156,17 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   item_tags: () => [],
   item_detail: ({ itemId }) => detail(itemId as number),
   sorting_items: () => ITEMS[2] ?? [],
+  // The bar acts on the mock library as it would on a real one, so the dev window shows the state.
+  set_item_favorite: ({ itemIds, favorite }) => {
+    const wanted = new Set(itemIds as number[]);
+    for (const item of everyItem()) {
+      if (wanted.has(item.id)) item.favorite = favorite as boolean;
+    }
+    return null;
+  },
+  reveal_item: () => null,
+  open_item: () => null,
+  copy_item_file: () => null,
   start_index: () => null,
   index_progress: (): Progress => ({
     phase: "idle",

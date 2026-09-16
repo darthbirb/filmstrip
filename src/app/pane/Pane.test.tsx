@@ -129,6 +129,23 @@ test("a video plays in the pane over its poster, and the header says how long it
   expect(video.poster).toMatch(/^data:image\/svg/);
 });
 
+test("a picture stands on the panel, with no bars left around it", async () => {
+  const pyramid = await inCairo("pyramid.jpg");
+  showInPane(pyramid.id);
+  const screen = await render(<Harness grid={false} />);
+  const picture = screen.getByRole("img", { name: "pyramid.jpg" });
+  await expect.element(picture).toBeVisible();
+
+  const element = picture.element() as HTMLImageElement;
+  const stage = element.parentElement as HTMLElement;
+  expect(getComputedStyle(stage).backgroundColor).toBe("rgba(0, 0, 0, 0)");
+  expect(getComputedStyle(element).borderRadius).toBe("10px");
+  // A 4:3 picture in a taller pane fills the width exactly, and nothing is drawn above or below it.
+  const area = () => stage.getBoundingClientRect();
+  await expect.poll(() => area().width - element.getBoundingClientRect().width).toBeLessThan(1);
+  expect(element.getBoundingClientRect().height).toBeLessThan(area().height);
+});
+
 test("an item that has gone says so", async () => {
   showInPane(9999);
   const screen = await render(<Harness />);

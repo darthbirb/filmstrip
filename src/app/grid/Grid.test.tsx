@@ -5,6 +5,7 @@ import { page } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
+import { getFullScreen, setFullScreen } from "../pane/full-screen";
 import { getPaneItem, showInPane } from "../pane/pane-store";
 import { setPlace } from "../place";
 import { updatePreferences } from "../preferences";
@@ -69,6 +70,7 @@ const firstRow = () => {
 beforeEach(() => {
   setPlace({ kind: "folder", sourceId: 1, path: [{ id: 1, title: "Pictures" }] });
   showInPane(null);
+  setFullScreen(false);
 });
 
 afterEach(() => {
@@ -127,18 +129,59 @@ test("clicking a picture puts it in the pane, and the grid marks which one it is
   await expect.element(third).not.toHaveAttribute("aria-current");
 });
 
-test("a place with nothing in it says so, and only a folder points to the folders inside it", async () => {
+test("a double-clicked picture takes the window, where a single click only shows it", async () => {
+  serve(6);
+  const screen = await renderGrid("justified");
+  const third = screen.getByRole("button", { name: "item-2.png" });
+  await third.click();
+  expect(getPaneItem()).toBe(3);
+  expect(getFullScreen()).toBe(false);
+
+  await third.dblClick();
+  expect(getPaneItem()).toBe(3);
+  expect(getFullScreen()).toBe(true);
+});
+
+test("an empty place says which kind of empty it is, in its own words", async () => {
   mockIPC((cmd) => (cmd === "folder_items" || cmd === "sorting_items" ? [] : undefined), {
     shouldMockEvents: true,
   });
   const screen = await renderGrid("justified");
-  const note = () => screen.getByText("Folders inside it are in the tree.");
-  await expect.element(screen.getByText("No pictures here.")).toBeVisible();
-  await expect.element(note()).toBeVisible();
+  await expect.element(screen.getByText("This Folder Is Empty")).toBeVisible();
+  await expect
+    .element(screen.getByText("Nothing is in Pictures, on disk or in the index."))
+    .toBeVisible();
 
   setPlace({ kind: "sorting" });
-  await expect.poll(() => note().elements().length).toBe(0);
-  await expect.element(screen.getByText("No pictures here.")).toBeVisible();
+  await expect.element(screen.getByText("Nothing To Sort")).toBeVisible();
+});
+
+test("while a place is read, stand-ins fill the rows, and its tiles replace them", async () => {
+  let answer: (rows: ItemRow[]) => void = () => undefined;
+  mockIPC(
+    (cmd) =>
+      cmd === "folder_items"
+        ? new Promise<ItemRow[]>((resolve) => {
+            answer = resolve;
+          })
+        : undefined,
+    { shouldMockEvents: true },
+  );
+  const screen = await renderGrid("justified");
+  const reading = screen.getByTestId("reading");
+  await expect.poll(() => reading.elements().length).toBe(1);
+  expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
+  expect(tiles()).toHaveLength(0);
+  // Each row of stand-ins runs edge to edge, as the rows that replace it will.
+  const row = reading.element().firstElementChild as HTMLElement;
+  const last = row.lastElementChild as HTMLElement;
+  expect(row.children.length).toBeGreaterThan(1);
+  expect(last.getBoundingClientRect().right).toBeCloseTo(row.getBoundingClientRect().right, 0);
+
+  answer(rows(6));
+  await expect.poll(() => tiles().length).toBe(6);
+  expect(reading.elements()).toHaveLength(0);
+  expect(document.querySelector('[aria-busy="true"]')).toBeNull();
 });
 
 test("a video's tile writes its length in the corner, and a picture's writes nothing", async () => {

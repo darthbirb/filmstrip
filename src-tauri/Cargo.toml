@@ -30,6 +30,10 @@ ts-rs = "12.0.1"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp", "tiff"] }
 webp = { version = "0.3.1", default-features = false }
 kamadak-exif = "0.6.1"
+# Reveal in Explorer, and Open with the default app.
+tauri-plugin-opener = "2"
+# A real CF_HDROP copy, so pasting into Explorer produces the file and not its path.
+clipboard-win = "5"
 
 [profile.release]
 opt-level = 3
