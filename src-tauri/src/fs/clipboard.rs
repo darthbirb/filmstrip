@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use clipboard_win::{raw, Clipboard};
+use clipboard_win::{Clipboard, raw};
 
 use crate::error::{AppError, Result};
 

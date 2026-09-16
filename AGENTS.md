@@ -30,6 +30,11 @@ way a choice is offered.
   pushes. `git status -sb` before committing: the user merges and pulls between turns, so the
   branch you were on may now be `main`. The `.githooks/pre-commit` hook refuses that commit
   when the clone has run `git config core.hooksPath .githooks`.
+- **Every branch starts from an up-to-date `main`, and only from `main`.** Before a new task:
+  `git fetch --prune`, see that no earlier branch is still waiting to be merged, and branch from
+  `main`. Branching from unmerged work means the eventual merge meets a squashed copy of that same
+  work and conflicts with itself — a false conflict whose only honest resolution is to keep the
+  branch's tree.
 - **Commit messages are one lowercase subject line.** No body, no trailers.
 - **Do not add a dependency without asking.** npm versions are exact; `Cargo.lock` holds Rust's.
 - **Port before you build.** Most of the backend already exists, tested, in ggallery at
