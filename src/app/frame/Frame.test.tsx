@@ -158,6 +158,23 @@ test("panel widths and hidden panels come back from the saved preferences", asyn
   expect(screen.getByRole("complementary", { name: "Pane" }).elements()).toHaveLength(0);
 });
 
+test("a folded rail keeps its places, and its way back to the tree has a name of its own", async () => {
+  await page.viewport(1600, 900);
+  updatePreferences({ hidden: { nav: true, pane: false } });
+  const screen = await render(
+    <div className="flex h-dvh flex-col">
+      <Frame nav={<p>nav content</p>} navRail={<p>rail places</p>} />
+    </div>,
+  );
+  await expect.element(screen.getByText("rail places")).toBeVisible();
+  // Two controls in one rail may not answer to a single name.
+  await expect.element(screen.getByRole("button", { name: "Show navigation" })).toBeVisible();
+
+  await screen.getByRole("button", { name: "Show the tree" }).click();
+  await expect.element(screen.getByText("nav content")).toBeVisible();
+  expect(screen.getByText("rail places").elements()).toHaveLength(0);
+});
+
 test("resizing a panel is saved to the preferences", async () => {
   await page.viewport(1600, 900);
   const screen = await renderFrame();

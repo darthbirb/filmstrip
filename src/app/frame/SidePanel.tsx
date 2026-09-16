@@ -12,6 +12,8 @@ const COPY = {
     caption: "Library",
     show: "Show navigation",
     hide: "Hide navigation",
+    /** The rail's own way back to the tree, which must not answer to the unfold button's name. */
+    tree: "Show the tree",
     flip: false,
     edge: "border-r",
   },
@@ -20,6 +22,7 @@ const COPY = {
     caption: undefined,
     show: "Show pane",
     hide: "Hide pane",
+    tree: undefined,
     flip: true,
     edge: "border-l",
   },
@@ -93,7 +96,7 @@ export function SidePanel({ layout, side, header, foot, rail, railFoot, children
               {/* Without it the tree is simply gone until you unfold, which makes folding a trap. */}
               <RailButton
                 glyph="tree"
-                label={`Show ${copy.label.toLowerCase()}`}
+                label={copy.tree ?? copy.show}
                 pressed={open}
                 onClick={() => (open ? layout.close() : layout.show(side))}
               />
