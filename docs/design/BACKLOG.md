@@ -11,18 +11,6 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## The pane: an action bar, and its own video controls · DRAWN
-
-The pane has no actions. The old drawing had a bar under the picture: favourite and Move To… on
-the left; Reveal In Explorer, Copy, Open With The Default App, Delete (in the red tint) and a ⋯
-menu on the right. Videos also play with the window's native controls, which match nothing else
-in the app.
-
-Port the old drawing's pane nearly as it is (its "The pane · features/pane/" frames, and the
-pane in "The main screen"): the 44px action bar under the picture, and its video controls, with
-play and pause, a frame back and forward, a progress track, the time, mute and speed. Draw every
-action; each button is built when the action behind it exists.
-
 ## A folder's details · DRAWN
 
 The grid's header says only where you are. A folder has more to know, and nowhere to show it:
@@ -147,3 +135,39 @@ nothing draws what it opens: no field, no rule about the extension, and nothing 
 the name is already taken in that folder.
 
 Draw the rename, or drop it from the menu so the menu's contents are all things that can happen.
+
+## The video track is drawn without saying whether it seeks
+
+The track is 0.1875rem and the block justifies that by calling it a proportion, "neither is a
+slider". That reads as a statement about its weight, not about what it does, and nothing in the set
+draws a clip being scrubbed. A player whose track only reports is a real choice, but it has to be
+the drawn one.
+
+Draw seeking: the hit area a 3px track gets, what it looks like under the pointer and while being
+dragged, and where the time reads while scrubbing. Or say the track only reports, and draw how a
+clip is scrubbed instead.
+
+## A frame step has no frame to step by
+
+The row carries a frame back and a frame forward, but nothing in the app knows a frame rate:
+`media/probe.rs` records duration, codec and bitrate and no fps, so there is no size for the step to
+be. Building it means inventing one.
+
+Say what the step is without needing the frame rate, or say that the probe has to record the frame
+rate first and that the two buttons wait for it.
+
+## The speed control never says what the speeds are
+
+Two states are drawn, 1× and 1.5×, and the block explains their ink. Neither says what set they
+come from, nor whether pressing it cycles, opens a menu, or something else.
+
+Name the speeds and draw how one is chosen.
+
+## The 20rem video row contradicts the 20rem pane
+
+The row labelled "At 20rem · frame steps and speed have gone" is 270px wide and drops both. The
+pane frame beside it is 320px, its picture narrower still, and its plate keeps the frame steps. The
+narrower drawing carries more controls than the wider one, so the two cannot both be right.
+
+Settle which is right, and say at what measured point each control leaves, as the header already
+does: dropped when what remains would be narrower than its content, never at a written-down width.
