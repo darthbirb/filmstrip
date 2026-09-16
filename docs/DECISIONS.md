@@ -316,6 +316,16 @@ turned down live on 13 September 2026, and re-derived from ggallery's drawing.
   bar wait for history, sets and actions to exist, and PRODUCT.md "The three panels" keeps one
   mode.
 
+**Full screen is a state of the pane, not a place you go**, drawn on 15 September 2026 and built
+the day after. The pane takes the frame below the bar and keeps every part it has; the bar stays,
+because native decorations are off and it is the only way left to close or minimise the window.
+**The columns are hidden rather than dropped**, so the pane element survives the trip and its
+picture is never reloaded, and the grid comes back where it was. The control sits in the pane's
+header beside the fold button, and in full screen the fold button goes rather than moves, since
+there is nothing left to fold away from. Escape leaves, and leaving puts the pane back in exactly
+the state it was in. Folded or hidden there is no header row to hold a control, so a double-click
+on a tile is the way in; a single click still only shows it.
+
 **What the pane knows comes from the file.** Capture dates, a video's length and codec, and a
 rotated recording's true shape are read when the thumbnail is made; "Capture dates" and "Video
 and ffmpeg" above say how.

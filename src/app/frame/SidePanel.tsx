@@ -35,6 +35,9 @@ type Props = {
   header?: ReactNode;
   /** Pinned under the panel, so nothing above it moves when it changes. */
   foot?: ReactNode;
+  /** Beside the fold button, which goes when the panel has the window to itself. */
+  headerControl?: ReactNode;
+  full?: boolean;
   /** The places the rail keeps while the panel is folded, and that foot's narrower shape. */
   rail?: ReactNode;
   railFoot?: ReactNode;
@@ -42,7 +45,17 @@ type Props = {
 };
 
 /** Navigation or the pane: docked beside a splitter, or folded to a rail that opens it over the grid. */
-export function SidePanel({ layout, side, header, foot, rail, railFoot, children }: Props) {
+export function SidePanel({
+  layout,
+  side,
+  header,
+  foot,
+  headerControl,
+  full = false,
+  rail,
+  railFoot,
+  children,
+}: Props) {
   const copy = COPY[side];
   const width = `${layout.widths[side]}rem`;
   const limits = layout.metrics[side];
@@ -60,17 +73,33 @@ export function SidePanel({ layout, side, header, foot, rail, railFoot, children
           </span>
         )}
         {header && <div className="min-w-0 flex-1">{header}</div>}
-        <GlyphButton
-          glyph="panel"
-          flip={copy.flip}
-          label={copy.hide}
-          onClick={() => layout.hide(side)}
-        />
+        {headerControl}
+        {/* In full screen there is nothing to fold away from, so the button goes rather than moves. */}
+        {!full && (
+          <GlyphButton
+            glyph="panel"
+            flip={copy.flip}
+            label={copy.hide}
+            onClick={() => layout.hide(side)}
+          />
+        )}
       </div>
       <div className="min-h-0 flex-1 overflow-auto">{children}</div>
       {foot}
     </>
   );
+
+  // The panel takes the frame whole, keeping every part it has; only the columns beside it go.
+  if (full) {
+    return (
+      <Region
+        aria-label={copy.label}
+        className="absolute inset-0 z-(--z-overlay) flex flex-col bg-panel"
+      >
+        {body}
+      </Region>
+    );
+  }
 
   if (layout.folded[side]) {
     const edge = side === "nav" ? "left" : "right";

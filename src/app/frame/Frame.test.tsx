@@ -175,6 +175,31 @@ test("a folded rail keeps its places, and its way back to the tree has a name of
   expect(screen.getByText("rail places").elements()).toHaveLength(0);
 });
 
+test("full screen gives the pane the window, and leaves the columns standing behind it", async () => {
+  await page.viewport(1600, 900);
+  const screen = await render(
+    <div className="flex h-dvh flex-col">
+      <Frame
+        nav={<p>nav content</p>}
+        grid={<p>grid content</p>}
+        pane={<p>pane content</p>}
+        full
+        onToggleFull={() => undefined}
+      />
+    </div>,
+  );
+  await expect.element(screen.getByText("pane content")).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "Leave full screen" })).toBeVisible();
+  // There is nothing left to fold away from, so the fold button goes rather than moves.
+  expect(screen.getByRole("button", { name: "Hide pane" }).elements()).toHaveLength(0);
+
+  // Both columns stay in the tree, so nothing they hold is rebuilt on the way back out.
+  expect(screen.getByText("grid content").elements()).toHaveLength(1);
+  expect(screen.getByText("nav content").elements()).toHaveLength(1);
+  expect(screen.getByText("grid content").element().checkVisibility()).toBe(false);
+  expect(screen.getByText("nav content").element().checkVisibility()).toBe(false);
+});
+
 test("resizing a panel is saved to the preferences", async () => {
   await page.viewport(1600, 900);
   const screen = await renderFrame();

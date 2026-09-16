@@ -5,6 +5,7 @@ import { page } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
+import { getFullScreen, setFullScreen } from "../pane/full-screen";
 import { getPaneItem, showInPane } from "../pane/pane-store";
 import { setPlace } from "../place";
 import { updatePreferences } from "../preferences";
@@ -69,6 +70,7 @@ const firstRow = () => {
 beforeEach(() => {
   setPlace({ kind: "folder", sourceId: 1, path: [{ id: 1, title: "Pictures" }] });
   showInPane(null);
+  setFullScreen(false);
 });
 
 afterEach(() => {
@@ -125,6 +127,19 @@ test("clicking a picture puts it in the pane, and the grid marks which one it is
   await expect.element(third).toHaveAttribute("aria-current", "true");
   await screen.getByRole("button", { name: "item-4.png" }).click();
   await expect.element(third).not.toHaveAttribute("aria-current");
+});
+
+test("a double-clicked picture takes the window, where a single click only shows it", async () => {
+  serve(6);
+  const screen = await renderGrid("justified");
+  const third = screen.getByRole("button", { name: "item-2.png" });
+  await third.click();
+  expect(getPaneItem()).toBe(3);
+  expect(getFullScreen()).toBe(false);
+
+  await third.dblClick();
+  expect(getPaneItem()).toBe(3);
+  expect(getFullScreen()).toBe(true);
 });
 
 test("an empty place says which kind of empty it is, in its own words", async () => {

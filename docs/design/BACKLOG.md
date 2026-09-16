@@ -132,3 +132,11 @@ cites "the overlay from 06", where 06 is the motion entry, not the panel overlay
 
 Decide what the ffmpeg button does, or draw the banner without it; and point the rail's note at
 the folded-panel overlay the frame already has.
+
+## Full screen names a shortcut that is never given
+
+The full-screen block says that, folded or hidden, the way in is a double-click on a tile "or the
+shortcut". No key is named there or anywhere else in the set, and the only key drawn is Escape,
+which leaves. The build has the double-click and Escape, and no key that enters.
+
+Name the key that enters full screen, or drop the mention so the double-click stands alone.

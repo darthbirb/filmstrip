@@ -5,6 +5,7 @@ import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { formatDuration } from "../../lib/format";
 import { SkeletonTile } from "../../ui/Skeleton";
 import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
+import { setFullScreen } from "../pane/full-screen";
 import { showInPane, usePaneItem } from "../pane/pane-store";
 import { type Place, usePlace } from "../place";
 import { usePreferences } from "../preferences";
@@ -152,6 +153,11 @@ function Tile({ item, from, shown, left, top, width, height }: TileProps) {
         aria-label={item.diskName}
         aria-current={shown || undefined}
         onClick={() => showInPane(item.id, from)}
+        // Folded or hidden, the pane has no header to hold the control, so the tile is the way in.
+        onDoubleClick={() => {
+          showInPane(item.id, from);
+          setFullScreen(true);
+        }}
         className={`focus-ring block size-full ${THUMB_FRAME}`}
       >
         <ThumbFace

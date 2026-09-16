@@ -507,6 +507,10 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Pane disclosure.** The pane's header row: a chevron and the item's shape, length and size in
   tabular `ui` figures. A `wash` under the pointer; opened, it rests on `raised` in `fg` and the
   chevron turns down.
+- **Full screen.** The pane takes the frame below the bar, keeping its header, picture and
+  filmstrip and losing only the columns beside it. Its control is a glyph button in the pane's
+  header, before the fold button; in full screen it wears the pressed state and the fold button is
+  gone. The header row keeps its height, its disclosure and its figures either way.
 - **Filmstrip.** A frame for each item in the place, the one shown centred and carrying the
   `in-pane` ring, the rest sitting back at `--strip-rest` until the pointer is on one. The panel
   fades in over both ends, and a pill-shaped step floats on `veil` over each; at the first or last

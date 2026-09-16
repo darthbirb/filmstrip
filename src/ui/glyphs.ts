@@ -26,6 +26,8 @@ export const GLYPHS = {
   appearance: { icon: "monitor", code: 0xe32e },
   search: { icon: "magnifying-glass", code: 0xe30c },
   tree: { icon: "tree-structure", code: 0xe67c },
+  expand: { icon: "corners-out", code: 0xe1d0 },
+  collapse: { icon: "corners-in", code: 0xe1ce },
   warning: { icon: "warning-circle", code: 0xe4e2 },
 } as const;
 

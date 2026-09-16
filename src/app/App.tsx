@@ -10,6 +10,7 @@ import { Breadcrumb } from "./navigation/Breadcrumb";
 import { Foot } from "./navigation/Foot";
 import { Navigation } from "./navigation/Navigation";
 import { Rail } from "./navigation/Rail";
+import { setFullScreen, useEscapeLeavesFullScreen, useFullScreen } from "./pane/full-screen";
 import { Pane, PaneHeader } from "./pane/Pane";
 import { PaneDetailProvider } from "./pane/pane-detail";
 import { whenShownInPane } from "./pane/pane-store";
@@ -24,6 +25,8 @@ export function App() {
   useScaleHotkeys();
   const layout = usePreferences().layout ?? DEFAULT_LAYOUT;
   const [settings, setSettings] = useState(false);
+  const full = useFullScreen();
+  useEscapeLeavesFullScreen();
 
   return (
     <div className="flex h-dvh flex-col bg-ground text-fg">
@@ -45,6 +48,8 @@ export function App() {
           pane={<Pane />}
           paneHeader={<PaneHeader />}
           revealPane={whenShownInPane}
+          full={full}
+          onToggleFull={() => setFullScreen(!full)}
         />
       </PaneDetailProvider>
       <Settings open={settings} onClose={() => setSettings(false)} />
