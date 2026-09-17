@@ -45,58 +45,32 @@ picture. The action menu is already built in `src/ui/Menu.tsx` and the pane's ac
 names what the app can do to a file, so the shape exists; what is undrawn is which of those actions
 a right-click offers, and what a right-click on a *selection* of several tiles offers instead.
 
-## Adding a folder has no refusal, and the one refusal drawn is backwards · DEFECT
+## The refusal band and the indexing line want the same slot · DEFECT
 
-The Sources block draws the happy path only. The built backend refuses four cases outright, each
-with a message and no source added: the same folder twice, a folder inside a source that already
-exists, a folder that contains one, and anything inside the app's own folder. None of them is
-drawn — and the one the sheet does mention, it gets the wrong way round. It says a folder inside an
-existing source has "the row it would duplicate selected instead", where the code returns an error
-and adds nothing.
+A refusal is drawn at the foot of navigation, "in the slot the indexing line uses". The indexing
+line lives there too, and both can be live at once: a walk from a source added earlier is still
+running when a second folder is refused. Nothing says what happens then — whether the band takes
+the slot and the line waits, whether they stack, or whether the foot grows to hold both.
 
-Draw what a refused folder looks like and where it is said. The picker has closed by then, so it is
-the app's own surface that has to carry it. Two more states are missing: what a cancelled picker
-leaves behind, and Settings › Sources before any source exists — the section is drawn only with
-three in it.
+Draw the two together. The same question applies at the foot of Settings › Sources, where the band
+is drawn a second time.
 
-## The component sheet's glyphs were left at sizes the scale does not name · DEFECT
+## Two stand-in cards disagree with the empty places on their own sheet · DEFECT
 
-The pass moved 65 glyphs on the pane and artboard sheets onto the scale's `glyph`, 0.9375rem, and
-both sheets are now clean. The component sheet was not touched and still holds fifteen: the tile
-checkbox's tick at 13px, a menu row's tick at 14px, and the dropdown's caret at 16px across its
-rest, hover, pressed and focus states. These are component drawings rather than sheet furniture,
-and 13, 14 and 16px are the same three sizes the other two sheets were cleared of.
+The component sheet draws the same two states twice and words them differently. Under "Standing in
+for something" they read **No pictures here.** and **Archive is not reachable.**; in the empty
+places block they read **No Pictures Here** and **Archive Is Offline**, which is what `EmptyPlace.tsx`
+has built. It is the fault that was fixed for the no-sources state, still present on two more cards.
 
-Move them onto a size the scale names, or add the sizes to the token sheet and say which surfaces
-take them.
+Carry the empty places block's wording onto both cards, so one sheet says one thing.
 
-## One empty state, drawn twice, in two voices · DEFECT
+## A glyph in the folder's band is at a size the scale does not name · DEFECT
 
-Navigation with no sources is drawn on two sheets and they disagree: the artboard reads **No
-Sources Yet**, the component card reads **No sources yet.** The same pass put the pane's two empty
-titles into Title Case with a sentence under them, which suggests the component card is the one
-left behind — but that is a guess, and a build needs one answer.
+The "Set a cover" affordance in the folder band draws its glyph at 1.25rem. The scale names four
+glyph sizes — 0.75, 0.9375, 1.125 and 2rem — and 1.25 is not one of them. It is the last glyph in
+the set that is off the scale, and the band is the next surface to be built.
 
-Settle the wording and carry it on both sheets.
-
-## "A right-click adds no verb" contradicts the menus under it · DEFECT
-
-The rule is stated twice and is the reason the context menus have the shape they do: every row is
-already a button in the pane's action bar or a row in its ⋯. The sheet then names **Read It Again**
-as "the one verb here that is not on the pane's bar" — but the source row also carries **Manage
-Sources…** and **Remove Source**, and neither is on the bar either. The drawing accounts for them,
-as "the two things only a source has"; the rule as written does not.
-
-Restate the rule so it covers all three, or say why a source's two do not count against it.
-
-## The Sorting Box's + cannot be reached by keyboard · DEFECT
-
-Which of the two `+` buttons was pressed is what decides a source's kind, so one of them is the only
-way to nominate a sorting folder. That one "appears on the row under the pointer" — a hover-only
-control, and nothing in the set says how a keyboard reaches it. The Library caption's `+` has no
-such problem.
-
-Draw the keyboard's way to it, or give the Sorting Box's `+` a resting state of its own.
+Move it onto a size the scale names.
 
 ## A folder's details · DRAWN
 
