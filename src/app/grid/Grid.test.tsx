@@ -1,7 +1,7 @@
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { page } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
@@ -138,6 +138,18 @@ test("a double-clicked picture takes the window, where a single click only shows
   expect(getFullScreen()).toBe(false);
 
   await third.dblClick();
+  expect(getPaneItem()).toBe(3);
+  expect(getFullScreen()).toBe(true);
+});
+
+test("Enter on the tile the keyboard is on takes the window too", async () => {
+  serve(6);
+  const screen = await renderGrid("justified");
+  const third = screen.getByRole("button", { name: "item-2.png" });
+  await expect.element(third).toBeVisible();
+  (third.element() as HTMLElement).focus();
+
+  await userEvent.keyboard("{Enter}");
   expect(getPaneItem()).toBe(3);
   expect(getFullScreen()).toBe(true);
 });

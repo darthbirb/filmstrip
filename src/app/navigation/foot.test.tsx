@@ -3,6 +3,7 @@ import { mockIPC } from "@tauri-apps/api/mocks";
 import { beforeEach, expect, test } from "vitest";
 import { render } from "vitest-browser-react";
 
+import { inSight } from "../../dev/in-sight";
 import type { Progress } from "../../ipc/bindings/Progress";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { getPlace, setPlace } from "../place";
@@ -63,7 +64,7 @@ test("the panel's baseline counts what the library holds, grouped as Windows gro
 test("a walk shows above the baseline while it runs, and leaves when it ends", async () => {
   const screen = await render(<Foot />);
   const line = () => screen.getByText(/^Indexing/);
-  expect(line().elements()).toHaveLength(0);
+  expect(inSight(line())).toBe(false);
 
   await emit("job-progress", {
     phase: "working",
@@ -79,7 +80,7 @@ test("a walk shows above the baseline while it runs, and leaves when it ends", a
   await expect.element(screen.getByText("41,239 items · 2 sources")).toBeVisible();
 
   await emit("job-progress", IDLE);
-  await expect.poll(() => line().elements().length).toBe(0);
+  await expect.poll(() => inSight(line())).toBe(false);
 });
 
 test("the folded rail keeps the app's own places, each carrying its count", async () => {

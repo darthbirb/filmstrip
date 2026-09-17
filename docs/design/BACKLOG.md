@@ -11,6 +11,35 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
+## Nothing adds a source, and only the doorway is drawn
+
+The app cannot be used at all: `add_source` and `remove_source` exist in Rust and are tested, but
+nothing in the interface calls either, so a real library can never be pointed at. Navigation's
+no-sources state is a bare line of text where the components sheet draws the doorway properly —
+a glyph, "No sources yet.", "Add a folder and Filmstrip will read it where it stands." and an
+**Add a folder…** button.
+
+Build the drawn empty state as it stands. What is undrawn, and what this entry asks for:
+
+- **What Add a folder… opens.** Presumably the system's own folder picker, which needs a plugin the
+  app does not have yet. Say whether it is that or something of the app's own.
+- **How a source's kind is chosen.** `SourceKind` is `library` or `sorting`, and DECISIONS.md
+  "Places, not queries" says the Sorting Box is "several real folders the user nominates" — so
+  nominating one has to be possible somewhere, and nothing draws where.
+- **Where sources are managed afterwards.** Settings has one section, Appearance. Removing a source,
+  renaming it, and seeing that one is offline all have nowhere to happen.
+
+## Right-click is the browser's menu
+
+Right-clicking anywhere offers Edge's own menu — print, copy link to highlight, and the rest — which
+says plainly that this is a web page. Suppressing it is a fix and needs no drawing, but it leaves
+the question of what should be there instead.
+
+Draw whether the app has a context menu at all and, if so, on what: a tile, a tree row, the pane's
+picture. The action menu is already built in `src/ui/Menu.tsx` and the pane's action bar already
+names what the app can do to a file, so the shape exists; what is undrawn is which of those actions
+a right-click offers, and what a right-click on a *selection* of several tiles offers instead.
+
 ## A folder's details · DRAWN
 
 The grid's header says only where you are. A folder has more to know, and nowhere to show it:
@@ -22,17 +51,6 @@ band: a chevron, the folder's title and its counts, then the header's own contro
 drops a band with the cover beside rows for Path, Status, Labels, Tags and Note, in the same
 rhythm as the pane's details. The Sorting Box and the Trash keep a plain header with no
 disclosure.
-
-## Motion · DRAWN
-
-Navigation and the pane snap open and shut, the pane's details only fade in, and full screen
-will need a way in and out.
-
-Specify all of it, starting from the old drawing: a panel folds as one width change over 180ms
-while its content cross-fades over 220ms, so it reads as the panel narrowing rather than two
-panels swapping; the details push down over the same 180ms; full screen grows out of the pane.
-Under reduced motion all of it is instant. Add the tokens it needs, as the old drawing's
-motion/size and motion/swap.
 
 ## Scrubbing a video's tile · DRAWN
 

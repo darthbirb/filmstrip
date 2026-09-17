@@ -2,6 +2,7 @@ import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import { formatBytes, formatDimensions, formatDuration } from "../../lib/format";
 import { EmptyState } from "../../ui/EmptyState";
 import { Glyph } from "../../ui/Glyph";
+import { PushDown } from "../../ui/PushDown";
 import { updatePreferences, usePreferences } from "../preferences";
 import { Actions } from "./Actions";
 import { Details } from "./Details";
@@ -43,15 +44,15 @@ export function Pane() {
   return (
     <div className="flex h-full flex-col">
       <h2 className="sr-only">{item.diskName}</h2>
-      {open && (
+      <PushDown open={open} className="max-h-1/2 shrink-0">
         <section
           id={DETAILS_ID}
           aria-label="Details"
-          className="max-h-1/2 shrink-0 animate-reveal overflow-auto border-line border-b px-3 pt-1.5 pb-3 motion-reduce:animate-none"
+          className="h-full overflow-auto border-line border-b px-3 pt-1.5 pb-3"
         >
           <Details item={item} tags={tags} />
         </section>
-      )}
+      </PushDown>
       {/* The gap around the picture is the pane itself, so it is the pane's own inset. */}
       <div className="flex min-h-0 flex-1 p-2">
         <Media key={item.id} item={item} fill />
@@ -64,12 +65,16 @@ export function Pane() {
 
 function Empty({ gone }: { gone: boolean }) {
   return gone ? (
-    <EmptyState glyph="image" title="This file is no longer here." />
+    <EmptyState
+      glyph="image"
+      title="This File Has Gone"
+      note="It was moved or deleted outside the app, so there is nothing left to show."
+    />
   ) : (
     <EmptyState
       glyph="image"
-      title="Click a picture to see it here."
-      note="The pane keeps it while you look elsewhere."
+      title="Nothing Chosen Yet"
+      note="Click a picture and it shows here, and stays while you look elsewhere."
     />
   );
 }

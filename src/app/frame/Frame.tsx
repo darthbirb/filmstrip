@@ -46,13 +46,25 @@ export function Frame({
 
   return (
     <div ref={layout.frameRef} className="relative flex min-h-0 flex-1 border-line border-t">
-      {/* Hidden rather than dropped, so nothing either column holds is rebuilt on the way back. */}
-      <div className={full ? "hidden" : "contents"}>
-        <SidePanel layout={layout} side="nav" foot={navFoot} rail={navRail} railFoot={navRailFoot}>
-          {nav}
-        </SidePanel>
-      </div>
-      <main className={`flex min-w-0 flex-1 flex-col ${full ? "hidden" : ""}`}>
+      {/* Faded rather than dropped, so nothing either column holds is rebuilt on the way back. */}
+      <SidePanel
+        layout={layout}
+        side="nav"
+        foot={navFoot}
+        rail={navRail}
+        railFoot={navRailFoot}
+        behind={full}
+      >
+        {nav}
+      </SidePanel>
+      <main
+        inert={full}
+        className={`flex min-w-0 flex-1 flex-col ${full ? "opacity-0" : "opacity-100"} ${
+          layout.settled
+            ? "transition-opacity duration-(--motion-swap) ease-out motion-reduce:transition-none"
+            : ""
+        }`}
+      >
         <div className="flex h-toolbar shrink-0 items-center gap-3 border-line border-b bg-panel pr-2 pl-3">
           {location}
         </div>

@@ -1,5 +1,6 @@
 import { formatCount } from "../../lib/format";
 import { Glyph } from "../../ui/Glyph";
+import { PushDown } from "../../ui/PushDown";
 import { useIndex } from "./index-store";
 import { useWork } from "./work-store";
 
@@ -18,13 +19,13 @@ export function Foot({ rail = false }: { rail?: boolean }) {
 
   return (
     <div className="shrink-0">
-      {busy &&
-        (rail ? (
+      <PushDown open={busy}>
+        {rail ? (
           <div className="border-line border-t px-1.5 pt-2 pb-1.5">
             <Bar percent={percent} />
           </div>
         ) : (
-          <div className="flex animate-reveal flex-col gap-1 border-line border-t px-2.5 pt-2 pb-1.5 motion-reduce:animate-none">
+          <div className="flex flex-col gap-1 border-line border-t px-2.5 pt-2 pb-1.5">
             <span className="flex items-baseline gap-2 text-fg-mid text-small">
               <span className="min-w-0 flex-1 truncate tabular-nums">
                 Indexing {formatCount(left)}…
@@ -33,7 +34,8 @@ export function Foot({ rail = false }: { rail?: boolean }) {
             </span>
             <Bar percent={percent} />
           </div>
-        ))}
+        )}
+      </PushDown>
       <div
         title={rail ? totals : undefined}
         className={`flex h-foot items-center border-line border-t text-fg-dim text-small ${rail ? "justify-center" : "gap-2 px-2.5"}`}
@@ -50,7 +52,7 @@ function Bar({ percent }: { percent: number }) {
   return (
     <span className="block h-progress overflow-hidden rounded-full bg-raised">
       <span
-        className="block h-full bg-plate transition-[width] duration-(--motion-reveal) ease-out motion-reduce:transition-none"
+        className="block h-full bg-plate transition-[width] duration-(--motion-size) ease-out motion-reduce:transition-none"
         style={{ width: `${percent}%` }}
       />
     </span>

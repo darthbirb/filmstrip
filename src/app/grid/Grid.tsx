@@ -158,6 +158,13 @@ function Tile({ item, from, shown, left, top, width, height }: TileProps) {
           showInPane(item.id, from);
           setFullScreen(true);
         }}
+        // The keyboard's own way in, so Enter is not left docking what a double-click opens whole.
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" || event.ctrlKey || event.altKey || event.metaKey) return;
+          event.preventDefault();
+          showInPane(item.id, from);
+          setFullScreen(true);
+        }}
         className={`focus-ring block size-full ${THUMB_FRAME}`}
       >
         <ThumbFace

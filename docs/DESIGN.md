@@ -560,10 +560,19 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   sections grouped under `eyebrow` captions, with a filter field on `ground` above them, the one
   shown on `raised-hi`; and the section's settings as rows in an `inset` group, each a label and
   its control.
+- **Push-down.** A box arriving under the row above it: it grows from no height, lifts the
+  `--push-lift` it started above where it settles, and fades, all as one move. Closed, it is out of
+  sight and out of the tab order rather than sitting at no height. The pane's details and the
+  indexing line are the same shape, and the folder's band will be.
 
-**Motion is filtered by frequency.** Colour changes and the disclosure's chevron take
-`--motion-quick` (120ms) ease-out; opened details drop in over `--motion-reveal` (180ms). Both
-turn off under reduced motion. Menus, the dialog and the strip's scroll never animate.
+**Three durations, and what moves is always a box changing size.** `--motion-size` (180ms) is every
+box that changes size: a panel folding, a push-down, the pane growing to full screen.
+`--motion-swap` (220ms) is content cross-fading *under* a size change, and only ever with one — the
+longer of the two, so the box settles before the fade finishes rather than under it.
+`--motion-quick` (120ms) is a colour, a chevron turning and a frame's opacity. All three take
+`--ease-out`, and all three go to zero under reduced motion. Nothing else moves: the pane's
+contents are replaced without a transition, the grid never animates its layout, the strip never
+scrolls smoothly, the splitter follows the pointer exactly, and nothing animates on first paint.
 
 ## Do's and Don'ts
 
