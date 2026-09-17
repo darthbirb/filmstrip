@@ -561,6 +561,14 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   sections grouped under `eyebrow` captions, with a filter field on `ground` above them, the one
   shown on `raised-hi`; and the section's settings as rows in an `inset` group, each a label and
   its control.
+- **Band.** What could not be done, at the foot of the panel it was asked from: a sentence, the
+  folder's path under it in `--font-mono`, and a dismiss, on a `danger-wash` ground. There is only
+  ever one, and a second refusal replaces it rather than stacking.
+- **Segmented.** A value with few enough answers to show them all at once, the one it is on filled
+  on `raised-hi` inside an `inset` trough. Real radios, so the arrow keys move between them.
+- **Source row.** In Settings, two lines: the source's glyph, its name as a field where it stands,
+  its count — or the walk, while one runs — its kind as a segmented group, then reveal and remove;
+  its path beneath in `--font-mono`. One that cannot be read keeps its remove and loses its reveal.
 - **Push-down.** A box arriving under the row above it: it grows from no height, lifts the
   `--push-lift` it started above where it settles, and fades, all as one move. Closed, it is out of
   sight and out of the tab order rather than sitting at no height. The pane's details and the

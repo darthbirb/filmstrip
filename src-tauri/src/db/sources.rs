@@ -124,6 +124,35 @@ pub fn item_stats(conn: &Connection, id: i64) -> Result<(i64, i64)> {
     )?)
 }
 
+/// The app's own label for a source, not the folder's name on disk. Its root folder
+/// carries the same words, so navigation and Settings never disagree.
+pub fn rename(conn: &Connection, id: i64, title: &str) -> Result<()> {
+    let title = title.trim();
+    if title.is_empty() {
+        return Ok(());
+    }
+    conn.execute(
+        "UPDATE source SET title = ?2 WHERE id = ?1",
+        params![id, title],
+    )?;
+    let root = folders::source_root_folder(conn, id)?;
+    conn.execute(
+        "UPDATE folder SET title = ?2 WHERE id = ?1",
+        params![root, title],
+    )?;
+    crate::db::tags::sync_title_tag(conn, root, title)?;
+    Ok(())
+}
+
+/// Moves a source between the tree and the Sorting Box. Nothing on disk moves.
+pub fn set_kind(conn: &Connection, id: i64, kind: SourceKind) -> Result<()> {
+    conn.execute(
+        "UPDATE source SET kind = ?2 WHERE id = ?1",
+        params![id, kind.as_str()],
+    )?;
+    Ok(())
+}
+
 /// Forgets a source outright; **its directory is never touched**, and adding it
 /// again re-reads it. Covers point in from outside the cascade, so go first.
 pub fn remove(conn: &Connection, id: i64) -> Result<()> {

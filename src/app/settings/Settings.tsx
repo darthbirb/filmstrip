@@ -6,6 +6,7 @@ import { GlyphButton } from "../../ui/GlyphButton";
 import type { GlyphName } from "../../ui/glyphs";
 import { DEFAULT_LAYOUT, type LayoutMode } from "../grid/layout";
 import { SCALES, updatePreferences, usePreferences } from "../preferences";
+import { Sources } from "./Sources";
 
 type Row = { label: string; control: ReactNode };
 
@@ -17,6 +18,8 @@ type Section = {
   glyph: GlyphName;
   caption: string;
   rows: Row[];
+  /** A section whose shape is its own, rather than a list of labels and controls. */
+  body?: ReactNode;
 };
 
 const SIZES = SCALES.map((scale) => ({ value: String(scale), label: `${scale * 100}%` }));
@@ -63,6 +66,15 @@ function useSections(): Section[] {
         },
       ],
     },
+    {
+      id: "sources",
+      group: "This app",
+      title: "Sources",
+      glyph: "source",
+      caption: "Folders read where they stand",
+      rows: [],
+      body: <Sources />,
+    },
   ];
 }
 
@@ -105,7 +117,9 @@ function Body({ onClose }: { onClose: () => void }) {
       ...section,
       rows: section.rows.filter((row) => row.label.toLowerCase().includes(term)),
     }))
-    .filter((section) => section.rows.length > 0);
+    .filter((section) =>
+      section.body ? section.title.toLowerCase().includes(term) : section.rows.length > 0,
+    );
   const shown = found.find((section) => section.id === chosen) ?? found[0];
   const groups = [...new Set(found.map((section) => section.group))];
 
@@ -167,17 +181,19 @@ function Body({ onClose }: { onClose: () => void }) {
           {shown ? (
             <section aria-label={shown.title} className="flex flex-col gap-1.5">
               <h3 className="m-0 pl-0.5 text-eyebrow text-fg-dim uppercase">{shown.caption}</h3>
-              <div className="flex flex-col rounded-control bg-inset inset-ring inset-ring-line-control">
-                {shown.rows.map((row) => (
-                  <div
-                    key={row.label}
-                    className="flex min-h-toolbar items-center gap-4 border-line px-3 py-1.5 not-first:border-t"
-                  >
-                    <span className="min-w-0 flex-1 text-fg text-ui">{row.label}</span>
-                    {row.control}
-                  </div>
-                ))}
-              </div>
+              {shown.body ?? (
+                <div className="flex flex-col rounded-control bg-inset inset-ring inset-ring-line-control">
+                  {shown.rows.map((row) => (
+                    <div
+                      key={row.label}
+                      className="flex min-h-toolbar items-center gap-4 border-line px-3 py-1.5 not-first:border-t"
+                    >
+                      <span className="min-w-0 flex-1 text-fg text-ui">{row.label}</span>
+                      {row.control}
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
           ) : (
             <p className="m-0 text-fg-dim text-ui">No setting matches “{query.trim()}”.</p>

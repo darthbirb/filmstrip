@@ -22,6 +22,14 @@ export const addSource = (root: string, kind: SourceKind, title?: string) =>
 
 export const pickFolder = () => invoke<string | null>("pick_folder");
 
+export const renameSource = (id: number, title: string) =>
+  invoke<void>("rename_source", { id, title });
+
+export const setSourceKind = (id: number, kind: SourceKind) =>
+  invoke<void>("set_source_kind", { id, kind });
+
+export const revealSource = (id: number) => invoke<void>("reveal_source", { id });
+
 export const removeSource = (id: number) => invoke<void>("remove_source", { id });
 
 export const folderChildren = (folderId: number) =>

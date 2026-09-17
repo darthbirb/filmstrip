@@ -92,6 +92,36 @@ pub async fn add_source(
 }
 
 #[tauri::command]
+pub async fn rename_source(state: State<'_, AppState>, id: i64, title: String) -> Result<()> {
+    run(&state, move |conn| {
+        in_transaction(conn, |tx| sources::rename(tx, id, &title))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn set_source_kind(state: State<'_, AppState>, id: i64, kind: SourceKind) -> Result<()> {
+    run(&state, move |conn| {
+        in_transaction(conn, |tx| sources::set_kind(tx, id, kind))
+    })
+    .await
+}
+
+/// A source's own folder in Explorer. An offline source has none to open.
+#[tauri::command]
+pub async fn reveal_source(app: AppHandle, state: State<'_, AppState>, id: i64) -> Result<()> {
+    let root = run(&state, move |conn| {
+        sources::get(conn, id)?
+            .map(|source| source.root)
+            .ok_or_else(|| AppError::invalid("that source is no longer in the index"))
+    })
+    .await?;
+    app.opener()
+        .reveal_item_in_dir(root)
+        .map_err(AppError::invalid)
+}
+
+#[tauri::command]
 pub async fn remove_source(state: State<'_, AppState>, id: i64) -> Result<()> {
     run(&state, move |conn| {
         in_transaction(conn, |tx| sources::remove(tx, id))

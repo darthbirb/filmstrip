@@ -152,6 +152,9 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     Promise.reject<AppError>({ kind: "invalid", message: "Adding a source needs the real app." }),
   // The picker is the system's, so outside Tauri there is nothing to open and nothing chosen.
   pick_folder: () => null,
+  rename_source: () => null,
+  set_source_kind: () => null,
+  reveal_source: () => null,
   remove_source: () => null,
   folder_children: ({ folderId }) => FOLDERS[folderId as number] ?? [],
   folder_items: ({ folderId }) => ITEMS[folderId as number] ?? [],
