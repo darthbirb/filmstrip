@@ -6,7 +6,7 @@ import type { FolderNode } from "./bindings/FolderNode";
 import type { ItemDetail } from "./bindings/ItemDetail";
 import type { ItemRow } from "./bindings/ItemRow";
 import type { Progress } from "./bindings/Progress";
-import type { Source } from "./bindings/Source";
+import type { AddOutcome } from "./bindings/AddOutcome";
 import type { SourceKind } from "./bindings/SourceKind";
 import type { SourceSummary } from "./bindings/SourceSummary";
 
@@ -19,7 +19,9 @@ export type AppError = { kind: "io" | "db" | "json" | "invalid" | "media"; messa
 export const listSources = () => invoke<SourceSummary[]>("list_sources");
 
 export const addSource = (root: string, kind: SourceKind, title?: string) =>
-  invoke<Source>("add_source", { root, kind, title });
+  invoke<AddOutcome>("add_source", { root, kind, title });
+
+export const pickFolder = () => invoke<string | null>("pick_folder");
 
 export const removeSource = (id: number) => invoke<void>("remove_source", { id });
 

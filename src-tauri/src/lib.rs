@@ -20,6 +20,7 @@ const DEBUG_PORT: u16 = 9322;
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             fs::paths::ensure_app_dirs()?;
             let db_path = fs::paths::db_path()?;
@@ -81,6 +82,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::list_sources,
             commands::add_source,
+            commands::pick_folder,
             commands::remove_source,
             commands::folder_children,
             commands::folder_items,

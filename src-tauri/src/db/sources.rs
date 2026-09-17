@@ -33,6 +33,22 @@ impl SourceKind {
     }
 }
 
+/// Why a folder was not taken as a source. The words belong to the band that says
+/// so; this only says which of the four it was. DESIGN.md "Shapes".
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum Refusal {
+    /// The folder is already a source under its own name.
+    Same,
+    /// The folder sits inside a source.
+    Inside,
+    /// The folder holds a source somewhere within it.
+    Contains,
+    /// The folder is the app's own, where nothing of the user's belongs.
+    AppFolder,
+}
+
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -124,13 +140,25 @@ pub fn remove(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
-/// The registered source `candidate` collides with: the same directory, or one
-/// inside the other — which would give one directory two identities.
-pub fn nesting_conflict<'a>(existing: &'a [Source], candidate: &Path) -> Option<&'a Source> {
+/// The registered source `candidate` collides with, and how: the same directory,
+/// or one inside the other — which would give one directory two identities.
+pub fn nesting_conflict<'a>(
+    existing: &'a [Source],
+    candidate: &Path,
+) -> Option<(Refusal, &'a Source)> {
     use crate::fs::paths::{contains, same_dir};
-    existing.iter().find(|source| {
+    existing.iter().find_map(|source| {
         let root = Path::new(&source.root);
-        same_dir(root, candidate) || contains(root, candidate) || contains(candidate, root)
+        let why = if same_dir(root, candidate) {
+            Refusal::Same
+        } else if contains(root, candidate) {
+            Refusal::Inside
+        } else if contains(candidate, root) {
+            Refusal::Contains
+        } else {
+            return None;
+        };
+        Some((why, source))
     })
 }
 
@@ -207,10 +235,17 @@ mod tests {
         .unwrap();
         let existing = list(&conn).unwrap();
 
-        for candidate in ["D:/library/photos/2024", "D:/library", "D:/library/photos"] {
-            assert!(
-                nesting_conflict(&existing, &PathBuf::from(candidate)).is_some(),
-                "{candidate} should collide"
+        // Which of the three it is decides which sentence the band says.
+        for (candidate, why) in [
+            ("D:/library/photos/2024", Refusal::Inside),
+            ("D:/library", Refusal::Contains),
+            ("D:/library/photos", Refusal::Same),
+        ] {
+            let clash = nesting_conflict(&existing, &PathBuf::from(candidate));
+            assert_eq!(
+                clash.map(|(why, source)| (why, source.title.clone())),
+                Some((why, "Photos".to_string())),
+                "{candidate} should collide as {why:?}"
             );
         }
         assert!(
