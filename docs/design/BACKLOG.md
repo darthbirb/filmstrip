@@ -23,17 +23,6 @@ drops a band with the cover beside rows for Path, Status, Labels, Tags and Note,
 rhythm as the pane's details. The Sorting Box and the Trash keep a plain header with no
 disclosure.
 
-## Motion · DRAWN
-
-Navigation and the pane snap open and shut, the pane's details only fade in, and full screen
-will need a way in and out.
-
-Specify all of it, starting from the old drawing: a panel folds as one width change over 180ms
-while its content cross-fades over 220ms, so it reads as the panel narrowing rather than two
-panels swapping; the details push down over the same 180ms; full screen grows out of the pane.
-Under reduced motion all of it is instant. Add the tokens it needs, as the old drawing's
-motion/size and motion/swap.
-
 ## Scrubbing a video's tile · DRAWN
 
 A video's tile shows one frame. In ggallery, running the pointer across a video's tile scrubbed
