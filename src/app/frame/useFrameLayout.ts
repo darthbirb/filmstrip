@@ -35,6 +35,7 @@ export function useFrameLayout() {
   );
   const [overlay, setOverlay] = useState<Side | null>(null);
   const room = useRoomInRem(frameRef);
+  const settled = useSettled();
 
   // The grid never folds; navigation outranks the pane, so the pane goes first.
   const { gridMin, rail, splitter } = metrics;
@@ -64,6 +65,7 @@ export function useFrameLayout() {
     widths,
     folded,
     open,
+    settled,
     setWidth: (side: Side, rem: number) => {
       const next = { ...widths, [side]: rem };
       setWidths(next);
@@ -87,6 +89,23 @@ export function useFrameLayout() {
     },
     close: () => setOverlay(null),
   };
+}
+
+/** Whether the frame has measured itself and drawn once, since nothing animates on first paint. */
+function useSettled() {
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    let live = true;
+    // Two frames: the observer's first measurement lands in the first, the fold it decides in the second.
+    let id = requestAnimationFrame(() => {
+      id = requestAnimationFrame(() => live && setSettled(true));
+    });
+    return () => {
+      live = false;
+      cancelAnimationFrame(id);
+    };
+  }, []);
+  return settled;
 }
 
 /** Saved widths, held within today's limits; the defaults where nothing was saved. */

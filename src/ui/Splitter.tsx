@@ -10,6 +10,8 @@ type Props = {
   /** Whether that panel sits before the splitter or after it. */
   panel: "before" | "after";
   onChange: (rem: number) => void;
+  /** True while a width is being chosen, so the panel follows exactly rather than animating. */
+  onSizing?: (sizing: boolean) => void;
 };
 
 // Arrow keys move a splitter by this many rem; with Shift, by the larger step.
@@ -17,7 +19,7 @@ const STEP = 1;
 const LARGE_STEP = 4;
 
 /** A draggable edge between two panels: pointer, arrow keys, Home and End, double-click to reset. */
-export function Splitter({ label, value, min, max, initial, panel, onChange }: Props) {
+export function Splitter({ label, value, min, max, initial, panel, onChange, onSizing }: Props) {
   const drag = useRef<{ x: number; value: number } | null>(null);
   const toward = panel === "before" ? 1 : -1;
   const set = (rem: number) => onChange(Math.min(max, Math.max(min, rem)));
@@ -35,6 +37,7 @@ export function Splitter({ label, value, min, max, initial, panel, onChange }: P
       onPointerDown={(event) => {
         event.currentTarget.setPointerCapture(event.pointerId);
         drag.current = { x: event.clientX, value };
+        onSizing?.(true);
       }}
       onPointerMove={(event) => {
         if (!drag.current) return;
@@ -43,9 +46,11 @@ export function Splitter({ label, value, min, max, initial, panel, onChange }: P
       }}
       onPointerUp={() => {
         drag.current = null;
+        onSizing?.(false);
       }}
       onPointerCancel={() => {
         drag.current = null;
+        onSizing?.(false);
       }}
       onDoubleClick={() => onChange(initial)}
       onKeyDown={(event) => {
@@ -55,8 +60,11 @@ export function Splitter({ label, value, min, max, initial, panel, onChange }: P
         else if (event.key === "Home") set(min);
         else if (event.key === "End") set(max);
         else return;
+        onSizing?.(true);
         event.preventDefault();
       }}
+      onKeyUp={() => onSizing?.(false)}
+      onBlur={() => onSizing?.(false)}
       className="focus-ring-inset group flex w-splitter shrink-0 cursor-col-resize touch-none select-none items-center justify-center bg-ground"
     >
       <span className="h-grip w-grip-width rounded-full bg-line-control transition-colors duration-(--motion-quick) group-hover:bg-fg-dim group-active:bg-fg-mid motion-reduce:transition-none" />

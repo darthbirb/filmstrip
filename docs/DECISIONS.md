@@ -198,6 +198,13 @@ behaves the same way.
 pane nobody can see does nothing: it docks where it fits, and opens over the grid where it does
 not.
 
+**A side panel is one box, not three.** Docked, folded to a rail, laid over the grid and filling
+the window are four widths of the same element, with its rows and its rail two layers cross-fading
+inside it. They were three separate trees until 17 September 2026, so every change between them was
+a swap rather than a move: React rebuilt the pane on the way into full screen, which reloaded the
+picture behind its thumbnail and started a playing video again from zero. The box keeps its place
+in the row while it grows, so the grid never reflows under its own fade.
+
 ## The interface size
 
 **Everything is sized in rem, so one number scales the whole interface.** The interface size is

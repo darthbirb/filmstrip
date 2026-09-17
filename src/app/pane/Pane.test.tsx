@@ -4,6 +4,7 @@ import { beforeAll, beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
+import { inSight } from "../../dev/in-sight";
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { folderItems, itemDetail } from "../../ipc/commands";
@@ -103,6 +104,24 @@ test("the header row gives the shape and size, and opens onto the rest, remember
   await expect.element(details.getByText(/^2[.,]3 MB$/)).toBeVisible();
   await expect.element(details.getByText("pyramid.jpg", { exact: true })).toBeVisible();
   expect(getPreferences().details).toBe(true);
+});
+
+test("the details push back up when shut, out of sight and out of reach", async () => {
+  const pyramid = await inCairo("pyramid.jpg");
+  showInPane(pyramid.id);
+  updatePreferences({ details: true });
+  const screen = await render(<Harness />);
+  const pane = screen.getByRole("complementary", { name: "Pane" });
+  const details = () => document.getElementById("pane-details");
+  await expect.poll(() => inSight(details())).toBe(true);
+
+  await pane
+    .getByRole("button", { name: new RegExp(`^${pyramid.width} × ${pyramid.height} · `) })
+    .click();
+  // It stays in the tree so it can grow back, and nothing in it can be seen or tabbed to meanwhile.
+  await expect.poll(() => inSight(details())).toBe(false);
+  expect(details()).not.toBeNull();
+  expect(pane.getByRole("region", { name: "Details" }).elements()).toHaveLength(0);
 });
 
 test("the folders the picture sits in each lead there", async () => {

@@ -23,11 +23,16 @@
   color-scheme: dark;
 
   --motion-quick: 120ms;
-  --motion-reveal: 180ms;
+  /* Every box that changes size: a panel folding, details pushing down, full screen growing. */
+  --motion-size: 180ms;
+  /* Content cross-fading under a size change, and only ever with one, so the box settles first. */
+  --motion-swap: 220ms;
   /* How far a filmstrip frame other than the one shown sits back. */
   --strip-rest: 0.5;
   --focus-width: 2px;
   --focus-gap: 2px;
+  /* How far a box pushing down starts above where it settles. */
+  --push-lift: 0.25rem;
   --z-overlay: 20;
   /* The width of one band in the hatch that stands in for a picture not made yet. */
   --hatch-band: 0.5rem;
@@ -116,8 +121,6 @@
 
   --shadow-overlay: 0 18px 44px rgb(0 0 0 / 0.6);
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  /* Something opened drops in from just above where it settles. */
-  --animate-reveal: reveal var(--motion-reveal) var(--ease-out);
   /* A tile narrower than this shows the in-pane mark without its words. */
   --container-badge: 7rem;
   /* A filmstrip frame's shape, whatever the picture's own. */
@@ -191,11 +194,29 @@
   --text-glyph-large--line-height: 1;
 }
 
-/* Outside @theme, where check:docs reads the tokens line by line; --animate-reveal runs it. */
-@keyframes reveal {
-  from {
-    opacity: 0;
-    transform: translateY(-0.25rem);
+/* A box arriving under the row above it: it grows, lifts and fades as one move, and at rest it is
+   out of the tab order rather than sitting there at no height. DESIGN.md "Shapes". */
+@utility push-down {
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  opacity: 0;
+  translate: 0 calc(var(--push-lift) * -1);
+  transition:
+    grid-template-rows var(--motion-size) var(--ease-out),
+    translate var(--motion-size) var(--ease-out),
+    opacity var(--motion-size) var(--ease-out),
+    visibility var(--motion-size);
+
+  &[data-open="true"] {
+    grid-template-rows: 1fr;
+    visibility: visible;
+    opacity: 1;
+    translate: 0 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
   }
 }
 

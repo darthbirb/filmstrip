@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { afterEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
+import { inSight } from "../../dev/in-sight";
 import { showInPane, whenShownInPane } from "../pane/pane-store";
 import { getPreferences, updatePreferences } from "../preferences";
 import { Frame } from "./Frame";
@@ -68,12 +70,11 @@ test("the pane folds first as room runs out, then navigation", async () => {
   await page.viewport(640, 480);
   const screen = await renderFrame();
   await expect.element(screen.getByRole("navigation", { name: "Navigation" })).toBeVisible();
-  expect(screen.getByRole("complementary", { name: "Pane" }).elements()).toHaveLength(0);
+  expect(inSight(screen.getByText("pane content"))).toBe(false);
+  await expect.element(screen.getByRole("button", { name: "Show pane" })).toBeVisible();
 
   document.documentElement.style.fontSize = "24px";
-  await expect
-    .poll(() => screen.getByRole("navigation", { name: "Navigation" }).elements().length)
-    .toBe(0);
+  await expect.poll(() => inSight(screen.getByText("nav content"))).toBe(false);
 });
 
 test("a folded panel opens over the grid, and Escape puts it away", async () => {
@@ -83,14 +84,14 @@ test("a folded panel opens over the grid, and Escape puts it away", async () => 
   await expect.element(screen.getByText("pane content")).toBeVisible();
 
   await userEvent.keyboard("{Escape}");
-  await expect.poll(() => screen.getByText("pane content").elements().length).toBe(0);
+  await expect.poll(() => inSight(screen.getByText("pane content"))).toBe(false);
 });
 
 test("a panel can be hidden while it fits, and shown again", async () => {
   await page.viewport(1600, 900);
   const screen = await renderFrame();
   await screen.getByRole("button", { name: "Hide navigation" }).click();
-  expect(screen.getByRole("navigation", { name: "Navigation" }).elements()).toHaveLength(0);
+  await expect.poll(() => inSight(screen.getByText("nav content"))).toBe(false);
 
   await screen.getByRole("button", { name: "Show navigation" }).click();
   await expect.element(screen.getByRole("navigation", { name: "Navigation" })).toBeVisible();
@@ -100,24 +101,25 @@ test("clicking a picture docks a pane hidden by hand, where it fits", async () =
   await page.viewport(1600, 900);
   updatePreferences({ hidden: { nav: false, pane: true } });
   const screen = await renderRevealing();
-  expect(screen.getByText("pane content").elements()).toHaveLength(0);
+  expect(inSight(screen.getByText("pane content"))).toBe(false);
 
   await screen.getByRole("button", { name: "picture" }).click();
-  await expect.element(screen.getByRole("complementary", { name: "Pane" })).toBeVisible();
+  await expect.poll(() => inSight(screen.getByText("pane content"))).toBe(true);
   expect(getPreferences().hidden?.pane).toBe(false);
-  expect(screen.getByRole("button", { name: "Show pane" }).elements()).toHaveLength(0);
+  // The rail it docked out of takes the cross-fade to leave, so it is gone a moment later.
+  await expect.poll(() => inSight(screen.getByRole("button", { name: "Show pane" }))).toBe(false);
 });
 
 test("clicking a picture opens a pane that did not fit, over the grid", async () => {
   await page.viewport(640, 480);
   const screen = await renderRevealing();
-  expect(screen.getByText("pane content").elements()).toHaveLength(0);
+  expect(inSight(screen.getByText("pane content"))).toBe(false);
 
   await screen.getByRole("button", { name: "picture" }).click();
-  await expect.element(screen.getByText("pane content")).toBeVisible();
-  await expect
-    .element(screen.getByRole("button", { name: "Show pane" }))
-    .toHaveAttribute("aria-pressed", "true");
+  await expect.poll(() => inSight(screen.getByText("pane content"))).toBe(true);
+  // Laid over the grid, it arrives wearing the one shadow in the app. DESIGN.md "Shapes".
+  const panel = screen.getByRole("complementary", { name: "Pane" }).element();
+  expect(getComputedStyle(panel).boxShadow).not.toBe("none");
 });
 
 test("a pane shown where it fits stays folded when the window then narrows", async () => {
@@ -128,7 +130,7 @@ test("a pane shown where it fits stays folded when the window then narrows", asy
   await expect.element(screen.getByText("pane content")).toBeVisible();
 
   await page.viewport(640, 480);
-  await expect.poll(() => screen.getByText("pane content").elements().length).toBe(0);
+  await expect.poll(() => inSight(screen.getByText("pane content"))).toBe(false);
 });
 
 test("nothing overflows at any width or text size", async () => {
@@ -155,7 +157,7 @@ test("panel widths and hidden panels come back from the saved preferences", asyn
   const screen = await renderFrame();
   const nav = screen.getByRole("navigation", { name: "Navigation" }).element();
   expect(nav.getBoundingClientRect().width).toBe(320);
-  expect(screen.getByRole("complementary", { name: "Pane" }).elements()).toHaveLength(0);
+  expect(inSight(screen.getByText("pane content"))).toBe(false);
 });
 
 test("a folded rail keeps its places, and its way back to the tree has a name of its own", async () => {
@@ -171,8 +173,10 @@ test("a folded rail keeps its places, and its way back to the tree has a name of
   await expect.element(screen.getByRole("button", { name: "Show navigation" })).toBeVisible();
 
   await screen.getByRole("button", { name: "Show the tree" }).click();
-  await expect.element(screen.getByText("nav content")).toBeVisible();
-  expect(screen.getByText("rail places").elements()).toHaveLength(0);
+  await expect.poll(() => inSight(screen.getByText("nav content"))).toBe(true);
+  // The rail stays in the tree under the rows it cross-faded with, out of sight and out of reach.
+  expect(screen.getByText("rail places").elements()).toHaveLength(1);
+  await expect.poll(() => inSight(screen.getByText("rail places"))).toBe(false);
 });
 
 test("full screen gives the pane the window, and leaves the columns standing behind it", async () => {
@@ -196,8 +200,53 @@ test("full screen gives the pane the window, and leaves the columns standing beh
   // Both columns stay in the tree, so nothing they hold is rebuilt on the way back out.
   expect(screen.getByText("grid content").elements()).toHaveLength(1);
   expect(screen.getByText("nav content").elements()).toHaveLength(1);
-  expect(screen.getByText("grid content").element().checkVisibility()).toBe(false);
-  expect(screen.getByText("nav content").element().checkVisibility()).toBe(false);
+  await expect.poll(() => inSight(screen.getByText("grid content"))).toBe(false);
+  await expect.poll(() => inSight(screen.getByText("nav content"))).toBe(false);
+});
+
+/** Something in the pane with a state of its own, which a pane built afresh would lose. */
+function Kept() {
+  const [clicks, setClicks] = useState(0);
+  return (
+    <button type="button" onClick={() => setClicks(clicks + 1)}>
+      kept {clicks}
+    </button>
+  );
+}
+
+function Growing() {
+  const [full, setFull] = useState(false);
+  return (
+    <div className="flex h-dvh flex-col">
+      <Frame
+        nav={<p>nav content</p>}
+        grid={<p>grid content</p>}
+        pane={<Kept />}
+        full={full}
+        onToggleFull={() => setFull(!full)}
+      />
+    </div>
+  );
+}
+
+test("full screen grows the pane's own box rather than building a new one", async () => {
+  await page.viewport(1600, 900);
+  const screen = await render(<Growing />);
+  const pane = screen.getByRole("complementary", { name: "Pane" }).element();
+  const frame = pane.parentElement?.parentElement as HTMLElement;
+  await screen.getByRole("button", { name: /^kept/ }).click();
+  await expect.element(screen.getByText("kept 1")).toBeVisible();
+
+  await screen.getByRole("button", { name: "Full screen" }).click();
+  await expect.element(screen.getByRole("button", { name: "Leave full screen" })).toBeVisible();
+  // The same box grew, so nothing it holds was rebuilt: a picture is not reloaded, a video plays on.
+  expect(screen.getByRole("complementary", { name: "Pane" }).element()).toBe(pane);
+  await expect.element(screen.getByText("kept 1")).toBeVisible();
+  await expect.poll(() => pane.getBoundingClientRect().width).toBe(frame.clientWidth);
+
+  await screen.getByRole("button", { name: "Leave full screen" }).click();
+  await expect.element(screen.getByText("kept 1")).toBeVisible();
+  expect(screen.getByRole("complementary", { name: "Pane" }).element()).toBe(pane);
 });
 
 test("resizing a panel is saved to the preferences", async () => {

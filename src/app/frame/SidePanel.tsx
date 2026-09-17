@@ -1,4 +1,4 @@
-import { type ReactNode, type RefObject, useEffect, useRef } from "react";
+import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
 
 import { GlyphButton } from "../../ui/GlyphButton";
 import { RailButton } from "../../ui/RailButton";
@@ -38,13 +38,15 @@ type Props = {
   /** Beside the fold button, which goes when the panel has the window to itself. */
   headerControl?: ReactNode;
   full?: boolean;
+  /** Another surface has the window: fade out of the way and stop answering. */
+  behind?: boolean;
   /** The places the rail keeps while the panel is folded, and that foot's narrower shape. */
   rail?: ReactNode;
   railFoot?: ReactNode;
   children?: ReactNode;
 };
 
-/** Navigation or the pane: docked beside a splitter, or folded to a rail that opens it over the grid. */
+/** Navigation or the pane: one box whose width says whether it is docked, folded or whole. DECISIONS.md "The frame". */
 export function SidePanel({
   layout,
   side,
@@ -52,17 +54,27 @@ export function SidePanel({
   foot,
   headerControl,
   full = false,
+  behind = false,
   rail,
   railFoot,
   children,
 }: Props) {
   const copy = COPY[side];
-  const width = `${layout.widths[side]}rem`;
+  const own = `${layout.widths[side]}rem`;
   const limits = layout.metrics[side];
   const Region = side === "nav" ? "nav" : "aside";
-  const overlayRef = useRef<HTMLElement>(null);
+  const regionRef = useRef<HTMLElement>(null);
+  const [sizing, setSizing] = useState(false);
+  const folded = layout.folded[side];
   const open = layout.open === side;
-  useDismiss(open, side, overlayRef, layout.close);
+  const showRail = folded && !open && !full;
+  useDismiss(open, regionRef, layout.close);
+
+  // The box's width is the state: a rail folded, its own docked or laid over the grid, the frame whole.
+  const width = full ? "100%" : showRail ? "var(--spacing-rail)" : own;
+  // What it keeps in the row, which a panel over the grid or filling the window no longer matches.
+  const held = folded ? "var(--spacing-rail)" : own;
+  const grows = layout.settled && !sizing;
 
   const body = (
     <>
@@ -89,63 +101,29 @@ export function SidePanel({
     </>
   );
 
-  // The panel takes the frame whole, keeping every part it has; only the columns beside it go.
-  if (full) {
-    return (
-      <Region
-        aria-label={copy.label}
-        className="absolute inset-0 z-(--z-overlay) flex flex-col bg-panel"
-      >
-        {body}
-      </Region>
-    );
-  }
-
-  if (layout.folded[side]) {
-    const edge = side === "nav" ? "left" : "right";
-    return (
-      <>
-        <div
-          data-frame-toggle={side}
-          className={`flex w-rail shrink-0 flex-col items-center border-line bg-panel ${copy.edge}`}
-        >
-          <div className="grid h-toolbar w-full place-items-center border-line border-b">
-            <GlyphButton
-              glyph="panel"
-              flip={copy.flip}
-              label={copy.show}
-              pressed={open}
-              onClick={() => (open ? layout.close() : layout.show(side))}
-            />
-          </div>
-          {rail && (
-            <div className="flex min-h-0 flex-1 flex-col items-center gap-2 p-1.5">
-              {rail}
-              <span aria-hidden="true" className="my-1.5 h-px w-full shrink-0 bg-line" />
-              {/* Without it the tree is simply gone until you unfold, which makes folding a trap. */}
-              <RailButton
-                glyph="tree"
-                label={copy.tree ?? copy.show}
-                pressed={open}
-                onClick={() => (open ? layout.close() : layout.show(side))}
-              />
-            </div>
-          )}
-          {railFoot}
+  const unfold = () => (open ? layout.close() : layout.show(side));
+  const railColumn = (
+    <>
+      <div className="grid h-toolbar w-full place-items-center border-line border-b">
+        <GlyphButton
+          glyph="panel"
+          flip={copy.flip}
+          label={copy.show}
+          pressed={open}
+          onClick={unfold}
+        />
+      </div>
+      {rail && (
+        <div className="flex min-h-0 flex-1 flex-col items-center gap-2 p-1.5">
+          {rail}
+          <span aria-hidden="true" className="my-1.5 h-px w-full shrink-0 bg-line" />
+          {/* Without it the tree is simply gone until you unfold, which makes folding a trap. */}
+          <RailButton glyph="tree" label={copy.tree ?? copy.show} pressed={open} onClick={unfold} />
         </div>
-        {open && (
-          <Region
-            ref={overlayRef}
-            aria-label={copy.label}
-            className={`absolute inset-y-0 z-(--z-overlay) flex flex-col border-line bg-panel shadow-overlay ${copy.edge}`}
-            style={{ width, [edge]: "var(--spacing-rail)" }}
-          >
-            {body}
-          </Region>
-        )}
-      </>
-    );
-  }
+      )}
+      {railFoot}
+    </>
+  );
 
   const splitter = (
     <Splitter
@@ -156,45 +134,99 @@ export function SidePanel({
       initial={limits.initial}
       panel={side === "nav" ? "before" : "after"}
       onChange={(rem) => layout.setWidth(side, rem)}
+      onSizing={setSizing}
     />
   );
-  const panel = (
-    <Region
-      aria-label={copy.label}
-      className={`flex shrink-0 flex-col border-line bg-panel ${copy.edge}`}
-      style={{ width }}
+  // The row keeps the panel's place while the box itself is positioned against the frame.
+  const place = <div aria-hidden="true" className="shrink-0" style={{ width: held }} />;
+
+  return (
+    <div
+      inert={behind}
+      className={`flex shrink-0 ${behind ? "opacity-0" : "opacity-100"} ${
+        layout.settled
+          ? "transition-opacity duration-(--motion-swap) ease-out motion-reduce:transition-none"
+          : ""
+      }`}
     >
-      {body}
-    </Region>
-  );
-  return side === "nav" ? (
-    <>
-      {panel}
-      {splitter}
-    </>
-  ) : (
-    <>
-      {splitter}
-      {panel}
-    </>
+      <Region
+        ref={regionRef}
+        aria-label={copy.label}
+        style={side === "nav" ? { width, left: 0 } : { width, right: 0 }}
+        // The grid's tiles are positioned too, so without this they paint over a folding panel.
+        className={`absolute inset-y-0 z-(--z-overlay) overflow-hidden border-line bg-panel ${copy.edge} ${
+          open ? "shadow-overlay" : ""
+        } ${
+          grows
+            ? "transition-[width] duration-(--motion-size) ease-out motion-reduce:transition-none"
+            : ""
+        }`}
+      >
+        <Layer shown={!showRail} width={full ? "100%" : own} side={side} settled={layout.settled}>
+          {body}
+        </Layer>
+        <Layer
+          shown={showRail}
+          width="var(--spacing-rail)"
+          side={side}
+          settled={layout.settled}
+          center
+        >
+          {railColumn}
+        </Layer>
+      </Region>
+      {side === "nav" ? (
+        <>
+          {place}
+          {splitter}
+        </>
+      ) : (
+        <>
+          {splitter}
+          {place}
+        </>
+      )}
+    </div>
   );
 }
 
-/** Closes an open overlay when the pointer goes down anywhere but on it or on its rail. */
-function useDismiss(
-  open: boolean,
-  side: Side,
-  ref: RefObject<HTMLElement | null>,
-  close: () => void,
-) {
+type LayerProps = {
+  shown: boolean;
+  width: string;
+  side: Side;
+  settled: boolean;
+  center?: boolean;
+  children: ReactNode;
+};
+
+/** One of the panel's two faces, held at its own width so the box clips it rather than reflowing it. */
+function Layer({ shown, width, side, settled, center, children }: LayerProps) {
+  return (
+    <div
+      inert={!shown}
+      style={side === "nav" ? { width, left: 0 } : { width, right: 0 }}
+      className={`absolute inset-y-0 flex flex-col ${center ? "items-center" : ""} ${
+        shown ? "visible opacity-100" : "invisible opacity-0"
+      } ${
+        settled
+          ? "transition-[opacity,visibility] duration-(--motion-swap) ease-out motion-reduce:transition-none"
+          : ""
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
+
+/** Closes an open panel when the pointer goes down anywhere but on it. */
+function useDismiss(open: boolean, ref: RefObject<HTMLElement | null>, close: () => void) {
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
-      const target = event.target as Element | null;
-      if (ref.current?.contains(target) || target?.closest(`[data-frame-toggle="${side}"]`)) return;
+      if (ref.current?.contains(event.target as Element | null)) return;
       close();
     };
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
-  }, [open, side, ref, close]);
+  }, [open, ref, close]);
 }
