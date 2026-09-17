@@ -16,24 +16,6 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## Adding a source · DRAWN
-
-The app cannot be used at all: `add_source` and `remove_source` exist in Rust and are tested, but
-nothing in the interface calls either, so a real library can never be pointed at. Navigation's
-no-sources state is a bare line of text where the components sheet draws the doorway properly —
-a glyph, "No sources yet.", "Add a folder and Filmstrip will read it where it stands." and an
-**Add a folder…** button.
-
-Build the drawn empty state as it stands. What is undrawn, and what this entry asks for:
-
-- **What Add a folder… opens.** Presumably the system's own folder picker, which needs a plugin the
-  app does not have yet. Say whether it is that or something of the app's own.
-- **How a source's kind is chosen.** `SourceKind` is `library` or `sorting`, and DECISIONS.md
-  "Places, not queries" says the Sorting Box is "several real folders the user nominates" — so
-  nominating one has to be possible somewhere, and nothing draws where.
-- **Where sources are managed afterwards.** Settings has one section, Appearance. Removing a source,
-  renaming it, and seeing that one is offline all have nowhere to happen.
-
 ## Right-click is the browser's menu · DRAWN
 
 Right-clicking anywhere offers Edge's own menu — print, copy link to highlight, and the rest — which
