@@ -1,12 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
-
+import type { AddOutcome } from "./bindings/AddOutcome";
 import type { EffectiveTag } from "./bindings/EffectiveTag";
 import type { Failure } from "./bindings/Failure";
 import type { FolderNode } from "./bindings/FolderNode";
 import type { ItemDetail } from "./bindings/ItemDetail";
 import type { ItemRow } from "./bindings/ItemRow";
 import type { Progress } from "./bindings/Progress";
-import type { AddOutcome } from "./bindings/AddOutcome";
 import type { SourceKind } from "./bindings/SourceKind";
 import type { SourceSummary } from "./bindings/SourceSummary";
 

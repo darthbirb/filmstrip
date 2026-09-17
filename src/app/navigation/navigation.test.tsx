@@ -1,3 +1,4 @@
+import { mockIPC } from "@tauri-apps/api/mocks";
 import { beforeEach, expect, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
@@ -6,6 +7,7 @@ import { getPlace, setPlace } from "../place";
 import { Breadcrumb } from "./Breadcrumb";
 import { loadIndex, resetIndex } from "./index-store";
 import { Navigation } from "./Navigation";
+import { getRefused, setRefused } from "./refusal-store";
 
 // Against the dev mock: Pictures holds People and Trips › Cairo; Incoming is a sorting source
 // holding three items; Archive cannot be reached.
@@ -17,6 +19,7 @@ const titles = () => {
 beforeEach(async () => {
   resetIndex();
   setPlace(null);
+  setRefused(null);
   await loadIndex();
 });
 
@@ -96,4 +99,47 @@ test("the breadcrumb goes back up to any folder on the path", async () => {
 
   await screen.getByRole("button", { name: "Pictures" }).click();
   expect(titles()).toEqual(["Pictures"]);
+});
+
+test("the Sorting Box keeps its own way in, reachable after the row it sits on", async () => {
+  const screen = await render(<Navigation />);
+  const row = screen.getByRole("treeitem", { name: "Sorting Box 3" });
+  await expect.element(row).toBeVisible();
+
+  // Drawn at rest, not on hover: it is the only way to nominate a sorting folder.
+  const nominate = screen.getByRole("button", { name: "Nominate a folder" });
+  await expect.element(nominate).toBeVisible();
+  expect(row.element().contains(nominate.element())).toBe(true);
+
+  // The row is one tab stop and its + is the next.
+  (row.element() as HTMLElement).focus();
+  await userEvent.tab();
+  expect(document.activeElement).toBe(nominate.element());
+});
+
+test("a refused folder says so and changes nothing, and a second refusal replaces the first", async () => {
+  const screen = await render(<Navigation />);
+  await expect.element(screen.getByRole("treeitem", { name: "Pictures" })).toBeVisible();
+
+  setRefused({ why: "inside", clash: "Pictures", path: "C:UsersadaPicturesTrips" });
+  expect(getRefused()?.why).toBe("inside");
+  // The tree is exactly as it was: nothing added, and nothing selected on the person's behalf.
+  expect(screen.getByRole("treeitem").elements().length).toBe(4);
+
+  setRefused({ why: "appFolder", clash: null, path: "D:Filmstrip\thumbs" });
+  expect(getRefused()?.why).toBe("appFolder");
+});
+
+// This one replaces the dev mock, so it stays last.
+test("with no sources at all, the doorway stands where the tree will", async () => {
+  mockIPC((command) => (command === "list_sources" ? [] : undefined), { shouldMockEvents: true });
+  resetIndex();
+  await loadIndex();
+  const screen = await render(<Navigation />);
+
+  await expect.element(screen.getByText("No Sources Yet")).toBeVisible();
+  await expect
+    .element(screen.getByText("Add a folder and Filmstrip will read it where it stands."))
+    .toBeVisible();
+  await expect.element(screen.getByRole("button", { name: /Add a folder/ })).toBeVisible();
 });

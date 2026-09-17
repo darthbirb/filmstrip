@@ -294,11 +294,9 @@ pub fn register_source(
     })
 }
 
-/// An existing absolute directory, clear of every registered source and of the
-/// app's own folder. Reads the disk; never writes to it.
-///
-/// The four a person can reach through the picker come back as a refusal to show;
-/// the three it cannot produce — a relative path, a `..`, a file — stay errors.
+/// An existing absolute directory, clear of every registered source and of the app's
+/// own folder. The four a picker can hand over come back as a refusal to show; the
+/// three it cannot produce — a relative path, a `..`, a file — stay errors.
 fn checked_root(
     conn: &Connection,
     raw: &str,

@@ -2,6 +2,7 @@
 /* Bundled with the app and never fetched, as the CSP requires. DECISIONS.md "The look". */
 @import "@fontsource/ibm-plex-sans/latin-400.css";
 @import "@fontsource/ibm-plex-sans/latin-600.css";
+@import "@fontsource/ibm-plex-mono/latin-400.css";
 @import "@fontsource/archivo/latin-800.css";
 
 /* Phosphor's woff2 files alone: its own stylesheets would bundle three fallback formats too. */
@@ -67,6 +68,8 @@
   --font-sans: "IBM Plex Sans", "Segoe UI Variable Text", system-ui, sans-serif;
   /* The wordmark's face and nowhere else. */
   --font-brand: "Archivo", "IBM Plex Sans", sans-serif;
+  /* A path, and nothing else: its separators and its segments have to be told apart. */
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
   /* Outlined names an action; filled names a thing. */
   --font-glyph: "Phosphor";
   --font-glyph-fill: "Phosphor-Fill";
@@ -88,6 +91,8 @@
   --color-line-strong: #6b6863;
   /* A hairline that carries a warning without filling the surface behind it. */
   --color-line-danger: rgb(194 90 74 / 0.45);
+  /* The ground under something refused: enough red to be seen, not enough to shout. */
+  --color-danger-wash: rgb(194 90 74 / 0.1);
 
   --color-fg-hi: #f4f3f1;
   --color-fg: #eceae7;

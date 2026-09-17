@@ -10,6 +10,7 @@ import { getPlace, setPlace } from "../place";
 import { Foot } from "./Foot";
 import { loadIndex, resetIndex } from "./index-store";
 import { Rail } from "./Rail";
+import { setRefused } from "./refusal-store";
 import { resetWork, watchWork } from "./work-store";
 
 const SOURCES: SourceSummary[] = [
@@ -51,6 +52,7 @@ beforeEach(async () => {
   );
   resetIndex();
   resetWork();
+  setRefused(null);
   setPlace(null);
   await loadIndex();
   await watchWork();
@@ -97,4 +99,32 @@ test("the folded rail keeps the app's own places, each carrying its count", asyn
   await sorting.click();
   expect(getPlace()?.kind).toBe("sorting");
   await expect.element(sorting).toHaveAttribute("aria-current", "true");
+});
+
+test("a refusal stacks above the walk, and dismissing it leaves the walk alone", async () => {
+  const screen = await render(<Foot />);
+  await emit("job-progress", {
+    phase: "working",
+    pending: 4120,
+    running: 0,
+    failed: 0,
+    completed: 6880,
+  });
+  await expect.element(screen.getByText("Indexing 4,120…")).toBeVisible();
+
+  setRefused({ why: "inside", clash: "Pictures", path: "C:UsersadaPicturesTrips" });
+  const band = screen.getByText("That folder is already inside Pictures.");
+  await expect.element(band).toBeVisible();
+  await expect.element(screen.getByText("C:UsersadaPicturesTrips")).toBeVisible();
+
+  // Ordered by permanence from the bottom: the count, the walk, then the band above it.
+  const line = screen.getByText("Indexing 4,120…").element().getBoundingClientRect();
+  const total = screen.getByText("41,239 items · 2 sources").element().getBoundingClientRect();
+  expect(band.element().getBoundingClientRect().top).toBeLessThan(line.top);
+  expect(line.top).toBeLessThan(total.top);
+
+  await screen.getByRole("button", { name: "Dismiss" }).click();
+  await expect.poll(() => inSight(band)).toBe(false);
+  // The walk carries on underneath it.
+  await expect.element(screen.getByText("Indexing 4,120…")).toBeVisible();
 });

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { Tree, type TreeRow } from "../../ui/Tree";
 import { type Place, setPlace, usePlace } from "../place";
+import { addFolder } from "./add-source";
 import { ensureChildren, useIndex } from "./index-store";
 import {
   addFolderRows,
@@ -28,9 +29,9 @@ export function Navigation() {
   }, [expanded]);
 
   if (!sources) return null;
-  if (sources.length === 0) return <NoSources />;
+  if (sources.length === 0) return <NoSources onAdd={() => void addFolder("library")} />;
 
-  const rows: TreeRow[] = [sortingRow(sources), trashRow()];
+  const rows: TreeRow[] = [sortingRow(sources, () => void addFolder("sorting")), trashRow()];
   const places = new Map<string, Place>([
     [SORTING_ID, { kind: "sorting" }],
     [TRASH_ID, { kind: "trash" }],

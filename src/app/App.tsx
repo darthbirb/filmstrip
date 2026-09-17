@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 
 import { SearchStandIn } from "../dev/FrameStandIns";
+import { GlyphButton } from "../ui/GlyphButton";
 import { Frame } from "./frame/Frame";
 import { Grid } from "./grid/Grid";
 import { DEFAULT_LAYOUT } from "./grid/layout";
 import { Notices } from "./grid/Notices";
 import { TileSize } from "./grid/TileSize";
+import { addFolder } from "./navigation/add-source";
 import { Breadcrumb } from "./navigation/Breadcrumb";
 import { Foot } from "./navigation/Foot";
 import { Navigation } from "./navigation/Navigation";
@@ -34,6 +36,13 @@ export function App() {
       <PaneDetailProvider>
         <Frame
           nav={<Navigation />}
+          navControl={
+            <GlyphButton
+              glyph="plus"
+              label="Add a folder"
+              onClick={() => void addFolder("library")}
+            />
+          }
           navFoot={<Foot />}
           navRail={<Rail />}
           navRailFoot={<Foot rail />}

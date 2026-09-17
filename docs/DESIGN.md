@@ -17,6 +17,7 @@ colors:
   line-control-hi: "#3a3a3a"
   line-strong: "#6b6863"
   line-danger: "rgb(194 90 74 / 0.45)"
+  danger-wash: "rgb(194 90 74 / 0.1)"
   fg-hi: "#f4f3f1"
   fg: "#eceae7"
   fg-mid: "#a8a5a0"

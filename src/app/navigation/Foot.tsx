@@ -1,13 +1,17 @@
 import { formatCount } from "../../lib/format";
+import { Band } from "../../ui/Band";
 import { Glyph } from "../../ui/Glyph";
 import { PushDown } from "../../ui/PushDown";
+import { refusalSentence } from "./add-source";
 import { useIndex } from "./index-store";
+import { setRefused, useRefused } from "./refusal-store";
 import { useWork } from "./work-store";
 
 /** The panel's baseline and, above it, the walk in progress. DECISIONS.md "Background work". */
 export function Foot({ rail = false }: { rail?: boolean }) {
   const { sources } = useIndex();
   const { progress } = useWork();
+  const refused = useRefused();
   const held = (sources ?? []).reduce((sum, source) => sum + source.itemCount, 0);
   const count = sources?.length ?? 0;
   const totals = `${formatCount(held)} items · ${formatCount(count)} ${count === 1 ? "source" : "sources"}`;
@@ -18,7 +22,17 @@ export function Foot({ rail = false }: { rail?: boolean }) {
   const percent = done + left > 0 ? Math.round((done / (done + left)) * 100) : 0;
 
   return (
+    // Ordered by permanence from the bottom: the count, the walk, then what waits to be read.
     <div className="shrink-0">
+      <PushDown open={refused !== null}>
+        {refused && (
+          <Band
+            sentence={refusalSentence(refused.why, refused.clash)}
+            path={refused.path}
+            onDismiss={() => setRefused(null)}
+          />
+        )}
+      </PushDown>
       <PushDown open={busy}>
         {rail ? (
           <div className="border-line border-t px-1.5 pt-2 pb-1.5">
