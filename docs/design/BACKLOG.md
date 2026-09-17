@@ -45,34 +45,6 @@ picture. The action menu is already built in `src/ui/Menu.tsx` and the pane's ac
 names what the app can do to a file, so the shape exists; what is undrawn is which of those actions
 a right-click offers, and what a right-click on a *selection* of several tiles offers instead.
 
-## The stand-in cards' glyphs disagree with the empty places on their own sheet · DEFECT
-
-The wording was settled last round; the glyphs were not. Under "Standing in for something" the two
-cards draw `folder-open` and `hard-drives`, where the empty places block draws `folders` and
-`plugs` — and `plugs` and `folders` are what `EmptyPlace.tsx` has built. One sheet, one state, two
-glyphs.
-
-Carry the empty places block's glyphs onto both cards, as the wording already was.
-
-## A source's row while it is being walked is asserted but never drawn · DEFECT
-
-The reason given for the foot of Settings › Sources having no contention is that "a walk in Settings
-is reported on the row it belongs to — the source is already a row there, and its item count is the
-slot the progress goes in". Nothing draws that row. All three rows in the section show a settled
-count, so what replaces the count while a walk runs — a figure climbing, a bar, both — is unknown,
-and it is the fact the whole no-contention argument rests on.
-
-Draw a source's row mid-walk, in the section and at the width it already uses.
-
-## Every Windows path in the artboards renders with doubled separators · DEFECT
-
-`C:\Users\ada\Pictures\Trips` is what the markup holds and what a browser draws, for all eight
-paths on the sheet — the new ones under Sources and the three that were already in Settings. The
-last round reported this fixed; it is not. Cosmetic rather than ambiguous, but a path is the one
-thing this feature is about, and the sheet is where its shape is read from.
-
-Write them with single separators.
-
 ## A folder's details · DRAWN
 
 The grid's header says only where you are. A folder has more to know, and nowhere to show it:
