@@ -65,12 +65,16 @@ export function Pane() {
 
 function Empty({ gone }: { gone: boolean }) {
   return gone ? (
-    <EmptyState glyph="image" title="This file is no longer here." />
+    <EmptyState
+      glyph="image"
+      title="This File Has Gone"
+      note="It was moved or deleted outside the app, so there is nothing left to show."
+    />
   ) : (
     <EmptyState
       glyph="image"
-      title="Click a picture to see it here."
-      note="The pane keeps it while you look elsewhere."
+      title="Nothing Chosen Yet"
+      note="Click a picture and it shows here, and stays while you look elsewhere."
     />
   );
 }

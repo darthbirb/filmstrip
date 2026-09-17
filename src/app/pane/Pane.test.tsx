@@ -72,7 +72,7 @@ beforeEach(async () => {
 test("the pane shows the picture clicked, and the next click replaces it", async () => {
   const screen = await render(<Harness />);
   const pane = screen.getByRole("complementary", { name: "Pane" });
-  await expect.element(pane.getByText("Click a picture to see it here.")).toBeVisible();
+  await expect.element(pane.getByText("Nothing Chosen Yet")).toBeVisible();
 
   const pyramid = screen.getByRole("button", { name: "pyramid.jpg" });
   await pyramid.click();
@@ -168,7 +168,7 @@ test("a picture stands on the panel, with no bars left around it", async () => {
 test("an item that has gone says so", async () => {
   showInPane(9999);
   const screen = await render(<Harness />);
-  await expect.element(screen.getByText("This file is no longer here.")).toBeVisible();
+  await expect.element(screen.getByText("This File Has Gone")).toBeVisible();
 });
 
 test("the filmstrip runs through the place the picture was clicked in, wherever the grid goes", async () => {
