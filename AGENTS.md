@@ -16,6 +16,7 @@ pinned version:
 - `npx --yes pnpm@12.4.1 lint | check | test | test:e2e` — the four frontend gates
 - `npx --yes pnpm@12.4.1 check:docs` — doc pointers resolve and comments stay short
 - `cargo test --manifest-path src-tauri/Cargo.toml` — the Rust gate; CI adds fmt and clippy
+- `npx --yes pnpm@12.4.1 tauri build` — the release app, for the user to try by hand
 
 ## Ports
 
@@ -42,6 +43,11 @@ way a choice is offered.
   then port critically — see `docs/DEVELOPMENT.md` "Porting from ggallery".
 - **Nothing changes the machine.** No global installs, no system settings, no registry. A test
   that seems to need one is reaching too far — say so instead.
+- **Every task ends with a release build**, so the work can be tried by hand against a real
+  library. `bundle.active` is false, so the build is one portable `Filmstrip.exe` and nothing is
+  installed. Copy it over `latest\Filmstrip.exe`, which is ignored by git: the index, the
+  thumbnails and the trash sit in a `data\` folder beside the executable, so keeping one home for
+  it means they survive a `cargo clean` and are not rebuilt from scratch every time.
 - **Verify before claiming.** Run the gates. For anything visual, look at a screenshot rather
   than asserting it works.
 - **A change in behaviour lands with a test that fails without it.** A bug fix starts with the

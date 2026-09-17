@@ -4,6 +4,9 @@ dist/
 src-tauri/target/
 src-tauri/gen/
 
+# The release build kept for trying by hand, and the index, thumbnails and trash beside it.
+latest/
+
 test-results/
 .vitest/
 playwright-report/
