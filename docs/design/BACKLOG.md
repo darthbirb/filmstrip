@@ -49,6 +49,16 @@ without a pointer has no way to any of the five menus.
 
 Draw where a keyboard-opened menu lands against the focused tile or row.
 
+## The way into full screen sits on the wrong side of the pane's header · DEFECT
+
+The pane's header draws the full-screen button beside the button that folds the pane away, at the
+header's right-hand end, so the two controls that do very different things sit together and the one
+that grows the pane points nowhere in particular.
+
+Draw the way into full screen on the opposite side of the header from the fold, and as an arrow that
+says which way it goes. Say what it becomes in full screen, where there is nothing left to fold. The
+old drawing has no such control to borrow from, so this one is drawn from scratch.
+
 ## A button's label is drawn in two cases at once · DEFECT
 
 The Components sheet's own note settles the empty states on Title Case, "the same case the buttons

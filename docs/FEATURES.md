@@ -48,7 +48,7 @@ drawn. **Not started** — neither.
 | Rename a folder, on disk | Not started | |
 | A folder's cover | Not started | `folder.cover_item_id` exists |
 | A folder's status, notes, favourite | Not started | |
-| A folder's labels and flags | Not started | |
+| A folder's labels and tags, inherited by everything under it | Not started | items inherit labels, and never own one |
 | Every item id under a folder | Not started | |
 
 ## Items
@@ -78,14 +78,16 @@ drawn. **Not started** — neither.
 | **Zoom and pan a picture** | Backlogged | "Zoom in the pane" — the one thing missed rather than deferred |
 | Video playback | Built, on the browser's own controls | a plate of its own is drawn, and volume is not yet kept between items |
 | Frame steps and a named speed set | Backlogged | "The video plate…" |
-| Two panes side by side, and more | Not started | ggallery's compare and multi-view |
+| Several items at once, scaled to fit together | Not started | dragging items onto the pane, PRODUCT.md "The three panels" |
+| A folder shown in the pane rather than an item | Not started | its own thing, not a second mode |
+| Tiled compare and multi-view panes | **Dropped on purpose.** The pane has one mode. |
 
 ## Tags and labels
 
 | Capability | Filmstrip | Where |
 | --- | --- | --- |
 | An item's effective tags, inherited live | Built | `item_tags` |
-| Add or remove a tag on an item | Not started | |
+| Add or remove a tag on an item | Not started | an item owns tags only, never a label |
 | A folder's inherited tags | Not started | |
 | What a selection's tags cover | Not started | |
 | The vocabulary, with counts; rename and delete a tag | Not started | |
@@ -112,7 +114,7 @@ drawn. **Not started** — neither.
 
 | Capability | Filmstrip | Where |
 | --- | --- | --- |
-| Export a folder's subtree or a selection as a zip, as a job | Not started | |
+| Export a folder's subtree or a selection as a zip, as a job | Not started | Filmstrip's own change: renaming the files or keeping their own names is chosen at export |
 | An undo journal that survives a restart | Not started | no migration yet |
 | Undo the last batch, or a named one | Not started | |
 
