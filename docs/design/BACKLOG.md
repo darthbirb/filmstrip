@@ -49,6 +49,52 @@ without a pointer has no way to any of the five menus.
 
 Draw where a keyboard-opened menu lands against the focused tile or row.
 
+## A button's label is drawn in two cases at once · DEFECT
+
+The Components sheet's own note settles the empty states on Title Case, "the same case the buttons
+use". The button it draws under that note reads **Add a folder…**, and so does the one on the Pane
+sheet. One of the two is wrong, and every text button in the app takes the answer: the doorways, the
+notices' **Retry These** and **Show The 12**, and the folder buttons a folder of folders offers.
+
+Settle the case for a button's label, say it in the sheet's own words, and redraw every button that
+disagrees with it. The tooltip a glyph button carries is the same question.
+
+## The line under an empty title explains the app to itself · DEFECT
+
+Every empty state is drawn as a title and a sentence under it, and the sentences read as placeholder
+copy: "Add a folder and Filmstrip will read it where it stands.", "Click a picture and it shows here,
+and stays while you look elsewhere.", "Everything that came in has been filed. New files land here as
+they are found.", "Deleted files wait here until you empty it, and can be put back.", "It was moved or
+deleted outside the app, so there is nothing left to show." Settings carries the same voice in "Added
+here, a folder is a library source."
+
+None of them says anything the title and the button beside it do not. Draw the empty states without
+explaining the app: the title, the one move worth offering, and a line only where it carries a fact
+the person cannot see — a count, a name, a path. Where a line has nothing to add, draw none. This
+is a rule for every sentence the app shows, not only the six here.
+
+## Zoom and pan a picture in the pane
+
+ggallery zoomed pictures in the pane and Filmstrip does not, which was an oversight rather than a
+decision. The behaviour ports as it stands, verified against ggallery's own interaction code:
+
+- The wheel zooms about the point under the pointer, starting from the scale the fitted picture is
+  already drawn at, so the first notch out of fit does not jump.
+- A notch is ×1.12 in or ×0.89 out, held between 0.1× and 12×.
+- Dragging pans.
+- Double-click returns to fit, and so does showing another item.
+- Off fit, one small percentage readout appears, which is also the way back to fit; at fit there is
+  no zoom furniture at all.
+
+What is not drawn, and has to be:
+
+- where the readout sits, at the pane's own width and in full screen, and what it looks like over a
+  photograph
+- the pointer: whether it says a picture can be dragged, and whether that changes while it is held
+- whether the keyboard can zoom, and what returns to fit without a pointer
+- whether a video zooms too, or only a picture
+- what a zoomed picture does when the pane is resized, folded, or the item changes
+
 ## A folder's details · DRAWN
 
 The grid's header says only where you are. A folder has more to know, and nowhere to show it:
