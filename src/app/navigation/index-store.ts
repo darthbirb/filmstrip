@@ -4,7 +4,8 @@ import type { FolderNode } from "../../ipc/bindings/FolderNode";
 import type { Progress } from "../../ipc/bindings/Progress";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { folderChildren, listSources } from "../../ipc/commands";
-import { getPlace, setPlace } from "../place";
+import { getPaneOrigin, showInPane } from "../pane/pane-store";
+import { getPlace, type Place, setPlace } from "../place";
 
 /** The index as navigation reads it: the sources, and each folder's children once asked for. */
 type Snapshot = {
@@ -16,11 +17,23 @@ let snapshot: Snapshot = { sources: null, children: new Map() };
 const pending = new Set<number>();
 const listeners = new Set<() => void>();
 
-/** Reads the sources and their top-level folders, and settles on a place if there is none. */
+/** Reads the sources and their top-level folders, then settles where the window is looking. */
 export async function loadIndex() {
   const sources = await listSources();
   publish({ sources, children: new Map() });
   ensureChildren(sources.map((source) => source.rootFolderId));
+  settle(sources);
+}
+
+/**
+ * A source that is gone is left rather than stood in, so nothing waits on a folder that no
+ * longer exists; then an empty window settles on the first library. DECISIONS.md "Places, not queries".
+ */
+function settle(sources: SourceSummary[]) {
+  const held = (place: Place | null) =>
+    place?.kind !== "folder" || sources.some((source) => source.id === place.sourceId);
+  if (!held(getPlace())) setPlace(null);
+  if (!held(getPaneOrigin())) showInPane(null);
   const library = sources.find((source) => source.kind === "library");
   if (getPlace() === null && library) {
     setPlace({
