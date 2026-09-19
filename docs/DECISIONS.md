@@ -53,6 +53,19 @@ restore to put anything back.
 The Sorting Box is the one that is plural. It is several real folders the user nominates, shown
 as one surface — not one directory, and not a view over the index.
 
+**Which `+` was pressed is the kind.** A folder becomes a source through one of two doorways —
+navigation's Library caption, or the Sorting Box's own row — and nothing is asked once the picker
+closes, because the answer was the button. Asking afterwards would mean a dialog after the picker's
+dialog, and asking someone to choose between two words before they have seen either behave;
+Settings › Sources is where a kind is corrected instead. The Sorting Box's `+` rests on its row
+rather than appearing under the pointer, since it is the only way to nominate a sorting folder and a
+hover-only control has no keyboard.
+
+**A refused folder is an answer, not an error.** Four folders are turned away — the same one twice,
+one inside a source, one holding a source, and the app's own — and each says so in a band at the
+foot of the panel the add began from. Nothing is added and no row is selected in its place, because
+selecting the row it overlaps would answer a question nobody asked.
+
 ## Renames made while the app was closed
 
 A directory renamed or moved while the app is closed reads, on the next walk, as one folder

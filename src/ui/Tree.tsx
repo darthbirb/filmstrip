@@ -19,6 +19,8 @@ export type TreeRow = {
   muted?: boolean;
   /** Set apart from the rows above it by a rule. */
   separated?: boolean;
+  /** One thing the row can do, resting at its end: its own tab stop after the row. */
+  action?: { glyph: GlyphName; label: string; onClick: () => void };
 };
 
 type Props = {
@@ -109,6 +111,14 @@ export function Tree({ label, rows, selectedId, onSelect, onExpand, onCollapse }
                 else elements.current.delete(row.id);
               }}
               role="treeitem"
+              // Named explicitly, so a trailing action's own label is not read as the row's.
+              aria-label={[
+                row.label,
+                row.count === undefined ? null : formatCount(row.count),
+                row.detail,
+              ]
+                .filter(Boolean)
+                .join(" ")}
               aria-level={row.level}
               aria-expanded={row.expandable ? Boolean(row.expanded) : undefined}
               aria-selected={selected}
@@ -158,6 +168,26 @@ export function Tree({ label, rows, selectedId, onSelect, onExpand, onCollapse }
                 >
                   {row.detail}
                 </span>
+              )}
+              {/* Drawn at rest rather than on hover: a pointer is not the only way here. */}
+              {row.action && (
+                <button
+                  type="button"
+                  aria-label={row.action.label}
+                  title={row.action.label}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    row.action?.onClick();
+                  }}
+                  onKeyDown={(event) => event.stopPropagation()}
+                  className={`focus-ring -mr-1 grid size-chip shrink-0 place-items-center rounded-nested text-glyph transition-colors duration-(--motion-quick) motion-reduce:transition-none ${
+                    selected
+                      ? "text-on-plate-dim hover:bg-on-plate-wash hover:text-on-plate"
+                      : "text-fg-dim hover:bg-wash hover:text-fg"
+                  }`}
+                >
+                  <Glyph name={row.action.glyph} />
+                </button>
               )}
             </div>
           </Fragment>

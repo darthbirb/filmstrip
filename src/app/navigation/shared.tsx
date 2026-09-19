@@ -1,5 +1,7 @@
 import type { FolderNode } from "../../ipc/bindings/FolderNode";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
+import { EmptyState } from "../../ui/EmptyState";
+import { Glyph } from "../../ui/Glyph";
 import type { TreeRow } from "../../ui/Tree";
 import type { Crumb, Place } from "../place";
 
@@ -20,7 +22,7 @@ export function sourcePlace(source: SourceSummary): Place {
 }
 
 /** The Sorting Box: every sorting source shown as one place, counted together. */
-export function sortingRow(sources: SourceSummary[]): TreeRow {
+export function sortingRow(sources: SourceSummary[], onNominate?: () => void): TreeRow {
   const waiting = sources
     .filter((source) => source.kind === "sorting")
     .reduce((sum, source) => sum + source.itemCount, 0);
@@ -31,6 +33,10 @@ export function sortingRow(sources: SourceSummary[]): TreeRow {
     expandable: false,
     glyph: "sortingBox",
     count: waiting > 0 ? waiting : undefined,
+    // Which + was pressed is what decides a source's kind, so this one is never hidden.
+    action: onNominate
+      ? { glyph: "plus", label: "Nominate a folder", onClick: onNominate }
+      : undefined,
   };
 }
 
@@ -96,6 +102,22 @@ export function rowFolder(id: string) {
   return id.startsWith("folder-") ? Number(id.slice("folder-".length)) : undefined;
 }
 
-export function NoSources() {
-  return <p className="px-3 py-2 text-fg-dim text-ui">No sources yet.</p>;
+/** The doorway, where the tree will be. A folder is read where it stands, never moved. */
+export function NoSources({ onAdd }: { onAdd: () => void }) {
+  return (
+    <EmptyState
+      glyph="folders"
+      title="No Sources Yet"
+      note="Add a folder and Filmstrip will read it where it stands."
+    >
+      <button
+        type="button"
+        onClick={onAdd}
+        className="focus-ring flex h-control items-center gap-1.5 rounded-control bg-raised px-2.5 text-fg text-ui inset-ring inset-ring-line-control transition-colors duration-(--motion-quick) hover:bg-raised-hi motion-reduce:transition-none"
+      >
+        <Glyph name="plus" className="text-fg-dim text-glyph" />
+        Add a folder…
+      </button>
+    </EmptyState>
+  );
 }

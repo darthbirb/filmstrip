@@ -7,6 +7,8 @@ import { useFrameLayout } from "./useFrameLayout";
 /** What fills the frame. Each region belongs to a later slice. */
 export type Regions = {
   nav?: ReactNode;
+  /** Beside navigation's caption, in its header row. */
+  navControl?: ReactNode;
   /** Navigation's foot, its folded rail, and that foot's narrower shape. */
   navFoot?: ReactNode;
   navRail?: ReactNode;
@@ -28,6 +30,7 @@ export type Regions = {
 /** Navigation, the grid and the pane as docked columns, each with its own header row. DECISIONS.md "The frame". */
 export function Frame({
   nav,
+  navControl,
   navFoot,
   navRail,
   navRailFoot,
@@ -50,6 +53,7 @@ export function Frame({
       <SidePanel
         layout={layout}
         side="nav"
+        headerControl={navControl}
         foot={navFoot}
         rail={navRail}
         railFoot={navRailFoot}

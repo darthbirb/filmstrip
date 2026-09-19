@@ -6,13 +6,14 @@ use std::path::{Component, Path, PathBuf};
 use rusqlite::Connection;
 use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
+use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 use ts_rs::TS;
 
 use crate::db::folders::{self, FolderNode};
 use crate::db::items::{self, ItemDetail, ItemRow};
 use crate::db::jobs::{self as job_table, Failure};
-use crate::db::sources::{self, Source, SourceKind};
+use crate::db::sources::{self, Refusal, Source, SourceKind};
 use crate::db::tags::{self, EffectiveTag};
 use crate::error::{AppError, Result};
 use crate::fs::paths;
@@ -22,6 +23,17 @@ pub struct AppState {
     pub db: PathBuf,
     pub thumbs: PathBuf,
     pub queue: JobQueue,
+}
+
+/// What came of offering the app a folder. A refusal is an answer, not an error:
+/// nothing is added, nothing is selected, and the band says which of the four it
+/// was. DECISIONS.md "Places, not queries".
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(export)]
+pub enum AddOutcome {
+    Added { source: Source },
+    Refused { why: Refusal, clash: Option<String> },
 }
 
 /// A source as the navigation and Settings show it.
@@ -43,6 +55,20 @@ pub async fn list_sources(state: State<'_, AppState>) -> Result<Vec<SourceSummar
     run(&state, source_summaries).await
 }
 
+/// The system's own picker, which the app adds no step of its own to. `None` is a
+/// cancelled picker, which is not an error and is not reported.
+#[tauri::command]
+pub async fn pick_folder(app: AppHandle) -> Result<Option<String>> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.dialog().file().pick_folder(move |picked| {
+        let _ = tx.send(picked);
+    });
+    let picked = tauri::async_runtime::spawn_blocking(move || rx.recv())
+        .await?
+        .map_err(AppError::invalid)?;
+    Ok(picked.map(|path| path.to_string()))
+}
+
 #[tauri::command]
 pub async fn add_source(
     app: AppHandle,
@@ -50,17 +76,49 @@ pub async fn add_source(
     root: String,
     kind: SourceKind,
     title: Option<String>,
-) -> Result<Source> {
+) -> Result<AddOutcome> {
     let app_dir = crate::config::app_dir()?;
-    let source = run(&state, move |conn| {
+    let outcome = run(&state, move |conn| {
         in_transaction(conn, |tx| {
             register_source(tx, &root, kind, title.as_deref(), &app_dir)
         })
     })
     .await?;
-    app.asset_protocol_scope()
-        .allow_directory(&source.root, true)?;
-    Ok(source)
+    if let AddOutcome::Added { source } = &outcome {
+        app.asset_protocol_scope()
+            .allow_directory(&source.root, true)?;
+    }
+    Ok(outcome)
+}
+
+#[tauri::command]
+pub async fn rename_source(state: State<'_, AppState>, id: i64, title: String) -> Result<()> {
+    run(&state, move |conn| {
+        in_transaction(conn, |tx| sources::rename(tx, id, &title))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn set_source_kind(state: State<'_, AppState>, id: i64, kind: SourceKind) -> Result<()> {
+    run(&state, move |conn| {
+        in_transaction(conn, |tx| sources::set_kind(tx, id, kind))
+    })
+    .await
+}
+
+/// A source's own folder in Explorer. An offline source has none to open.
+#[tauri::command]
+pub async fn reveal_source(app: AppHandle, state: State<'_, AppState>, id: i64) -> Result<()> {
+    let root = run(&state, move |conn| {
+        sources::get(conn, id)?
+            .map(|source| source.root)
+            .ok_or_else(|| AppError::invalid("that source is no longer in the index"))
+    })
+    .await?;
+    app.opener()
+        .reveal_item_in_dir(root)
+        .map_err(AppError::invalid)
 }
 
 #[tauri::command]
@@ -249,8 +307,11 @@ pub fn register_source(
     kind: SourceKind,
     title: Option<&str>,
     app_dir: &Path,
-) -> Result<Source> {
-    let root = checked_root(conn, raw_root, app_dir)?;
+) -> Result<AddOutcome> {
+    let root = match checked_root(conn, raw_root, app_dir)? {
+        Ok(root) => root,
+        Err(refused) => return Ok(refused),
+    };
     let title = match title.map(str::trim) {
         Some(title) if !title.is_empty() => title.to_string(),
         _ => root.file_name().map_or_else(
@@ -258,12 +319,19 @@ pub fn register_source(
             |name| name.to_string_lossy().into_owned(),
         ),
     };
-    sources::add(conn, &root, &title, kind)
+    Ok(AddOutcome::Added {
+        source: sources::add(conn, &root, &title, kind)?,
+    })
 }
 
-/// An existing absolute directory, clear of every registered source and of the
-/// app's own folder. Reads the disk; never writes to it.
-fn checked_root(conn: &Connection, raw: &str, app_dir: &Path) -> Result<PathBuf> {
+/// An existing absolute directory, clear of every registered source and of the app's
+/// own folder. The four a picker can hand over come back as a refusal to show; the
+/// three it cannot produce — a relative path, a `..`, a file — stay errors.
+fn checked_root(
+    conn: &Connection,
+    raw: &str,
+    app_dir: &Path,
+) -> Result<std::result::Result<PathBuf, AddOutcome>> {
     let root = PathBuf::from(raw.trim());
     if !root.is_absolute() {
         return Err(AppError::invalid(
@@ -281,18 +349,18 @@ fn checked_root(conn: &Connection, raw: &str, app_dir: &Path) -> Result<PathBuf>
     }
     let root: PathBuf = root.components().collect();
     if paths::same_dir(&root, app_dir) || paths::contains(app_dir, &root) {
-        return Err(AppError::invalid(
-            "a source may not sit inside the app folder",
-        ));
+        return Ok(Err(AddOutcome::Refused {
+            why: Refusal::AppFolder,
+            clash: None,
+        }));
     }
-    if let Some(clash) = sources::nesting_conflict(&sources::list(conn)?, &root) {
-        return Err(AppError::invalid(format!(
-            "{} overlaps the source {}",
-            root.display(),
-            clash.title
-        )));
+    if let Some((why, clash)) = sources::nesting_conflict(&sources::list(conn)?, &root) {
+        return Ok(Err(AddOutcome::Refused {
+            why,
+            clash: Some(clash.title.clone()),
+        }));
     }
-    Ok(root)
+    Ok(Ok(root))
 }
 
 #[cfg(test)]
@@ -324,8 +392,16 @@ mod tests {
         conn
     }
 
-    fn register(conn: &Connection, dir: &Path, app: &Path) -> Result<Source> {
+    fn register(conn: &Connection, dir: &Path, app: &Path) -> Result<AddOutcome> {
         register_source(conn, dir.to_str().unwrap(), SourceKind::Library, None, app)
+    }
+
+    /// The source a taken folder produced; a refusal here is the test failing.
+    fn added(outcome: AddOutcome) -> Source {
+        match outcome {
+            AddOutcome::Added { source } => source,
+            AddOutcome::Refused { why, clash } => panic!("refused as {why:?} against {clash:?}"),
+        }
     }
 
     #[test]
@@ -336,10 +412,11 @@ mod tests {
         std::fs::create_dir_all(base.join("dump")).unwrap();
         let conn = conn();
 
-        let plain = register(&conn, &base.join("Holiday Pics"), &app).unwrap();
+        let plain = added(register(&conn, &base.join("Holiday Pics"), &app).unwrap());
         let dump = format!("{}/", base.join("dump").display());
-        let named =
-            register_source(&conn, &dump, SourceKind::Sorting, Some("  Incoming "), &app).unwrap();
+        let named = added(
+            register_source(&conn, &dump, SourceKind::Sorting, Some("  Incoming "), &app).unwrap(),
+        );
 
         assert_eq!(plain.title, "Holiday Pics");
         assert_eq!(named.title, "Incoming");
@@ -374,16 +451,30 @@ mod tests {
         let conn = conn();
         register(&conn, &library, &app).unwrap();
 
-        for dir in [
-            library.join("inner"),
-            library.clone(),
-            app.join("data"),
-            app.clone(),
+        // Each says which of the four it was, since each has its own sentence in the band.
+        let outside = base.join("outside");
+        std::fs::create_dir_all(&outside).unwrap();
+        for (dir, why, clash) in [
+            (library.join("inner"), Refusal::Inside, Some("library")),
+            (library.clone(), Refusal::Same, Some("library")),
+            (base.clone(), Refusal::Contains, Some("library")),
+            (app.join("data"), Refusal::AppFolder, None),
+            (app.clone(), Refusal::AppFolder, None),
         ] {
-            let outcome = register(&conn, &dir, &app);
-            assert!(outcome.is_err(), "{} should be refused", dir.display());
+            let outcome = register(&conn, &dir, &app).unwrap();
+            let AddOutcome::Refused {
+                why: got,
+                clash: against,
+            } = outcome
+            else {
+                panic!("{} should be refused", dir.display());
+            };
+            assert_eq!(got, why, "{} refused for the wrong reason", dir.display());
+            assert_eq!(against.as_deref(), clash, "{}", dir.display());
         }
-        assert_eq!(sources::list(&conn).unwrap().len(), 1);
+        // A folder that overlaps nothing is still taken, so the refusals are not a blanket no.
+        added(register(&conn, &outside, &app).unwrap());
+        assert_eq!(sources::list(&conn).unwrap().len(), 2);
     }
 
     #[test]

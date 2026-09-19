@@ -7,6 +7,7 @@ import { render } from "vitest-browser-react";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { Grid } from "../grid/Grid";
 import { DEFAULT_LAYOUT } from "../grid/layout";
+import { loadIndex, resetIndex } from "../navigation/index-store";
 import { setPlace } from "../place";
 import { getPreferences, updatePreferences, usePreferences } from "../preferences";
 import { Settings } from "./Settings";
@@ -146,4 +147,70 @@ test("Settings fits the smallest window at the largest interface size", async ()
   expect(box.top).toBeGreaterThanOrEqual(0);
   expect(box.right).toBeLessThanOrEqual(640);
   expect(box.bottom).toBeLessThanOrEqual(480);
+});
+
+const SOURCES = [
+  {
+    id: 1,
+    root: "D:Pictures",
+    title: "Pictures",
+    kind: "library" as const,
+    addedAt: 0,
+    rootFolderId: 1,
+    reachable: true,
+    itemCount: 6,
+    totalBytes: 0,
+  },
+  {
+    id: 2,
+    root: "E:Archive",
+    title: "Archive",
+    kind: "library" as const,
+    addedAt: 0,
+    rootFolderId: 2,
+    reachable: false,
+    itemCount: 0,
+    totalBytes: 0,
+  },
+];
+
+/** Settings open on Sources, against two folders: one read, one on a drive that is away. */
+async function onSources() {
+  mockIPC(
+    (cmd) => {
+      if (cmd === "list_sources") return SOURCES;
+      if (cmd === "folder_items") return items;
+      return undefined;
+    },
+    { shouldMockEvents: true },
+  );
+  resetIndex();
+  await loadIndex();
+  const screen = await render(<Harness />);
+  await screen.getByRole("button", { name: "Sources" }).click();
+  return screen.getByRole("region", { name: "Sources" });
+}
+
+// These replace the dev mock's library, so they stay last.
+test("Sources lists every folder read, and an offline one keeps remove but loses reveal", async () => {
+  const section = await onSources();
+
+  // Its path, its count and its kind: what only a source has.
+  await expect.element(section.getByText("D:Pictures")).toBeVisible();
+  await expect.element(section.getByText("6 items")).toBeVisible();
+  await expect.element(section.getByRole("radio", { name: "Library" }).first()).toBeChecked();
+
+  await expect.element(section.getByRole("button", { name: "Reveal Pictures" })).toBeVisible();
+  await expect.element(section.getByRole("button", { name: "Remove Pictures" })).toBeVisible();
+  // The folder is not there to open, so the reveal goes and the remove stays.
+  expect(section.getByRole("button", { name: "Reveal Archive" }).elements()).toHaveLength(0);
+  await expect.element(section.getByRole("button", { name: "Remove Archive" })).toBeVisible();
+});
+
+test("a source's name is a field where it stands, with no button of its own", async () => {
+  const section = await onSources();
+
+  expect(section.getByRole("button", { name: /^Rename/ }).elements()).toHaveLength(0);
+  await section.getByRole("button", { name: "Pictures" }).click();
+  await expect.element(section.getByRole("textbox", { name: "Rename Pictures" })).toBeVisible();
 });

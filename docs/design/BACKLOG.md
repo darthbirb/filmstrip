@@ -4,6 +4,11 @@ What the next Claude Design pass should draw. Each entry is one issue and the fi
 for it; once the fix is drawn and built, the entry is deleted. An entry marked **DRAWN** has
 been through a pass already and is waiting to be built, so it does not need drawing again.
 
+An entry marked **DEFECT** is a fault in what a pass drew — a contradiction between two sheets, a
+drawing that disagrees with what is already built, or a state that was never drawn at all. Defects
+are drawn before anything else and nothing is built from a sheet that carries one: a surface built
+from an incomplete drawing is built twice.
+
 "The old drawing" is `old-ggallery-design.html` in this folder. Where an entry borrows from it,
 take its structure and behaviour, and fit its values to the current token sheet: Plex, Phosphor,
 the red focus ring, the white in-pane mark.
@@ -11,25 +16,7 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## Nothing adds a source, and only the doorway is drawn
-
-The app cannot be used at all: `add_source` and `remove_source` exist in Rust and are tested, but
-nothing in the interface calls either, so a real library can never be pointed at. Navigation's
-no-sources state is a bare line of text where the components sheet draws the doorway properly —
-a glyph, "No sources yet.", "Add a folder and Filmstrip will read it where it stands." and an
-**Add a folder…** button.
-
-Build the drawn empty state as it stands. What is undrawn, and what this entry asks for:
-
-- **What Add a folder… opens.** Presumably the system's own folder picker, which needs a plugin the
-  app does not have yet. Say whether it is that or something of the app's own.
-- **How a source's kind is chosen.** `SourceKind` is `library` or `sorting`, and DECISIONS.md
-  "Places, not queries" says the Sorting Box is "several real folders the user nominates" — so
-  nominating one has to be possible somewhere, and nothing draws where.
-- **Where sources are managed afterwards.** Settings has one section, Appearance. Removing a source,
-  renaming it, and seeing that one is offline all have nowhere to happen.
-
-## Right-click is the browser's menu
+## Right-click is the browser's menu · DRAWN
 
 Right-clicking anywhere offers Edge's own menu — print, copy link to highlight, and the rest — which
 says plainly that this is a web page. Suppressing it is a fix and needs no drawing, but it leaves
@@ -71,7 +58,7 @@ to jump anywhere; the position is the information. Investigate whether it replac
 scrollbar or sits beside it. The pass that drew it recommends building the other ten first, and
 only building this if the largest folders still feel unnavigable afterwards.
 
-## The video plate draws its glyphs at two sizes, and neither is in the scale
+## The video plate draws its glyphs at two sizes, and neither is in the scale · DRAWN
 
 The frame steps and the mute are `0.8125rem` in the plate drawn at the pane's own width and
 `0.875rem` in the wide rows beside it — the same two controls, drawn at two sizes. Neither size is
@@ -82,7 +69,7 @@ artboard sheets, and `0.8125rem` about seven, including in the controls this pas
 Pick one size for the plate's glyphs, and either move every glyph onto a size the scale names or
 add the missing sizes to the token sheet and say which surfaces use them.
 
-## The narrow video plate drops the total time, and no rule says it may
+## The narrow video plate drops the total time, and no rule says it may · DRAWN
 
 The plate at the pane's own width reads `0:03`; every wider plate reads `0:03 / 0:12`. The block
 gives the order things leave — the speed first, then the frame steps, then the mute — and says play,

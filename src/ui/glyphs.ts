@@ -33,6 +33,8 @@ export const GLYPHS = {
   copy: { icon: "copy", code: 0xe1ca },
   openExternal: { icon: "arrow-square-out", code: 0xe5de },
   more: { icon: "dots-three", code: 0xe1fe },
+  plus: { icon: "plus", code: 0xe3d4 },
+  minusCircle: { icon: "minus-circle", code: 0xe32c },
 } as const;
 
 export type GlyphName = keyof typeof GLYPHS;

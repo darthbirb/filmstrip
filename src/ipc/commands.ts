@@ -1,12 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
-
+import type { AddOutcome } from "./bindings/AddOutcome";
 import type { EffectiveTag } from "./bindings/EffectiveTag";
 import type { Failure } from "./bindings/Failure";
 import type { FolderNode } from "./bindings/FolderNode";
 import type { ItemDetail } from "./bindings/ItemDetail";
 import type { ItemRow } from "./bindings/ItemRow";
 import type { Progress } from "./bindings/Progress";
-import type { Source } from "./bindings/Source";
 import type { SourceKind } from "./bindings/SourceKind";
 import type { SourceSummary } from "./bindings/SourceSummary";
 
@@ -19,7 +18,17 @@ export type AppError = { kind: "io" | "db" | "json" | "invalid" | "media"; messa
 export const listSources = () => invoke<SourceSummary[]>("list_sources");
 
 export const addSource = (root: string, kind: SourceKind, title?: string) =>
-  invoke<Source>("add_source", { root, kind, title });
+  invoke<AddOutcome>("add_source", { root, kind, title });
+
+export const pickFolder = () => invoke<string | null>("pick_folder");
+
+export const renameSource = (id: number, title: string) =>
+  invoke<void>("rename_source", { id, title });
+
+export const setSourceKind = (id: number, kind: SourceKind) =>
+  invoke<void>("set_source_kind", { id, kind });
+
+export const revealSource = (id: number) => invoke<void>("reveal_source", { id });
 
 export const removeSource = (id: number) => invoke<void>("remove_source", { id });
 
