@@ -16,16 +16,38 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## Right-click is the browser's menu · DRAWN
+## The app's own right-click menus · DRAWN
 
-Right-clicking anywhere offers Edge's own menu — print, copy link to highlight, and the rest — which
-says plainly that this is a web page. Suppressing it is a fix and needs no drawing, but it leaves
-the question of what should be there instead.
+The browser's menu is now suppressed everywhere but in a field, as the drawing says, so right-clicking
+a tile or a row opens nothing. The app's own five menus are drawn and wait on the three defects below.
 
-Draw whether the app has a context menu at all and, if so, on what: a tile, a tree row, the pane's
-picture. The action menu is already built in `src/ui/Menu.tsx` and the pane's action bar already
-names what the app can do to a file, so the shape exists; what is undrawn is which of those actions
-a right-click offers, and what a right-click on a *selection* of several tiles offers instead.
+## The right-click menus and the pane's bar name the open verb differently · DEFECT
+
+The menus' own rule is that every row is already a button in the pane's bar or a row in its ⋯, in the
+same order. The two sheets disagree on the words. Components draws **Open With…** and **Reveal In
+Explorer**; the Pane sheet draws the bar's button and ⋯ row as **Open with the default app** and
+**Reveal in Explorer**, which is what is built. It is two differences, and both carry weight: an
+ellipsis promises a chooser, where the built verb opens the default app with no question asked, and the
+same `Menu.tsx` draws both menus, in two different cases.
+
+Settle one verb and one case, and carry them on both sheets.
+
+## Rename on a tree row has nowhere to happen · DEFECT
+
+The folder row's menu and the source row's menu both offer **Rename**. Every other rename is drawn: a
+tile's goes to the pane's Name row, and Settings renames a source by making its name a field where it
+stands. Nothing draws a tree row being renamed — whether the row itself becomes a field, whether it
+sends the person to Settings, or something else.
+
+Draw a tree row being renamed.
+
+## A menu opened from the keyboard is undrawn · DEFECT
+
+The Notes list "what the menu key and Shift+F10 open" as open, and the right-click block never mentions
+the keyboard. With the browser's menu suppressed, those two keys now open nothing at all, so a person
+without a pointer has no way to any of the five menus.
+
+Draw where a keyboard-opened menu lands against the focused tile or row.
 
 ## A folder's details · DRAWN
 
