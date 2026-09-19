@@ -2,7 +2,6 @@ import type { FolderNode } from "../../ipc/bindings/FolderNode";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { Button } from "../../ui/Button";
 import { EmptyState } from "../../ui/EmptyState";
-import { Glyph } from "../../ui/Glyph";
 import type { TreeRow } from "../../ui/Tree";
 import type { Crumb, Place } from "../place";
 

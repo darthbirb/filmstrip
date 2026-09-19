@@ -5,9 +5,6 @@ import { RailButton } from "../../ui/RailButton";
 import { Splitter } from "../../ui/Splitter";
 import type { FrameLayout, Side } from "./useFrameLayout";
 
-// Half a pixel at the usual text size: rounding, not a real need for more room.
-const TOLERANCE = 0.03;
-
 // One glyph for both panels, mirrored for the pane; whether it is pressed says which way it acts.
 const COPY = {
   nav: {
@@ -68,7 +65,6 @@ export function SidePanel({
   const Region = side === "nav" ? "nav" : "aside";
   const regionRef = useRef<HTMLElement>(null);
   const faceRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const [sizing, setSizing] = useState(false);
   const folded = layout.folded[side];
   const open = layout.open === side;
@@ -81,7 +77,7 @@ export function SidePanel({
   const held = folded ? "var(--spacing-rail)" : own;
   const grows = layout.settled && !sizing;
 
-  useFloor(layout, side, faceRef, scrollRef, !folded && !full);
+  useFloor(layout, side, faceRef, !folded && !full);
 
   const body = (
     <>
@@ -103,9 +99,7 @@ export function SidePanel({
           />
         )}
       </div>
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
-        {children}
-      </div>
+      <div className="min-h-0 flex-1 overflow-auto">{children}</div>
       {foot}
     </>
   );
@@ -222,7 +216,7 @@ function Layer({ ref, shown, width, side, settled, center, children }: LayerProp
       ref={ref}
       inert={!shown}
       style={side === "nav" ? { width, left: 0 } : { width, right: 0 }}
-      className={`absolute inset-y-0 flex min-w-min flex-col ${center ? "items-center" : ""} ${
+      className={`absolute inset-y-0 flex flex-col ${center ? "items-center" : ""} ${
         shown ? "visible opacity-100" : "invisible opacity-0"
       } ${
         settled
@@ -236,37 +230,67 @@ function Layer({ ref, shown, width, side, settled, center, children }: LayerProp
 }
 
 /**
- * What the panel holds is its own floor: a face held open past the width asked for, or content
- * that has overflowed the scroller, is room the panel may not take back. DECISIONS.md "The frame".
+ * A button's label is the one thing in a panel that may not be cut, so how much of one is cut
+ * right now is how much narrower than its content the panel has been made — and its floor is the
+ * width where nothing is. The floor only ever rises while the panel holds the same thing; a floor
+ * that fell as soon as it was met would fight the pointer. DECISIONS.md "The frame".
  */
 function useFloor(
   layout: FrameLayout,
   side: Side,
   faceRef: RefObject<HTMLDivElement | null>,
-  scrollRef: RefObject<HTMLDivElement | null>,
   docked: boolean,
 ) {
-  const asked = layout.asked[side];
   const setFloor = layout.setFloor;
   useEffect(() => {
     const face = faceRef.current;
-    const scroller = scrollRef.current;
-    if (!docked || !face || !scroller) {
+    if (!docked || !face) {
       setFloor(side, 0);
       return;
     }
+    // A 1rem probe resizes when the root font size does, which no element here would report.
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:absolute;visibility:hidden;width:1rem;height:0";
+    document.body.append(probe);
+    let held = 0;
+    let queued = 0;
     const measure = () => {
-      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
-      const needed = Math.max(face.getBoundingClientRect().width, scroller.scrollWidth) / rem;
-      setFloor(side, needed > asked + TOLERANCE ? needed : 0);
+      queued = 0;
+      const rem = probe.getBoundingClientRect().width;
+      const panel = face.getBoundingClientRect().width;
+      let needed = 0;
+      for (const label of face.querySelectorAll("button .truncate")) {
+        // Only a label with something cut off it has anything to say about the width.
+        const cut = label.scrollWidth - label.clientWidth;
+        if (cut > 0) needed = Math.max(needed, panel + cut);
+      }
+      if (rem > 0 && needed > held) {
+        held = needed;
+        setFloor(side, held / rem);
+      }
     };
-    const observer = new ResizeObserver(measure);
-    observer.observe(face);
-    observer.observe(scroller);
-    for (const child of scroller.children) observer.observe(child);
+    // Measuring twice in a frame costs two layouts and answers the same, so one is enough.
+    const later = () => {
+      if (!queued) queued = requestAnimationFrame(measure);
+    };
+    // Different content needs a different width, so the floor starts again with it.
+    const content = new MutationObserver(() => {
+      held = 0;
+      setFloor(side, 0);
+      later();
+    });
+    content.observe(face, { childList: true, subtree: true, characterData: true });
+    const size = new ResizeObserver(later);
+    size.observe(probe);
+    size.observe(face);
     measure();
-    return () => observer.disconnect();
-  }, [side, asked, docked, faceRef, scrollRef, setFloor]);
+    return () => {
+      cancelAnimationFrame(queued);
+      content.disconnect();
+      size.disconnect();
+      probe.remove();
+    };
+  }, [side, docked, faceRef, setFloor]);
 }
 
 /** Closes an open panel when the pointer goes down anywhere but on it. */

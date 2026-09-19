@@ -1,35 +1,58 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
-/** With no sources, navigation draws its doorway: a button whose label is the widest thing it holds. */
-test("navigation stops at what it holds rather than cutting into a button", async ({ page }) => {
+const NAV = 'nav[aria-label="Navigation"]';
+
+/** Drags the splitter left in small steps, reporting how wide navigation was after each one. */
+async function dragNarrower(page: Page, steps: number) {
+  const splitter = page.getByRole("separator", { name: "Resize navigation" });
+  const grip = await splitter.boundingBox();
+  if (!grip) throw new Error("navigation has no splitter");
+  const width = () =>
+    page.evaluate(
+      (selector) =>
+        Math.round(document.querySelector(selector)?.getBoundingClientRect().width ?? 0),
+      NAV,
+    );
+
+  await page.mouse.move(grip.x + 2, grip.y + 200);
+  await page.mouse.down();
+  const seen: number[] = [];
+  for (let step = 0; step < steps; step++) {
+    await page.mouse.move(grip.x - step * 10, grip.y + 200);
+    await page.waitForTimeout(50);
+    seen.push(await width());
+  }
+  await page.mouse.up();
+  return seen;
+}
+
+test("a panel being dragged narrower never pushes back", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  await expect(page.getByRole("treeitem", { name: "Pictures" })).toBeVisible();
+
+  // A width that grows while the pointer only ever moves left is the panel fighting it.
+  const seen = await dragNarrower(page, 18);
+  const pushes = seen.filter((width, at) => at > 0 && width > (seen[at - 1] ?? 0) + 1);
+  expect(pushes, `widths: ${seen.join(",")}`).toEqual([]);
+  expect(seen.at(-1)).toBeLessThan(seen[0] ?? 0);
+});
+
+test("the doorway keeps its whole label at the narrowest navigation", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/?no-sources");
-  const nav = page.getByRole("navigation", { name: "Navigation" });
-  const add = nav.getByRole("button", { name: "Add a folder…" });
+  const add = page.getByRole("button", { name: "Add a folder…" });
   await expect(add).toBeVisible();
 
-  // Home on the splitter asks for the narrowest navigation the tokens allow, which is narrower
-  // than the doorway needs; the panel is expected to stop at the doorway instead.
-  await page.getByRole("separator", { name: "Resize navigation" }).focus();
-  await page.keyboard.press("Home");
-  await page.waitForTimeout(300);
-
-  const narrow = await nav.evaluate((panel) => {
-    const face = panel.querySelector("div") as HTMLElement;
-    const button = [...panel.querySelectorAll("button")].find((control) =>
-      control.textContent?.includes("Add a folder"),
-    ) as HTMLElement;
-    const label = button.querySelector(".truncate") as HTMLElement;
+  await dragNarrower(page, 18);
+  const label = await add.evaluate((button) => {
+    const text = button.querySelector(".truncate") as HTMLElement;
     return {
-      panel: panel.getBoundingClientRect().width,
-      needed: face.getBoundingClientRect().width,
+      cut: text.scrollWidth - text.clientWidth,
       height: button.getBoundingClientRect().height,
-      cut: label.scrollWidth - label.clientWidth,
     };
   });
 
-  // Nothing of what it holds is clipped, the label is whole, and it sits on one line.
-  expect(narrow.panel).toBeGreaterThanOrEqual(narrow.needed);
-  expect(narrow.cut).toBeLessThanOrEqual(0);
-  expect(narrow.height).toBeLessThan(40);
+  expect(label.cut, "nothing is cut off the label").toBeLessThanOrEqual(0);
+  expect(label.height, "the label is on one line").toBeLessThan(40);
 });

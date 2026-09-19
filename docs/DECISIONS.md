@@ -214,12 +214,14 @@ navigation, and the grid never does. A folded panel leaves a rail at the window'
 button opens the panel over the grid until Escape or a click elsewhere. A panel hidden by hand
 behaves the same way.
 
-**A panel never gets narrower than what it holds.** A label wrapping inside a button is the
+**A panel never gets narrower than a button's label.** A label wrapping inside a button is the
 window saying it ran out of room, which the frame is supposed to have decided already. So a
-button's label never wraps, and each panel's own content sets a floor under the width the
-splitter asks for: it reports what it needs, the splitter stops there, and the frame counts that
-floor when it decides whether the panel still fits. The token minimum is the floor's own floor,
-not the answer.
+button's label never wraps: it ends in an ellipsis instead, and the panel around it stops before
+that. How much of a label is cut right now is how much narrower than its content the panel has
+been made, which is what the panel measures. A floor that fell again the moment it was met would
+fight the pointer, so within the same content the floor only ever rises, and it starts over when
+the content or the text size changes. Nothing else in a panel sets a floor: a row's name, a path
+and a count are all free to be cut, and say so by truncating.
 
 **Clicking a picture opens the pane** when it is folded or hidden, since showing something in a
 pane nobody can see does nothing: it docks where it fits, and opens over the grid where it does

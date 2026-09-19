@@ -3,7 +3,6 @@ import { useEffect } from "react";
 import { formatCount } from "../../lib/format";
 import { Button } from "../../ui/Button";
 import { EmptyState } from "../../ui/EmptyState";
-import { Glyph } from "../../ui/Glyph";
 import { ensureChildren, useIndex } from "../navigation/index-store";
 import { type Place, setPlace } from "../place";
 
