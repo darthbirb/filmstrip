@@ -187,6 +187,13 @@ column, the same reason search is there.
 Drawing our own buttons costs two things a native title bar has: the snap-layout panel on
 hovering maximise, and the system menu on right-clicking the bar.
 
+**Nothing selects and nothing offers the browser's menu, except a field.** A drag across the
+window highlighted words in blue and a right-click offered to print or copy a link to a highlight —
+both said, plainly, that this was a web page. So `body` does not select, and the page's own menu is
+turned off everywhere but in a field, where cut, copy, paste and the spell-checker live and the app
+does not reimplement them. A field keeps its own text whatever it sits in. The pane's details do
+not select either: the drawing names fields as the only exception, and copying a file is the bar's.
+
 **The 640×480 minimum holds**: the bar, the grid's header and the Settings dialog fit it at
 200%, as the tests measure. Whether a smaller window would also hold is not yet measured.
 

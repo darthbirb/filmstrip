@@ -133,7 +133,7 @@ export function Tree({ label, rows, selectedId, onSelect, onExpand, onCollapse }
                 if (row.expandable) toggle(row);
               }}
               onKeyDown={(event) => onKeyDown(event, index)}
-              className={`focus-ring mx-row-inset flex h-row shrink-0 cursor-default select-none items-center gap-2 rounded-control pr-2 pl-1 text-row transition-colors duration-(--motion-quick) motion-reduce:transition-none ${tone}`}
+              className={`focus-ring mx-row-inset flex h-row shrink-0 cursor-default items-center gap-2 rounded-control pr-2 pl-1 text-row transition-colors duration-(--motion-quick) motion-reduce:transition-none ${tone}`}
             >
               <span
                 aria-hidden="true"
