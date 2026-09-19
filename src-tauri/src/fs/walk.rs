@@ -167,34 +167,53 @@ fn record_file(conn: &Connection, file: &Path, folder_id: i64, source_id: i64) -
 
 /// Brings the index back in line with what is on disk.
 pub fn reconcile(conn: &Connection) -> Result<WalkReport> {
+    reconcile_list(conn, sources::list(conn)?)
+}
+
+/// The pass itself, over the sources it listed when it started.
+fn reconcile_list(conn: &Connection, listed: Vec<sources::Source>) -> Result<WalkReport> {
     let mut report = WalkReport::default();
     let mut walked: Vec<i64> = Vec::new();
 
-    for source in sources::list(conn)? {
+    for source in listed {
         let root = PathBuf::from(&source.root);
         if !root.is_dir() {
             continue; // unreachable, so nothing here can be judged
         }
-        let root_folder = folders::source_root_folder(conn, source.id)?;
-
-        items::begin_sweep(conn)?;
-        let (folder_ids, files) = mirror(conn, &root, root_folder)?;
-        for file in files {
-            let Some(folder_id) = file.parent().and_then(|p| folder_ids.get(p)).copied() else {
-                continue;
-            };
-            match record_file(conn, &file, folder_id, source.id) {
-                Ok(Outcome::Unchanged) => report.unchanged += 1,
-                Ok(Outcome::Indexed) => report.indexed += 1,
-                Err(err) => eprintln!("could not index {}: {err}", file.display()),
+        match walk_source(conn, &source, &mut report) {
+            Ok(()) => walked.push(source.id),
+            // Removed while this pass ran: it took its folders with it, and the rest still walk.
+            Err(err) => {
+                if sources::get(conn, source.id)?.is_some() {
+                    return Err(err);
+                }
             }
         }
-        report.items_retired += items::finish_sweep(conn, source.id)?;
-        walked.push(source.id);
     }
 
     report.folders_retired = retire_vanished_folders(conn, &walked)?;
     Ok(report)
+}
+
+/// One source: its directories mirrored, its files recorded, and what vanished retired.
+fn walk_source(conn: &Connection, source: &sources::Source, report: &mut WalkReport) -> Result<()> {
+    let root = PathBuf::from(&source.root);
+    let root_folder = folders::source_root_folder(conn, source.id)?;
+
+    items::begin_sweep(conn)?;
+    let (folder_ids, files) = mirror(conn, &root, root_folder)?;
+    for file in files {
+        let Some(folder_id) = file.parent().and_then(|p| folder_ids.get(p)).copied() else {
+            continue;
+        };
+        match record_file(conn, &file, folder_id, source.id) {
+            Ok(Outcome::Unchanged) => report.unchanged += 1,
+            Ok(Outcome::Indexed) => report.indexed += 1,
+            Err(err) => eprintln!("could not index {}: {err}", file.display()),
+        }
+    }
+    report.items_retired += items::finish_sweep(conn, source.id)?;
+    Ok(())
 }
 
 /// Retires folders whose directory is gone, **only in sources this pass read**.
@@ -294,6 +313,26 @@ mod tests {
                 ("at-the-root.jpg".to_string(), root_folder),
                 ("pyramid.jpg".to_string(), cairo)
             ]
+        );
+    }
+
+    #[test]
+    fn a_source_removed_while_the_pass_runs_does_not_stop_the_others() {
+        let (conn, root) = library("removed-mid-pass");
+        write(&root.join("kept.jpg"), "a");
+        let going = scratch("removed-mid-pass-going");
+        write(&going.join("gone.jpg"), "b");
+        let doomed = sources::add(&conn, &going, "Going", SourceKind::Library).unwrap();
+        // The pass listed both, and one was removed before it reached the other.
+        let listed = sources::list(&conn).unwrap();
+        sources::remove(&conn, doomed.id).unwrap();
+
+        let report = reconcile_list(&conn, listed).unwrap();
+        assert_eq!(report.indexed, 1);
+        assert_eq!(
+            live_items(&conn).len(),
+            1,
+            "the source still there was walked"
         );
     }
 

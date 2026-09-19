@@ -43,6 +43,15 @@ pub fn is_queued(conn: &Connection, kind: &str, payload: &str) -> Result<bool> {
     )?)
 }
 
+/// Whether this exact job is waiting to start. One already running may have read too early.
+pub fn is_pending(conn: &Connection, kind: &str, payload: &str) -> Result<bool> {
+    Ok(conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM job WHERE kind = ?1 AND payload = ?2 AND status = 'pending')",
+        params![kind, payload],
+        |r| r.get(0),
+    )?)
+}
+
 /// Takes the most urgent waiting job and marks it running. The immediate transaction stops two
 /// workers from taking the same one.
 pub fn claim(conn: &mut Connection) -> Result<Option<QueuedJob>> {
