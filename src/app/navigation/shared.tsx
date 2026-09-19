@@ -1,5 +1,6 @@
 import type { FolderNode } from "../../ipc/bindings/FolderNode";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
+import { Button } from "../../ui/Button";
 import { EmptyState } from "../../ui/EmptyState";
 import { Glyph } from "../../ui/Glyph";
 import type { TreeRow } from "../../ui/Tree";
@@ -110,14 +111,9 @@ export function NoSources({ onAdd }: { onAdd: () => void }) {
       title="No Sources Yet"
       note="Add a folder and Filmstrip will read it where it stands."
     >
-      <button
-        type="button"
-        onClick={onAdd}
-        className="focus-ring flex h-control items-center gap-1.5 rounded-control bg-raised px-2.5 text-fg text-ui inset-ring inset-ring-line-control transition-colors duration-(--motion-quick) hover:bg-raised-hi motion-reduce:transition-none"
-      >
-        <Glyph name="plus" className="text-fg-dim text-glyph" />
+      <Button glyph="plus" onClick={onAdd}>
         Add a folder…
-      </button>
+      </Button>
     </EmptyState>
   );
 }

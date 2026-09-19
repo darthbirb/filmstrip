@@ -5,6 +5,7 @@ import { expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
+import { Button } from "./Button";
 import { Chip } from "./Chip";
 import { Dropdown } from "./Dropdown";
 import { Glyph } from "./Glyph";
@@ -140,4 +141,20 @@ test("an open menu sits just under its button, lined up with the edge it is give
   expect(menu.top - below.bottom).toBeLessThan(8);
   expect(Math.abs(menu.right - below.right)).toBeLessThan(1);
   expect(menu.width).toBeGreaterThanOrEqual(below.width);
+});
+
+test("a button keeps its label on one line, however little room it is given", async () => {
+  const screen = await render(
+    <div style={{ width: "5rem" }}>
+      <Button glyph="plus" onClick={() => {}}>
+        Add a folder…
+      </Button>
+    </div>,
+  );
+  const button = screen.getByRole("button").element() as HTMLElement;
+  const line = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) * 2;
+  expect(button.getBoundingClientRect().height).toBeCloseTo(line, 0);
+  // Narrower than the label, so what it cannot show it ends rather than wrapping.
+  const label = button.querySelector(".truncate") as HTMLElement;
+  expect(label.scrollWidth).toBeGreaterThan(label.clientWidth);
 });

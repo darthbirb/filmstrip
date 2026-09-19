@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import { formatCount } from "../../lib/format";
+import { Button } from "../../ui/Button";
 import { EmptyState } from "../../ui/EmptyState";
 import { Glyph } from "../../ui/Glyph";
 import { ensureChildren, useIndex } from "../navigation/index-store";
@@ -67,9 +68,11 @@ export function EmptyPlace({ place }: { place: Place }) {
       note={`${folder.title} holds ${formatCount(inside.length)} ${inside.length === 1 ? "folder" : "folders"} and no loose files.`}
     >
       {inside.map((child) => (
-        <button
+        <Button
           key={child.id}
-          type="button"
+          glyph="folder"
+          filled
+          detail={child.itemCount > 0 ? formatCount(child.itemCount) : undefined}
           onClick={() =>
             setPlace({
               kind: "folder",
@@ -77,14 +80,9 @@ export function EmptyPlace({ place }: { place: Place }) {
               path: [...place.path, { id: child.id, title: child.title }],
             })
           }
-          className="focus-ring inline-flex h-control items-center gap-1.5 rounded-control bg-raised px-2.5 text-fg text-ui inset-ring inset-ring-line-control transition-colors duration-(--motion-quick) hover:bg-raised-hi motion-reduce:transition-none"
         >
-          <Glyph name="folder" filled className="text-fg-dim text-glyph" />
           {child.title}
-          {child.itemCount > 0 && (
-            <span className="text-fg-dim tabular-nums">{formatCount(child.itemCount)}</span>
-          )}
-        </button>
+        </Button>
       ))}
     </EmptyState>
   );

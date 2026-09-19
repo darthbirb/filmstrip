@@ -5,6 +5,7 @@ import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { removeSource, renameSource, revealSource, setSourceKind } from "../../ipc/commands";
 import { formatCount } from "../../lib/format";
 import { Band } from "../../ui/Band";
+import { Button } from "../../ui/Button";
 import { EmptyState } from "../../ui/EmptyState";
 import { Glyph } from "../../ui/Glyph";
 import { GlyphButton } from "../../ui/GlyphButton";
@@ -18,9 +19,6 @@ const KINDS: readonly { value: SourceKind; label: string }[] = [
   { value: "library", label: "Library" },
   { value: "sorting", label: "Sorting" },
 ];
-
-const ADD =
-  "focus-ring flex h-control items-center gap-1.5 rounded-control bg-raised px-2.5 text-fg text-ui inset-ring inset-ring-line-control transition-colors duration-(--motion-quick) hover:bg-raised-hi motion-reduce:transition-none";
 
 /** Every folder the app reads, and the two things only a source has. DECISIONS.md "Places, not queries". */
 export function Sources() {
@@ -53,10 +51,9 @@ export function Sources() {
         />
       )}
       <div className="flex items-center gap-2.5">
-        <button type="button" onClick={() => void addFolder("library")} className={ADD}>
-          <Glyph name="plus" className="text-fg-dim text-glyph" />
+        <Button glyph="plus" onClick={() => void addFolder("library")}>
           Add a folder…
-        </button>
+        </Button>
         <span className="text-fg-dim text-small">Added here, a folder is a library source.</span>
       </div>
       <p className="m-0 text-fg-dim text-small">

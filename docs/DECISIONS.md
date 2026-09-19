@@ -214,6 +214,13 @@ navigation, and the grid never does. A folded panel leaves a rail at the window'
 button opens the panel over the grid until Escape or a click elsewhere. A panel hidden by hand
 behaves the same way.
 
+**A panel never gets narrower than what it holds.** A label wrapping inside a button is the
+window saying it ran out of room, which the frame is supposed to have decided already. So a
+button's label never wraps, and each panel's own content sets a floor under the width the
+splitter asks for: it reports what it needs, the splitter stops there, and the frame counts that
+floor when it decides whether the panel still fits. The token minimum is the floor's own floor,
+not the answer.
+
 **Clicking a picture opens the pane** when it is folded or hidden, since showing something in a
 pane nobody can see does nothing: it docks where it fits, and opens over the grid where it does
 not.

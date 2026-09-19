@@ -29,13 +29,17 @@ function readMetrics() {
 export function useFrameLayout() {
   const frameRef = useRef<HTMLDivElement>(null);
   const [metrics] = useState(readMetrics);
-  const [widths, setWidths] = useState(() => restoredWidths(metrics, getPreferences().widths));
+  const [asked, setAsked] = useState(() => restoredWidths(metrics, getPreferences().widths));
   const [hidden, setHidden] = useState(
     () => getPreferences().hidden ?? { nav: false, pane: false },
   );
   const [overlay, setOverlay] = useState<Side | null>(null);
+  // What each panel's own content needs, which is a floor under the width asked for.
+  const [floors, setFloors] = useState({ nav: 0, pane: 0 });
   const room = useRoomInRem(frameRef);
   const settled = useSettled();
+
+  const widths = { nav: Math.max(asked.nav, floors.nav), pane: Math.max(asked.pane, floors.pane) };
 
   // The grid never folds; navigation outranks the pane, so the pane goes first.
   const { gridMin, rail, splitter } = metrics;
@@ -63,12 +67,18 @@ export function useFrameLayout() {
     frameRef,
     metrics,
     widths,
+    /** The width each panel was dragged to, before its own content had its say. */
+    asked,
+    floors,
+    /** What a panel's content needs; 0 where it needs no more than it was given. */
+    setFloor: (side: Side, rem: number) =>
+      setFloors((held) => (held[side] === rem ? held : { ...held, [side]: rem })),
     folded,
     open,
     settled,
     setWidth: (side: Side, rem: number) => {
-      const next = { ...widths, [side]: rem };
-      setWidths(next);
+      const next = { ...asked, [side]: rem };
+      setAsked(next);
       updatePreferences({ widths: next });
     },
     /** Docks the panel where it fits, and opens it over the grid where it does not. */

@@ -5,6 +5,9 @@ import { RailButton } from "../../ui/RailButton";
 import { Splitter } from "../../ui/Splitter";
 import type { FrameLayout, Side } from "./useFrameLayout";
 
+// Half a pixel at the usual text size: rounding, not a real need for more room.
+const TOLERANCE = 0.03;
+
 // One glyph for both panels, mirrored for the pane; whether it is pressed says which way it acts.
 const COPY = {
   nav: {
@@ -64,6 +67,8 @@ export function SidePanel({
   const limits = layout.metrics[side];
   const Region = side === "nav" ? "nav" : "aside";
   const regionRef = useRef<HTMLElement>(null);
+  const faceRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [sizing, setSizing] = useState(false);
   const folded = layout.folded[side];
   const open = layout.open === side;
@@ -75,6 +80,8 @@ export function SidePanel({
   // What it keeps in the row, which a panel over the grid or filling the window no longer matches.
   const held = folded ? "var(--spacing-rail)" : own;
   const grows = layout.settled && !sizing;
+
+  useFloor(layout, side, faceRef, scrollRef, !folded && !full);
 
   const body = (
     <>
@@ -96,7 +103,9 @@ export function SidePanel({
           />
         )}
       </div>
-      <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
+        {children}
+      </div>
       {foot}
     </>
   );
@@ -129,7 +138,7 @@ export function SidePanel({
     <Splitter
       label={`Resize ${copy.label.toLowerCase()}`}
       value={layout.widths[side]}
-      min={limits.min}
+      min={Math.max(limits.min, layout.floors[side])}
       max={limits.max}
       initial={limits.initial}
       panel={side === "nav" ? "before" : "after"}
@@ -162,7 +171,13 @@ export function SidePanel({
             : ""
         }`}
       >
-        <Layer shown={!showRail} width={full ? "100%" : own} side={side} settled={layout.settled}>
+        <Layer
+          ref={faceRef}
+          shown={!showRail}
+          width={full ? "100%" : own}
+          side={side}
+          settled={layout.settled}
+        >
           {body}
         </Layer>
         <Layer
@@ -191,6 +206,7 @@ export function SidePanel({
 }
 
 type LayerProps = {
+  ref?: RefObject<HTMLDivElement | null>;
   shown: boolean;
   width: string;
   side: Side;
@@ -200,12 +216,13 @@ type LayerProps = {
 };
 
 /** One of the panel's two faces, held at its own width so the box clips it rather than reflowing it. */
-function Layer({ shown, width, side, settled, center, children }: LayerProps) {
+function Layer({ ref, shown, width, side, settled, center, children }: LayerProps) {
   return (
     <div
+      ref={ref}
       inert={!shown}
       style={side === "nav" ? { width, left: 0 } : { width, right: 0 }}
-      className={`absolute inset-y-0 flex flex-col ${center ? "items-center" : ""} ${
+      className={`absolute inset-y-0 flex min-w-min flex-col ${center ? "items-center" : ""} ${
         shown ? "visible opacity-100" : "invisible opacity-0"
       } ${
         settled
@@ -216,6 +233,40 @@ function Layer({ shown, width, side, settled, center, children }: LayerProps) {
       {children}
     </div>
   );
+}
+
+/**
+ * What the panel holds is its own floor: a face held open past the width asked for, or content
+ * that has overflowed the scroller, is room the panel may not take back. DECISIONS.md "The frame".
+ */
+function useFloor(
+  layout: FrameLayout,
+  side: Side,
+  faceRef: RefObject<HTMLDivElement | null>,
+  scrollRef: RefObject<HTMLDivElement | null>,
+  docked: boolean,
+) {
+  const asked = layout.asked[side];
+  const setFloor = layout.setFloor;
+  useEffect(() => {
+    const face = faceRef.current;
+    const scroller = scrollRef.current;
+    if (!docked || !face || !scroller) {
+      setFloor(side, 0);
+      return;
+    }
+    const measure = () => {
+      const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const needed = Math.max(face.getBoundingClientRect().width, scroller.scrollWidth) / rem;
+      setFloor(side, needed > asked + TOLERANCE ? needed : 0);
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(face);
+    observer.observe(scroller);
+    for (const child of scroller.children) observer.observe(child);
+    measure();
+    return () => observer.disconnect();
+  }, [side, asked, docked, faceRef, scrollRef, setFloor]);
 }
 
 /** Closes an open panel when the pointer goes down anywhere but on it. */
