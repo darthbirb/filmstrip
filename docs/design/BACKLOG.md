@@ -16,18 +16,6 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## The delete question has no shape for many sorting sources · DEFECT
-
-The delete question names each sorting source on its own button beside the trash. The Notes leave the
-case of many open: "where the answers should go when a person keeps six sorting sources. They wrap
-today, which is honest and untidy; a band that scrolls is the next shape, and nothing needs it yet."
-The question is going to be built, so what it does with more sorting sources than fit on one line has
-to be drawn rather than left to wrap.
-
-Draw the question with more sorting sources than its row holds, at the pane's narrowest grid width and
-at 200%, and say in the note where the answers go once they no longer fit. The trash answer, the box
-and cancel keep their places.
-
 ## The app's own right-click menus · DRAWN
 
 Drawn on the Components sheet: a tile, a selection of five, a folder row, a source row and the pane's
@@ -36,9 +24,9 @@ the same menus one tile-gap below the focused tile's or row's ring. A tree row r
 Settings renames a source. A folder's row makes, moves and deletes folders: New folder lands a row
 already in its name field, Move to… is the file picker, and Delete asks only when the folder holds
 something, naming each sorting source as its own answer, with a box that keeps the pick as the
-default in Settings › Sources. A source's row makes a folder at its top level. Waiting on the defect
-above. The folder verbs that change the disk also wait on the undo journal, FEATURES.md "Export and
-undo".
+default in Settings › Sources; more sorting sources than the line holds fold into one Move them to….
+A source's row makes a folder at its top level. The folder verbs that change the disk wait on the
+undo journal, FEATURES.md "Export and undo".
 
 ## The way into full screen · DRAWN
 
