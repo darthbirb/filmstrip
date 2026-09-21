@@ -55,9 +55,9 @@ there is no line. Three lines were drawn past it.
   thumbnail." The format is a fact; the rest explains the picture.
 
 Carry all three onto the rule. The Sources section also keeps its warning that removing a source drops
-the tags and notes on its files. That is not a count, a name, a path or a query, so either it is the
-rule's one stated exception — a warning before something that cannot be undone — or it moves to where
-the removing happens. Say which, in the rule's own words.
+the tags and notes on its files. That is not a count, a name, a path or a query, and it is decided: the
+warning moves to where the removing happens — on pressing a source's remove — and the section carries
+no line of its own. Draw that moment.
 
 ## A zoomed picture both keeps and loses its corner and gap · DEFECT
 

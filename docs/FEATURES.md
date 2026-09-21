@@ -115,7 +115,7 @@ drawn. **Not started** — neither.
 | Capability | Filmstrip | Where |
 | --- | --- | --- |
 | Export a folder's subtree or a selection as a zip, as a job | Not started | Filmstrip's own change: renaming the files or keeping their own names is chosen at export |
-| An undo journal that survives a restart | Not started | no migration yet |
+| An undo journal that survives a restart | Not started | comes before any verb that changes the disk: folder rename, move and delete wait on it |
 | Undo the last batch, or a named one | Not started | |
 
 ## The interface
