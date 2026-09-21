@@ -42,9 +42,9 @@ drawn. **Not started** — neither.
 | --- | --- | --- |
 | The tree, and a folder's children | Built | `folder_children` |
 | A folder's own details | Backlogged, and not in Rust | "A folder's details" |
-| Create a folder | Not started | |
-| Move a folder | Not started | |
-| Delete a folder, choosing what happens to what is inside | Not started | |
+| Create a folder | Drawn, waiting on the undo journal | the folder row's menu |
+| Move a folder | Drawn, waiting on the undo journal | the folder row's menu |
+| Delete a folder, choosing what happens to what is inside | Drawn, with a defect, and waiting on the undo journal | which Sorting Box, PRODUCT.md "Folders and sources" |
 | Rename a folder, on disk | Drawn on its tree row | no command yet |
 | A folder's cover | Not started | `folder.cover_item_id` exists |
 | A folder's status, notes, favourite | Not started | |
@@ -75,7 +75,7 @@ drawn. **Not started** — neither.
 | Details, and the tags on an item | Built | |
 | A filmstrip of the place it came from | Built | |
 | Full screen | Built | |
-| **Zoom and pan a picture** | Drawn, with one defect | the one thing missed rather than deferred |
+| **Zoom and pan a picture** | Drawn | the one thing missed rather than deferred |
 | Video playback | Built, on the browser's own controls | a plate of its own is drawn, and volume is not yet kept between items |
 | Frame steps and a named speed set | Backlogged | "The video plate…" |
 | Several items at once, scaled to fit together | Not started | dragging items onto the pane, PRODUCT.md "The three panels" |
@@ -125,6 +125,6 @@ drawn. **Not started** — neither.
 | Three panels, splitters, folding, the rail | Built | |
 | The app's own window chrome | Built | |
 | Settings | Built, with Sources in it | |
-| The app's own right-click menus | Drawn, with two defects | a folder's menu still lacks its folder verbs |
+| The app's own right-click menus | Drawn, with two defects | a source's menu and the delete question |
 | A scrubber for very large folders | Backlogged | |
 | Compression review, duplicate detection, a storage screen, a tags screen | Not started | PRODUCT.md "Later" |

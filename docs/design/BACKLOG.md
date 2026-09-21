@@ -16,69 +16,42 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## A folder row's menu says folders are never moved or deleted · DEFECT
+## A source's row cannot make a folder at its own top level · DEFECT
 
-The Components sheet's folder-row menu holds Rename, Reveal in Explorer and Read it again, and its note
-explains the gap: "this app moves files, never folders, and deleting a folder is not something it can
-do." PRODUCT.md "Folders and sources" says the opposite: "Deleting a folder asks: move what is inside to
-the Sorting Box, or send it to the trash as well. An empty folder goes without asking." And every
-ggallery capability comes over, which includes creating a folder, moving one and deleting one
-(FEATURES.md "Folders").
+The Components sheet gives a folder's row New folder, Favourite, Move to…, Reveal in Explorer, Rename,
+Read it again and Delete, and a source's row Rename, Reveal in Explorer, Read it again, Manage sources…
+and Remove source. The note says a source's row "is a folder's row minus those three" — New folder,
+Move to… and Delete — but the drawn row is also missing Favourite. And without New folder, nothing in
+the app can make a folder directly inside a source, since a source's row is the only row that stands
+for its top level.
 
-Draw a folder row's menu with New folder, Move to… and Delete beside what it already holds, in the
-menus' own order and case, and say where each one opens: the name field a new folder starts as, the
-picker Move to… already uses for files, and the question deleting a folder with something in it asks.
-Correct the note. A source's row keeps Remove source and has no Delete or Move to…, since removing is
-what a source has instead.
+Give a source's row New folder and Favourite, keep it without Move to… and Delete, and make the note
+say exactly what the row holds.
 
-## The keyboard's menu is drawn at one distance and described at another · DEFECT
+## Deleting a folder does not say which Sorting Box, or what happens with none · DEFECT
 
-The note puts a menu opened from the keyboard "4px clear of the 2px ring and its 2px gap", which is
-8px below a tile. The markup puts it at `calc(100% + 4px)`, 4px below the tile, which lands it on the
-ring's outer edge rather than clear of it. A row is drawn 4px under its edge. Neither distance is a
-token, and the sheets' own rule is that nothing but the ring and the hairlines carries a pixel.
+The delete question offers "Move them to the Sorting Box" or "Send them to the trash too". Filmstrip's
+Sorting Box is any number of sorting sources, so the question has two states the drawing does not
+have. Both are decided, in PRODUCT.md "Folders and sources":
 
-Settle one distance, measured from the ring where the anchor has one outside it, and name it from the
-tokens rather than in pixels.
+- **Several sorting sources.** Moving asks which one. The question names them and one is picked,
+  with a checkbox that keeps the answer as the default, so later deletes move there without asking.
+  Settings holds that default: change it, or go back to asking each time.
+- **No sorting source.** There is nowhere to move to, so the question offers only the trash, and
+  cancel.
 
-## Three lines still explain the app to itself · DEFECT
-
-The last pass settled the rule: a line under a title carries a count, a name, a path or a query, or
-there is no line. Three lines were drawn past it.
-
-- **This Folder Is Empty** keeps "Nothing is in People, on disk or in the index." The Notes count the
-  lines that went and the lines that stayed, and this one is in neither list, so it was not looked at.
-- **Settings › Sources** gains a line under the section title that was not there before: "Three folders,
-  read where they stand." with sources, and "No folders yet." without — the second directly above a
-  **No Sources Yet** title that says the same thing.
-- **A codec the window cannot play** keeps "The window can't open .mkv files, so this is its
-  thumbnail." The format is a fact; the rest explains the picture.
-
-Carry all three onto the rule. The Sources section also keeps its warning that removing a source drops
-the tags and notes on its files. That is not a count, a name, a path or a query, and it is decided: the
-warning moves to where the removing happens — on pressing a source's remove — and the section carries
-no line of its own. Draw that moment.
-
-## A zoomed picture both keeps and loses its corner and gap · DEFECT
-
-The zoom block's last heading reads "Off fit, the picture has no corners and no gap", and the paragraph
-under it says "Bigger than the media area, it fills that area exactly — the corner stays, the gap stays,
-and what is cropped is cropped by the pane's own edge." The readout is placed against "the picture's
-bottom-left corner", which is off screen once a picture is bigger than the area.
-
-"Bigger than the media area" also has two directions. A panorama zoomed until it overflows sideways but
-not vertically, and any picture zoomed out below fit, still show their own bottom edge inside the area.
-
-Settle whether a zoomed picture is clipped by the media area's rounded inset or runs to the pane's edge,
-and anchor the readout to something that is always on screen: the media area's corner, whatever the
-picture is doing.
+Draw the question in both states, the checkbox, and the Settings row. Where the Settings row sits is
+the design's call; the Sources section is where sorting sources already live.
 
 ## The app's own right-click menus · DRAWN
 
 Drawn on the Components sheet: a tile, a selection of five, a folder row, a source row and the pane's
 picture, in sentence case with the verbs the pane's bar already uses. The menu key and Shift+F10 open
-the same menus against the focused tile or row. A tree row renames in place, as Settings renames a
-source. Waiting on the two defects above; a folder's rename also needs a command that does not exist.
+the same menus one tile-gap below the focused tile's or row's ring. A tree row renames in place, as
+Settings renames a source. A folder's row makes, moves and deletes folders: New folder lands a row
+already in its name field, Move to… is the file picker, and Delete asks only when the folder holds
+something. Waiting on the two defects above. The folder verbs that change the disk also wait on the
+undo journal, FEATURES.md "Export and undo".
 
 ## The way into full screen · DRAWN
 
@@ -90,19 +63,22 @@ screen the fold button goes and nothing slides into its place.
 A title is Title Case; every label on a button, a menu row or a tooltip is sentence case. The built app
 already agrees except for the notices: **Retry these**, **Show the 31**, **Hide the list**.
 
-## Empty states without their explanations · DRAWN
+## Lines only where they hold a fact · DRAWN
 
-Nothing Chosen Yet, Nothing To Sort, Trash Is Empty and both No Sources Yet lose their lines; This File
-Has Gone names the path it was at; a folder of folders and an offline source keep the count their line
-carries. Waiting on the defect above for the three that were missed.
+Nothing Chosen Yet, Nothing To Sort, Trash Is Empty, This Folder Is Empty and both No Sources Yet lose
+their lines, and so does the Sources section's title. This File Has Gone names the path it was at, a
+codec the window cannot play names its format in mono, and a folder of folders and an offline source
+keep their counts. Pressing a source's remove turns its row into the warning, with Remove source and
+Cancel; Escape puts the row back.
 
 ## Zoom and pan a picture in the pane · DRAWN
 
 On the Pane sheet. The behaviour ports from ggallery as it stands. At fit nothing is on the picture;
-off fit, one percentage plate, which is also the way back to fit and a tab stop only while it is there.
-Plus and minus zoom about the centre from the keyboard and 0 fits; a video does not zoom; a multiple of
-fit and a centre point survive a resize, a fold and full screen, and the next item starts at fit.
-Waiting on the defect above.
+off fit, one percentage plate a tile-inset inside the media area's bottom-left, which is also the way
+back to fit and a tab stop only while it is there. The picture is clipped by the media area's rounded
+inset at every magnification. Plus and minus zoom about the centre from the keyboard and 0 fits; a
+video does not zoom; a multiple of fit and a centre point survive a resize, a fold and full screen,
+and the next item starts at fit.
 
 ## A folder's details · DRAWN
 

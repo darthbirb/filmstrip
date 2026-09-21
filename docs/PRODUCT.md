@@ -18,7 +18,10 @@ A **source** is a folder the user adds to the app. There can be several, and one
 not sit inside another. Removing a source forgets the index and never the files.
 
 Deleting a folder asks: move what is inside to the Sorting Box, or send it to the trash as
-well. An empty folder goes without asking.
+well. An empty folder goes without asking. With several sorting sources, moving asks which one,
+and the answer can be kept as the default; Settings changes that default or goes back to asking
+each time. With no sorting source there is no Sorting Box to move to, so the only answer is the
+trash.
 
 ## The Sorting Box
 
