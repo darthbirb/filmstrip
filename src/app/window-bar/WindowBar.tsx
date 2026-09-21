@@ -21,7 +21,7 @@ export function WindowBar({ search, onSettings, settingsOpen = false }: Props) {
   return (
     <header
       data-tauri-drag-region
-      className="grid h-caption shrink-0 select-none grid-cols-[1fr_minmax(0,var(--spacing-bar-search))_1fr] items-center bg-panel"
+      className="grid h-caption shrink-0 grid-cols-[1fr_minmax(0,var(--spacing-bar-search))_1fr] items-center bg-panel"
     >
       {/* Ignores the pointer, so the bar beneath it still drags. */}
       <span

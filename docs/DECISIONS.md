@@ -187,6 +187,13 @@ column, the same reason search is there.
 Drawing our own buttons costs two things a native title bar has: the snap-layout panel on
 hovering maximise, and the system menu on right-clicking the bar.
 
+**Nothing selects and nothing offers the browser's menu, except a field.** A drag across the
+window highlighted words in blue and a right-click offered to print or copy a link to a highlight —
+both said, plainly, that this was a web page. So `body` does not select, and the page's own menu is
+turned off everywhere but in a field, where cut, copy, paste and the spell-checker live and the app
+does not reimplement them. A field keeps its own text whatever it sits in. The pane's details do
+not select either: the drawing names fields as the only exception, and copying a file is the bar's.
+
 **The 640×480 minimum holds**: the bar, the grid's header and the Settings dialog fit it at
 200%, as the tests measure. Whether a smaller window would also hold is not yet measured.
 
@@ -206,6 +213,15 @@ width against the columns' actual widths and the grid's minimum: the pane folds 
 navigation, and the grid never does. A folded panel leaves a rail at the window's edge, and its
 button opens the panel over the grid until Escape or a click elsewhere. A panel hidden by hand
 behaves the same way.
+
+**A panel never gets narrower than a button's label.** A label wrapping inside a button is the
+window saying it ran out of room, which the frame is supposed to have decided already. So a
+button's label never wraps: it ends in an ellipsis instead, and the panel around it stops before
+that. How much of a label is cut right now is how much narrower than its content the panel has
+been made, which is what the panel measures. A floor that fell again the moment it was met would
+fight the pointer, so within the same content the floor only ever rises, and it starts over when
+the content or the text size changes. Nothing else in a panel sets a floor: a row's name, a path
+and a count are all free to be cut, and say so by truncating.
 
 **Clicking a picture opens the pane** when it is folded or hidden, since showing something in a
 pane nobody can see does nothing: it docks where it fits, and opens over the grid where it does

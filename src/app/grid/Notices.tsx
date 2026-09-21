@@ -1,11 +1,10 @@
 import { useState } from "react";
 
 import { formatCount } from "../../lib/format";
+import { Button } from "../../ui/Button";
 import { Glyph } from "../../ui/Glyph";
 import { retryFailures, useWork } from "../navigation/work-store";
 
-const ACTION =
-  "focus-ring flex h-control shrink-0 items-center gap-1 whitespace-nowrap rounded-control px-2.5 text-ui transition-colors duration-(--motion-quick) motion-reduce:transition-none";
 const COLUMNS = "grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_3.5rem] items-center gap-3.5 px-3";
 
 /** What could not be read, above the grid until it is dealt with. DECISIONS.md "Background work". */
@@ -27,22 +26,15 @@ export function Notices() {
           <span className="min-w-0 flex-1 text-fg text-ui tabular-nums">
             {formatCount(count)} {count === 1 ? "file" : "files"} could not be indexed
           </span>
-          <button
-            type="button"
-            onClick={() => void retryFailures()}
-            className={`${ACTION} bg-raised text-fg inset-ring inset-ring-line-control hover:bg-raised-hi`}
-          >
-            Retry These
-          </button>
-          <button
-            type="button"
-            aria-expanded={open}
+          <Button onClick={() => void retryFailures()}>Retry These</Button>
+          <Button
+            tone="quiet"
+            expanded={open}
+            detail={open && <Glyph name="chevronDown" className="rotate-180 text-glyph-small" />}
             onClick={() => setOpen(!open)}
-            className={`${ACTION} ${open ? "bg-raised-hi text-fg" : "text-fg-mid hover:bg-wash hover:text-fg"}`}
           >
             {open ? "Hide The List" : `Show The ${formatCount(count)}`}
-            {open && <Glyph name="chevronDown" className="rotate-180 text-glyph-small" />}
-          </button>
+          </Button>
           <button
             type="button"
             aria-label="Dismiss"

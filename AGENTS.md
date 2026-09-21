@@ -55,7 +55,7 @@ way a choice is offered.
 - **Comments split three ways.** A constraint a future edit would break *silently* stays in the
   source, in three lines at most. Why the design is this shape goes in `docs/DECISIONS.md`, and the
   source names the section. Bug history and "it used to be X" go in neither; git has them.
-- **Doc pointers are load-bearing.** Comments cite headings in the five docs by exact title, on
+- **Doc pointers are load-bearing.** Comments cite headings in the six docs by exact title, on
   one line. Rename a heading and fix its callers in the same commit. `check:docs` enforces this
   and the three-line limit.
 - **Primitives own every visual decision; surfaces compose them.** Sizes, colours and durations
@@ -82,3 +82,4 @@ way a choice is offered.
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — how to work on it
 - [docs/SCHEMA.md](docs/SCHEMA.md) — the tables and the rules the data keeps
 - [docs/DESIGN.md](docs/DESIGN.md) — how it looks: the tokens and the shapes
+- [docs/FEATURES.md](docs/FEATURES.md) — every ggallery capability, and whether Filmstrip has it yet

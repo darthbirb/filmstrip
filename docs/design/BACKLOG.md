@@ -16,16 +16,44 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## Right-click is the browser's menu · DRAWN
+## The app's own right-click menus · DRAWN
 
-Right-clicking anywhere offers Edge's own menu — print, copy link to highlight, and the rest — which
-says plainly that this is a web page. Suppressing it is a fix and needs no drawing, but it leaves
-the question of what should be there instead.
+Drawn on the Components sheet: a tile, a selection of five, a folder row, a source row and the pane's
+picture, in sentence case with the verbs the pane's bar already uses. The menu key and Shift+F10 open
+the same menus one tile-gap below the focused tile's or row's ring. A tree row renames in place, as
+Settings renames a source. A folder's row makes, moves and deletes folders: New folder lands a row
+already in its name field, Move to… is the file picker, and Delete asks only when the folder holds
+something, naming each sorting source as its own answer, with a box that keeps the pick as the
+default in Settings › Sources; more sorting sources than the line holds fold into one Move them to….
+A source's row makes a folder at its top level. The folder verbs that change the disk wait on the
+undo journal, FEATURES.md "Export and undo".
 
-Draw whether the app has a context menu at all and, if so, on what: a tile, a tree row, the pane's
-picture. The action menu is already built in `src/ui/Menu.tsx` and the pane's action bar already
-names what the app can do to a file, so the shape exists; what is undrawn is which of those actions
-a right-click offers, and what a right-click on a *selection* of several tiles offers instead.
+## The way into full screen · DRAWN
+
+At the left end of the pane's header, as `arrow-line-left`, and `arrow-line-right` to leave. In full
+screen the fold button goes and nothing slides into its place.
+
+## Labels in sentence case · DRAWN
+
+A title is Title Case; every label on a button, a menu row or a tooltip is sentence case. The built app
+already agrees except for the notices: **Retry these**, **Show the 31**, **Hide the list**.
+
+## Lines only where they hold a fact · DRAWN
+
+Nothing Chosen Yet, Nothing To Sort, Trash Is Empty, This Folder Is Empty and both No Sources Yet lose
+their lines, and so does the Sources section's title. This File Has Gone names the path it was at, a
+codec the window cannot play names its format in mono, and a folder of folders and an offline source
+keep their counts. Pressing a source's remove turns its row into the warning, with Remove source and
+Cancel; Escape puts the row back.
+
+## Zoom and pan a picture in the pane · DRAWN
+
+On the Pane sheet. The behaviour ports from ggallery as it stands. At fit nothing is on the picture;
+off fit, one percentage plate a tile-inset inside the media area's bottom-left, which is also the way
+back to fit and a tab stop only while it is there. The picture is clipped by the media area's rounded
+inset at every magnification. Plus and minus zoom about the centre from the keyboard and 0 fits; a
+video does not zoom; a multiple of fit and a centre point survive a resize, a fold and full screen,
+and the next item starts at fit.
 
 ## A folder's details · DRAWN
 

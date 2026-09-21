@@ -54,8 +54,10 @@ export function Media({ item, fill = false }: Props) {
 
   return (
     <figure className={`m-0 flex flex-col ${fill ? "min-h-0 min-w-0 flex-1" : "w-full"}`}>
+      {/* A box that can be smaller than what it holds, so a tall picture shrinks to it rather than
+          running past the actions below. DESIGN.md "Shapes". */}
       <div
-        className={`relative grid place-items-center ${fill ? "min-h-0 flex-1" : "max-h-(--pane-media-max) w-full"}`}
+        className={`relative flex min-h-0 items-center justify-center ${fill ? "flex-1" : "max-h-(--pane-media-max) w-full"}`}
       >
         {body}
       </div>

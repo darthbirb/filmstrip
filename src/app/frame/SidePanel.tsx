@@ -64,6 +64,7 @@ export function SidePanel({
   const limits = layout.metrics[side];
   const Region = side === "nav" ? "nav" : "aside";
   const regionRef = useRef<HTMLElement>(null);
+  const faceRef = useRef<HTMLDivElement>(null);
   const [sizing, setSizing] = useState(false);
   const folded = layout.folded[side];
   const open = layout.open === side;
@@ -75,6 +76,8 @@ export function SidePanel({
   // What it keeps in the row, which a panel over the grid or filling the window no longer matches.
   const held = folded ? "var(--spacing-rail)" : own;
   const grows = layout.settled && !sizing;
+
+  useFloor(layout, side, faceRef, !folded && !full);
 
   const body = (
     <>
@@ -129,7 +132,7 @@ export function SidePanel({
     <Splitter
       label={`Resize ${copy.label.toLowerCase()}`}
       value={layout.widths[side]}
-      min={limits.min}
+      min={Math.max(limits.min, layout.floors[side])}
       max={limits.max}
       initial={limits.initial}
       panel={side === "nav" ? "before" : "after"}
@@ -162,7 +165,13 @@ export function SidePanel({
             : ""
         }`}
       >
-        <Layer shown={!showRail} width={full ? "100%" : own} side={side} settled={layout.settled}>
+        <Layer
+          ref={faceRef}
+          shown={!showRail}
+          width={full ? "100%" : own}
+          side={side}
+          settled={layout.settled}
+        >
           {body}
         </Layer>
         <Layer
@@ -191,6 +200,7 @@ export function SidePanel({
 }
 
 type LayerProps = {
+  ref?: RefObject<HTMLDivElement | null>;
   shown: boolean;
   width: string;
   side: Side;
@@ -200,9 +210,10 @@ type LayerProps = {
 };
 
 /** One of the panel's two faces, held at its own width so the box clips it rather than reflowing it. */
-function Layer({ shown, width, side, settled, center, children }: LayerProps) {
+function Layer({ ref, shown, width, side, settled, center, children }: LayerProps) {
   return (
     <div
+      ref={ref}
       inert={!shown}
       style={side === "nav" ? { width, left: 0 } : { width, right: 0 }}
       className={`absolute inset-y-0 flex flex-col ${center ? "items-center" : ""} ${
@@ -216,6 +227,70 @@ function Layer({ shown, width, side, settled, center, children }: LayerProps) {
       {children}
     </div>
   );
+}
+
+/**
+ * A button's label is the one thing in a panel that may not be cut, so how much of one is cut
+ * right now is how much narrower than its content the panel has been made — and its floor is the
+ * width where nothing is. The floor only ever rises while the panel holds the same thing; a floor
+ * that fell as soon as it was met would fight the pointer. DECISIONS.md "The frame".
+ */
+function useFloor(
+  layout: FrameLayout,
+  side: Side,
+  faceRef: RefObject<HTMLDivElement | null>,
+  docked: boolean,
+) {
+  const setFloor = layout.setFloor;
+  useEffect(() => {
+    const face = faceRef.current;
+    if (!docked || !face) {
+      setFloor(side, 0);
+      return;
+    }
+    // A 1rem probe resizes when the root font size does, which no element here would report.
+    const probe = document.createElement("div");
+    probe.style.cssText = "position:absolute;visibility:hidden;width:1rem;height:0";
+    document.body.append(probe);
+    let held = 0;
+    let queued = 0;
+    const measure = () => {
+      queued = 0;
+      const rem = probe.getBoundingClientRect().width;
+      const panel = face.getBoundingClientRect().width;
+      let needed = 0;
+      for (const label of face.querySelectorAll("button .truncate")) {
+        // Only a label with something cut off it has anything to say about the width.
+        const cut = label.scrollWidth - label.clientWidth;
+        if (cut > 0) needed = Math.max(needed, panel + cut);
+      }
+      if (rem > 0 && needed > held) {
+        held = needed;
+        setFloor(side, held / rem);
+      }
+    };
+    // Measuring twice in a frame costs two layouts and answers the same, so one is enough.
+    const later = () => {
+      if (!queued) queued = requestAnimationFrame(measure);
+    };
+    // Different content needs a different width, so the floor starts again with it.
+    const content = new MutationObserver(() => {
+      held = 0;
+      setFloor(side, 0);
+      later();
+    });
+    content.observe(face, { childList: true, subtree: true, characterData: true });
+    const size = new ResizeObserver(later);
+    size.observe(probe);
+    size.observe(face);
+    measure();
+    return () => {
+      cancelAnimationFrame(queued);
+      content.disconnect();
+      size.disconnect();
+      probe.remove();
+    };
+  }, [side, docked, faceRef, setFloor]);
 }
 
 /** Closes an open panel when the pointer goes down anywhere but on it. */

@@ -18,7 +18,10 @@ A **source** is a folder the user adds to the app. There can be several, and one
 not sit inside another. Removing a source forgets the index and never the files.
 
 Deleting a folder asks: move what is inside to the Sorting Box, or send it to the trash as
-well. An empty folder goes without asking.
+well. An empty folder goes without asking. Each sorting source is its own answer, and one can be kept
+as the default: from then on a folder with files in it moves there without asking at all, until
+Settings changes the default or goes back to asking each time. With no sorting source there is no Sorting Box to move to, so the only answer is the
+trash.
 
 ## The Sorting Box
 
@@ -56,8 +59,9 @@ folder.
 ## The three panels
 
 Navigation on one side, the grid in the middle, the pane on the other. The pane shows the item
-you clicked; clicking another replaces it, and dragging items onto it adds them, up to a limit.
-One mode, not a preview mode and a grid mode.
+you clicked; clicking another replaces it, and dragging items onto it adds them, up to a limit —
+several at once are scaled together so all of them are in sight. One mode, not a preview mode and
+a grid mode.
 
 Along the pane's foot, a filmstrip steps through the place the item was clicked in. The pane
 keeps both while the user looks somewhere else.

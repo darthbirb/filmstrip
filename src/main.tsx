@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "./app/App";
+import { suppressBrowserMenu } from "./app/browser-menu";
 import { startIndex } from "./app/navigation/index-store";
 import { watchWork } from "./app/navigation/work-store";
 import { loadPreferences } from "./app/preferences";
@@ -11,6 +12,7 @@ import "./styles/app.css";
 if (import.meta.env.DEV && !("__TAURI_INTERNALS__" in window)) {
   await import("./dev/mock");
 }
+suppressBrowserMenu();
 await loadPreferences();
 void startIndex();
 void watchWork();

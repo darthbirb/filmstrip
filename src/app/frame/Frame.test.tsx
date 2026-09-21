@@ -4,6 +4,7 @@ import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { inSight } from "../../dev/in-sight";
+import { Button } from "../../ui/Button";
 import { showInPane, whenShownInPane } from "../pane/pane-store";
 import { getPreferences, updatePreferences } from "../preferences";
 import { Frame } from "./Frame";
@@ -255,4 +256,37 @@ test("resizing a panel is saved to the preferences", async () => {
   (screen.getByRole("separator", { name: "Resize navigation" }).element() as HTMLElement).focus();
   await userEvent.keyboard("{ArrowRight}");
   expect(getPreferences().widths?.nav).toBe(16);
+});
+
+test("a panel will not be squeezed until a button's label is cut", async () => {
+  await page.viewport(1600, 900);
+  const screen = await render(
+    <div className="flex h-dvh flex-col">
+      <Frame
+        nav={
+          <Button glyph="plus" onClick={() => {}}>
+            Add a folder from somewhere else on this disk…
+          </Button>
+        }
+        grid={<p>grid content</p>}
+      />
+    </div>,
+  );
+  const nav = screen.getByRole("navigation", { name: "Navigation" }).element();
+  const splitter = screen.getByRole("separator", { name: "Resize navigation" });
+
+  // Home asks for the narrowest navigation the tokens allow, which is narrower than this label.
+  await splitter.click();
+  await userEvent.keyboard("{Home}");
+
+  const token = Number.parseFloat(
+    getComputedStyle(document.documentElement).getPropertyValue("--frame-nav-min"),
+  );
+  const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+  await expect.poll(() => nav.getBoundingClientRect().width).toBeGreaterThan(token * rem);
+
+  const label = nav.querySelector("button .truncate") as HTMLElement;
+  expect(label.scrollWidth - label.clientWidth, "nothing is cut off the label").toBeLessThanOrEqual(
+    0,
+  );
 });

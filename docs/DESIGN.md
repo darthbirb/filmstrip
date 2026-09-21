@@ -494,6 +494,11 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   `raised-hi` while Settings is open. While another window has focus they fall to `fg-faint`.
 - **Panels.** `panel`, a `line` at the edge facing the grid, a header row with the panel's name in
   `eyebrow` capitals and its fold button.
+- **Button.** A named move in words: `control`-tall at the `control` corner, `ui` text, a glyph
+  before the label in `fg-dim` where it has one and a count or chevron after it. Raised on
+  `raised` with a `line-control` ring, or quiet with no ground until the pointer brings a `wash`.
+  A label never wraps: too little room ends it in an ellipsis, and the panel it sits in stops
+  before it comes to that. DECISIONS.md "The frame".
 - **Glyph button.** A `control` square on `raised` with a `line-control` ring. Disabled, it sinks
   to `inset` on a `line` ring, its glyph `fg-faint`.
 - **Tree row.** Chevron, glyph, name and count. At rest the name is `fg-mid`; under the pointer a

@@ -284,4 +284,9 @@
     scrollbar-width: thin;
     scrollbar-color: var(--color-line-control-hi) transparent;
   }
+
+  /* Nothing selects but a field, which keeps its own text whatever it sits in. DECISIONS.md "The window". */
+  body {
+    user-select: none;
+  }
 }

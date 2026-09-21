@@ -300,7 +300,7 @@ pub fn source_summaries(conn: &Connection) -> Result<Vec<SourceSummary>> {
         .collect()
 }
 
-/// Registers a directory as a source, titled after it unless a title is given.
+/// Registers a directory as a source, titled after it unless a title is given, and queues its walk.
 pub fn register_source(
     conn: &Connection,
     raw_root: &str,
@@ -319,9 +319,9 @@ pub fn register_source(
             |name| name.to_string_lossy().into_owned(),
         ),
     };
-    Ok(AddOutcome::Added {
-        source: sources::add(conn, &root, &title, kind)?,
-    })
+    let source = sources::add(conn, &root, &title, kind)?;
+    jobs::enqueue_index_again(conn)?;
+    Ok(AddOutcome::Added { source })
 }
 
 /// An existing absolute directory, clear of every registered source and of the app's
@@ -475,6 +475,23 @@ mod tests {
         // A folder that overlaps nothing is still taken, so the refusals are not a blanket no.
         added(register(&conn, &outside, &app).unwrap());
         assert_eq!(sources::list(&conn).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn an_added_source_is_walked_even_when_a_walk_is_already_running() {
+        let base = scratch("queued");
+        let app = app_dir(&base);
+        let (first, second) = (base.join("first"), base.join("second"));
+        std::fs::create_dir_all(&first).unwrap();
+        std::fs::create_dir_all(&second).unwrap();
+        let mut conn = conn();
+        added(register(&conn, &first, &app).unwrap());
+        assert!(job_table::is_pending(&conn, "index", "{}").unwrap());
+
+        // The first walk starts, having listed only the first source.
+        job_table::claim(&mut conn).unwrap().unwrap();
+        added(register(&conn, &second, &app).unwrap());
+        assert!(job_table::is_pending(&conn, "index", "{}").unwrap());
     }
 
     #[test]

@@ -206,6 +206,15 @@ pub fn enqueue_index(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Queues a walk that starts after now, for a source just added: a walk already running listed
+/// the sources before it existed.
+pub fn enqueue_index_again(conn: &Connection) -> Result<()> {
+    if !table::is_pending(conn, kinds::INDEX, "{}")? {
+        table::enqueue(conn, kinds::INDEX, "{}", kinds::PRIORITY_INDEX)?;
+    }
+    Ok(())
+}
+
 pub fn enqueue_thumb(conn: &Connection, item_id: i64) -> Result<()> {
     let payload = serde_json::to_string(&kinds::ItemPayload { item_id })?;
     table::enqueue(conn, kinds::THUMB, &payload, kinds::PRIORITY_THUMB)?;

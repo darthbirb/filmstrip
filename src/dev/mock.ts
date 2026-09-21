@@ -147,7 +147,8 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     storedPreferences = preferences;
     return null;
   },
-  list_sources: () => SOURCES,
+  // `?no-sources` empties the library, which is the only way to see the doorways it draws instead.
+  list_sources: () => (new URLSearchParams(location.search).has("no-sources") ? [] : SOURCES),
   add_source: () =>
     Promise.reject<AppError>({ kind: "invalid", message: "Adding a source needs the real app." }),
   // The picker is the system's, so outside Tauri there is nothing to open and nothing chosen.

@@ -65,7 +65,7 @@ export function Splitter({ label, value, min, max, initial, panel, onChange, onS
       }}
       onKeyUp={() => onSizing?.(false)}
       onBlur={() => onSizing?.(false)}
-      className="focus-ring-inset group flex w-splitter shrink-0 cursor-col-resize touch-none select-none items-center justify-center bg-ground"
+      className="focus-ring-inset group flex w-splitter shrink-0 cursor-col-resize touch-none items-center justify-center bg-ground"
     >
       <span className="h-grip w-grip-width rounded-full bg-line-control transition-colors duration-(--motion-quick) group-hover:bg-fg-dim group-active:bg-fg-mid motion-reduce:transition-none" />
     </div>
