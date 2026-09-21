@@ -16,32 +16,17 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## A source's row cannot make a folder at its own top level · DEFECT
+## The delete question has no shape for many sorting sources · DEFECT
 
-The Components sheet gives a folder's row New folder, Favourite, Move to…, Reveal in Explorer, Rename,
-Read it again and Delete, and a source's row Rename, Reveal in Explorer, Read it again, Manage sources…
-and Remove source. The note says a source's row "is a folder's row minus those three" — New folder,
-Move to… and Delete — but the drawn row is also missing Favourite. And without New folder, nothing in
-the app can make a folder directly inside a source, since a source's row is the only row that stands
-for its top level.
+The delete question names each sorting source on its own button beside the trash. The Notes leave the
+case of many open: "where the answers should go when a person keeps six sorting sources. They wrap
+today, which is honest and untidy; a band that scrolls is the next shape, and nothing needs it yet."
+The question is going to be built, so what it does with more sorting sources than fit on one line has
+to be drawn rather than left to wrap.
 
-Give a source's row New folder and Favourite, keep it without Move to… and Delete, and make the note
-say exactly what the row holds.
-
-## Deleting a folder does not say which Sorting Box, or what happens with none · DEFECT
-
-The delete question offers "Move them to the Sorting Box" or "Send them to the trash too". Filmstrip's
-Sorting Box is any number of sorting sources, so the question has two states the drawing does not
-have. Both are decided, in PRODUCT.md "Folders and sources":
-
-- **Several sorting sources.** Moving asks which one. The question names them and one is picked,
-  with a checkbox that keeps the answer as the default, so later deletes move there without asking.
-  Settings holds that default: change it, or go back to asking each time.
-- **No sorting source.** There is nowhere to move to, so the question offers only the trash, and
-  cancel.
-
-Draw the question in both states, the checkbox, and the Settings row. Where the Settings row sits is
-the design's call; the Sources section is where sorting sources already live.
+Draw the question with more sorting sources than its row holds, at the pane's narrowest grid width and
+at 200%, and say in the note where the answers go once they no longer fit. The trash answer, the box
+and cancel keep their places.
 
 ## The app's own right-click menus · DRAWN
 
@@ -50,8 +35,10 @@ picture, in sentence case with the verbs the pane's bar already uses. The menu k
 the same menus one tile-gap below the focused tile's or row's ring. A tree row renames in place, as
 Settings renames a source. A folder's row makes, moves and deletes folders: New folder lands a row
 already in its name field, Move to… is the file picker, and Delete asks only when the folder holds
-something. Waiting on the two defects above. The folder verbs that change the disk also wait on the
-undo journal, FEATURES.md "Export and undo".
+something, naming each sorting source as its own answer, with a box that keeps the pick as the
+default in Settings › Sources. A source's row makes a folder at its top level. Waiting on the defect
+above. The folder verbs that change the disk also wait on the undo journal, FEATURES.md "Export and
+undo".
 
 ## The way into full screen · DRAWN
 

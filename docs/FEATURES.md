@@ -44,7 +44,7 @@ drawn. **Not started** — neither.
 | A folder's own details | Backlogged, and not in Rust | "A folder's details" |
 | Create a folder | Drawn, waiting on the undo journal | the folder row's menu |
 | Move a folder | Drawn, waiting on the undo journal | the folder row's menu |
-| Delete a folder, choosing what happens to what is inside | Drawn, with a defect, and waiting on the undo journal | which Sorting Box, PRODUCT.md "Folders and sources" |
+| Delete a folder, choosing what happens to what is inside | Drawn, with a defect, and waiting on the undo journal | PRODUCT.md "Folders and sources" |
 | Rename a folder, on disk | Drawn on its tree row | no command yet |
 | A folder's cover | Not started | `folder.cover_item_id` exists |
 | A folder's status, notes, favourite | Not started | |
@@ -125,6 +125,6 @@ drawn. **Not started** — neither.
 | Three panels, splitters, folding, the rail | Built | |
 | The app's own window chrome | Built | |
 | Settings | Built, with Sources in it | |
-| The app's own right-click menus | Drawn, with two defects | a source's menu and the delete question |
+| The app's own right-click menus | Drawn, with one defect | the delete question with many sorting sources |
 | A scrubber for very large folders | Backlogged | |
 | Compression review, duplicate detection, a storage screen, a tags screen | Not started | PRODUCT.md "Later" |
