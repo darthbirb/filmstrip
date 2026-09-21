@@ -18,7 +18,7 @@ drawn. **Not started** — neither.
 | --- | --- | --- |
 | Register a folder as a source | Built | `add_source`, and both doorways |
 | Several sources at once, library and sorting | Built | `list_sources`, `set_source_kind` |
-| Rename a source | Built in Settings | `rename_source`; a tree row's rename is a DEFECT in the backlog |
+| Rename a source | Built in Settings | `rename_source`; renaming on its tree row is drawn |
 | Remove a source, leaving the folder alone | Built | `remove_source` |
 | Reveal a source in Explorer | Built | `reveal_source` |
 | Remember the interface's own state | Built | `ui_preferences` |
@@ -45,7 +45,7 @@ drawn. **Not started** — neither.
 | Create a folder | Not started | |
 | Move a folder | Not started | |
 | Delete a folder, choosing what happens to what is inside | Not started | |
-| Rename a folder, on disk | Not started | |
+| Rename a folder, on disk | Drawn on its tree row | no command yet |
 | A folder's cover | Not started | `folder.cover_item_id` exists |
 | A folder's status, notes, favourite | Not started | |
 | A folder's labels and tags, inherited by everything under it | Not started | items inherit labels, and never own one |
@@ -75,7 +75,7 @@ drawn. **Not started** — neither.
 | Details, and the tags on an item | Built | |
 | A filmstrip of the place it came from | Built | |
 | Full screen | Built | |
-| **Zoom and pan a picture** | Backlogged | "Zoom in the pane" — the one thing missed rather than deferred |
+| **Zoom and pan a picture** | Drawn, with one defect | the one thing missed rather than deferred |
 | Video playback | Built, on the browser's own controls | a plate of its own is drawn, and volume is not yet kept between items |
 | Frame steps and a named speed set | Backlogged | "The video plate…" |
 | Several items at once, scaled to fit together | Not started | dragging items onto the pane, PRODUCT.md "The three panels" |
@@ -125,6 +125,6 @@ drawn. **Not started** — neither.
 | Three panels, splitters, folding, the rail | Built | |
 | The app's own window chrome | Built | |
 | Settings | Built, with Sources in it | |
-| The app's own right-click menus | Drawn, with three defects | the backlog |
+| The app's own right-click menus | Drawn, with two defects | a folder's menu still lacks its folder verbs |
 | A scrubber for very large folders | Backlogged | |
 | Compression review, duplicate detection, a storage screen, a tags screen | Not started | PRODUCT.md "Later" |

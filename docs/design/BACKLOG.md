@@ -16,94 +16,93 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
+## A folder row's menu says folders are never moved or deleted · DEFECT
+
+The Components sheet's folder-row menu holds Rename, Reveal in Explorer and Read it again, and its note
+explains the gap: "this app moves files, never folders, and deleting a folder is not something it can
+do." PRODUCT.md "Folders and sources" says the opposite: "Deleting a folder asks: move what is inside to
+the Sorting Box, or send it to the trash as well. An empty folder goes without asking." And every
+ggallery capability comes over, which includes creating a folder, moving one and deleting one
+(FEATURES.md "Folders").
+
+Draw a folder row's menu with New folder, Move to… and Delete beside what it already holds, in the
+menus' own order and case, and say where each one opens: the name field a new folder starts as, the
+picker Move to… already uses for files, and the question deleting a folder with something in it asks.
+Correct the note. A source's row keeps Remove source and has no Delete or Move to…, since removing is
+what a source has instead.
+
+## The keyboard's menu is drawn at one distance and described at another · DEFECT
+
+The note puts a menu opened from the keyboard "4px clear of the 2px ring and its 2px gap", which is
+8px below a tile. The markup puts it at `calc(100% + 4px)`, 4px below the tile, which lands it on the
+ring's outer edge rather than clear of it. A row is drawn 4px under its edge. Neither distance is a
+token, and the sheets' own rule is that nothing but the ring and the hairlines carries a pixel.
+
+Settle one distance, measured from the ring where the anchor has one outside it, and name it from the
+tokens rather than in pixels.
+
+## Three lines still explain the app to itself · DEFECT
+
+The last pass settled the rule: a line under a title carries a count, a name, a path or a query, or
+there is no line. Three lines were drawn past it.
+
+- **This Folder Is Empty** keeps "Nothing is in People, on disk or in the index." The Notes count the
+  lines that went and the lines that stayed, and this one is in neither list, so it was not looked at.
+- **Settings › Sources** gains a line under the section title that was not there before: "Three folders,
+  read where they stand." with sources, and "No folders yet." without — the second directly above a
+  **No Sources Yet** title that says the same thing.
+- **A codec the window cannot play** keeps "The window can't open .mkv files, so this is its
+  thumbnail." The format is a fact; the rest explains the picture.
+
+Carry all three onto the rule. The Sources section also keeps its warning that removing a source drops
+the tags and notes on its files. That is not a count, a name, a path or a query, so either it is the
+rule's one stated exception — a warning before something that cannot be undone — or it moves to where
+the removing happens. Say which, in the rule's own words.
+
+## A zoomed picture both keeps and loses its corner and gap · DEFECT
+
+The zoom block's last heading reads "Off fit, the picture has no corners and no gap", and the paragraph
+under it says "Bigger than the media area, it fills that area exactly — the corner stays, the gap stays,
+and what is cropped is cropped by the pane's own edge." The readout is placed against "the picture's
+bottom-left corner", which is off screen once a picture is bigger than the area.
+
+"Bigger than the media area" also has two directions. A panorama zoomed until it overflows sideways but
+not vertically, and any picture zoomed out below fit, still show their own bottom edge inside the area.
+
+Settle whether a zoomed picture is clipped by the media area's rounded inset or runs to the pane's edge,
+and anchor the readout to something that is always on screen: the media area's corner, whatever the
+picture is doing.
+
 ## The app's own right-click menus · DRAWN
 
-The browser's menu is now suppressed everywhere but in a field, as the drawing says, so right-clicking
-a tile or a row opens nothing. The app's own five menus are drawn and wait on the three defects below.
+Drawn on the Components sheet: a tile, a selection of five, a folder row, a source row and the pane's
+picture, in sentence case with the verbs the pane's bar already uses. The menu key and Shift+F10 open
+the same menus against the focused tile or row. A tree row renames in place, as Settings renames a
+source. Waiting on the two defects above; a folder's rename also needs a command that does not exist.
 
-## The right-click menus and the pane's bar name the open verb differently · DEFECT
+## The way into full screen · DRAWN
 
-The menus' own rule is that every row is already a button in the pane's bar or a row in its ⋯, in the
-same order. The two sheets disagree on the words. Components draws **Open With…** and **Reveal In
-Explorer**; the Pane sheet draws the bar's button and ⋯ row as **Open with the default app** and
-**Reveal in Explorer**, which is what is built. It is two differences, and both carry weight: an
-ellipsis promises a chooser, where the built verb opens the default app with no question asked, and the
-same `Menu.tsx` draws both menus, in two different cases.
+At the left end of the pane's header, as `arrow-line-left`, and `arrow-line-right` to leave. In full
+screen the fold button goes and nothing slides into its place.
 
-Settle one verb and one case, and carry them on both sheets.
+## Labels in sentence case · DRAWN
 
-## Rename on a tree row has nowhere to happen · DEFECT
+A title is Title Case; every label on a button, a menu row or a tooltip is sentence case. The built app
+already agrees except for the notices: **Retry these**, **Show the 31**, **Hide the list**.
 
-The folder row's menu and the source row's menu both offer **Rename**. Every other rename is drawn: a
-tile's goes to the pane's Name row, and Settings renames a source by making its name a field where it
-stands. Nothing draws a tree row being renamed — whether the row itself becomes a field, whether it
-sends the person to Settings, or something else.
+## Empty states without their explanations · DRAWN
 
-Draw a tree row being renamed.
+Nothing Chosen Yet, Nothing To Sort, Trash Is Empty and both No Sources Yet lose their lines; This File
+Has Gone names the path it was at; a folder of folders and an offline source keep the count their line
+carries. Waiting on the defect above for the three that were missed.
 
-## A menu opened from the keyboard is undrawn · DEFECT
+## Zoom and pan a picture in the pane · DRAWN
 
-The Notes list "what the menu key and Shift+F10 open" as open, and the right-click block never mentions
-the keyboard. With the browser's menu suppressed, those two keys now open nothing at all, so a person
-without a pointer has no way to any of the five menus.
-
-Draw where a keyboard-opened menu lands against the focused tile or row.
-
-## The way into full screen sits on the wrong side of the pane's header · DEFECT
-
-The pane's header draws the full-screen button beside the button that folds the pane away, at the
-header's right-hand end, so the two controls that do very different things sit together and the one
-that grows the pane points nowhere in particular.
-
-Draw the way into full screen on the opposite side of the header from the fold, and as an arrow that
-says which way it goes. Say what it becomes in full screen, where there is nothing left to fold. The
-old drawing has no such control to borrow from, so this one is drawn from scratch.
-
-## A button's label is drawn in two cases at once · DEFECT
-
-The Components sheet's own note settles the empty states on Title Case, "the same case the buttons
-use". The button it draws under that note reads **Add a folder…**, and so does the one on the Pane
-sheet. One of the two is wrong, and every text button in the app takes the answer: the doorways, the
-notices' **Retry These** and **Show The 12**, and the folder buttons a folder of folders offers.
-
-Settle the case for a button's label, say it in the sheet's own words, and redraw every button that
-disagrees with it. The tooltip a glyph button carries is the same question.
-
-## The line under an empty title explains the app to itself · DEFECT
-
-Every empty state is drawn as a title and a sentence under it, and the sentences read as placeholder
-copy: "Add a folder and Filmstrip will read it where it stands.", "Click a picture and it shows here,
-and stays while you look elsewhere.", "Everything that came in has been filed. New files land here as
-they are found.", "Deleted files wait here until you empty it, and can be put back.", "It was moved or
-deleted outside the app, so there is nothing left to show." Settings carries the same voice in "Added
-here, a folder is a library source."
-
-None of them says anything the title and the button beside it do not. Draw the empty states without
-explaining the app: the title, the one move worth offering, and a line only where it carries a fact
-the person cannot see — a count, a name, a path. Where a line has nothing to add, draw none. This
-is a rule for every sentence the app shows, not only the six here.
-
-## Zoom and pan a picture in the pane
-
-ggallery zoomed pictures in the pane and Filmstrip does not, which was an oversight rather than a
-decision. The behaviour ports as it stands, verified against ggallery's own interaction code:
-
-- The wheel zooms about the point under the pointer, starting from the scale the fitted picture is
-  already drawn at, so the first notch out of fit does not jump.
-- A notch is ×1.12 in or ×0.89 out, held between 0.1× and 12×.
-- Dragging pans.
-- Double-click returns to fit, and so does showing another item.
-- Off fit, one small percentage readout appears, which is also the way back to fit; at fit there is
-  no zoom furniture at all.
-
-What is not drawn, and has to be:
-
-- where the readout sits, at the pane's own width and in full screen, and what it looks like over a
-  photograph
-- the pointer: whether it says a picture can be dragged, and whether that changes while it is held
-- whether the keyboard can zoom, and what returns to fit without a pointer
-- whether a video zooms too, or only a picture
-- what a zoomed picture does when the pane is resized, folded, or the item changes
+On the Pane sheet. The behaviour ports from ggallery as it stands. At fit nothing is on the picture;
+off fit, one percentage plate, which is also the way back to fit and a tab stop only while it is there.
+Plus and minus zoom about the centre from the keyboard and 0 fits; a video does not zoom; a multiple of
+fit and a centre point survive a resize, a fold and full screen, and the next item starts at fit.
+Waiting on the defect above.
 
 ## A folder's details · DRAWN
 
