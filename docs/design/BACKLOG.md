@@ -28,15 +28,6 @@ default in Settings › Sources; more sorting sources than the line holds fold i
 A source's row makes a folder at its top level. The folder verbs that change the disk wait on the
 undo journal, FEATURES.md "Export and undo".
 
-## Zoom and pan a picture in the pane · DRAWN
-
-On the Pane sheet. The behaviour ports from ggallery as it stands. At fit nothing is on the picture;
-off fit, one percentage plate a tile-inset inside the media area's bottom-left, which is also the way
-back to fit and a tab stop only while it is there. The picture is clipped by the media area's rounded
-inset at every magnification. Plus and minus zoom about the centre from the keyboard and 0 fits; a
-video does not zoom; a multiple of fit and a centre point survive a resize, a fold and full screen,
-and the next item starts at fit.
-
 ## A folder's details · DRAWN
 
 The grid's header says only where you are. A folder has more to know, and nowhere to show it:

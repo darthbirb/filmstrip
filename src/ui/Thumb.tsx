@@ -1,4 +1,5 @@
 import { Glyph } from "./Glyph";
+import { Plate } from "./Plate";
 
 /** The classes a thumbnail's own element needs: its corner, and the hatch until a picture covers it. */
 export const THUMB_FRAME = "group @container relative overflow-hidden rounded-control hatch";
@@ -37,9 +38,9 @@ export function ThumbFace({ src, current = false, badge = true, duration }: Face
         </span>
       )}
       {duration && (
-        <span className="pointer-events-none absolute right-tile-inset bottom-tile-inset flex h-badge items-center rounded-badge bg-veil px-1.5 text-fg text-small tabular-nums">
+        <Plate className="pointer-events-none absolute right-tile-inset bottom-tile-inset">
           {duration}
-        </span>
+        </Plate>
       )}
     </>
   );

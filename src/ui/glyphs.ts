@@ -29,6 +29,7 @@ export const GLYPHS = {
   // The pane's left edge is the one full screen moves, so the arrow points along it.
   fullScreen: { icon: "arrow-line-left", code: 0xe062 },
   leaveFullScreen: { icon: "arrow-line-right", code: 0xe064 },
+  fit: { icon: "arrows-in-simple", code: 0xe09e },
   warning: { icon: "warning-circle", code: 0xe4e2 },
   star: { icon: "star", code: 0xe46a },
   copy: { icon: "copy", code: 0xe1ca },
