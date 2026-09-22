@@ -30,11 +30,7 @@ export function Sources() {
     <div className="flex flex-col gap-2">
       {held.length === 0 ? (
         <div className="rounded-control bg-inset py-6 inset-ring inset-ring-line-control">
-          <EmptyState
-            glyph="folders"
-            title="No Sources Yet"
-            note="Add a folder and Filmstrip will read it where it stands."
-          />
+          <EmptyState glyph="folders" title="No Sources Yet" />
         </div>
       ) : (
         <div className="flex flex-col gap-1.5">
@@ -50,21 +46,25 @@ export function Sources() {
           onDismiss={() => setRefused(null)}
         />
       )}
-      <div className="flex items-center gap-2.5">
+      <div className="flex">
         <Button glyph="plus" onClick={() => void addFolder("library")}>
           Add a folder…
         </Button>
-        <span className="text-fg-dim text-small">Added here, a folder is a library source.</span>
       </div>
-      <p className="m-0 text-fg-dim text-small">
-        Removing a source leaves its folder on disk and drops what Filmstrip knows about it,
-        including the tags and notes on its files.
-      </p>
     </div>
   );
 }
 
 function Row({ source }: { source: SourceSummary }) {
+  const [asking, setAsking] = useState(false);
+  return asking ? (
+    <Asking source={source} onCancel={() => setAsking(false)} />
+  ) : (
+    <Settled source={source} onRemove={() => setAsking(true)} />
+  );
+}
+
+function Settled({ source, onRemove }: { source: SourceSummary; onRemove: () => void }) {
   const { progress } = useWork();
   const [naming, setNaming] = useState(false);
   const field = useRef<HTMLInputElement>(null);
@@ -144,11 +144,8 @@ function Row({ source }: { source: SourceSummary }) {
         <GlyphButton
           glyph="minusCircle"
           label={`Remove ${source.title}`}
-          onClick={() => {
-            void removeSource(source.id)
-              .then(() => loadIndex())
-              .catch(() => undefined);
-          }}
+          danger
+          onClick={onRemove}
         />
       </div>
       <span className="truncate pl-7 font-mono text-eyebrow text-fg-dim" title={source.root}>
@@ -156,5 +153,56 @@ function Row({ source }: { source: SourceSummary }) {
         {!source.reachable && " · offline"}
       </span>
     </div>
+  );
+}
+
+/**
+ * The warning, at the moment it matters and on the row it is about: the name and the count stay,
+ * so the question says which source it means. Escape puts the row back and leaves Settings open.
+ */
+function Asking({ source, onCancel }: { source: SourceSummary; onCancel: () => void }) {
+  const cancel = useRef<HTMLButtonElement>(null);
+  // The remove button that had the focus has just gone, so the focus goes to the answer that keeps.
+  useEffect(() => {
+    cancel.current?.focus();
+  }, []);
+
+  return (
+    <fieldset
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        onCancel();
+      }}
+      className="m-0 flex min-w-0 flex-col gap-1.5 rounded-control border-0 bg-inset px-2.5 py-2 inset-ring inset-ring-line-danger"
+    >
+      <legend className="sr-only">Remove {source.title}?</legend>
+      <div className="flex items-center gap-2">
+        <Glyph name="warning" className="shrink-0 text-danger text-icon" />
+        <span className="min-w-0 flex-1 truncate px-1 text-fg text-ui">{source.title}</span>
+        <span className="shrink-0 text-fg-mid text-small tabular-nums">
+          {formatCount(source.itemCount)} items
+        </span>
+      </div>
+      <p className="m-0 pl-7 text-fg-mid text-small">
+        The folder stays on disk. Filmstrip drops what it knows about it, including the tags and
+        notes on its files.
+      </p>
+      <div className="flex gap-1.5 pl-7">
+        <Button
+          tone="danger"
+          onClick={() => {
+            void removeSource(source.id)
+              .then(() => loadIndex())
+              .catch(() => undefined);
+          }}
+        >
+          Remove source
+        </Button>
+        <Button ref={cancel} tone="quiet" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </fieldset>
   );
 }

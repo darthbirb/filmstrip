@@ -2,35 +2,49 @@ import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import { formatBytes, formatDimensions, formatDuration } from "../../lib/format";
 import { EmptyState } from "../../ui/EmptyState";
 import { Glyph } from "../../ui/Glyph";
+import { GlyphButton } from "../../ui/GlyphButton";
 import { PushDown } from "../../ui/PushDown";
 import { updatePreferences, usePreferences } from "../preferences";
 import { Actions } from "./Actions";
 import { Details } from "./Details";
+import { setFullScreen, useFullScreen } from "./full-screen";
 import { Media } from "./Media";
 import { usePaneDetail } from "./pane-detail";
 import { Strip } from "./Strip";
 
 const DETAILS_ID = "pane-details";
 
-/** The pane's header row: the item's shape and size, opening onto everything else known about it. */
+/**
+ * The pane's header row: the way into full screen, then the item's shape and size, opening onto
+ * everything else known about it. Both go with the item, so an empty pane's header holds only its fold.
+ */
 export function PaneHeader() {
   const shown = usePaneDetail();
   const open = usePreferences().details ?? false;
+  const full = useFullScreen();
   if (shown.status !== "ready") return null;
   return (
-    <button
-      type="button"
-      aria-expanded={open}
-      aria-controls={DETAILS_ID}
-      onClick={() => updatePreferences({ details: !open })}
-      className="focus-ring flex h-control w-full min-w-0 items-center gap-2 rounded-control px-2 text-left text-fg-mid text-ui tabular-nums transition-colors duration-(--motion-quick) hover:bg-wash hover:text-fg aria-expanded:bg-raised aria-expanded:text-fg motion-reduce:transition-none"
-    >
-      <Glyph
-        name="chevronRight"
-        className={`text-fg-dim text-icon transition-transform duration-(--motion-quick) ease-out motion-reduce:transition-none ${open ? "rotate-90" : ""}`}
+    <div className="flex min-w-0 items-center gap-1.5">
+      <GlyphButton
+        glyph={full ? "leaveFullScreen" : "fullScreen"}
+        label={full ? "Leave full screen" : "Full screen"}
+        pressed={full}
+        onClick={() => setFullScreen(!full)}
       />
-      <span className="min-w-0 flex-1 truncate">{summary(shown.item)}</span>
-    </button>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={DETAILS_ID}
+        onClick={() => updatePreferences({ details: !open })}
+        className="focus-ring flex h-control w-full min-w-0 items-center gap-2 rounded-control px-2 text-left text-fg-mid text-ui tabular-nums transition-colors duration-(--motion-quick) hover:bg-wash hover:text-fg aria-expanded:bg-raised aria-expanded:text-fg motion-reduce:transition-none"
+      >
+        <Glyph
+          name="chevronRight"
+          className={`text-fg-dim text-icon transition-transform duration-(--motion-quick) ease-out motion-reduce:transition-none ${open ? "rotate-90" : ""}`}
+        />
+        <span className="min-w-0 flex-1 truncate">{summary(shown.item)}</span>
+      </button>
+    </div>
   );
 }
 
@@ -39,7 +53,7 @@ export function Pane() {
   const shown = usePaneDetail();
   const open = usePreferences().details ?? false;
   if (shown.status === "loading") return null;
-  if (shown.status !== "ready") return <Empty gone={shown.status === "gone"} />;
+  if (shown.status !== "ready") return <Empty gone={shown.status === "gone" ? shown : null} />;
   const { item, tags } = shown;
   return (
     <div className="flex h-full flex-col">
@@ -63,19 +77,11 @@ export function Pane() {
   );
 }
 
-function Empty({ gone }: { gone: boolean }) {
+function Empty({ gone }: { gone: { path: string | null } | null }) {
   return gone ? (
-    <EmptyState
-      glyph="image"
-      title="This File Has Gone"
-      note="It was moved or deleted outside the app, so there is nothing left to show."
-    />
+    <EmptyState glyph="image" title="This File Has Gone" path={gone.path ?? undefined} />
   ) : (
-    <EmptyState
-      glyph="image"
-      title="Nothing Chosen Yet"
-      note="Click a picture and it shows here, and stays while you look elsewhere."
-    />
+    <EmptyState glyph="image" title="Nothing Chosen Yet" />
   );
 }
 

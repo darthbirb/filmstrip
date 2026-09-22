@@ -41,6 +41,8 @@ export const itemTags = (itemId: number) => invoke<EffectiveTag[]>("item_tags", 
 
 export const itemDetail = (itemId: number) => invoke<ItemDetail | null>("item_detail", { itemId });
 
+export const itemPath = (itemId: number) => invoke<string | null>("item_path", { itemId });
+
 export const sortingItems = () => invoke<ItemRow[]>("sorting_items");
 
 export const setItemFavorite = (itemIds: number[], favorite: boolean) =>

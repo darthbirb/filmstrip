@@ -138,8 +138,7 @@ test("with no sources at all, the doorway stands where the tree will", async () 
   const screen = await render(<Navigation />);
 
   await expect.element(screen.getByText("No Sources Yet")).toBeVisible();
-  await expect
-    .element(screen.getByText("Add a folder and Filmstrip will read it where it stands."))
-    .toBeVisible();
   await expect.element(screen.getByRole("button", { name: /Add a folder/ })).toBeVisible();
+  // A glyph, the title and the button: no line explaining what adding does.
+  expect(screen.container.querySelectorAll("p")).toHaveLength(1);
 });

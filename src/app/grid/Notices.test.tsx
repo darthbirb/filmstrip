@@ -61,11 +61,11 @@ test("the failures are counted, listed in place, and can be tried again", async 
   // The list is not a dialog: it stays closed until asked for.
   expect(screen.getByText("Unsupported raw").elements()).toHaveLength(0);
 
-  await screen.getByRole("button", { name: "Show The 2" }).click();
+  await screen.getByRole("button", { name: "Show the 2" }).click();
   await expect.element(screen.getByText("Trips\\Cairo\\_DSC4411.ARW")).toBeVisible();
   await expect.element(screen.getByText("Unsupported raw")).toBeVisible();
 
-  await screen.getByRole("button", { name: "Retry These" }).click();
+  await screen.getByRole("button", { name: "Retry these" }).click();
   await expect.poll(() => retried).toBe(1);
   await expect.poll(() => screen.getByText(/could not be indexed/).elements().length).toBe(0);
 });

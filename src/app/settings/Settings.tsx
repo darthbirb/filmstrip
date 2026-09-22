@@ -68,10 +68,10 @@ function useSections(): Section[] {
     },
     {
       id: "sources",
-      group: "This app",
+      group: "Your library",
       title: "Sources",
       glyph: "source",
-      caption: "Folders read where they stand",
+      caption: "Sources",
       rows: [],
       body: <Sources />,
     },

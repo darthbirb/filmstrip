@@ -17,22 +17,10 @@ export function EmptyPlace({ place }: { place: Place }) {
   }, [folderId]);
 
   if (place.kind === "sorting") {
-    return (
-      <EmptyState
-        glyph="checkCircle"
-        title="Nothing To Sort"
-        note="Everything that came in has been filed. New files land here as they are found."
-      />
-    );
+    return <EmptyState glyph="checkCircle" title="Nothing To Sort" />;
   }
   if (place.kind === "trash") {
-    return (
-      <EmptyState
-        glyph="trash"
-        title="Trash Is Empty"
-        note="Deleted files wait here until you empty it, and can be put back."
-      />
-    );
+    return <EmptyState glyph="trash" title="Trash Is Empty" />;
   }
   if (!folder) return null;
 
@@ -43,7 +31,7 @@ export function EmptyPlace({ place }: { place: Place }) {
       <EmptyState
         glyph="unplugged"
         title={`${source.title} Is Offline`}
-        note={`The app knows what is in this source but cannot reach it. Its last count was ${formatCount(source.itemCount)} items.`}
+        note={`${formatCount(source.itemCount)} items when it was last read.`}
       />
     );
   }
@@ -52,13 +40,7 @@ export function EmptyPlace({ place }: { place: Place }) {
   if (!children.has(folder.id)) return null;
   const inside = children.get(folder.id) ?? [];
   if (inside.length === 0) {
-    return (
-      <EmptyState
-        glyph="folderDashed"
-        title="This Folder Is Empty"
-        note={`Nothing is in ${folder.title}, on disk or in the index.`}
-      />
-    );
+    return <EmptyState glyph="folderDashed" title="This Folder Is Empty" />;
   }
   return (
     <EmptyState

@@ -15,7 +15,7 @@ import { Pane, PaneHeader } from "./Pane";
 import { PaneDetailProvider } from "./pane-detail";
 import { showInPane } from "./pane-store";
 
-// These run against the dev mock's library, until the last two tests replace it.
+// These run against the dev mock's library, until the tests at the end replace it.
 
 const CAIRO: Place = {
   kind: "folder",
@@ -84,6 +84,28 @@ test("the pane shows the picture clicked, and the next click replaces it", async
   await expect.element(pyramid).not.toHaveAttribute("aria-current");
 });
 
+test("the way into full screen leads the header row, and goes with the item", async () => {
+  const screen = await render(<Harness />);
+  const pane = screen.getByRole("complementary", { name: "Pane" });
+  await expect.element(pane.getByText("Nothing Chosen Yet")).toBeVisible();
+  expect(pane.getByRole("button", { name: "Full screen" }).elements()).toHaveLength(0);
+
+  showInPane((await inCairo("pyramid.jpg")).id);
+  const into = pane.getByRole("button", { name: "Full screen" });
+  await expect.element(into).toBeVisible();
+  // First in the row, before the disclosure, so it stands at the edge that full screen moves.
+  expect(pane.getByRole("button").elements()[0]).toBe(into.element());
+  const arrow = () => into.element().querySelector(".glyph")?.textContent;
+  expect(arrow()).toBe(String.fromCodePoint(0xe062));
+
+  await into.click();
+  const out = pane.getByRole("button", { name: "Leave full screen" });
+  await expect.element(out).toHaveAttribute("aria-pressed", "true");
+  expect(out.element().querySelector(".glyph")?.textContent).toBe(String.fromCodePoint(0xe064));
+  await out.click();
+  await expect.element(pane.getByRole("button", { name: "Full screen" })).toBeVisible();
+});
+
 test("the header row gives the shape and size, and opens onto the rest, remembered", async () => {
   const pyramid = await inCairo("pyramid.jpg");
   showInPane(pyramid.id);
@@ -148,6 +170,20 @@ test("a video plays in the pane over its poster, and the header says how long it
   expect(video.poster).toMatch(/^data:image\/svg/);
 });
 
+test("a clip the window cannot play names its format, and nothing else", async () => {
+  const felucca = await inCairo("felucca.mp4");
+  showInPane(felucca.id);
+  const screen = await render(<Harness grid={false} />);
+  await expect.element(screen.getByRole("button", { name: /0:12/ })).toBeVisible();
+  const video = document.querySelector("aside video") as HTMLVideoElement;
+  video.dispatchEvent(new Event("error"));
+
+  const caption = screen.getByText(".mp4");
+  await expect.element(caption).toBeVisible();
+  expect(caption.element().tagName).toBe("FIGCAPTION");
+  expect(getComputedStyle(caption.element()).fontFamily).toMatch(/^"?IBM Plex Mono/);
+});
+
 test("a picture stands on the panel, with no bars left around it", async () => {
   const pyramid = await inCairo("pyramid.jpg");
   showInPane(pyramid.id);
@@ -165,10 +201,19 @@ test("a picture stands on the panel, with no bars left around it", async () => {
   expect(element.getBoundingClientRect().height).toBeLessThan(area().height);
 });
 
-test("an item that has gone says so", async () => {
+test("an item that has gone says so, with no line when nothing remembers where it was", async () => {
   showInPane(9999);
   const screen = await render(<Harness />);
-  await expect.element(screen.getByText("This File Has Gone")).toBeVisible();
+  const pane = screen.getByRole("complementary", { name: "Pane" });
+  await expect.element(pane.getByText("This File Has Gone")).toBeVisible();
+  expect(pane.getByRole("paragraph").elements()).toHaveLength(1);
+});
+
+test("an empty pane has a title and nothing under it", async () => {
+  const screen = await render(<Harness grid={false} />);
+  const pane = screen.getByRole("complementary", { name: "Pane" });
+  await expect.element(pane.getByText("Nothing Chosen Yet")).toBeVisible();
+  expect(pane.getByRole("paragraph").elements()).toHaveLength(1);
 });
 
 test("the filmstrip runs through the place the picture was clicked in, wherever the grid goes", async () => {
@@ -324,4 +369,22 @@ test("the strip's steps float over its ends, and the first frame sits clear of t
   expect(previous.left).toBeGreaterThan(track.left);
   expect(next.right).toBeLessThan(track.right);
   expect(box(first.element()).left).toBeGreaterThanOrEqual(previous.right);
+});
+
+test("an item gone from disk names the path it was at", async () => {
+  mockIPC((cmd) => {
+    if (cmd === "item_detail") return null;
+    if (cmd === "item_path") return "C:UsersadaPicturesTripsIMG_4821.jpg";
+    return cmd === "item_tags" ? [] : undefined;
+  });
+  showInPane(4821);
+  const screen = await render(
+    <PaneDetailProvider>
+      <Pane />
+    </PaneDetailProvider>,
+  );
+  await expect.element(screen.getByText("This File Has Gone")).toBeVisible();
+  const path = screen.getByText("C:UsersadaPicturesTripsIMG_4821.jpg");
+  await expect.element(path).toBeVisible();
+  expect(getComputedStyle(path.element()).fontFamily).toMatch(/^"?IBM Plex Mono/);
 });

@@ -161,6 +161,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   folder_items: ({ folderId }) => ITEMS[folderId as number] ?? [],
   item_tags: () => [],
   item_detail: ({ itemId }) => detail(itemId as number),
+  item_path: ({ itemId }) => detail(itemId as number)?.path ?? null,
   sorting_items: () => ITEMS[2] ?? [],
   // The bar acts on the mock library as it would on a real one, so the dev window shows the state.
   set_item_favorite: ({ itemIds, favorite }) => {

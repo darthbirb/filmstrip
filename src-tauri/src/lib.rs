@@ -92,6 +92,7 @@ pub fn run() {
             commands::sorting_items,
             commands::item_tags,
             commands::item_detail,
+            commands::item_path,
             commands::set_item_favorite,
             commands::reveal_item,
             commands::open_item,
