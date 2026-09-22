@@ -14,14 +14,15 @@ type Props = {
 // The picture sizes itself and carries the corner, so nothing is drawn around it. DECISIONS.md "The pane".
 const PICTURE = "max-h-full max-w-full rounded-control";
 
-/** The item itself: a picture over its thumbnail until the original arrives, or a video over its poster. */
+/** The item itself: a picture once its original is in, or a video over its poster. */
 export function Media({ item, fill = false }: Props) {
   const [state, setState] = useState<"loading" | "shown" | "failed">("loading");
   const thumb = item.thumb ? convertFileSrc(item.thumb) : undefined;
   const area = useRef<HTMLDivElement>(null);
   // Only the pane's picture zooms, and only once the original is in: a thumbnail has no pixels to spare.
   const [own, setOwn] = useState<Size | null>(null);
-  const zoom = useZoom(area, own);
+  const known = item.width && item.height ? { width: item.width, height: item.height } : null;
+  const zoom = useZoom(area, fill && item.kind === "image" ? (own ?? known) : null, own !== null);
 
   let body: ReactNode;
   if (item.kind === "video") {
@@ -40,9 +41,15 @@ export function Media({ item, fill = false }: Props) {
   } else if (item.kind === "image") {
     body = (
       <>
-        {thumb && state !== "shown" && (
-          // Centred under the original by its own auto margins, so both sit in the same place.
-          <img className={`absolute inset-0 m-auto ${PICTURE}`} src={thumb} alt="" />
+        {thumb && state === "failed" && (
+          // Only an original that cannot be drawn is stood in for, at the size it would have taken.
+          // While one loads nothing is, so it never flashes low. DECISIONS.md "The pane".
+          <img
+            className={`absolute inset-0 m-auto ${PICTURE}`}
+            style={zoom.fitted}
+            src={thumb}
+            alt=""
+          />
         )}
         <img
           className={`${zoom.zoomed ? "max-w-none rounded-control" : PICTURE} ${state === "shown" ? "" : "opacity-0"}`}

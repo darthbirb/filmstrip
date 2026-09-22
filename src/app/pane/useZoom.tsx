@@ -29,11 +29,11 @@ const NONE: Size = { width: 0, height: 0 };
 
 /**
  * Zooming the pane's picture: the wheel, a drag, a double-click and the keys on the media area, and
- * what they do to it. `image` is the picture's own size once the original is in; until then, and for
- * a video or a tile, there is nothing to zoom.
+ * what they do to it. `image` is the picture's own size as far as it is known; only once the original
+ * is in (`on`) is there anything to zoom, and for a video or a tile there never is.
  */
-export function useZoom(area: RefObject<HTMLElement | null>, image: Size | null) {
-  const on = image !== null;
+export function useZoom(area: RefObject<HTMLElement | null>, image: Size | null, on: boolean) {
+  const known = image !== null;
   const [view, setView] = useState<View>(null);
   const [size, setSize] = useState(NONE);
   const [dragging, setDragging] = useState(false);
@@ -41,13 +41,13 @@ export function useZoom(area: RefObject<HTMLElement | null>, image: Size | null)
 
   useLayoutEffect(() => {
     const box = area.current;
-    if (!on || !box) return;
+    if (!known || !box) return;
     const measure = () => setSize({ width: box.clientWidth, height: box.clientHeight });
     const observer = new ResizeObserver(measure);
     observer.observe(box);
     measure();
     return () => observer.disconnect();
-  }, [area, on]);
+  }, [area, known]);
 
   const own = image ?? NONE;
   const fit = fitScale(size, own);
@@ -125,6 +125,7 @@ export function useZoom(area: RefObject<HTMLElement | null>, image: Size | null)
     ? { position: "absolute", left: at.left, top: at.top, width: at.width, height: at.height }
     : undefined;
   const cursor = room ? (dragging ? "cursor-grabbing" : "cursor-grab") : "";
+  const fitted = placement(null, fit, own, size);
 
   return {
     zoomed,
@@ -133,6 +134,8 @@ export function useZoom(area: RefObject<HTMLElement | null>, image: Size | null)
     cursor,
     percent: Math.round(scaleOf(view, fit) * 100),
     fit: () => setView(null),
+    /** The box the picture fills at fit, once its size and the area's are known. */
+    fitted: known && size.width ? { width: fitted.width, height: fitted.height } : undefined,
   };
 }
 

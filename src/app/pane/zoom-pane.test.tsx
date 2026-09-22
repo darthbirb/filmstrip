@@ -3,7 +3,7 @@ import { beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
-import { folderItems } from "../../ipc/commands";
+import { folderItems, itemDetail } from "../../ipc/commands";
 import { Pane } from "./Pane";
 import { PaneDetailProvider } from "./pane-detail";
 import { showInPane } from "./pane-store";
@@ -151,6 +151,56 @@ test("the next item starts at fit", async () => {
   await expect.poll(() => figure(area)).not.toBeNull();
   showInPane((await inCairo("sphinx.jpg")).id);
   await expect.poll(() => document.querySelector("button[aria-label^='Fit']")).toBeNull();
+});
+
+test("while the original loads nothing stands in for it, so no low copy ever shows", async () => {
+  const item = await inCairo("pyramid.jpg");
+  // Every picture the pane puts up on its way to the original, from the first render on.
+  const drawn: string[] = [];
+  const watch = new MutationObserver((changes) => {
+    for (const change of changes)
+      for (const node of change.addedNodes)
+        if (node instanceof Element)
+          for (const img of [node, ...node.querySelectorAll("img")])
+            if (img instanceof HTMLImageElement) drawn.push(img.alt);
+  });
+  watch.observe(document.body, { childList: true, subtree: true });
+  try {
+    showInPane(item.id);
+    const screen = await render(<Harness />);
+    await expect.element(screen.getByRole("group", { name: "Zoom" })).toBeVisible();
+  } finally {
+    watch.disconnect();
+  }
+  expect(drawn).toEqual(["pyramid.jpg"]);
+});
+
+test("an original that cannot be drawn is stood in for by its thumbnail, at the size it would fit at", async () => {
+  const item = await inCairo("pyramid.jpg");
+  const detail = await itemDetail(item.id);
+  if (!detail?.width || !detail.height) throw new Error("the mock's pyramid.jpg has no size");
+  const internals = (
+    window as unknown as { __TAURI_INTERNALS__: { convertFileSrc: (path: string) => string } }
+  ).__TAURI_INTERNALS__;
+  const drawn = internals.convertFileSrc;
+  internals.convertFileSrc = (path) =>
+    path === detail.path ? "/no-such-original.jpg" : drawn(path);
+  try {
+    showInPane(item.id);
+    const screen = await render(<Harness />);
+    await expect.poll(() => screen.container.querySelector("img[alt='']")).not.toBeNull();
+    const thumb = screen.container.querySelector("img[alt='']") as HTMLImageElement;
+    await expect.poll(() => thumb.complete && thumb.naturalWidth).toBeGreaterThan(0);
+    // The mock's thumbnail is 320px long, smaller than the area, as a real one is.
+    expect(Math.max(thumb.naturalWidth, thumb.naturalHeight)).toBe(320);
+    const area = thumb.parentElement as HTMLElement;
+    const own = { width: detail.width, height: detail.height };
+    const fit = fitScale({ width: area.clientWidth, height: area.clientHeight }, own);
+    await expect.poll(() => thumb.getBoundingClientRect().width).toBeCloseTo(own.width * fit, 0);
+    expect(thumb.getBoundingClientRect().height).toBeCloseTo(own.height * fit, 0);
+  } finally {
+    internals.convertFileSrc = drawn;
+  }
 });
 
 test("a video does not zoom", async () => {
