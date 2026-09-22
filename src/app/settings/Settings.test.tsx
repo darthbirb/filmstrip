@@ -175,11 +175,12 @@ const SOURCES = [
 ];
 
 /** Settings open on Sources, against two folders: one read, one on a drive that is away. */
-async function onSources() {
+async function onSources(removed: number[] = []) {
   mockIPC(
-    (cmd) => {
+    (cmd, payload) => {
       if (cmd === "list_sources") return SOURCES;
       if (cmd === "folder_items") return items;
+      if (cmd === "remove_source") removed.push((payload as { id: number }).id);
       return undefined;
     },
     { shouldMockEvents: true },
@@ -213,4 +214,58 @@ test("a source's name is a field where it stands, with no button of its own", as
   expect(section.getByRole("button", { name: /^Rename/ }).elements()).toHaveLength(0);
   await section.getByRole("button", { name: "Pictures" }).click();
   await expect.element(section.getByRole("textbox", { name: "Rename Pictures" })).toBeVisible();
+});
+
+test("the section explains nothing: the rows are the count, and the warning waits for remove", async () => {
+  const section = await onSources();
+  await expect.element(section.getByText("D:Pictures")).toBeVisible();
+  expect(section.getByText(/Added here/).elements()).toHaveLength(0);
+  expect(section.getByText(/drops what Filmstrip knows/).elements()).toHaveLength(0);
+});
+
+test("pressing remove asks on the row, and Cancel or Escape puts the row back", async () => {
+  const removed: number[] = [];
+  const section = await onSources(removed);
+  await section.getByRole("button", { name: "Remove Pictures" }).click();
+
+  const question = section.getByRole("group", { name: "Remove Pictures?" });
+  await expect.element(question.getByText(/The folder stays on disk\./)).toBeVisible();
+  // The name and the count stay; the kind, reveal and remove give up their space.
+  await expect.element(question.getByText("Pictures", { exact: true })).toBeVisible();
+  await expect.element(question.getByText("6 items")).toBeVisible();
+  expect(section.getByRole("button", { name: "Reveal Pictures" }).elements()).toHaveLength(0);
+  await expect.element(question.getByRole("button", { name: "Cancel" })).toHaveFocus();
+  expect(removed).toEqual([]);
+
+  await question.getByRole("button", { name: "Cancel" }).click();
+  await expect.element(section.getByRole("button", { name: "Remove Pictures" })).toBeVisible();
+
+  await section.getByRole("button", { name: "Remove Pictures" }).click();
+  await expect.element(section.getByRole("group", { name: "Remove Pictures?" })).toBeVisible();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(section.getByRole("button", { name: "Remove Pictures" })).toBeVisible();
+  // Escape answered the question, so it does not also put Settings away.
+  await expect.element(section).toBeVisible();
+  expect(removed).toEqual([]);
+});
+
+test("Remove source is the answer that removes it", async () => {
+  const removed: number[] = [];
+  const section = await onSources(removed);
+  await section.getByRole("button", { name: "Remove Pictures" }).click();
+  await section.getByRole("button", { name: "Remove source" }).click();
+  await expect.poll(() => removed).toEqual([1]);
+});
+
+test("Sources sits under Your library, and its caption is its name", async () => {
+  const section = await onSources();
+  await expect
+    .element(section.getByRole("heading", { name: "Sources", exact: true }))
+    .toBeVisible();
+  // A group's heading, then the name of each section under it, in the order the rail draws them.
+  const rail = [...document.querySelectorAll("dialog nav > p, dialog nav button .truncate")].map(
+    (entry) => entry.textContent,
+  );
+  expect(rail.indexOf("Your library")).toBeGreaterThan(rail.indexOf("Appearance"));
+  expect(rail.indexOf("Sources")).toBeGreaterThan(rail.indexOf("Your library"));
 });

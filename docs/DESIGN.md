@@ -18,6 +18,7 @@ colors:
   line-strong: "#6b6863"
   line-danger: "rgb(194 90 74 / 0.45)"
   danger-wash: "rgb(194 90 74 / 0.1)"
+  danger-tint: "rgb(194 90 74 / 0.16)"
   fg-hi: "#f4f3f1"
   fg: "#eceae7"
   fg-mid: "#a8a5a0"
@@ -419,7 +420,8 @@ thing and is never decoration:** where the keyboard is, and close.
 | `wash` | White at 9%, laid over something already filled when the pointer is on it. |
 | `veil` | Dark glass over a picture, for what must read on any photograph: a video's length, the strip's steps. |
 | `scrim` | Behind the Settings dialog; the window stays legible under it. |
-| `danger`, `danger-press`, `on-danger` | The close button under the pointer, and destructive actions to come. |
+| `danger`, `danger-press`, `on-danger` | The close button under the pointer; a destroying button under the pointer and pressed. |
+| `danger-tint` | A destroying button at rest: its ground, under a `line-danger` ring and `danger` ink. |
 
 **Contrast is measured, not asserted.** `fg-hi`, `fg`, `fg-mid` and `fg-dim` reach 4.5:1 on
 `well`, `ground`, `panel` and `raised`; `focus` and `in-pane` reach 3:1 on each; `on-plate`
@@ -497,10 +499,13 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Button.** A named move in words: `control`-tall at the `control` corner, `ui` text, a glyph
   before the label in `fg-dim` where it has one and a count or chevron after it. Raised on
   `raised` with a `line-control` ring, or quiet with no ground until the pointer brings a `wash`.
+  One that destroys or forgets is `danger` ink on `danger-tint` in a `line-danger` ring, filled
+  `danger` under the pointer. Its label is sentence case; only a title takes Title Case.
   A label never wraps: too little room ends it in an ellipsis, and the panel it sits in stops
   before it comes to that. DECISIONS.md "The frame".
 - **Glyph button.** A `control` square on `raised` with a `line-control` ring. Disabled, it sinks
-  to `inset` on a `line` ring, its glyph `fg-faint`.
+  to `inset` on a `line` ring, its glyph `fg-faint`. The one that destroys or forgets takes the
+  button's `danger` colours.
 - **Tree row.** Chevron, glyph, name and count. At rest the name is `fg-mid`; under the pointer a
   `wash`; selected, a `plate` with `on-plate` ink. An offline source is `fg-dim` with an
   `fg-faint` glyph. The app's own places sit above a `line` rule.
@@ -542,18 +547,21 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   a glyph button and anchored to it. A dropdown offers a choice and marks the one taken; a menu
   marks nothing, because every row in it is a thing to do rather than a thing to be.
 - **Full screen.** The pane takes the frame below the bar, keeping its header, picture and
-  filmstrip and losing only the columns beside it. Its control is a glyph button in the pane's
-  header, before the fold button; in full screen it wears the pressed state and the fold button is
-  gone. The header row keeps its height, its disclosure and its figures either way.
+  filmstrip and losing only the columns beside it. Its control is a glyph button at the header's
+  left end, an arrow pointing along the edge that moves: left going in, right coming out, where it
+  wears the pressed state and the fold button is gone. It goes with the item, so a pane showing
+  nothing has none. The header row keeps its height, its disclosure and its figures either way.
 - **Filmstrip.** A frame for each item in the place, the one shown centred and carrying the
   `in-pane` ring, the rest sitting back at `--strip-rest` until the pointer is on one. The panel
   fades in over both ends, and a pill-shaped step floats on `veil` over each; at the first or last
   frame its step falls to `fg-faint`.
-- **Empty state.** A `glyph-large` glyph in `fg-faint` over a semibold line of `ui` and a note in
-  `small`, the note held to a `note` measure. One shape for every empty place, with its own glyph
-  and its own words: a cleared Sorting Box, an emptied Trash, a folder of folders, an empty folder,
-  an unreachable source, and the pane with nothing clicked or a file gone. Where there is one move
-  worth offering it follows as `control`-tall buttons on `raised`; most places have none.
+- **Empty state.** A `glyph-large` glyph in `fg-faint` over a semibold Title Case line of `ui`.
+  One shape for every empty place, with its own glyph and its own words: a cleared Sorting Box, an
+  emptied Trash, a folder of folders, an empty folder, an unreachable source, and the pane with
+  nothing clicked or a file gone. A line under the title carries a count, a name, a path or a
+  query — `small`, held to a `note` measure, a path in `--font-mono` — or there is no line; it
+  never explains the app. Where there is one move worth offering it follows as `control`-tall
+  buttons on `raised`; most places have none.
 - **Stand-in.** A tile still being read: `inset` at the `control` corner, in rows of photograph
   shapes at the tile size, filling the view until the place's tiles arrive. Never a spinner.
 - **Stat chip.** A measured value, a shape, a length or a size, on `raised` at `nested` corners.
@@ -574,6 +582,9 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Source row.** In Settings, two lines: the source's glyph, its name as a field where it stands,
   its count — or the walk, while one runs — its kind as a segmented group, then reveal and remove;
   its path beneath in `--font-mono`. One that cannot be read keeps its remove and loses its reveal.
+  Remove asks on the row: a `line-danger` ring, the glyph becomes the warning, the kind and the
+  buttons give up their space, and the path gives way to what removing forgets, over **Remove
+  source** and **Cancel**. The name and the count stay, and Escape puts the row back.
 - **Push-down.** A box arriving under the row above it: it grows from no height, lifts the
   `--push-lift` it started above where it settles, and fades, all as one move. Closed, it is out of
   sight and out of the tab order rather than sitting at no height. The pane's details and the

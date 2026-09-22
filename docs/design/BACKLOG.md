@@ -28,24 +28,6 @@ default in Settings › Sources; more sorting sources than the line holds fold i
 A source's row makes a folder at its top level. The folder verbs that change the disk wait on the
 undo journal, FEATURES.md "Export and undo".
 
-## The way into full screen · DRAWN
-
-At the left end of the pane's header, as `arrow-line-left`, and `arrow-line-right` to leave. In full
-screen the fold button goes and nothing slides into its place.
-
-## Labels in sentence case · DRAWN
-
-A title is Title Case; every label on a button, a menu row or a tooltip is sentence case. The built app
-already agrees except for the notices: **Retry these**, **Show the 31**, **Hide the list**.
-
-## Lines only where they hold a fact · DRAWN
-
-Nothing Chosen Yet, Nothing To Sort, Trash Is Empty, This Folder Is Empty and both No Sources Yet lose
-their lines, and so does the Sources section's title. This File Has Gone names the path it was at, a
-codec the window cannot play names its format in mono, and a folder of folders and an offline source
-keep their counts. Pressing a source's remove turns its row into the warning, with Remove source and
-Cancel; Escape puts the row back.
-
 ## Zoom and pan a picture in the pane · DRAWN
 
 On the Pane sheet. The behaviour ports from ggallery as it stands. At fit nothing is on the picture;

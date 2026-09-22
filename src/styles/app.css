@@ -93,6 +93,8 @@
   --color-line-danger: rgb(194 90 74 / 0.45);
   /* The ground under something refused: enough red to be seen, not enough to shout. */
   --color-danger-wash: rgb(194 90 74 / 0.1);
+  /* The ground of a button that destroys or forgets, before the pointer fills it red. */
+  --color-danger-tint: rgb(194 90 74 / 0.16);
 
   --color-fg-hi: #f4f3f1;
   --color-fg: #eceae7;
