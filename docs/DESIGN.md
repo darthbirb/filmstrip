@@ -564,6 +564,13 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   buttons on `raised`; most places have none.
 - **Stand-in.** A tile still being read: `inset` at the `control` corner, in rows of photograph
   shapes at the tile size, filling the view until the place's tiles arrive. Never a spinner.
+- **Plate.** A small fact laid over a picture: `badge`-tall at the `badge` corner on `veil`, `small`
+  tabular figures in `fg`. A video's length on its tile and a zoom's figure in the pane are the same
+  plate. One that acts takes `hover-wash` under the pointer and the focus ring, never a new ground.
+- **Zoom.** Nothing on the picture at fit. Off fit, a plate a `tile-inset` inside the media area's
+  bottom-left states the scale, and is the way back: under the pointer the figure becomes the `fit`
+  glyph and **Fit**. The media area clips the picture at its `control` corner at every scale. The
+  pointer is the grab hand only while there is somewhere to drag to.
 - **Stat chip.** A measured value, a shape, a length or a size, on `raised` at `nested` corners.
   The kind of file after them is the same chip in `fg-mid`.
 - **Facts.** Terms in `eyebrow` capitals, in a column as wide as the longest of them, values in

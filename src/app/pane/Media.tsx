@@ -1,7 +1,9 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
+import { useZoom, ZoomPlate } from "./useZoom";
+import type { Size } from "./zoom";
 
 type Props = {
   item: ItemDetail;
@@ -16,6 +18,10 @@ const PICTURE = "max-h-full max-w-full rounded-control";
 export function Media({ item, fill = false }: Props) {
   const [state, setState] = useState<"loading" | "shown" | "failed">("loading");
   const thumb = item.thumb ? convertFileSrc(item.thumb) : undefined;
+  const area = useRef<HTMLDivElement>(null);
+  // Only the pane's picture zooms, and only once the original is in: a thumbnail has no pixels to spare.
+  const [own, setOwn] = useState<Size | null>(null);
+  const zoom = useZoom(area, own);
 
   let body: ReactNode;
   if (item.kind === "video") {
@@ -39,11 +45,17 @@ export function Media({ item, fill = false }: Props) {
           <img className={`absolute inset-0 m-auto ${PICTURE}`} src={thumb} alt="" />
         )}
         <img
-          className={`${PICTURE} ${state === "shown" ? "" : "opacity-0"}`}
+          className={`${zoom.zoomed ? "max-w-none rounded-control" : PICTURE} ${state === "shown" ? "" : "opacity-0"}`}
+          style={zoom.style}
           src={convertFileSrc(item.path)}
           alt={item.diskName}
           decoding="async"
-          onLoad={() => setState("shown")}
+          draggable={false}
+          onLoad={(event) => {
+            setState("shown");
+            const { naturalWidth: width, naturalHeight: height } = event.currentTarget;
+            if (fill) setOwn({ width, height });
+          }}
           onError={() => setState("failed")}
         />
       </>
@@ -57,9 +69,12 @@ export function Media({ item, fill = false }: Props) {
       {/* A box that can be smaller than what it holds, so a tall picture shrinks to it rather than
           running past the actions below. DESIGN.md "Shapes". */}
       <div
-        className={`relative flex min-h-0 items-center justify-center ${fill ? "flex-1" : "max-h-(--pane-media-max) w-full"}`}
+        ref={area}
+        {...zoom.handlers}
+        className={`relative flex min-h-0 items-center justify-center ${fill ? "flex-1" : "max-h-(--pane-media-max) w-full"} ${own ? "focus-ring rounded-control" : ""} ${zoom.zoomed ? "overflow-hidden" : ""} ${zoom.cursor}`}
       >
         {body}
+        {zoom.zoomed && <ZoomPlate percent={zoom.percent} onFit={zoom.fit} />}
       </div>
       {state === "failed" && (
         <figcaption className="px-1 pt-2 font-mono text-fg-dim text-small">.{item.ext}</figcaption>

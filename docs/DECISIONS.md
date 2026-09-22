@@ -374,6 +374,16 @@ to fold away from. Escape leaves, and leaving puts the pane back in exactly
 the state it was in. Folded or hidden there is no header row to hold a control, so a double-click
 on a tile is the way in; a single click still only shows it.
 
+**A picture zooms as ggallery's did, but holds its zoom differently.** The wheel zooms about the
+point under the pointer from the scale the picture already fits at, a drag pans, double-click fits,
+and the next item starts at fit — ported as they were. ggallery held the zoom as a scale and a pan
+in pixels, so a pane resized under a zoomed picture drifted off what was being looked at. Filmstrip
+holds a multiple of the fitted scale and the image point at the centre of the view, so a resize, a
+fold, the details opening or full screen re-fits and keeps the same view. ggallery's floor of a
+tenth stays, lowered to the fitted scale for a picture too large to fit above it, which would
+otherwise jump on its first notch. At fit there is no zoom furniture; off fit, one plate states the
+scale and is the way back. A video does not zoom: its controls and its track already own the picture.
+
 **What the pane knows comes from the file.** Capture dates, a video's length and codec, and a
 rotated recording's true shape are read when the thumbnail is made; "Capture dates" and "Video
 and ffmpeg" above say how.
