@@ -167,6 +167,12 @@ pub async fn item_detail(state: State<'_, AppState>, item_id: i64) -> Result<Opt
     run(&state, move |conn| detail_of(conn, item_id, &thumbs)).await
 }
 
+/// Where an item's file was, for a pane showing one that has gone: a retired row still knows.
+#[tauri::command]
+pub async fn item_path(state: State<'_, AppState>, item_id: i64) -> Result<Option<String>> {
+    run(&state, move |conn| last_path(conn, item_id)).await
+}
+
 /// Favourite is binary and acts on a selection, so one call covers any number of items.
 #[tauri::command]
 pub async fn set_item_favorite(
@@ -271,6 +277,15 @@ fn item_abs_path(conn: &Connection, item_id: i64) -> Result<PathBuf> {
     let file = items::file_of(conn, item_id)?
         .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
     paths::item_path(conn, file.folder_id, &file.disk_name)
+}
+
+/// The path an item's file had when it was last read, live or retired; nothing for no such item.
+pub fn last_path(conn: &Connection, item_id: i64) -> Result<Option<String>> {
+    let Some(file) = items::file_of(conn, item_id)? else {
+        return Ok(None);
+    };
+    let path = paths::item_path(conn, file.folder_id, &file.disk_name)?;
+    Ok(Some(path.to_string_lossy().into_owned()))
 }
 
 /// An item in full, with the paths to its file and its thumbnail.
@@ -526,6 +541,41 @@ mod tests {
             (ticket.disk_name.as_str(), ticket.kind.as_str()),
             ("ticket.png", "image")
         );
+    }
+
+    #[test]
+    fn a_file_gone_from_disk_still_says_where_it_was() {
+        let base = scratch("gone");
+        let app = app_dir(&base);
+        let library = base.join("library");
+        std::fs::create_dir_all(library.join("Trips")).unwrap();
+        std::fs::write(library.join("Trips/ticket.png"), "de").unwrap();
+        let conn = conn();
+        register(&conn, &library, &app).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let [summary] = source_summaries(&conn).unwrap().try_into().unwrap();
+        let [trips] = folders::children(&conn, summary.root_folder_id)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        let [ticket] = items::in_folder(&conn, trips.id)
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        std::fs::remove_file(library.join("Trips/ticket.png")).unwrap();
+        walk::reconcile(&conn).unwrap();
+
+        assert!(
+            detail_of(&conn, ticket.id, &base).unwrap().is_none(),
+            "the item is gone"
+        );
+        let was = last_path(&conn, ticket.id).unwrap().unwrap();
+        assert!(
+            was.ends_with("ticket.png") && was.contains("Trips"),
+            "{was}"
+        );
+        assert_eq!(last_path(&conn, 9_999).unwrap(), None);
     }
 
     #[test]

@@ -62,11 +62,7 @@ export function Media({ item, fill = false }: Props) {
         {body}
       </div>
       {state === "failed" && (
-        <figcaption className="px-1 pt-1 text-fg-dim text-small">
-          {thumb
-            ? `The window can't open .${item.ext} files, so this is its thumbnail.`
-            : `The window can't open .${item.ext} files.`}
-        </figcaption>
+        <figcaption className="px-1 pt-2 font-mono text-fg-dim text-small">.{item.ext}</figcaption>
       )}
     </figure>
   );

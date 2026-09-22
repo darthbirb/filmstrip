@@ -1,6 +1,5 @@
 import { type ReactNode, useEffect, useEffectEvent } from "react";
 
-import { GlyphButton } from "../../ui/GlyphButton";
 import { SidePanel } from "./SidePanel";
 import { useFrameLayout } from "./useFrameLayout";
 
@@ -22,9 +21,8 @@ export type Regions = {
   paneHeader?: ReactNode;
   /** Subscribes to the pane being given something to show, which opens it if folded or hidden. */
   revealPane?: (listener: () => void) => () => void;
-  /** Whether the pane has the window to itself, and what the control in its header does. */
+  /** Whether the pane has the window to itself. */
   full?: boolean;
-  onToggleFull?: () => void;
 };
 
 /** Navigation, the grid and the pane as docked columns, each with its own header row. DECISIONS.md "The frame". */
@@ -41,7 +39,6 @@ export function Frame({
   paneHeader,
   revealPane,
   full = false,
-  onToggleFull,
 }: Regions) {
   const layout = useFrameLayout();
   const reveal = useEffectEvent(() => layout.show("pane"));
@@ -75,22 +72,7 @@ export function Frame({
         {notices}
         <div className="min-h-0 flex-1 overflow-auto">{grid}</div>
       </main>
-      <SidePanel
-        layout={layout}
-        side="pane"
-        header={paneHeader}
-        full={full}
-        headerControl={
-          onToggleFull && (
-            <GlyphButton
-              glyph={full ? "collapse" : "expand"}
-              label={full ? "Leave full screen" : "Full screen"}
-              pressed={full}
-              onClick={onToggleFull}
-            />
-          )
-        }
-      >
+      <SidePanel layout={layout} side="pane" header={paneHeader} full={full}>
         {pane}
       </SidePanel>
     </div>

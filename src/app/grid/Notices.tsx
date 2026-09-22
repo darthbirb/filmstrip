@@ -26,14 +26,14 @@ export function Notices() {
           <span className="min-w-0 flex-1 text-fg text-ui tabular-nums">
             {formatCount(count)} {count === 1 ? "file" : "files"} could not be indexed
           </span>
-          <Button onClick={() => void retryFailures()}>Retry These</Button>
+          <Button onClick={() => void retryFailures()}>Retry these</Button>
           <Button
             tone="quiet"
             expanded={open}
             detail={open && <Glyph name="chevronDown" className="rotate-180 text-glyph-small" />}
             onClick={() => setOpen(!open)}
           >
-            {open ? "Hide The List" : `Show The ${formatCount(count)}`}
+            {open ? "Hide the list" : `Show the ${formatCount(count)}`}
           </Button>
           <button
             type="button"

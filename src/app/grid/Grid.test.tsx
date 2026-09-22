@@ -160,9 +160,6 @@ test("an empty place says which kind of empty it is, in its own words", async ()
   });
   const screen = await renderGrid("justified");
   await expect.element(screen.getByText("This Folder Is Empty")).toBeVisible();
-  await expect
-    .element(screen.getByText("Nothing is in Pictures, on disk or in the index."))
-    .toBeVisible();
 
   setPlace({ kind: "sorting" });
   await expect.element(screen.getByText("Nothing To Sort")).toBeVisible();

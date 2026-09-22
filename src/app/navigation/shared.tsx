@@ -105,11 +105,7 @@ export function rowFolder(id: string) {
 /** The doorway, where the tree will be. A folder is read where it stands, never moved. */
 export function NoSources({ onAdd }: { onAdd: () => void }) {
   return (
-    <EmptyState
-      glyph="folders"
-      title="No Sources Yet"
-      note="Add a folder and Filmstrip will read it where it stands."
-    >
+    <EmptyState glyph="folders" title="No Sources Yet">
       <Button glyph="plus" onClick={onAdd}>
         Add a folder…
       </Button>

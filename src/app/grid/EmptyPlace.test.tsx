@@ -14,13 +14,18 @@ beforeEach(async () => {
   await loadIndex();
 });
 
-test("the app's own two places say what their emptiness means", async () => {
+/** The lines an empty place draws: its title, then a line only where it holds a fact. */
+const lines = (container: HTMLElement) =>
+  [...container.querySelectorAll("p")].map((line) => line.textContent);
+
+test("the app's own two places are named, and explain nothing", async () => {
   const sorting = await render(<EmptyPlace place={{ kind: "sorting" }} />);
   await expect.element(sorting.getByText("Nothing To Sort")).toBeVisible();
-  await expect.element(sorting.getByText(/Everything that came in has been filed/)).toBeVisible();
+  expect(lines(sorting.container)).toEqual(["Nothing To Sort"]);
 
   const trash = await render(<EmptyPlace place={{ kind: "trash" }} />);
   await expect.element(trash.getByText("Trash Is Empty")).toBeVisible();
+  expect(lines(trash.container)).toEqual(["Trash Is Empty"]);
 });
 
 test("a folder of folders lists them, and choosing one goes there", async () => {
@@ -40,16 +45,15 @@ test("a folder of folders lists them, and choosing one goes there", async () => 
   ]);
 });
 
-test("a folder holding nothing at all names itself", async () => {
+test("a folder holding nothing at all says so, and nothing more", async () => {
   const screen = await render(
     <EmptyPlace
       place={{ kind: "folder", sourceId: 1, path: [...PICTURES.path, { id: 5, title: "People" }] }}
     />,
   );
   await expect.element(screen.getByText("This Folder Is Empty")).toBeVisible();
-  await expect
-    .element(screen.getByText("Nothing is in People, on disk or in the index."))
-    .toBeVisible();
+  // The header already names the folder, and an empty one has no count to give.
+  expect(lines(screen.container)).toEqual(["This Folder Is Empty"]);
 });
 
 test("a source that cannot be reached says so, not that it is empty", async () => {
@@ -57,5 +61,8 @@ test("a source that cannot be reached says so, not that it is empty", async () =
     <EmptyPlace place={{ kind: "folder", sourceId: 3, path: [{ id: 3, title: "Archive" }] }} />,
   );
   await expect.element(screen.getByText("Archive Is Offline")).toBeVisible();
-  await expect.element(screen.getByText(/cannot reach it/)).toBeVisible();
+  expect(lines(screen.container)).toEqual([
+    "Archive Is Offline",
+    expect.stringMatching(/^[\d,]+ items when it was last read\.$/),
+  ]);
 });

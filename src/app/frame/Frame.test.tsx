@@ -184,17 +184,10 @@ test("full screen gives the pane the window, and leaves the columns standing beh
   await page.viewport(1600, 900);
   const screen = await render(
     <div className="flex h-dvh flex-col">
-      <Frame
-        nav={<p>nav content</p>}
-        grid={<p>grid content</p>}
-        pane={<p>pane content</p>}
-        full
-        onToggleFull={() => undefined}
-      />
+      <Frame nav={<p>nav content</p>} grid={<p>grid content</p>} pane={<p>pane content</p>} full />
     </div>,
   );
   await expect.element(screen.getByText("pane content")).toBeVisible();
-  await expect.element(screen.getByRole("button", { name: "Leave full screen" })).toBeVisible();
   // There is nothing left to fold away from, so the fold button goes rather than moves.
   expect(screen.getByRole("button", { name: "Hide pane" }).elements()).toHaveLength(0);
 
@@ -223,8 +216,12 @@ function Growing() {
         nav={<p>nav content</p>}
         grid={<p>grid content</p>}
         pane={<Kept />}
+        paneHeader={
+          <button type="button" onClick={() => setFull(!full)}>
+            {full ? "Leave full screen" : "Full screen"}
+          </button>
+        }
         full={full}
-        onToggleFull={() => setFull(!full)}
       />
     </div>
   );

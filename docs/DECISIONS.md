@@ -367,9 +367,10 @@ command and two of them on a drawing of what they open.
 the day after. The pane takes the frame below the bar and keeps every part it has; the bar stays,
 because native decorations are off and it is the only way left to close or minimise the window.
 **The columns are hidden rather than dropped**, so the pane element survives the trip and its
-picture is never reloaded, and the grid comes back where it was. The control sits in the pane's
-header beside the fold button, and in full screen the fold button goes rather than moves, since
-there is nothing left to fold away from. Escape leaves, and leaving puts the pane back in exactly
+picture is never reloaded, and the grid comes back where it was. The control sits at the other end
+of the pane's header from the fold button, since the two do opposite things, as an arrow along the
+edge that moves; in full screen the fold button goes rather than moves, since there is nothing left
+to fold away from. Escape leaves, and leaving puts the pane back in exactly
 the state it was in. Folded or hidden there is no header row to hold a control, so a double-click
 on a tile is the way in; a single click still only shows it.
 
