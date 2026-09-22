@@ -196,4 +196,8 @@ of the base look, at the same value, and every component reference pointing at a
 - **A migration runs with foreign keys off.** SQLite empties a table before dropping it, which
   fires `ON DELETE CASCADE` on everything referencing it. The pragma cannot change inside a
   transaction, so `db::migrate` switches it around them rather than in the SQL.
+- **CI runs the component tests on a cold Vite cache.** A dependency Vite first meets mid-run is
+  optimized then and reloads the page, killing whichever test was in flight, so every such
+  dependency is named in `optimizeDeps.include` in `vitest.config.ts`. A warm local cache never
+  shows it: check with `node_modules/.vite/vitest` moved aside, and read the log for "reloading".
 - **CI compiles Rust from scratch**; there is no build cache yet, which is most of its runtime.
