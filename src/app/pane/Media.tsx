@@ -14,7 +14,7 @@ type Props = {
 // The picture sizes itself and carries the corner, so nothing is drawn around it. DECISIONS.md "The pane".
 const PICTURE = "max-h-full max-w-full rounded-control";
 
-/** The item itself: a picture over its thumbnail until the original arrives, or a video over its poster. */
+/** The item itself: a picture once its original is in, or a video over its poster. */
 export function Media({ item, fill = false }: Props) {
   const [state, setState] = useState<"loading" | "shown" | "failed">("loading");
   const thumb = item.thumb ? convertFileSrc(item.thumb) : undefined;
@@ -41,9 +41,9 @@ export function Media({ item, fill = false }: Props) {
   } else if (item.kind === "image") {
     body = (
       <>
-        {thumb && state !== "shown" && (
-          // Centred under the original by its own auto margins and drawn at the size the original will
-          // take, so nothing moves when it arrives. DECISIONS.md "The pane".
+        {thumb && state === "failed" && (
+          // Only an original that cannot be drawn is stood in for, at the size it would have taken.
+          // While one loads nothing is, so it never flashes low. DECISIONS.md "The pane".
           <img
             className={`absolute inset-0 m-auto ${PICTURE}`}
             style={zoom.fitted}

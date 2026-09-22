@@ -153,11 +153,32 @@ test("the next item starts at fit", async () => {
   await expect.poll(() => document.querySelector("button[aria-label^='Fit']")).toBeNull();
 });
 
-test("until the original is in, its thumbnail stands at the size the original will fit at", async () => {
+test("while the original loads nothing stands in for it, so no low copy ever shows", async () => {
+  const item = await inCairo("pyramid.jpg");
+  // Every picture the pane puts up on its way to the original, from the first render on.
+  const drawn: string[] = [];
+  const watch = new MutationObserver((changes) => {
+    for (const change of changes)
+      for (const node of change.addedNodes)
+        if (node instanceof Element)
+          for (const img of [node, ...node.querySelectorAll("img")])
+            if (img instanceof HTMLImageElement) drawn.push(img.alt);
+  });
+  watch.observe(document.body, { childList: true, subtree: true });
+  try {
+    showInPane(item.id);
+    const screen = await render(<Harness />);
+    await expect.element(screen.getByRole("group", { name: "Zoom" })).toBeVisible();
+  } finally {
+    watch.disconnect();
+  }
+  expect(drawn).toEqual(["pyramid.jpg"]);
+});
+
+test("an original that cannot be drawn is stood in for by its thumbnail, at the size it would fit at", async () => {
   const item = await inCairo("pyramid.jpg");
   const detail = await itemDetail(item.id);
   if (!detail?.width || !detail.height) throw new Error("the mock's pyramid.jpg has no size");
-  // An original that never arrives, so the thumbnail is still standing in when it is measured.
   const internals = (
     window as unknown as { __TAURI_INTERNALS__: { convertFileSrc: (path: string) => string } }
   ).__TAURI_INTERNALS__;
@@ -167,6 +188,7 @@ test("until the original is in, its thumbnail stands at the size the original wi
   try {
     showInPane(item.id);
     const screen = await render(<Harness />);
+    await expect.poll(() => screen.container.querySelector("img[alt='']")).not.toBeNull();
     const thumb = screen.container.querySelector("img[alt='']") as HTMLImageElement;
     await expect.poll(() => thumb.complete && thumb.naturalWidth).toBeGreaterThan(0);
     // The mock's thumbnail is 320px long, smaller than the area, as a real one is.
