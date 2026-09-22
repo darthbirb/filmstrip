@@ -3,7 +3,7 @@ import { beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
-import { folderItems } from "../../ipc/commands";
+import { folderItems, itemDetail } from "../../ipc/commands";
 import { Pane } from "./Pane";
 import { PaneDetailProvider } from "./pane-detail";
 import { showInPane } from "./pane-store";
@@ -151,6 +151,34 @@ test("the next item starts at fit", async () => {
   await expect.poll(() => figure(area)).not.toBeNull();
   showInPane((await inCairo("sphinx.jpg")).id);
   await expect.poll(() => document.querySelector("button[aria-label^='Fit']")).toBeNull();
+});
+
+test("until the original is in, its thumbnail stands at the size the original will fit at", async () => {
+  const item = await inCairo("pyramid.jpg");
+  const detail = await itemDetail(item.id);
+  if (!detail?.width || !detail.height) throw new Error("the mock's pyramid.jpg has no size");
+  // An original that never arrives, so the thumbnail is still standing in when it is measured.
+  const internals = (
+    window as unknown as { __TAURI_INTERNALS__: { convertFileSrc: (path: string) => string } }
+  ).__TAURI_INTERNALS__;
+  const drawn = internals.convertFileSrc;
+  internals.convertFileSrc = (path) =>
+    path === detail.path ? "/no-such-original.jpg" : drawn(path);
+  try {
+    showInPane(item.id);
+    const screen = await render(<Harness />);
+    const thumb = screen.container.querySelector("img[alt='']") as HTMLImageElement;
+    await expect.poll(() => thumb.complete && thumb.naturalWidth).toBeGreaterThan(0);
+    // The mock's thumbnail is 320px long, smaller than the area, as a real one is.
+    expect(Math.max(thumb.naturalWidth, thumb.naturalHeight)).toBe(320);
+    const area = thumb.parentElement as HTMLElement;
+    const own = { width: detail.width, height: detail.height };
+    const fit = fitScale({ width: area.clientWidth, height: area.clientHeight }, own);
+    await expect.poll(() => thumb.getBoundingClientRect().width).toBeCloseTo(own.width * fit, 0);
+    expect(thumb.getBoundingClientRect().height).toBeCloseTo(own.height * fit, 0);
+  } finally {
+    internals.convertFileSrc = drawn;
+  }
 });
 
 test("a video does not zoom", async () => {

@@ -384,6 +384,11 @@ tenth stays, lowered to the fitted scale for a picture too large to fit above it
 otherwise jump on its first notch. At fit there is no zoom furniture; off fit, one plate states the
 scale and is the way back. A video does not zoom: its controls and its track already own the picture.
 
+**Until the original is in, its thumbnail stands where the original will be**, drawn at the size
+the original fits at, from the shape the index read when it made the thumbnail. Drawn at its own
+320px it jumped when the original arrived, and only when the original was not already cached. An
+original the window cannot draw leaves the thumbnail standing there, at that size.
+
 **What the pane knows comes from the file.** Capture dates, a video's length and codec, and a
 rotated recording's true shape are read when the thumbnail is made; "Capture dates" and "Video
 and ffmpeg" above say how.

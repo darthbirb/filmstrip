@@ -21,7 +21,8 @@ export function Media({ item, fill = false }: Props) {
   const area = useRef<HTMLDivElement>(null);
   // Only the pane's picture zooms, and only once the original is in: a thumbnail has no pixels to spare.
   const [own, setOwn] = useState<Size | null>(null);
-  const zoom = useZoom(area, own);
+  const known = item.width && item.height ? { width: item.width, height: item.height } : null;
+  const zoom = useZoom(area, fill && item.kind === "image" ? (own ?? known) : null, own !== null);
 
   let body: ReactNode;
   if (item.kind === "video") {
@@ -41,8 +42,14 @@ export function Media({ item, fill = false }: Props) {
     body = (
       <>
         {thumb && state !== "shown" && (
-          // Centred under the original by its own auto margins, so both sit in the same place.
-          <img className={`absolute inset-0 m-auto ${PICTURE}`} src={thumb} alt="" />
+          // Centred under the original by its own auto margins and drawn at the size the original will
+          // take, so nothing moves when it arrives. DECISIONS.md "The pane".
+          <img
+            className={`absolute inset-0 m-auto ${PICTURE}`}
+            style={zoom.fitted}
+            src={thumb}
+            alt=""
+          />
         )}
         <img
           className={`${zoom.zoomed ? "max-w-none rounded-control" : PICTURE} ${state === "shown" ? "" : "opacity-0"}`}

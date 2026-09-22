@@ -131,7 +131,10 @@ function detail(itemId: number): ItemDetail | null {
 /** The mock has no files, so every path it hands out is drawn: a wash in the item's own shape. */
 function drawn(path: string) {
   const item = everyItem().find((row) => row.thumb === path || path.endsWith(`\\${row.diskName}`));
-  const [width, height] = [item?.width ?? 4, item?.height ?? 3];
+  const [full, tall] = [item?.width ?? 4, item?.height ?? 3];
+  // A thumbnail is drawn at its real size, 320px on the longest edge, as the app makes them.
+  const shrink = item && path === item.thumb ? Math.min(1, 320 / Math.max(full, tall)) : 1;
+  const [width, height] = [Math.round(full * shrink), Math.round(tall * shrink)];
   const hue = ((item?.id ?? 0) * 47) % 360;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}"><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue} 45% 55%)"/><stop offset="1" stop-color="hsl(${(hue + 60) % 360} 45% 25%)"/></linearGradient><rect width="100%" height="100%" fill="url(#g)"/></svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
