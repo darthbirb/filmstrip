@@ -7,6 +7,9 @@ import viteConfig from "./vite.config.ts";
 export default mergeConfig(
   viteConfig,
   defineConfig({
+    // Found mid-run on a cold cache, it reloads the page and kills a test in flight.
+    // DEVELOPMENT.md "Gotchas".
+    optimizeDeps: { include: ["react-dom/client"] },
     test: {
       include: ["src/**/*.test.{ts,tsx}"],
       setupFiles: ["./src/dev/test-setup.ts"],
