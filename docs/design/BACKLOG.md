@@ -99,19 +99,11 @@ Artboards › Undo: after an act, one line at the foot of navigation in the refu
 saying what it did, with Undo and no timer, for all seven acts and a move that finished in part;
 Ctrl+Z does the same wherever the focus is not in a field, across a restart; "Nothing to undo."
 once, beside the rail when it is folded. An undo refused in whole or in part opens the failures
-banner with Retry, its rows grouped under the place each is still in. Its Show in Trash waits on
-the defect below.
+banner with Retry, its rows grouped under the place each is still in.
 
-## Show in Trash leads to a Trash nobody has drawn · DEFECT
+## The Trash, holding files · DRAWN
 
-A file an undo could not take out of the Trash has Show in Trash, which "goes to the Trash place in
-navigation with that file plated, where it wears its own name and its own menu can restore or
-delete it". The Trash's row and its empty state are drawn; what it shows when it holds files is
-not, nor a trashed file's menu. PRODUCT.md "Trash" makes it a place, and puts its limits and
-purging under "Later", so a Delete on that menu has nothing behind it yet.
-
-Recommended: draw the Trash holding files: its grid, what a trashed tile says that a live one does
-not (where it came from, when it went), and a trashed file's menu, with Restore and without
-anything that purges. Draw what Restore says when it is refused: the folder it came from is gone,
-or its name there is taken. The last check of the previous pass also flagged two cut-off labels
-on the Artboards sheet, in drawings older than that pass; look at both and fix any that are real.
+Artboards › Trash, Components › Right-click and Pane › 02: the Trash's grid, newest first under a
+heading per day, each tile captioned with the folder it came from ("gone" when that folder is); the
+pane's From and Deleted rows; a trashed file's bar and menu, Restore and Restore to… and nothing that
+purges; Restore refused, in the undo's banner; and Restore as the undo table's eighth act.
