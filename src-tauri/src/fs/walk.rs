@@ -180,7 +180,10 @@ fn reconcile_list(conn: &Connection, listed: Vec<sources::Source>) -> Result<Wal
         if !root.is_dir() {
             continue; // unreachable, so nothing here can be judged
         }
-        match walk_source(conn, &source, &mut report) {
+        let turn = super::turn();
+        let walked_one = walk_source(conn, &source, &mut report);
+        drop(turn);
+        match walked_one {
             Ok(()) => walked.push(source.id),
             // Removed while this pass ran: it took its folders with it, and the rest still walk.
             Err(err) => {
@@ -191,6 +194,7 @@ fn reconcile_list(conn: &Connection, listed: Vec<sources::Source>) -> Result<Wal
         }
     }
 
+    let _turn = super::turn();
     report.folders_retired = retire_vanished_folders(conn, &walked)?;
     Ok(report)
 }
@@ -231,6 +235,7 @@ fn record_all(
 /// One folder read again, as the whole walk reads a source, judging nothing outside its subtree.
 /// A folder in an unreachable source is left as it is; one whose own directory is gone retires.
 pub fn reconcile_folder(conn: &Connection, folder_id: i64) -> Result<WalkReport> {
+    let _turn = super::turn();
     let mut report = WalkReport::default();
     if !folders::is_live(conn, folder_id)? {
         return Ok(report);
