@@ -33,10 +33,11 @@ way a choice is offered.
   when the clone has run `git config core.hooksPath .githooks`.
 - **Every branch starts from an up-to-date `main`, and only from `main`.** Before a new task:
   `git fetch --prune`, see that no earlier branch is still waiting to be merged, and branch from
-  `main`. Branching from unmerged work means the eventual merge meets a squashed copy of that same
-  work and conflicts with itself — a false conflict whose only honest resolution is to keep the
-  branch's tree.
-- **Commit messages are one lowercase subject line.** No body, no trailers.
+  `main`. A branch cut from unmerged work carries that work's commits into its own pull request,
+  so neither can land or be reverted alone, and the second review repeats the first.
+- **Branches, commits and pull requests follow CONTRIBUTING.md.** A branch is `type/topic`, a
+  commit is `type(scope): subject` in Conventional Commits form, and each commit passes the gates
+  on its own. No trailers.
 - **Do not add a dependency without asking.** npm versions are exact; `Cargo.lock` holds Rust's.
 - **Port before you build.** Most of the backend already exists, tested, in ggallery at
   `../ggallery`. It is read-only: never edit, install or run anything there. Look there first,

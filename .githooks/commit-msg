@@ -1,0 +1,23 @@
+#!/bin/sh
+# Refuses a subject that is not Conventional Commits, as CONTRIBUTING.md "Commits" sets out.
+# Git's own merges and reverts, and fixups waiting to be folded in, pass through.
+
+subject=$(head -n 1 "$1")
+
+case "$subject" in
+  "Merge "* | "Revert "* | "fixup! "* | "squash! "* | "amend! "*) exit 0 ;;
+esac
+
+types='feat|fix|perf|refactor|test|docs|build|ci|chore|revert'
+if ! printf '%s\n' "$subject" | grep -Eq "^($types)(\([a-z0-9-]+\))?!?: [a-z0-9]"; then
+  echo "commit-msg: the subject must read  type(scope): what changes" >&2
+  echo "            types: $types — see CONTRIBUTING.md \"Commits\"" >&2
+  exit 1
+fi
+
+if [ "${#subject}" -gt 72 ]; then
+  echo "commit-msg: the subject is ${#subject} characters; keep it to 72." >&2
+  exit 1
+fi
+
+exit 0
