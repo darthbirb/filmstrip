@@ -1,6 +1,7 @@
 pub mod clipboard;
 pub mod folders;
 pub mod paths;
+pub mod relocate;
 pub mod sanitize;
 pub mod undo;
 pub mod walk;
