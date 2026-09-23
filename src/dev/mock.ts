@@ -165,6 +165,8 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   create_folder: () =>
     Promise.reject<AppError>({ kind: "invalid", message: "Making a folder needs the real app." }),
   rename_folder: () => null,
+  move_folder: () => null,
+  move_items: () => ({ batchId: null, report: { moved: 0, refused: [] } }),
   undo_last: () => null,
   undo_batch: () => ({ reversed: 0, errors: [] }),
   folder_children: ({ folderId }) => FOLDERS[folderId as number] ?? [],

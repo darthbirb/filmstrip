@@ -45,7 +45,7 @@ drawn. **Not started** — neither.
 | Read one folder again | Built | `read_folder_again`, its row's menu; ggallery walked only whole sources |
 | A folder's own details | Backlogged, and not in Rust | "A folder's details" |
 | Create a folder | Built in Rust, journalled; not on screen yet | `create_folder`; drawn on the folder row's menu |
-| Move a folder | Drawn, waiting on the undo journal | the folder row's menu |
+| Move a folder | Built in Rust, journalled; not on screen yet | `move_folder`, across drives too; drawn on the folder row's menu |
 | Delete a folder, choosing what happens to what is inside | Drawn, waiting on the undo journal | PRODUCT.md "Folders and sources" |
 | Rename a folder, on disk | Built in Rust, journalled; not on screen yet | `rename_folder`; drawn on its tree row |
 | A folder's cover | Not started | `folder.cover_item_id` exists |
@@ -63,7 +63,7 @@ drawn. **Not started** — neither.
 | Favourite an item | Built | `set_item_favorite` |
 | Reveal, open, copy the file | Built | the pane's bar |
 | Sort by key and direction, random order held steady | Not started | |
-| Move items between folders | Not started | |
+| Move items between folders | Built in Rust, journalled; not on screen yet | `move_items`; a name already taken is reported, never changed |
 | Delete items to the trash | Not started | |
 | Paste files in, and take an OS drop | Not started | |
 | Copy an item's path | Not started | |

@@ -18,6 +18,7 @@ use crate::db::sources::{self, Refusal, Source, SourceKind};
 use crate::db::tags::{self, EffectiveTag};
 use crate::error::{AppError, Result};
 use crate::fs::folders as fs_folders;
+use crate::fs::items::{self as fs_items, MoveReport};
 use crate::fs::paths;
 use crate::fs::undo::{self, UndoReport};
 use crate::jobs::{self, JobQueue, Progress};
@@ -183,6 +184,49 @@ pub async fn rename_folder(
         let batch_id = journal::new_batch();
         let changed = fs_folders::rename(conn, folder_id, &title, &batch_id)?;
         Ok(changed.then_some(batch_id))
+    })
+    .await
+}
+
+/// A folder moved into another with everything in it; the batch that undoes it, or nothing when it
+/// was already there.
+#[tauri::command]
+pub async fn move_folder(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    parent_id: i64,
+) -> Result<Option<String>> {
+    run(&state, move |conn| {
+        let batch_id = journal::new_batch();
+        let moved = fs_folders::move_into(conn, folder_id, parent_id, &batch_id)?;
+        Ok(moved.then_some(batch_id))
+    })
+    .await
+}
+
+/// What a move of files did, and the batch that undoes it when anything went.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ItemsMoved {
+    pub batch_id: Option<String>,
+    pub report: MoveReport,
+}
+
+/// Files moved into a folder, each under its own name; a name already taken there is reported.
+#[tauri::command]
+pub async fn move_items(
+    state: State<'_, AppState>,
+    item_ids: Vec<i64>,
+    folder_id: i64,
+) -> Result<ItemsMoved> {
+    run(&state, move |conn| {
+        let batch_id = journal::new_batch();
+        let report = fs_items::move_items(conn, &item_ids, folder_id, &batch_id)?;
+        Ok(ItemsMoved {
+            batch_id: (report.moved > 0).then_some(batch_id),
+            report,
+        })
     })
     .await
 }

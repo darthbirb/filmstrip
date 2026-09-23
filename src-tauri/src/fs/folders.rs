@@ -1,12 +1,12 @@
-//! Folders changed on disk: made and renamed. The directory changes first and the row second, so
-//! a disk that refuses never leaves a row claiming what is not there; and each change is
-//! journalled, so it can be undone. DECISIONS.md "Undo".
+//! Folders changed on disk: made, renamed and moved. The directory changes first and the row
+//! second, so a disk that refuses never leaves a row claiming what is not there; and each change
+//! is journalled, so it can be undone. DECISIONS.md "Undo".
 
 use rusqlite::Connection;
 
 use crate::db::{folders, journal, tags};
 use crate::error::{AppError, Result};
-use crate::fs::{paths, sanitize};
+use crate::fs::{paths, relocate, sanitize};
 
 /// Makes a folder inside `parent_id` under `title`, as a directory and then a row.
 pub fn create(conn: &Connection, parent_id: i64, title: &str, batch_id: &str) -> Result<i64> {
@@ -82,6 +82,62 @@ pub(super) fn rename_unjournalled(
     });
     if recorded.is_err() {
         let _ = std::fs::rename(&to, &from);
+    }
+    recorded
+}
+
+/// Moves a folder, with everything in it, into another. `false` when it is already there.
+pub fn move_into(
+    conn: &Connection,
+    folder_id: i64,
+    parent_id: i64,
+    batch_id: &str,
+) -> Result<bool> {
+    let _turn = super::turn();
+    move_unjournalled(conn, folder_id, parent_id, Some(batch_id))
+}
+
+/// The move itself, which undo also uses to put a folder back without journalling it again.
+pub(super) fn move_unjournalled(
+    conn: &Connection,
+    folder_id: i64,
+    parent_id: i64,
+    batch_id: Option<&str>,
+) -> Result<bool> {
+    if !folders::is_live(conn, folder_id)? || !folders::is_live(conn, parent_id)? {
+        return Err(AppError::invalid("that folder is no longer in the index"));
+    }
+    let Some(from_parent) = folders::parent(conn, folder_id)? else {
+        return Err(AppError::invalid(
+            "a source's own folder sits inside nothing",
+        ));
+    };
+    if from_parent == parent_id {
+        return Ok(false);
+    }
+    if folders::is_within(conn, parent_id, folder_id)? {
+        return Err(AppError::invalid("a folder cannot go inside itself"));
+    }
+    let title = folders::title(conn, folder_id)?.unwrap_or_default();
+    refuse_clash(conn, parent_id, &title, None)?;
+
+    let from = paths::folder_dir(conn, folder_id)?;
+    let to = paths::folder_dir(conn, parent_id)?.join(&title);
+    if to.exists() {
+        return Err(taken(&title));
+    }
+    relocate::relocate(&from, &to)?;
+
+    let recorded = in_transaction(conn, |tx| {
+        folders::set_parent(tx, folder_id, parent_id)?;
+        tags::rebuild_subtree(tx, folder_id)?;
+        if let Some(batch_id) = batch_id {
+            journal::record_folder_move(tx, batch_id, folder_id, from_parent, parent_id)?;
+        }
+        Ok(true)
+    });
+    if recorded.is_err() {
+        let _ = relocate::relocate(&to, &from);
     }
     recorded
 }
@@ -225,5 +281,66 @@ mod tests {
         let (conn, root, top, _) = library("root");
         assert!(rename(&conn, top, "Elsewhere", &journal::new_batch()).is_err());
         assert!(root.is_dir());
+    }
+
+    fn carried(conn: &Connection, folder_id: i64) -> Vec<String> {
+        let item = db::items::in_folder(conn, folder_id).unwrap()[0].id;
+        tags::item_effective_tags(conn, item)
+            .unwrap()
+            .into_iter()
+            .map(|tag| tag.value)
+            .collect()
+    }
+
+    #[test]
+    fn a_folder_moves_with_everything_in_it_and_its_files_inherit_from_the_new_place() {
+        let (conn, root, top, trips) = library("move");
+        std::fs::create_dir(root.join("People")).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let people = folders::child_id(&conn, top, "People").unwrap().unwrap();
+        let cairo = folders::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+
+        assert!(move_into(&conn, cairo, people, &journal::new_batch()).unwrap());
+        assert!(root.join("People/Cairo/pyramid.jpg").is_file());
+        assert!(!root.join("Trips/Cairo").exists());
+        assert_eq!(folders::parent(&conn, cairo).unwrap(), Some(people));
+        let tags = carried(&conn, cairo);
+        assert!(tags.iter().any(|value| value == "people"), "{tags:?}");
+        assert!(!tags.iter().any(|value| value == "trips"), "{tags:?}");
+        assert!(!move_into(&conn, cairo, people, &journal::new_batch()).unwrap());
+    }
+
+    #[test]
+    fn a_folder_moved_into_another_source_takes_its_files_with_it() {
+        let (conn, root, _, trips) = library("across");
+        let incoming = root.parent().unwrap().join("incoming");
+        std::fs::create_dir_all(&incoming).unwrap();
+        let sorting = sources::add(&conn, &incoming, "Incoming", SourceKind::Sorting).unwrap();
+        let inbox = folders::source_root_folder(&conn, sorting.id).unwrap();
+        let cairo = folders::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+
+        move_into(&conn, cairo, inbox, &journal::new_batch()).unwrap();
+        assert!(incoming.join("Cairo/pyramid.jpg").is_file());
+        let item = db::items::in_folder(&conn, cairo).unwrap()[0].id;
+        let source: i64 = conn
+            .query_row("SELECT source_id FROM item WHERE id = ?1", [item], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(source, sorting.id);
+    }
+
+    #[test]
+    fn a_folder_goes_nowhere_inside_itself_nor_onto_a_name_taken() {
+        let (conn, root, top, trips) = library("move-refused");
+        let cairo = folders::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        assert!(move_into(&conn, trips, cairo, &journal::new_batch()).is_err());
+        assert!(move_into(&conn, trips, trips, &journal::new_batch()).is_err());
+        assert!(move_into(&conn, top, trips, &journal::new_batch()).is_err());
+
+        std::fs::create_dir_all(root.join("Cairo")).unwrap();
+        assert!(move_into(&conn, cairo, top, &journal::new_batch()).is_err());
+        assert!(root.join("Trips/Cairo/pyramid.jpg").is_file());
+        assert_eq!(journal::latest_batch(&conn).unwrap(), None);
     }
 }

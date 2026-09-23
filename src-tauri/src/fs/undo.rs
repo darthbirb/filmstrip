@@ -7,9 +7,9 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use ts_rs::TS;
 
-use crate::db::journal::{self, Entry, FolderCreated, FolderRenamed};
+use crate::db::journal::{self, Entry, FolderCreated, FolderMoved, FolderRenamed, ItemMoved};
 use crate::error::{AppError, Result};
-use crate::fs::folders;
+use crate::fs::{folders, items};
 
 /// What an undo put back, and what it could not, each with its reason.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
@@ -64,6 +64,14 @@ fn reverse(conn: &Connection, entry: &Entry) -> Result<()> {
             let back: FolderRenamed = inverse(entry)?;
             folders::rename_unjournalled(conn, back.folder_id, &back.to, None).map(|_| ())
         }
+        journal::FOLDER_MOVE => {
+            let back: FolderMoved = inverse(entry)?;
+            folders::move_unjournalled(conn, back.folder_id, back.to_parent_id, None).map(|_| ())
+        }
+        journal::ITEM_MOVE => {
+            let back: ItemMoved = inverse(entry)?;
+            items::move_unjournalled(conn, back.item_id, back.to_folder_id, None).map(|_| ())
+        }
         other => Err(AppError::invalid(format!("{other} cannot be undone"))),
     }
 }
@@ -80,7 +88,7 @@ mod tests {
     use super::*;
     use crate::db::sources::SourceKind;
     use crate::db::{self, folders as rows, sources};
-    use crate::fs::{folders, walk};
+    use crate::fs::{folders, items, walk};
     use std::path::{Path, PathBuf};
     use std::sync::mpsc;
     use std::time::Duration;
@@ -204,5 +212,60 @@ mod tests {
         finished.recv_timeout(Duration::from_secs(10)).unwrap();
         changer.join().unwrap();
         assert!(dir.join("library/Trips/Lisbon").is_dir());
+    }
+
+    #[test]
+    fn one_undo_brings_back_a_whole_selection_and_another_the_folder_moved_after_it() {
+        let dir = scratch("moves");
+        std::fs::write(dir.join("library/Trips/Cairo/sphinx.jpg"), "s").unwrap();
+        std::fs::create_dir_all(dir.join("library/People")).unwrap();
+        let (conn, trips) = library(&dir);
+        let top = rows::source_root_folder(&conn, 1).unwrap();
+        let people = rows::child_id(&conn, top, "People").unwrap().unwrap();
+        let cairo = rows::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        let ids: Vec<i64> = db::items::in_folder(&conn, cairo)
+            .unwrap()
+            .into_iter()
+            .map(|item| item.id)
+            .collect();
+
+        items::move_items(&conn, &ids, people, &journal::new_batch()).unwrap();
+        folders::move_into(&conn, cairo, people, &journal::new_batch()).unwrap();
+
+        undo_last(&conn).unwrap().unwrap();
+        assert!(dir.join("library/Trips/Cairo").is_dir());
+        let report = undo_last(&conn).unwrap().unwrap();
+        assert_eq!(
+            report,
+            UndoReport {
+                reversed: 2,
+                errors: vec![]
+            }
+        );
+        assert!(dir.join("library/Trips/Cairo/pyramid.jpg").is_file());
+        assert!(dir.join("library/Trips/Cairo/sphinx.jpg").is_file());
+        let home = |id: &i64| db::items::folder_of(&conn, *id).unwrap() == Some(cairo);
+        assert!(ids.iter().all(home));
+    }
+
+    #[test]
+    fn a_file_that_cannot_go_back_because_its_name_is_taken_keeps_its_undo() {
+        let dir = scratch("blocked");
+        std::fs::create_dir_all(dir.join("library/People")).unwrap();
+        let (conn, trips) = library(&dir);
+        let top = rows::source_root_folder(&conn, 1).unwrap();
+        let people = rows::child_id(&conn, top, "People").unwrap().unwrap();
+        let cairo = rows::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        let pyramid = db::items::in_folder(&conn, cairo).unwrap()[0].id;
+
+        let batch = journal::new_batch();
+        items::move_items(&conn, &[pyramid], people, &batch).unwrap();
+        std::fs::write(dir.join("library/Trips/Cairo/pyramid.jpg"), "a new one").unwrap();
+
+        let report = undo_batch(&conn, &batch).unwrap();
+        assert_eq!(report.reversed, 0);
+        assert!(report.errors[0].contains("Cairo already holds a file called pyramid.jpg"));
+        assert!(dir.join("library/People/pyramid.jpg").is_file());
+        assert_eq!(journal::latest_batch(&conn).unwrap(), Some(batch));
     }
 }

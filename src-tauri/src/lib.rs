@@ -90,6 +90,8 @@ pub fn run() {
             commands::read_folder_again,
             commands::create_folder,
             commands::rename_folder,
+            commands::move_folder,
+            commands::move_items,
             commands::undo_last,
             commands::undo_batch,
             commands::remove_source,

@@ -6,6 +6,7 @@ import type { FolderMade } from "./bindings/FolderMade";
 import type { FolderNode } from "./bindings/FolderNode";
 import type { ItemDetail } from "./bindings/ItemDetail";
 import type { ItemRow } from "./bindings/ItemRow";
+import type { ItemsMoved } from "./bindings/ItemsMoved";
 import type { Progress } from "./bindings/Progress";
 import type { SourceKind } from "./bindings/SourceKind";
 import type { SourceSummary } from "./bindings/SourceSummary";
@@ -44,6 +45,12 @@ export const createFolder = (parentId: number, title: string) =>
 
 export const renameFolder = (folderId: number, title: string) =>
   invoke<string | null>("rename_folder", { folderId, title });
+
+export const moveFolder = (folderId: number, parentId: number) =>
+  invoke<string | null>("move_folder", { folderId, parentId });
+
+export const moveItems = (itemIds: number[], folderId: number) =>
+  invoke<ItemsMoved>("move_items", { itemIds, folderId });
 
 export const undoLast = () => invoke<UndoReport | null>("undo_last");
 
