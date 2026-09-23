@@ -17,8 +17,19 @@ test("in full screen the wheel zooms, the figure sits in the area's corner, and 
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   for (let notch = 0; notch < 6; notch++) await page.mouse.wheel(0, -100);
 
+  // The wheel does not wait for the page, so the last notches can land after the plate first shows:
+  // wait for the figure six notches from fit reach, or a late one moves the picture mid-drag.
+  const six = await area.evaluate((element) => {
+    const own = element.querySelector("img[alt='cover.jpg']") as HTMLImageElement;
+    const fit = Math.min(
+      1,
+      element.clientWidth / own.naturalWidth,
+      element.clientHeight / own.naturalHeight,
+    );
+    return Math.round(fit * 1.12 ** 6 * 100);
+  });
   // The figure is a tile-inset inside the media area's bottom-left, never the picture's own corner.
-  const plate = pane.getByRole("button", { name: /^Fit, from \d+%$/ });
+  const plate = pane.getByRole("button", { name: `Fit, from ${six}%` });
   await expect(plate).toBeVisible();
   const at = await plate.boundingBox();
   const inset = await page.evaluate(
