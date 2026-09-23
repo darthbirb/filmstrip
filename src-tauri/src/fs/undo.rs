@@ -1,6 +1,6 @@
 //! Reversing what the journal holds: one batch at a time, newest row first. A reversal writes
-//! nothing to the journal, and a batch leaves it only once all of it has come back.
-//! DECISIONS.md "Undo".
+//! nothing to the journal, and each row leaves it as it comes back, so a retry takes back only
+//! what stayed. DECISIONS.md "Undo".
 
 use rusqlite::Connection;
 use serde::Serialize;
@@ -44,14 +44,14 @@ fn reverse_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
     }
     let mut report = UndoReport::default();
     for entry in &entries {
+        // What failed stays in the journal, or it could never be tried again.
         match reverse(conn, entry) {
-            Ok(()) => report.reversed += 1,
+            Ok(()) => {
+                journal::drop_entry(conn, entry.id)?;
+                report.reversed += 1;
+            }
             Err(err) => report.errors.push(err.to_string()),
         }
-    }
-    // A batch that came back only in part stays, or what failed could never be tried again.
-    if report.errors.is_empty() {
-        journal::drop_batch(conn, batch_id)?;
     }
     Ok(report)
 }
@@ -277,5 +277,37 @@ mod tests {
         assert!(report.errors[0].contains("Cairo already holds a file called pyramid.jpg"));
         assert!(dir.join("library/People/pyramid.jpg").is_file());
         assert_eq!(journal::latest_batch(&conn).unwrap(), Some(batch));
+    }
+
+    #[test]
+    fn a_retry_takes_back_only_what_stayed_the_first_time() {
+        let dir = scratch("retry");
+        std::fs::write(dir.join("library/Trips/Cairo/sphinx.jpg"), "s").unwrap();
+        let (conn, trips) = library(&dir);
+        let cairo = rows::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        let ids: Vec<i64> = db::items::in_folder(&conn, cairo)
+            .unwrap()
+            .into_iter()
+            .map(|item| item.id)
+            .collect();
+        let batch = journal::new_batch();
+        crate::fs::trash::trash_items(&conn, &ids, &batch).unwrap();
+        std::fs::write(dir.join("library/Trips/Cairo/sphinx.jpg"), "in the way").unwrap();
+
+        let first = undo_batch(&conn, &batch).unwrap();
+        assert_eq!((first.reversed, first.errors.len()), (1, 1));
+
+        std::fs::remove_file(dir.join("library/Trips/Cairo/sphinx.jpg")).unwrap();
+        let retry = undo_batch(&conn, &batch).unwrap();
+        assert_eq!(
+            retry,
+            UndoReport {
+                reversed: 1,
+                errors: vec![]
+            }
+        );
+        assert!(dir.join("library/Trips/Cairo/pyramid.jpg").is_file());
+        assert!(dir.join("library/Trips/Cairo/sphinx.jpg").is_file());
+        assert_eq!(journal::latest_batch(&conn).unwrap(), None);
     }
 }

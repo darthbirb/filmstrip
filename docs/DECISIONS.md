@@ -437,8 +437,8 @@ that interface will drive.
 
 - **The disk changes first, then the index and the journal together.** A disk that refuses leaves
   nothing claiming it succeeded, and a transaction that fails puts the disk back.
-- **One act, one batch, one undo.** A batch comes back newest row first. One that comes back only
-  in part stays in the journal, so what failed can be tried again; ggallery's rule, kept.
+- **One act, one batch, one undo.** A batch comes back newest row first. Each row leaves the
+  journal as it comes back and what failed stays, so trying again takes back only what stayed.
 - **An undo never destroys.** A folder the app made is taken back only while it is still empty,
   on disk as well as in the index: files the index has not read yet would go with it otherwise.
 - **One change to the disk at a time.** A walk that read a directory while a verb renamed it would

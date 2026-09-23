@@ -87,8 +87,8 @@ migration arrives with the feature that needs it and is never edited once shippe
   in `inverse`. `batch_id` groups the rows one act wrote, so one undo reverses the act.
 - Rows are written in the same transaction as the change to the index they describe, and only
   after the disk has changed.
-- An undo applies a batch's rows newest first and writes no row of its own. The batch is deleted
-  once every row has come back, and kept whole when any did not.
+- An undo applies a batch's rows newest first and writes no row of its own. Each row is deleted
+  as it comes back, so a batch that came back in part keeps exactly the rows that stayed.
 - Nothing prunes the journal yet.
 
 ## Not here yet

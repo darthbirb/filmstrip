@@ -209,9 +209,10 @@ pub fn batch(conn: &Connection, batch_id: &str) -> Result<Vec<Entry>> {
     Ok(rows)
 }
 
-/// Removes a batch once all of it has been reversed; a reversed act is not history to reverse again.
-pub fn drop_batch(conn: &Connection, batch_id: &str) -> Result<()> {
-    conn.execute("DELETE FROM journal WHERE batch_id = ?1", params![batch_id])?;
+/// Removes one row once it has been reversed: a reversed act is not history to reverse again, and
+/// a batch that came back only in part keeps exactly what stayed.
+pub fn drop_entry(conn: &Connection, entry_id: i64) -> Result<()> {
+    conn.execute("DELETE FROM journal WHERE id = ?1", params![entry_id])?;
     Ok(())
 }
 
@@ -248,7 +249,9 @@ mod tests {
         record_folder_rename(&conn, &second, 7, "Cairo", "Giza").unwrap();
         assert_eq!(latest_batch(&conn).unwrap(), Some(second.clone()));
 
-        drop_batch(&conn, &second).unwrap();
+        for entry in batch(&conn, &second).unwrap() {
+            drop_entry(&conn, entry.id).unwrap();
+        }
         assert_eq!(latest_batch(&conn).unwrap(), Some(first));
     }
 
