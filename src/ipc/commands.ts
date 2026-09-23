@@ -2,12 +2,14 @@ import { invoke } from "@tauri-apps/api/core";
 import type { AddOutcome } from "./bindings/AddOutcome";
 import type { EffectiveTag } from "./bindings/EffectiveTag";
 import type { Failure } from "./bindings/Failure";
+import type { FolderMade } from "./bindings/FolderMade";
 import type { FolderNode } from "./bindings/FolderNode";
 import type { ItemDetail } from "./bindings/ItemDetail";
 import type { ItemRow } from "./bindings/ItemRow";
 import type { Progress } from "./bindings/Progress";
 import type { SourceKind } from "./bindings/SourceKind";
 import type { SourceSummary } from "./bindings/SourceSummary";
+import type { UndoReport } from "./bindings/UndoReport";
 
 // One wrapper per Rust command, each typed invoke on one line: a Rust test reads this file.
 // DEVELOPMENT.md "The command boundary".
@@ -36,6 +38,16 @@ export const revealFolder = (folderId: number) => invoke<void>("reveal_folder", 
 
 export const readFolderAgain = (folderId: number) =>
   invoke<void>("read_folder_again", { folderId });
+
+export const createFolder = (parentId: number, title: string) =>
+  invoke<FolderMade>("create_folder", { parentId, title });
+
+export const renameFolder = (folderId: number, title: string) =>
+  invoke<string | null>("rename_folder", { folderId, title });
+
+export const undoLast = () => invoke<UndoReport | null>("undo_last");
+
+export const undoBatch = (batchId: string) => invoke<UndoReport>("undo_batch", { batchId });
 
 export const folderChildren = (folderId: number) =>
   invoke<FolderNode[]>("folder_children", { folderId });
