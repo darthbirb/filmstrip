@@ -25,8 +25,8 @@ and on a source's row makes a folder at its top level. Move to… is the file pi
 own descendants refused in it. A folder's Rename is the in-place field with its Taken state. Delete
 asks only when the folder holds something, naming each sorting source as its own answer, with a box
 that keeps the pick as the default in Settings › Sources; more sorting sources than the line holds
-fold into one Move Files to…. A source's menu opens under its heading, the eyebrow in `fg-dim`. The
-selection's menu, with its count and "Delete 5 Files", waits on selecting.
+fold into one Move Files to…. The selection's menu, with its count and "Delete 5 Files", waits on
+selecting.
 
 ## Favourite places · DRAWN
 

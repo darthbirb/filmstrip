@@ -456,7 +456,7 @@ names an action. All three ship inside the app and are never fetched.
 | `row` | 14 on 20 | A navigation row; a step back in the breadcrumb. |
 | `ui` | 13 on 20 | The working size: a control's label, a fact's value, a setting, prose. |
 | `small` | 12 on 16 | A count, a chip, a video's length. |
-| `eyebrow` | 11 on 16, semibold, spaced, capitals | A panel's caption, a fact's term, a group of settings, the in-pane plate. |
+| `eyebrow` | 11 on 16, semibold, spaced, capitals | A panel's caption, a fact's term, a group of settings, a menu's heading, the in-pane plate. |
 | `wordmark` | 14 on 20, extra bold, tight | The name beside the mark in the bar. |
 | `glyph-small`, `glyph`, `icon` | 12, 15 and 18 | The maximise square, the in-pane eye, a dropdown's caret. Caption glyphs, chevrons, a strip step, a menu option. A control's or a row's glyph. |
 | `glyph-large` | 32 | The glyph that stands in an empty pane or an empty place. |
@@ -572,7 +572,9 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Menu.** A `menu`-wide list of actions on `panel` at the `control` corner, with the
   `line-control` hairline and the overlay shadow. Its rows are `control` tall in `fg`, each glyph
   `glyph`-sized in `fg-dim`, and `raised-hi` under the pointer. A rule in `line` stands between two
-  groups only when both hold rows. The one row that cannot be taken back is `danger`, over
+  groups only when both hold rows. A menu about a thing that is not the row itself, as a
+  source's is, opens under a heading: `eyebrow` capitals in `fg-dim`, `chip` tall. The one row
+  that cannot be taken back is `danger`, over
   `danger-tint` under the pointer. It opens from a glyph button, anchored to it, or from a
   right-click: at the pointer, or, from the menu key or Shift+F10, one `tile-gap` clear of the
   focused element's ring, left edges met, flipping above when there is no room below and sliding

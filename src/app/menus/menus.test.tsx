@@ -217,6 +217,10 @@ test("a folder's row reveals and reads again; a source's adds Rename, then the S
     "Manage Sources",
     "Remove Source",
   ]);
+  // A source's menu says what it is about above its rows; a folder's needs no heading.
+  const heading = sourceMenu.element().firstElementChild;
+  expect(heading?.tagName).toBe("P");
+  expect(heading?.textContent).toBe("Source");
   await userEvent.keyboard("{Escape}");
 
   await source.click();
@@ -225,6 +229,7 @@ test("a folder's row reveals and reads again; a source's adds Rename, then the S
   const folderMenu = await menuOn(screen, trips, "Trips");
   expect(labels(folderMenu)).toEqual(["Show in Explorer", "Refresh"]);
   expect(folderMenu.element().querySelectorAll("hr")).toHaveLength(0);
+  expect(folderMenu.element().querySelector("p")).toBeNull();
 });
 
 test("the verbs reach the commands they name, for the folder they were opened on", async () => {

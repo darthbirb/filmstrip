@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { readFolderAgain, renameSource, revealFolder, revealSource } from "../../ipc/commands";
-import type { MenuAction, MenuGroups } from "../../ui/Menu";
+import type { HeadedMenu, MenuAction, MenuGroups } from "../../ui/Menu";
 import { Tree, type TreeRow } from "../../ui/Tree";
 import { type Place, setPlace, usePlace } from "../place";
 import { openSettings } from "../settings/settings-store";
@@ -71,15 +71,15 @@ export function Navigation() {
     return sources.find((source) => source.id === at.sourceId);
   };
 
-  const menuFor = (id: string): MenuGroups => {
+  const menuFor = (id: string): HeadedMenu => {
     const source = sourceOf(id);
     const folder = rowFolder(id);
-    if (!source || folder === undefined) return [];
+    if (!source || folder === undefined) return { groups: [] };
     if (folder === source.rootFolderId) {
-      return sourceMenu(source, () => setRenaming(id));
+      return { heading: "Source", groups: sourceMenu(source, () => setRenaming(id)) };
     }
     // Neither can act on a folder whose drive is away, and an empty menu opens nothing.
-    return source.reachable ? [[revealFolderRow(folder), readAgainRow(folder)]] : [];
+    return { groups: source.reachable ? [[revealFolderRow(folder), readAgainRow(folder)]] : [] };
   };
 
   const renamed = sourceOf(renaming ?? "");

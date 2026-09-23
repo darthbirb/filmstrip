@@ -28,6 +28,9 @@ export type MenuAction = {
 /** Rows in groups. A rule stands between two groups only when both hold something. */
 export type MenuGroups = readonly (readonly MenuAction[])[];
 
+/** A menu that says what it is about above its rows, as a source's does. */
+export type HeadedMenu = { heading?: string; groups: MenuGroups };
+
 // The list's own shape, whichever way it was opened. DESIGN.md "Components".
 const SURFACE =
   "inset-auto m-0 w-menu flex-col gap-px rounded-control border-0 bg-panel p-1 text-fg shadow-overlay inset-ring inset-ring-line-control open:flex";
@@ -40,18 +43,20 @@ const TONE = {
   danger: "text-danger hover:bg-danger-tint",
 };
 
-/** The rows, their rules, and the arrows that move between them. */
+/** The heading, the rows, their rules, and the arrows that move between them. */
 function MenuList({
   menu,
+  heading,
   groups,
   onChoose,
 }: {
   menu: RefObject<HTMLDivElement | null>;
+  heading?: string;
   groups: MenuGroups;
   onChoose: (action: MenuAction) => void;
 }) {
   const filled = groups.filter((group) => group.length > 0);
-  return filled.map((group, index) => (
+  const rows = filled.map((group, index) => (
     <Fragment key={group[0]?.id}>
       {index > 0 && <hr className="mx-2 my-1 h-px shrink-0 border-0 bg-line" />}
       {group.map((action) => (
@@ -76,6 +81,16 @@ function MenuList({
       ))}
     </Fragment>
   ));
+  return heading ? (
+    <>
+      <p className="m-0 flex h-chip shrink-0 items-center px-2 text-eyebrow text-fg-dim uppercase">
+        {heading}
+      </p>
+      {rows}
+    </>
+  ) : (
+    rows
+  );
 }
 
 const rows = (menu: RefObject<HTMLDivElement | null>) => [
@@ -177,6 +192,7 @@ export type MenuAnchor = { x: number; y: number } | { element: HTMLElement };
 
 type ContextProps = {
   label: string;
+  heading?: string;
   groups: MenuGroups;
   anchor: MenuAnchor;
   onClose: () => void;
@@ -187,7 +203,7 @@ type ContextProps = {
  * ring, flips above when there is no room below, and slides along the window's edge rather than
  * shrinking. DECISIONS.md "Right-click menus".
  */
-export function ContextMenu({ label, groups, anchor, onClose }: ContextProps) {
+export function ContextMenu({ label, heading, groups, anchor, onClose }: ContextProps) {
   const menu = useRef<HTMLDivElement>(null);
   // Where the focus goes back to: the element the keyboard opened it on, or wherever it was.
   const back = useRef<HTMLElement | null>(null);
@@ -235,7 +251,7 @@ export function ContextMenu({ label, groups, anchor, onClose }: ContextProps) {
       style={at ? { position: "fixed", ...at } : { position: "fixed", visibility: "hidden" }}
       className={SURFACE}
     >
-      <MenuList menu={menu} groups={groups} onChoose={choose} />
+      <MenuList menu={menu} heading={heading} groups={groups} onChoose={choose} />
     </div>
   );
 }
@@ -267,7 +283,7 @@ function placement(anchor: MenuAnchor, size: DOMRect) {
   };
 }
 
-type Opened = { label: string; anchor: MenuAnchor; groups: MenuGroups };
+type Opened = { label: string; anchor: MenuAnchor; heading?: string; groups: MenuGroups };
 
 /**
  * Right-click menus for a surface: `open` from its context menu event, with the menu for whatever
@@ -277,7 +293,12 @@ type Opened = { label: string; anchor: MenuAnchor; groups: MenuGroups };
 export function useContextMenu() {
   const [open, setOpen] = useState<Opened | null>(null);
 
-  const show = (event: MouseEvent<HTMLElement>, label: string, groups: MenuGroups) => {
+  const show = (
+    event: MouseEvent<HTMLElement>,
+    label: string,
+    groups: MenuGroups,
+    heading?: string,
+  ) => {
     const filled = groups.filter((group) => group.length > 0);
     // An empty menu opens nothing at all; the browser's own stays suppressed.
     if (filled.length === 0) return;
@@ -287,12 +308,13 @@ export function useContextMenu() {
       event.button === -1
         ? { element: event.currentTarget }
         : { x: event.clientX, y: event.clientY };
-    setOpen({ label, anchor, groups: filled });
+    setOpen({ label, anchor, heading, groups: filled });
   };
 
   const menu: ReactNode = open && (
     <ContextMenu
       label={open.label}
+      heading={open.heading}
       groups={open.groups}
       anchor={open.anchor}
       // A second right-click may already have opened it again before the first one's close lands.
