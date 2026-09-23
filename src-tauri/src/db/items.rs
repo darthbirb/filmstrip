@@ -249,6 +249,25 @@ pub fn mark_seen(conn: &Connection, uuid: &str) -> Result<()> {
 
 /// Trashes what the sweep did not see, **in this source only**, and returns how
 /// many. DECISIONS.md "A walk only judges what it read".
+/// As `finish_sweep`, for a walk that read only one folder's subtree.
+pub fn finish_sweep_under(conn: &Connection, folder_id: i64) -> Result<usize> {
+    conn.execute_batch("CREATE INDEX IF NOT EXISTS temp.idx_seen ON seen(uuid);")?;
+    let gone = conn.execute(
+        "WITH RECURSIVE subtree(id) AS (
+             SELECT ?2
+           UNION ALL
+             SELECT f.id FROM folder f JOIN subtree s ON f.parent_id = s.id
+         )
+         UPDATE item SET deleted_at = ?1
+          WHERE deleted_at IS NULL
+            AND folder_id IN (SELECT id FROM subtree)
+            AND NOT EXISTS (SELECT 1 FROM temp.seen s WHERE s.uuid = item.uuid)",
+        params![now(), folder_id],
+    )?;
+    conn.execute_batch("DROP TABLE IF EXISTS temp.seen;")?;
+    Ok(gone)
+}
+
 pub fn finish_sweep(conn: &Connection, source_id: i64) -> Result<usize> {
     conn.execute_batch("CREATE INDEX IF NOT EXISTS temp.idx_seen ON seen(uuid);")?;
     let gone = conn.execute(

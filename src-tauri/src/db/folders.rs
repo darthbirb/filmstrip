@@ -169,6 +169,32 @@ pub fn create(conn: &Connection, parent_id: i64, title: &str) -> Result<i64> {
 }
 
 /// Soft-deletes a folder and everything beneath it; returns how many folders.
+/// Whether the folder is in the index and not retired.
+pub fn is_live(conn: &Connection, folder_id: i64) -> Result<bool> {
+    Ok(conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM folder WHERE id = ?1 AND deleted_at IS NULL)",
+        params![folder_id],
+        |r| r.get(0),
+    )?)
+}
+
+/// Every live folder below this one, parents before their children.
+pub fn descendants(conn: &Connection, folder_id: i64) -> Result<Vec<i64>> {
+    let mut stmt = conn.prepare(
+        "WITH RECURSIVE subtree(id, depth) AS (
+             SELECT id, 1 FROM folder WHERE parent_id = ?1 AND deleted_at IS NULL
+           UNION ALL
+             SELECT f.id, s.depth + 1 FROM folder f JOIN subtree s ON f.parent_id = s.id
+              WHERE f.deleted_at IS NULL
+         )
+         SELECT id FROM subtree ORDER BY depth, id",
+    )?;
+    let ids = stmt
+        .query_map(params![folder_id], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(ids)
+}
+
 pub fn trash_subtree(conn: &Connection, folder_id: i64) -> Result<i64> {
     let count = conn.execute(
         "WITH RECURSIVE subtree(id) AS (

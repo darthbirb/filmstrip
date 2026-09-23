@@ -10,9 +10,11 @@ import {
 } from "react";
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
+import { useContextMenu } from "../../ui/Menu";
 import { StepButton } from "../../ui/StepButton";
 import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
 import { useGridItems } from "../grid/useGridItems";
+import { itemMenu } from "../menus/item-menu";
 import type { Place } from "../place";
 import { showInPane, usePaneItem, usePaneOrigin } from "./pane-store";
 
@@ -34,6 +36,8 @@ function Track({ items, current, from }: TrackProps) {
   const gapProbe = useRef<HTMLSpanElement>(null);
   const view = useTrackView(scroller, cellProbe, gapProbe);
   const refocus = useRef(false);
+  // A frame is a tile, and gets the tile's menu.
+  const context = useContextMenu();
   const index = items.findIndex((item) => item.id === current);
   const step = view.cell + view.gap;
 
@@ -101,6 +105,13 @@ function Track({ items, current, from }: TrackProps) {
             title={item.diskName}
             tabIndex={at === stop ? 0 : -1}
             onClick={() => show(at)}
+            onContextMenu={(event) =>
+              context.open(
+                event,
+                item.diskName,
+                itemMenu(item, () => show(at)),
+              )
+            }
             className={`focus-ring block size-full ${THUMB_FRAME} transition-opacity duration-(--motion-quick) ease-out motion-reduce:transition-none ${at === index ? "" : "opacity-(--strip-rest) hover:opacity-100"}`}
           >
             <ThumbFace
@@ -116,6 +127,7 @@ function Track({ items, current, from }: TrackProps) {
 
   return (
     <div className="relative h-strip shrink-0 border-line border-t">
+      {context.menu}
       <div
         ref={scroller}
         role="listbox"

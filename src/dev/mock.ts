@@ -160,6 +160,8 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   set_source_kind: () => null,
   reveal_source: () => null,
   remove_source: () => null,
+  reveal_folder: () => null,
+  read_folder_again: () => null,
   folder_children: ({ folderId }) => FOLDERS[folderId as number] ?? [],
   folder_items: ({ folderId }) => ITEMS[folderId as number] ?? [],
   item_tags: () => [],

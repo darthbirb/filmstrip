@@ -8,13 +8,14 @@ use crate::db::items;
 use crate::db::jobs::{self as table, QueuedJob};
 use crate::error::{AppError, Result};
 use crate::fs::{paths, walk};
-use crate::jobs::kinds::{self, ItemPayload};
+use crate::jobs::kinds::{self, FolderPayload, ItemPayload};
 use crate::jobs::{QueueInner, enqueue_thumb};
 use crate::media::thumbs;
 
 pub fn execute(inner: &QueueInner, conn: &mut Connection, job: &QueuedJob) -> Result<()> {
     match job.kind.as_str() {
         kinds::INDEX => index(inner, conn),
+        kinds::INDEX_FOLDER => index_folder(inner, conn, serde_json::from_str(&job.payload)?),
         kinds::THUMB => thumb(inner, conn, serde_json::from_str(&job.payload)?),
         other => Err(AppError::invalid(format!("no job of the kind {other}"))),
     }
@@ -28,7 +29,20 @@ fn index(inner: &QueueInner, conn: &mut Connection) -> Result<()> {
     let walked = walk::reconcile(conn);
     inner.walking.store(false, Ordering::Relaxed);
     walked?;
+    queue_thumbs(inner, conn)
+}
 
+/// One folder's subtree walked again, then the same thumbnails queued as after a whole walk.
+fn index_folder(inner: &QueueInner, conn: &mut Connection, payload: FolderPayload) -> Result<()> {
+    inner.walking.store(true, Ordering::Relaxed);
+    let walked = walk::reconcile_folder(conn, payload.folder_id);
+    inner.walking.store(false, Ordering::Relaxed);
+    walked?;
+    queue_thumbs(inner, conn)
+}
+
+/// Every picture, and every video once ffmpeg is at hand, not yet read or missing its thumbnail.
+fn queue_thumbs(inner: &QueueInner, conn: &mut Connection) -> Result<()> {
     let wanted: Vec<i64> = items::live_media(conn, inner.ffmpeg.is_some())?
         .into_iter()
         .filter(|media| !media.read || !inner.thumbs.join(paths::thumb_rel(&media.uuid)).is_file())

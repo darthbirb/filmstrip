@@ -121,6 +121,36 @@ pub async fn reveal_source(app: AppHandle, state: State<'_, AppState>, id: i64) 
         .map_err(AppError::invalid)
 }
 
+/// A folder's own directory in Explorer.
+#[tauri::command]
+pub async fn reveal_folder(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    folder_id: i64,
+) -> Result<()> {
+    let dir = run(&state, move |conn| folder_to_reveal(conn, folder_id)).await?;
+    app.opener()
+        .reveal_item_in_dir(dir)
+        .map_err(AppError::invalid)
+}
+
+/// Where a folder is on disk; a folder the index has retired has nowhere to show.
+pub fn folder_to_reveal(conn: &Connection, folder_id: i64) -> Result<PathBuf> {
+    if !folders::is_live(conn, folder_id)? {
+        return Err(AppError::invalid("that folder is no longer in the index"));
+    }
+    paths::folder_dir(conn, folder_id)
+}
+
+/// The walk the app runs at launch, aimed at one folder and everything under it.
+#[tauri::command]
+pub async fn read_folder_again(state: State<'_, AppState>, folder_id: i64) -> Result<()> {
+    run(&state, move |conn| {
+        jobs::enqueue_folder_walk(conn, folder_id)
+    })
+    .await
+}
+
 #[tauri::command]
 pub async fn remove_source(state: State<'_, AppState>, id: i64) -> Result<()> {
     run(&state, move |conn| {
@@ -541,6 +571,30 @@ mod tests {
             (ticket.disk_name.as_str(), ticket.kind.as_str()),
             ("ticket.png", "image")
         );
+    }
+
+    #[test]
+    fn a_folder_shows_where_it_is_until_the_index_retires_it() {
+        let base = scratch("reveal-folder");
+        let app = app_dir(&base);
+        let library = base.join("library");
+        std::fs::create_dir_all(library.join("Trips")).unwrap();
+        let conn = conn();
+        register(&conn, &library, &app).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let [summary] = source_summaries(&conn).unwrap().try_into().unwrap();
+        let [trips] = folders::children(&conn, summary.root_folder_id)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        assert_eq!(
+            folder_to_reveal(&conn, trips.id).unwrap(),
+            library.join("Trips")
+        );
+
+        std::fs::remove_dir_all(library.join("Trips")).unwrap();
+        walk::reconcile(&conn).unwrap();
+        assert!(folder_to_reveal(&conn, trips.id).is_err());
     }
 
     #[test]

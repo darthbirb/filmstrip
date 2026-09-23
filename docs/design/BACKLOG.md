@@ -16,17 +16,39 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## The app's own right-click menus · DRAWN
+## The app's own right-click menus: the verbs that change the disk · DRAWN
 
-Drawn on the Components sheet: a tile, a selection of five, a folder row, a source row and the pane's
-picture, in sentence case with the verbs the pane's bar already uses. The menu key and Shift+F10 open
-the same menus one tile-gap below the focused tile's or row's ring. A tree row renames in place, as
-Settings renames a source. A folder's row makes, moves and deletes folders: New folder lands a row
-already in its name field, Move to… is the file picker, and Delete asks only when the folder holds
-something, naming each sorting source as its own answer, with a box that keeps the pick as the
-default in Settings › Sources; more sorting sources than the line holds fold into one Move them to….
-A source's row makes a folder at its top level. The folder verbs that change the disk wait on the
-undo journal, FEATURES.md "Export and undo".
+Drawn on the Components sheet; what exists is built, DECISIONS.md "Right-click menus". What waits,
+on the undo journal (FEATURES.md "Export and undo"): a file's Move to…, Rename and Delete, and a
+folder's New folder, Move to…, Rename and Delete. New folder lands a row already in its name field,
+and on a source's row makes a folder at its top level. Move to… is the file picker, with a folder's
+own descendants refused in it. A folder's Rename is the in-place field with its Taken state. Delete
+asks only when the folder holds something, naming each sorting source as its own answer, with a box
+that keeps the pick as the default in Settings › Sources; more sorting sources than the line holds
+fold into one Move them to…. The selection's menu, with its count and "Delete five files", waits on
+selecting.
+
+## A menu's heading is drawn off the token sheet · DEFECT
+
+A source's menu opens under "Source" and a selection's under "5 files", both drawn in `#6e6e6e`,
+mono at 0.6875rem with 0.08em tracking. None of that colour or tracking is a token; the nearest is
+`eyebrow` at 0.12em in `fg-faint`. Recommended: draw the heading from the sheet's own type and
+colour. Until then a source's menu is built without it.
+
+## A keyboard menu's flip still says 4px, and the menu's width is on no sheet · DEFECT
+
+Components › Right-click, "The keyboard's menu hangs off the ring", says it flips above "the same
+4px clear of the ring"; its cards and the Notes settle one distance, the ring's 4px then a
+tile-gap. Every sheet draws menus 14rem wide, and the token sheet names no width for them; the
+build carries it as `menu`. Recommended: correct the sentence, and add the width to the token
+sheet. Neither blocks: the build follows the settled distance and the drawn width.
+
+## Where a favourite place shows
+
+Components draws Favourite on a folder's and a source's menu, but nothing shows which places are
+favourites, and the Artboards sheet leaves "whether favourite folders belong in the rail" open. A
+verb whose result nobody can see is not built. Recommended: draw where a favourite place shows, a
+mark on its row or a place of their own, and Favourite joins both menus.
 
 ## A folder's details · DRAWN
 

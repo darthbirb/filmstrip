@@ -201,19 +201,59 @@ fn walk_source(conn: &Connection, source: &sources::Source, report: &mut WalkRep
     let root_folder = folders::source_root_folder(conn, source.id)?;
 
     items::begin_sweep(conn)?;
-    let (folder_ids, files) = mirror(conn, &root, root_folder)?;
+    record_all(conn, &root, root_folder, source.id, report)?;
+    report.items_retired += items::finish_sweep(conn, source.id)?;
+    Ok(())
+}
+
+/// Every directory under `dir` mirrored into folders under `folder_id`, and every file recorded.
+fn record_all(
+    conn: &Connection,
+    dir: &Path,
+    folder_id: i64,
+    source_id: i64,
+    report: &mut WalkReport,
+) -> Result<()> {
+    let (folder_ids, files) = mirror(conn, dir, folder_id)?;
     for file in files {
         let Some(folder_id) = file.parent().and_then(|p| folder_ids.get(p)).copied() else {
             continue;
         };
-        match record_file(conn, &file, folder_id, source.id) {
+        match record_file(conn, &file, folder_id, source_id) {
             Ok(Outcome::Unchanged) => report.unchanged += 1,
             Ok(Outcome::Indexed) => report.indexed += 1,
             Err(err) => eprintln!("could not index {}: {err}", file.display()),
         }
     }
-    report.items_retired += items::finish_sweep(conn, source.id)?;
     Ok(())
+}
+
+/// One folder read again, as the whole walk reads a source, judging nothing outside its subtree.
+/// A folder in an unreachable source is left as it is; one whose own directory is gone retires.
+pub fn reconcile_folder(conn: &Connection, folder_id: i64) -> Result<WalkReport> {
+    let mut report = WalkReport::default();
+    if !folders::is_live(conn, folder_id)? {
+        return Ok(report);
+    }
+    let source_id = folders::location(conn, folder_id)?.source_id;
+    let Some(source) = sources::get(conn, source_id)? else {
+        return Ok(report);
+    };
+    if !Path::new(&source.root).is_dir() {
+        return Ok(report);
+    }
+    let dir = paths::folder_dir(conn, folder_id)?;
+    items::begin_sweep(conn)?;
+    if dir.is_dir() {
+        record_all(conn, &dir, folder_id, source_id, &mut report)?;
+    }
+    report.items_retired += items::finish_sweep_under(conn, folder_id)?;
+    report.folders_retired = if dir.is_dir() {
+        retire_gone(conn, folders::descendants(conn, folder_id)?)?
+    } else {
+        folders::trash_subtree(conn, folder_id)?
+    };
+    Ok(report)
 }
 
 /// Retires folders whose directory is gone, **only in sources this pass read**.
@@ -229,6 +269,17 @@ fn retire_vanished_folders(conn: &Connection, walked: &[i64]) -> Result<i64> {
         .collect::<rusqlite::Result<_>>()?;
     drop(stmt);
 
+    let mut read = Vec::new();
+    for folder_id in candidates {
+        if walked.contains(&folders::location(conn, folder_id)?.source_id) {
+            read.push(folder_id);
+        }
+    }
+    retire_gone(conn, read)
+}
+
+/// Retires each folder, in the order given, whose directory is no longer there.
+fn retire_gone(conn: &Connection, candidates: Vec<i64>) -> Result<i64> {
     let mut retired = 0;
     for folder_id in candidates {
         // An ancestor retired earlier in this loop takes its descendants with
@@ -239,10 +290,6 @@ fn retire_vanished_folders(conn: &Connection, walked: &[i64]) -> Result<i64> {
             |r| r.get(0),
         )?;
         if !still_live {
-            continue;
-        }
-        let location = folders::location(conn, folder_id)?;
-        if !walked.contains(&location.source_id) {
             continue;
         }
         if !paths::folder_dir(conn, folder_id)?.is_dir() {
@@ -452,6 +499,91 @@ mod tests {
             by_source,
             [("kept.jpg".to_string(), 1), ("waiting.jpg".to_string(), 2)]
         );
+    }
+
+    fn names(conn: &Connection) -> Vec<String> {
+        live_items(conn).into_iter().map(|(name, _)| name).collect()
+    }
+
+    fn folder_under(conn: &Connection, parent: i64, title: &str) -> i64 {
+        folders::child_id(conn, parent, title).unwrap().unwrap()
+    }
+
+    fn live(conn: &Connection, folder_id: i64) -> bool {
+        folders::is_live(conn, folder_id).unwrap()
+    }
+
+    #[test]
+    fn reading_a_folder_again_judges_only_its_own_subtree() {
+        let (conn, root) = library("again-subtree");
+        write(&root.join("Trips/a.jpg"), "a");
+        write(&root.join("Trips/Cairo/b.jpg"), "b");
+        write(&root.join("People/c.jpg"), "c");
+        reconcile(&conn).unwrap();
+        let top = folders::source_root_folder(&conn, 1).unwrap();
+        let trips = folder_under(&conn, top, "Trips");
+
+        write(&root.join("Trips/new.jpg"), "n");
+        write(&root.join("Trips/Cairo/deeper.jpg"), "d");
+        write(&root.join("People/elsewhere.jpg"), "e");
+        std::fs::remove_file(root.join("Trips/a.jpg")).unwrap();
+        std::fs::remove_file(root.join("People/c.jpg")).unwrap();
+        let report = reconcile_folder(&conn, trips).unwrap();
+
+        // Outside Trips nothing is judged: c.jpg stays, elsewhere.jpg waits for a whole walk.
+        assert_eq!(names(&conn), ["b.jpg", "c.jpg", "deeper.jpg", "new.jpg"]);
+        assert_eq!((report.indexed, report.items_retired), (2, 1));
+    }
+
+    #[test]
+    fn a_folder_gone_from_under_the_one_read_again_retires_and_nothing_outside_it_does() {
+        let (conn, root) = library("again-folders");
+        write(&root.join("Trips/Cairo/b.jpg"), "b");
+        write(&root.join("People/c.jpg"), "c");
+        reconcile(&conn).unwrap();
+        let top = folders::source_root_folder(&conn, 1).unwrap();
+        let trips = folder_under(&conn, top, "Trips");
+        let cairo = folder_under(&conn, trips, "Cairo");
+        let people = folder_under(&conn, top, "People");
+
+        std::fs::remove_dir_all(root.join("Trips/Cairo")).unwrap();
+        std::fs::remove_dir_all(root.join("People")).unwrap();
+        reconcile_folder(&conn, trips).unwrap();
+
+        assert!(!live(&conn, cairo));
+        assert!(live(&conn, trips) && live(&conn, people));
+        assert_eq!(names(&conn), ["c.jpg"]);
+    }
+
+    #[test]
+    fn a_folder_read_again_after_its_own_directory_went_retires_with_what_was_in_it() {
+        let (conn, root) = library("again-gone");
+        write(&root.join("Trips/a.jpg"), "a");
+        write(&root.join("People/c.jpg"), "c");
+        reconcile(&conn).unwrap();
+        let top = folders::source_root_folder(&conn, 1).unwrap();
+        let trips = folder_under(&conn, top, "Trips");
+
+        std::fs::remove_dir_all(root.join("Trips")).unwrap();
+        reconcile_folder(&conn, trips).unwrap();
+
+        assert!(!live(&conn, trips));
+        assert_eq!(names(&conn), ["c.jpg"]);
+    }
+
+    #[test]
+    fn a_folder_in_a_source_that_cannot_be_read_is_left_as_it_was() {
+        let (conn, root) = library("again-offline");
+        write(&root.join("Trips/a.jpg"), "a");
+        reconcile(&conn).unwrap();
+        let top = folders::source_root_folder(&conn, 1).unwrap();
+        let trips = folder_under(&conn, top, "Trips");
+
+        std::fs::remove_dir_all(&root).unwrap();
+        reconcile_folder(&conn, trips).unwrap();
+
+        assert!(live(&conn, trips));
+        assert_eq!(names(&conn), ["a.jpg"]);
     }
 
     /// Writing the same number of bytes within the same second would leave

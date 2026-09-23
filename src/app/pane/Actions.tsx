@@ -1,17 +1,18 @@
 import { type RefObject, useLayoutEffect, useRef, useState } from "react";
 
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
-import { copyItemFile, openItem, revealItem, setItemFavorite } from "../../ipc/commands";
+import { copyItemFile, openItem, revealItem } from "../../ipc/commands";
 import { GlyphButton } from "../../ui/GlyphButton";
 import type { GlyphName } from "../../ui/glyphs";
 import { Menu } from "../../ui/Menu";
+import { setFavourite, useFavourite } from "../favourites";
 
 type Action = { id: string; label: string; glyph: GlyphName; run: () => void };
 
 /** What the app can do to the file the pane is showing. DECISIONS.md "The pane". */
 export function Actions({ item }: { item: ItemDetail }) {
   const bar = useRef<HTMLDivElement>(null);
-  const [favorite, setFavorite] = useState(item.favorite);
+  const favorite = useFavourite(item.id, item.favorite);
 
   // Written in the order the drawing writes them, which is also the order they leave the bar.
   const actions: Action[] = [
@@ -39,12 +40,6 @@ export function Actions({ item }: { item: ItemDetail }) {
   const shown = actions.slice(0, fits);
   const folded = actions.slice(fits);
 
-  const toggleFavorite = () => {
-    const next = !favorite;
-    setFavorite(next);
-    void setItemFavorite([item.id], next).catch(() => setFavorite(!next));
-  };
-
   return (
     <div
       ref={bar}
@@ -58,7 +53,7 @@ export function Actions({ item }: { item: ItemDetail }) {
         filled={favorite}
         pressed={favorite}
         label={favorite ? "Favourited" : "Favourite"}
-        onClick={toggleFavorite}
+        onClick={() => setFavourite(item.id, !favorite)}
       />
       <div className="ml-auto flex items-center gap-1.5">
         {shown.map((action) => (
@@ -74,12 +69,14 @@ export function Actions({ item }: { item: ItemDetail }) {
           <Menu
             label="Everything else"
             glyph="more"
-            actions={folded.map((action) => ({
-              id: action.id,
-              label: action.label,
-              glyph: action.glyph,
-              onSelect: action.run,
-            }))}
+            groups={[
+              folded.map((action) => ({
+                id: action.id,
+                label: action.label,
+                glyph: action.glyph,
+                onSelect: action.run,
+              })),
+            ]}
           />
         )}
       </div>

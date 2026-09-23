@@ -6,6 +6,7 @@ use ts_rs::TS;
 
 use crate::db::now;
 use crate::error::Result;
+use crate::jobs::kinds::WALKS;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QueuedJob {
@@ -53,16 +54,18 @@ pub fn is_pending(conn: &Connection, kind: &str, payload: &str) -> Result<bool> 
 }
 
 /// Takes the most urgent waiting job and marks it running. The immediate transaction stops two
-/// workers from taking the same one.
+/// workers from taking the same one, and a walk waits while another walk runs.
 pub fn claim(conn: &mut Connection) -> Result<Option<QueuedJob>> {
     let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
     let job = tx
         .query_row(
             "SELECT id, kind, payload, attempts + 1 FROM job
               WHERE status = 'pending'
+                AND NOT (kind IN (?1, ?2) AND EXISTS(
+                    SELECT 1 FROM job WHERE status = 'running' AND kind IN (?1, ?2)))
               ORDER BY priority DESC, id
               LIMIT 1",
-            [],
+            params![WALKS[0], WALKS[1]],
             |r| {
                 Ok(QueuedJob {
                     id: r.get(0)?,
@@ -192,6 +195,20 @@ mod tests {
             std::iter::from_fn(|| claim(&mut conn).unwrap().map(|job| job.id)).collect();
         assert_eq!(order, [urgent, routine, later]);
         assert_eq!(counts(&conn).unwrap().running, 3);
+    }
+
+    #[test]
+    fn a_walk_waits_while_another_walk_runs_and_other_work_goes_past_it() {
+        let mut conn = conn();
+        let whole = enqueue(&conn, "index", "{}", 100).unwrap();
+        let folder = enqueue(&conn, "index_folder", "{\"folderId\":4}", 100).unwrap();
+        let thumb = enqueue(&conn, "thumb", "{}", 20).unwrap();
+
+        assert_eq!(claim(&mut conn).unwrap().map(|job| job.id), Some(whole));
+        assert_eq!(claim(&mut conn).unwrap().map(|job| job.id), Some(thumb));
+        assert_eq!(claim(&mut conn).unwrap(), None);
+        complete(&conn, whole).unwrap();
+        assert_eq!(claim(&mut conn).unwrap().map(|job| job.id), Some(folder));
     }
 
     #[test]

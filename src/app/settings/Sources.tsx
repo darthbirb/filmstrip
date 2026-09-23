@@ -21,7 +21,7 @@ const KINDS: readonly { value: SourceKind; label: string }[] = [
 ];
 
 /** Every folder the app reads, and the two things only a source has. DECISIONS.md "Places, not queries". */
-export function Sources() {
+export function Sources({ asking }: { asking?: number }) {
   const { sources } = useIndex();
   const refused = useRefused();
   const held = sources ?? [];
@@ -35,7 +35,7 @@ export function Sources() {
       ) : (
         <div className="flex flex-col gap-1.5">
           {held.map((source) => (
-            <Row key={source.id} source={source} />
+            <Row key={source.id} source={source} asking={source.id === asking} />
           ))}
         </div>
       )}
@@ -55,8 +55,8 @@ export function Sources() {
   );
 }
 
-function Row({ source }: { source: SourceSummary }) {
-  const [asking, setAsking] = useState(false);
+function Row({ source, asking: opened }: { source: SourceSummary; asking: boolean }) {
+  const [asking, setAsking] = useState(opened);
   return asking ? (
     <Asking source={source} onCancel={() => setAsking(false)} />
   ) : (

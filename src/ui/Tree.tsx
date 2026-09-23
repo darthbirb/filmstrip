@@ -1,8 +1,9 @@
-import { Fragment, type KeyboardEvent, useRef, useState } from "react";
+import { Fragment, type KeyboardEvent, useEffect, useRef, useState } from "react";
 
 import { formatCount } from "../lib/format";
 import { Glyph } from "./Glyph";
 import type { GlyphName } from "./glyphs";
+import { type MenuGroups, useContextMenu } from "./Menu";
 
 export type TreeRow = {
   id: string;
@@ -30,11 +31,27 @@ type Props = {
   onSelect: (id: string) => void;
   onExpand: (id: string) => void;
   onCollapse: (id: string) => void;
+  /** A row's right-click menu; an empty one opens nothing. */
+  menuFor?: (id: string) => MenuGroups;
+  /** The row whose name is a field for now, and what becomes of what is typed there. */
+  renaming?: Renaming | null;
 };
 
+export type Renaming = { id: string; onCommit: (name: string) => void; onCancel: () => void };
+
 /** An ARIA tree: one tab stop, arrows to move, Right and Left to open and close, Enter to go. */
-export function Tree({ label, rows, selectedId, onSelect, onExpand, onCollapse }: Props) {
+export function Tree({
+  label,
+  rows,
+  selectedId,
+  onSelect,
+  onExpand,
+  onCollapse,
+  menuFor,
+  renaming,
+}: Props) {
   const [focusId, setFocusId] = useState<string | null>(null);
+  const context = useContextMenu();
   const elements = useRef(new Map<string, HTMLElement>());
   const has = (id: string | null) => id !== null && rows.some((row) => row.id === id);
   const tabStop = has(focusId) ? focusId : has(selectedId) ? selectedId : (rows[0]?.id ?? null);
@@ -133,6 +150,9 @@ export function Tree({ label, rows, selectedId, onSelect, onExpand, onCollapse }
                 if (row.expandable) toggle(row);
               }}
               onKeyDown={(event) => onKeyDown(event, index)}
+              onContextMenu={(event) => {
+                if (menuFor) context.open(event, row.label, menuFor(row.id));
+              }}
               className={`focus-ring mx-row-inset flex h-row shrink-0 cursor-default items-center gap-2 rounded-control pr-2 pl-1 text-row transition-colors duration-(--motion-quick) motion-reduce:transition-none ${tone}`}
             >
               <span
@@ -154,7 +174,15 @@ export function Tree({ label, rows, selectedId, onSelect, onExpand, onCollapse }
               </span>
               {/* Filled, so a row reads as a thing; a control's outlined glyph reads as an action. */}
               {row.glyph && <Glyph name={row.glyph} filled className={`text-icon ${ink}`} />}
-              <span className="min-w-0 flex-1 truncate">{row.label}</span>
+              {renaming?.id === row.id ? (
+                <NameField
+                  name={row.label}
+                  renaming={renaming}
+                  onDone={() => elements.current.get(row.id)?.focus()}
+                />
+              ) : (
+                <span className="min-w-0 flex-1 truncate">{row.label}</span>
+              )}
               {row.count !== undefined && (
                 <span
                   className={`flex h-badge shrink-0 items-center rounded-badge px-1.5 text-small tabular-nums ${selected ? "bg-on-plate-wash text-on-plate" : "bg-raised text-fg-mid inset-ring inset-ring-line-control"}`}
@@ -193,6 +221,55 @@ export function Tree({ label, rows, selectedId, onSelect, onExpand, onCollapse }
           </Fragment>
         );
       })}
+      {context.menu}
     </div>
+  );
+}
+
+/**
+ * The row's name as a field, where it stands: the whole name selected, Enter or leaving it keeps
+ * what was typed, Escape keeps the old name. DECISIONS.md "Right-click menus".
+ */
+function NameField({
+  name,
+  renaming,
+  onDone,
+}: {
+  name: string;
+  renaming: Renaming;
+  onDone: () => void;
+}) {
+  const field = useRef<HTMLInputElement>(null);
+  const settled = useRef(false);
+  useEffect(() => {
+    field.current?.select();
+  }, []);
+
+  const settle = (keep: boolean) => {
+    if (settled.current) return;
+    settled.current = true;
+    const typed = field.current?.value.trim() ?? "";
+    if (keep && typed && typed !== name) renaming.onCommit(typed);
+    else renaming.onCancel();
+  };
+
+  return (
+    <input
+      ref={field}
+      aria-label={`Rename ${name}`}
+      defaultValue={name}
+      onBlur={() => settle(true)}
+      // The row's own keys and clicks are the tree's; in here they are the field's.
+      onClick={(event) => event.stopPropagation()}
+      onDoubleClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => {
+        event.stopPropagation();
+        if (event.key !== "Enter" && event.key !== "Escape") return;
+        event.preventDefault();
+        settle(event.key === "Enter");
+        onDone();
+      }}
+      className="focus-ring h-chip min-w-0 flex-1 rounded-nested bg-well px-1.5 text-fg inset-ring inset-ring-line-strong selection:bg-plate selection:text-on-plate"
+    />
   );
 }
