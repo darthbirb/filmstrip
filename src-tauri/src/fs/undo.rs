@@ -8,7 +8,7 @@ use serde::de::DeserializeOwned;
 use ts_rs::TS;
 
 use crate::db::journal::{
-    self, Entry, FolderCreated, FolderMoved, FolderRenamed, ItemMoved, ItemTrashed,
+    self, Entry, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, ItemMoved, ItemTrashed,
 };
 use crate::error::{AppError, Result};
 use crate::fs::{folders, items, trash};
@@ -77,6 +77,10 @@ fn reverse(conn: &Connection, entry: &Entry) -> Result<()> {
         journal::ITEM_TRASH => {
             let back: ItemTrashed = inverse(entry)?;
             trash::restore_unjournalled(conn, back.item_id)
+        }
+        journal::FOLDER_DELETE => {
+            let back: FolderDeleted = inverse(entry)?;
+            folders::undelete(conn, back.folder_id, back.retired_at)
         }
         other => Err(AppError::invalid(format!("{other} cannot be undone"))),
     }

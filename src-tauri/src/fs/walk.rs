@@ -15,7 +15,7 @@ use crate::error::Result;
 use crate::fs::paths;
 
 /// Windows and macOS litter; never library content.
-const IGNORED_FILES: &[&str] = &["thumbs.db", "desktop.ini", ".ds_store"];
+pub(crate) const IGNORED_FILES: &[&str] = &["thumbs.db", "desktop.ini", ".ds_store"];
 
 const IMAGE_EXTS: &[&str] = &[
     "jpg", "jpeg", "png", "gif", "webp", "bmp", "tif", "tiff", "avif", "heic",
