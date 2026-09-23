@@ -7,9 +7,11 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use ts_rs::TS;
 
-use crate::db::journal::{self, Entry, FolderCreated, FolderMoved, FolderRenamed, ItemMoved};
+use crate::db::journal::{
+    self, Entry, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, ItemMoved, ItemTrashed,
+};
 use crate::error::{AppError, Result};
-use crate::fs::{folders, items};
+use crate::fs::{folders, items, trash};
 
 /// What an undo put back, and what it could not, each with its reason.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
@@ -71,6 +73,14 @@ fn reverse(conn: &Connection, entry: &Entry) -> Result<()> {
         journal::ITEM_MOVE => {
             let back: ItemMoved = inverse(entry)?;
             items::move_unjournalled(conn, back.item_id, back.to_folder_id, None).map(|_| ())
+        }
+        journal::ITEM_TRASH => {
+            let back: ItemTrashed = inverse(entry)?;
+            trash::restore_unjournalled(conn, back.item_id)
+        }
+        journal::FOLDER_DELETE => {
+            let back: FolderDeleted = inverse(entry)?;
+            folders::undelete(conn, back.folder_id, back.retired_at)
         }
         other => Err(AppError::invalid(format!("{other} cannot be undone"))),
     }

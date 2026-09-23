@@ -69,6 +69,21 @@ pub fn thumb_rel(uuid: &str) -> String {
     format!("{a}/{b}/{uuid}.webp")
 }
 
+/// Where a trashed item's file waits: `<uuid>` → `ab/cd/<uuid>.<ext>` under the trash, sharded as
+/// the thumbnails are, and keeping its extension so Explorer still knows what it is.
+pub fn trash_path(uuid: &str, disk_name: &str) -> Result<PathBuf> {
+    let clean: String = uuid.chars().filter(char::is_ascii_alphanumeric).collect();
+    let a = clean.get(0..2).unwrap_or("00");
+    let b = clean.get(2..4).unwrap_or("00");
+    let ext = extension_of(disk_name);
+    let name = if ext.is_empty() {
+        uuid.to_string()
+    } else {
+        format!("{uuid}.{ext}")
+    };
+    Ok(trash_dir()?.join(a).join(b).join(name))
+}
+
 /// Whether two paths name one directory. Windows ignores case and takes either
 /// separator, so `==` cannot answer this.
 pub fn same_dir(a: &Path, b: &Path) -> bool {

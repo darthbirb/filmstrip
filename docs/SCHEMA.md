@@ -27,7 +27,9 @@ migration arrives with the feature that needs it and is never edited once shippe
 - A folder's path is its source's root, then the title of every folder between that root and
   the folder itself. The source's own root folder contributes no title. Derived on every read,
   in `fs::paths::folder_dir`.
-- An item's path is its folder's path joined with `disk_name`.
+- An item's path is its folder's path joined with `disk_name`. A trashed item's file is in the
+  app's trash instead, at `ab/cd/<uuid>.<ext>`, sharded as thumbnails are
+  (`fs::paths::trash_path`); its row keeps the folder and name it left.
 - **Every item has a folder.** A file waiting in a sorting source sits in that source's root
   folder or somewhere beneath it.
 - `item.source_id` repeats what the folder's ancestry implies. `items::set_folder` derives it
@@ -38,7 +40,8 @@ migration arrives with the feature that needs it and is never edited once shippe
 - One live folder per parent and title, compared case-insensitively. SQLite folds ASCII only,
   so `Ä` and `ä` are two titles.
 - One root folder per source.
-- One item per folder and `disk_name`, compared case-insensitively.
+- One item per folder and `disk_name`, compared case-insensitively, among items not in the trash.
+  A retired item keeps its name; a trashed one gives it up.
 - `item.uuid` is unique. It is identity and the thumbnail cache key — never a location.
 - `source.root` is unique, and the application also refuses a root that sits inside another
   or contains one.
@@ -59,12 +62,18 @@ migration arrives with the feature that needs it and is never edited once shippe
 
 ## Lifecycle
 
-- Trashing sets `deleted_at` and removes nothing. A trashed folder frees its spot for a new
-  folder of the same name.
+- An item has three states. Live: `deleted_at` is NULL. Retired, its file gone: `deleted_at` is
+  set and `trashed_at` is NULL, and a file arriving under its name again is the same item.
+  Trashed, its file in the app's trash: both are set, and a file arriving under its name is a
+  new item.
+- A deleted folder, and every folder under it, is retired with one stamp in `deleted_at`, which
+  is how an undo finds exactly those again. A retired folder frees its spot for a new folder of
+  the same name.
 - A walk retires the items it did not find, one source at a time, and the folders whose
   directory is gone — only in sources it could actually read.
 - Removing a source deletes its rows outright. Its directory is never touched.
-- A file moved to a name that only a retired row holds takes it: that row is deleted outright.
+- A file moved or restored to a name that only a retired row holds takes it: that row is deleted
+  outright. A trashed row never holds a name.
 - A folder moved into another source takes its items with it: their `source_id` follows the
   folder's new ancestry.
 - `item.probed_at` is set when the file is read for its shape and dates, and cleared when a walk

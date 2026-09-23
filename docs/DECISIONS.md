@@ -452,9 +452,19 @@ that interface will drive.
   ("IMG_0031 (2).jpg"); Filmstrip refuses that one file and says where the name is taken, and the
   rest of the selection still moves. The picker drawn on the Pane sheet reports a clash and never
   resolves it for you.
-- **A name held only by a file a walk found gone is freed** for the file arriving at it. Until the
-  trash exists every retired row is one of those; a trashed item will also hold its folder and
-  name, so the trash has to settle how the two are told apart.
+- **A name held only by a file a walk found gone is freed** for the file arriving at it.
+- **A trashed item gives up its name; a retired one keeps it.** `trashed_at` tells them apart. A
+  file vanishing and coming back is the same file, so it keeps its tags. A file sent to the trash
+  and then replaced under the same name is a different file: the newcomer is a new item, and the
+  trashed one waits in the trash, untouched, until it is taken back.
+- **The trash is a folder beside the executable**, as PRODUCT.md "Trash" has it, so a file on
+  another drive is copied there. A file already gone from where the index has it is refused
+  rather than trashed; the next walk retires it.
+- **Deleting a folder moves or trashes what it holds first**, under the batch the folder's own
+  deletion joins, so one undo takes back all of it. Moved to a sorting source, its files and its
+  subfolders arrive at that source's top level as they were. The folder itself goes only once
+  nothing is left in its directory but Windows' own litter (`desktop.ini`, `Thumbs.db`), which
+  goes with it; any other file the app does not show keeps it in place and is named.
 - **A source's own folder is not renamed on disk.** Its name in the app is the source's label, and
   its directory is the source's root; renaming that is removing one source and adding another.
 - **The journal keeps everything for now.** Its rows are small, and what to prune is settled with

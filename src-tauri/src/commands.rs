@@ -17,9 +17,10 @@ use crate::db::journal;
 use crate::db::sources::{self, Refusal, Source, SourceKind};
 use crate::db::tags::{self, EffectiveTag};
 use crate::error::{AppError, Result};
-use crate::fs::folders as fs_folders;
+use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
 use crate::fs::items::{self as fs_items, MoveReport};
 use crate::fs::paths;
+use crate::fs::trash::{self, TrashReport};
 use crate::fs::undo::{self, UndoReport};
 use crate::jobs::{self, JobQueue, Progress};
 
@@ -225,6 +226,66 @@ pub async fn move_items(
         let report = fs_items::move_items(conn, &item_ids, folder_id, &batch_id)?;
         Ok(ItemsMoved {
             batch_id: (report.moved > 0).then_some(batch_id),
+            report,
+        })
+    })
+    .await
+}
+
+/// What sending files to the trash did, and the batch that undoes it when anything went.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ItemsTrashed {
+    pub batch_id: Option<String>,
+    pub report: TrashReport,
+}
+
+/// Files sent to the app's trash, out of their folders, to wait there until taken back.
+#[tauri::command]
+pub async fn trash_items(state: State<'_, AppState>, item_ids: Vec<i64>) -> Result<ItemsTrashed> {
+    run(&state, move |conn| {
+        let batch_id = journal::new_batch();
+        let report = trash::trash_items(conn, &item_ids, &batch_id)?;
+        Ok(ItemsTrashed {
+            batch_id: (report.trashed > 0).then_some(batch_id),
+            report,
+        })
+    })
+    .await
+}
+
+/// How many files are at or below a folder: none, and deleting it asks nothing.
+#[tauri::command]
+pub async fn folder_file_count(state: State<'_, AppState>, folder_id: i64) -> Result<u32> {
+    run(&state, move |conn| {
+        Ok(items::live_under(conn, folder_id)?.len() as u32)
+    })
+    .await
+}
+
+/// What deleting a folder did, and the batch that undoes whatever of it happened.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct FolderDeleted {
+    pub batch_id: Option<String>,
+    pub report: DeleteReport,
+}
+
+/// A folder deleted; one that holds files needs `contents` to say where they go.
+#[tauri::command]
+pub async fn delete_folder(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    contents: Option<Contents>,
+) -> Result<FolderDeleted> {
+    run(&state, move |conn| {
+        let batch_id = journal::new_batch();
+        let report = fs_folders::delete(conn, folder_id, contents, &batch_id)?;
+        let journalled = !journal::batch(conn, &batch_id)?.is_empty();
+        Ok(FolderDeleted {
+            batch_id: journalled.then_some(batch_id),
             report,
         })
     })
@@ -815,7 +876,7 @@ mod tests {
         );
         assert_eq!(detail.source_kind, SourceKind::Library);
 
-        items::trash(&conn, id).unwrap();
+        items::retire(&conn, id).unwrap();
         assert_eq!(
             detail_of(&conn, id, &thumbs).unwrap(),
             None,

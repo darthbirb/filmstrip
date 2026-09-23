@@ -46,7 +46,7 @@ drawn. **Not started** — neither.
 | A folder's own details | Backlogged, and not in Rust | "A folder's details" |
 | Create a folder | Built in Rust, journalled; not on screen yet | `create_folder`; drawn on the folder row's menu |
 | Move a folder | Built in Rust, journalled; not on screen yet | `move_folder`, across drives too; drawn on the folder row's menu |
-| Delete a folder, choosing what happens to what is inside | Drawn, waiting on the undo journal | PRODUCT.md "Folders and sources" |
+| Delete a folder, choosing what happens to what is inside | Built in Rust, journalled; not on screen yet | `delete_folder`, `folder_file_count`; the default pick waits for its Settings row |
 | Rename a folder, on disk | Built in Rust, journalled; not on screen yet | `rename_folder`; drawn on its tree row |
 | A folder's cover | Not started | `folder.cover_item_id` exists |
 | A folder's status, notes, favourite | Not started | |
@@ -64,7 +64,7 @@ drawn. **Not started** — neither.
 | Reveal, open, copy the file | Built | the pane's bar |
 | Sort by key and direction, random order held steady | Not started | |
 | Move items between folders | Built in Rust, journalled; not on screen yet | `move_items`; a name already taken is reported, never changed |
-| Delete items to the trash | Not started | |
+| Delete items to the trash | Built in Rust, journalled; not on screen yet | `trash_items`; undo takes an item back |
 | Paste files in, and take an OS drop | Not started | |
 | Copy an item's path | Not started | |
 | Counts: unsorted, trashed, totals, arrival duplicates | Partly | the foot counts items and sources |
@@ -109,7 +109,7 @@ drawn. **Not started** — neither.
 | Select in a grid, and act on the selection | Not started | |
 | Move a selection somewhere | Not started | |
 | Destination hotkeys | Not started | no migration yet |
-| The trash as a place, with its own limits | Partly | the row and its empty state are built; nothing can be trashed yet |
+| The trash as a place, with its own limits | Partly | the row and its empty state are built, and items can be trashed; the place does not list them yet, and there are no limits |
 | Purge the trash, the one irreversible act | Not started | |
 
 ## Export and undo

@@ -55,7 +55,7 @@ pub fn existing_by_disk_name(
         .query_row(
             "SELECT id, uuid, size_bytes, mtime, deleted_at
                FROM item
-              WHERE folder_id = ?1 AND disk_name = ?2 COLLATE NOCASE",
+              WHERE folder_id = ?1 AND disk_name = ?2 COLLATE NOCASE AND trashed_at IS NULL",
             params![folder_id, disk_name],
             |r| {
                 let deleted: Option<i64> = r.get(4)?;
@@ -72,7 +72,7 @@ pub fn existing_by_disk_name(
 }
 
 /// Records what is on disk. A known name keeps its id and uuid — so its tags
-/// and thumbnail — and a trashed one comes back.
+/// and thumbnail — and a retired one comes back. A trashed one has given its name up.
 pub fn upsert(conn: &Connection, item: &NewItem) -> Result<i64> {
     if let Some(found) = existing_by_disk_name(conn, item.folder_id, &item.disk_name)? {
         conn.execute(
@@ -220,13 +220,14 @@ pub fn set_folder(conn: &Connection, id: i64, folder_id: i64, disk_name: &str) -
 /// is now arriving at.
 pub fn forget_retired(conn: &Connection, id: i64) -> Result<()> {
     conn.execute(
-        "DELETE FROM item WHERE id = ?1 AND deleted_at IS NOT NULL",
+        "DELETE FROM item WHERE id = ?1 AND deleted_at IS NOT NULL AND trashed_at IS NULL",
         params![id],
     )?;
     Ok(())
 }
 
-pub fn trash(conn: &Connection, id: i64) -> Result<()> {
+/// Retires an item whose file is gone. It keeps its name, so the file coming back is the same item.
+pub fn retire(conn: &Connection, id: i64) -> Result<()> {
     conn.execute(
         "UPDATE item SET deleted_at = ?1 WHERE id = ?2",
         params![now(), id],
@@ -234,12 +235,50 @@ pub fn trash(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
-pub fn restore(conn: &Connection, id: i64) -> Result<()> {
+/// Records an item as in the trash: out of its folder, its name there free for another file.
+pub fn send_to_trash(conn: &Connection, id: i64) -> Result<()> {
+    let at = now();
     conn.execute(
-        "UPDATE item SET deleted_at = NULL WHERE id = ?1",
+        "UPDATE item SET deleted_at = ?1, trashed_at = ?1 WHERE id = ?2",
+        params![at, id],
+    )?;
+    Ok(())
+}
+
+/// Records an item as back from the trash, in the folder it left.
+pub fn take_from_trash(conn: &Connection, id: i64) -> Result<()> {
+    conn.execute(
+        "UPDATE item SET deleted_at = NULL, trashed_at = NULL WHERE id = ?1",
         params![id],
     )?;
     Ok(())
+}
+
+pub fn is_trashed(conn: &Connection, id: i64) -> Result<bool> {
+    Ok(conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM item WHERE id = ?1 AND trashed_at IS NOT NULL)",
+        params![id],
+        |r| r.get(0),
+    )?)
+}
+
+/// Every live item at or below a folder, deepest folders last.
+pub fn live_under(conn: &Connection, folder_id: i64) -> Result<Vec<i64>> {
+    let mut stmt = conn.prepare(
+        "WITH RECURSIVE subtree(id) AS (
+             SELECT ?1
+           UNION ALL
+             SELECT f.id FROM folder f JOIN subtree s ON f.parent_id = s.id
+              WHERE f.deleted_at IS NULL
+         )
+         SELECT i.id FROM item i JOIN subtree s ON i.folder_id = s.id
+          WHERE i.deleted_at IS NULL
+          ORDER BY i.id",
+    )?;
+    let ids = stmt
+        .query_map(params![folder_id], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(ids)
 }
 
 /// Favourite is binary and acts on a whole selection, so one call covers any number of items.
@@ -522,10 +561,10 @@ mod tests {
     }
 
     #[test]
-    fn a_trashed_file_that_comes_back_is_the_same_item() {
+    fn a_retired_file_that_comes_back_is_the_same_item() {
         let (conn, root) = library();
         let id = upsert(&conn, &sample(1, root, "a.jpg")).unwrap();
-        trash(&conn, id).unwrap();
+        retire(&conn, id).unwrap();
 
         assert_eq!(upsert(&conn, &sample(1, root, "a.jpg")).unwrap(), id);
         let deleted: Option<i64> = conn
@@ -533,7 +572,7 @@ mod tests {
                 r.get(0)
             })
             .unwrap();
-        assert!(deleted.is_none(), "it is not in the trash any more");
+        assert!(deleted.is_none(), "it is not retired any more");
     }
 
     #[test]
@@ -542,7 +581,7 @@ mod tests {
         upsert(&conn, &sample(1, root, "b.jpg")).unwrap();
         upsert(&conn, &sample(1, root, "A.jpg")).unwrap();
         let gone = upsert(&conn, &sample(1, root, "c.jpg")).unwrap();
-        trash(&conn, gone).unwrap();
+        retire(&conn, gone).unwrap();
 
         let names: Vec<_> = in_folder(&conn, root)
             .unwrap()
