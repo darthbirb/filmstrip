@@ -64,6 +64,9 @@ migration arrives with the feature that needs it and is never edited once shippe
 - A walk retires the items it did not find, one source at a time, and the folders whose
   directory is gone — only in sources it could actually read.
 - Removing a source deletes its rows outright. Its directory is never touched.
+- A file moved to a name that only a retired row holds takes it: that row is deleted outright.
+- A folder moved into another source takes its items with it: their `source_id` follows the
+  folder's new ancestry.
 - `item.probed_at` is set when the file is read for its shape and dates, and cleared when a walk
   refreshes the row because the file changed. NULL means it is still to be read.
 - `captured_at` is only ever the file's own metadata, and `captured_src` says which: `exif` or

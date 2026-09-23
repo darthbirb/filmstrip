@@ -444,6 +444,17 @@ that interface will drive.
 - **One change to the disk at a time.** A walk that read a directory while a verb renamed it would
   find the old name gone and retire everything under it. So the walk takes a turn per source and
   a verb waits for the turn, which bounds the wait by one source's walk, never the whole pass.
+- **A move between drives is a copy, checked, and only then the original's removal.** ggallery
+  renamed, which cannot cross from one drive to another. A copy cut short is removed and the
+  original stays whole; an original that will not go once its copy is whole is left for the next
+  walk, so the index follows the copy and no file loses its identity.
+- **A file keeps its own name wherever it moves.** ggallery suffixed a clashing name
+  ("IMG_0031 (2).jpg"); Filmstrip refuses that one file and says where the name is taken, and the
+  rest of the selection still moves. The picker drawn on the Pane sheet reports a clash and never
+  resolves it for you.
+- **A name held only by a file a walk found gone is freed** for the file arriving at it. Until the
+  trash exists every retired row is one of those; a trashed item will also hold its folder and
+  name, so the trash has to settle how the two are told apart.
 - **A source's own folder is not renamed on disk.** Its name in the app is the source's label, and
   its directory is the source's root; renaming that is removing one source and adding another.
 - **The journal keeps everything for now.** Its rows are small, and what to prune is settled with
