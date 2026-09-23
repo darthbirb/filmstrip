@@ -815,7 +815,7 @@ mod tests {
         );
         assert_eq!(detail.source_kind, SourceKind::Library);
 
-        items::trash(&conn, id).unwrap();
+        items::retire(&conn, id).unwrap();
         assert_eq!(
             detail_of(&conn, id, &thumbs).unwrap(),
             None,

@@ -72,7 +72,7 @@ pub fn existing_by_disk_name(
 }
 
 /// Records what is on disk. A known name keeps its id and uuid — so its tags
-/// and thumbnail — and a trashed one comes back.
+/// and thumbnail — and a retired one comes back.
 pub fn upsert(conn: &Connection, item: &NewItem) -> Result<i64> {
     if let Some(found) = existing_by_disk_name(conn, item.folder_id, &item.disk_name)? {
         conn.execute(
@@ -226,7 +226,8 @@ pub fn forget_retired(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
-pub fn trash(conn: &Connection, id: i64) -> Result<()> {
+/// Retires an item whose file is gone. It keeps its name, so the file coming back is the same item.
+pub fn retire(conn: &Connection, id: i64) -> Result<()> {
     conn.execute(
         "UPDATE item SET deleted_at = ?1 WHERE id = ?2",
         params![now(), id],
@@ -522,10 +523,10 @@ mod tests {
     }
 
     #[test]
-    fn a_trashed_file_that_comes_back_is_the_same_item() {
+    fn a_retired_file_that_comes_back_is_the_same_item() {
         let (conn, root) = library();
         let id = upsert(&conn, &sample(1, root, "a.jpg")).unwrap();
-        trash(&conn, id).unwrap();
+        retire(&conn, id).unwrap();
 
         assert_eq!(upsert(&conn, &sample(1, root, "a.jpg")).unwrap(), id);
         let deleted: Option<i64> = conn
@@ -533,7 +534,7 @@ mod tests {
                 r.get(0)
             })
             .unwrap();
-        assert!(deleted.is_none(), "it is not in the trash any more");
+        assert!(deleted.is_none(), "it is not retired any more");
     }
 
     #[test]
@@ -542,7 +543,7 @@ mod tests {
         upsert(&conn, &sample(1, root, "b.jpg")).unwrap();
         upsert(&conn, &sample(1, root, "A.jpg")).unwrap();
         let gone = upsert(&conn, &sample(1, root, "c.jpg")).unwrap();
-        trash(&conn, gone).unwrap();
+        retire(&conn, gone).unwrap();
 
         let names: Vec<_> = in_folder(&conn, root)
             .unwrap()
