@@ -10,6 +10,8 @@ use crate::error::Result;
 
 pub const FOLDER_CREATE: &str = "folder_create";
 pub const FOLDER_RENAME: &str = "folder_rename";
+pub const FOLDER_MOVE: &str = "folder_move";
+pub const ITEM_MOVE: &str = "item_move";
 
 /// A folder the app made. Its inverse is itself: undoing it removes that folder again.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -26,6 +28,24 @@ pub struct FolderRenamed {
     pub folder_id: i64,
     pub from: String,
     pub to: String,
+}
+
+/// A folder moved into another. The inverse swaps the two parents.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderMoved {
+    pub folder_id: i64,
+    pub from_parent_id: i64,
+    pub to_parent_id: i64,
+}
+
+/// An item moved into another folder. The inverse swaps the two folders.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemMoved {
+    pub item_id: i64,
+    pub from_folder_id: i64,
+    pub to_folder_id: i64,
 }
 
 /// One row, as undo reads it back. The inverse stays JSON until its op says what it is.
@@ -93,6 +113,46 @@ pub fn record_folder_rename(
         to: from.to_string(),
     };
     record(conn, batch_id, FOLDER_RENAME, &forward, &inverse)
+}
+
+pub fn record_folder_move(
+    conn: &Connection,
+    batch_id: &str,
+    folder_id: i64,
+    from_parent_id: i64,
+    to_parent_id: i64,
+) -> Result<()> {
+    let forward = FolderMoved {
+        folder_id,
+        from_parent_id,
+        to_parent_id,
+    };
+    let inverse = FolderMoved {
+        folder_id,
+        from_parent_id: to_parent_id,
+        to_parent_id: from_parent_id,
+    };
+    record(conn, batch_id, FOLDER_MOVE, &forward, &inverse)
+}
+
+pub fn record_item_move(
+    conn: &Connection,
+    batch_id: &str,
+    item_id: i64,
+    from_folder_id: i64,
+    to_folder_id: i64,
+) -> Result<()> {
+    let forward = ItemMoved {
+        item_id,
+        from_folder_id,
+        to_folder_id,
+    };
+    let inverse = ItemMoved {
+        item_id,
+        from_folder_id: to_folder_id,
+        to_folder_id: from_folder_id,
+    };
+    record(conn, batch_id, ITEM_MOVE, &forward, &inverse)
 }
 
 /// Every row in a batch, newest first: the order an undo applies them in, since a later row can
