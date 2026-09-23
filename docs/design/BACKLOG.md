@@ -16,6 +16,18 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
+## Labels are sentence case, and should be Title Case · DEFECT
+
+Every label is drawn in sentence case: "Manage sources…", "Remove source", "Open with the default
+app", "Add a folder…". That was never chosen on its merits: a pass settled a clash between two
+sheets by counting which case the build already used. The user wants Title Case on every label, as
+the apps they use have it: each word capitalised but for short articles, conjunctions and
+prepositions ("Manage Sources…", "Open with the Default App", "Add a Folder…"). Recommended: redraw
+every label in Title Case (buttons, menu rows, tooltips, segmented options and Settings' row
+labels) on every sheet, and state once which small words stay lowercase. A sentence stays a
+sentence. Correct the Components card "A title is Title Case; a label is not" and the Notes entry
+that settled it; titles already take Title Case, so labels and titles end up in one case.
+
 ## The app's own right-click menus: the verbs that change the disk · DRAWN
 
 Drawn on the Components sheet; what exists is built, DECISIONS.md "Right-click menus". What waits,
