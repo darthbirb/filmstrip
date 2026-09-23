@@ -11,7 +11,7 @@ Tauri 2 · Rust · React 19 · TypeScript · Vite · Tailwind v4 · Base UI · S
 pinned version:
 
 - `npx --yes pnpm@12.4.1 install` — install
-- `npx --yes pnpm@12.4.1 dev -- --port 1422` — dev server for checking the UI
+- `npx --yes pnpm@12.4.1 dev --port 1422 --strictPort` — dev server for checking the UI
 - `npx --yes pnpm@12.4.1 tauri dev` — the real app in its own window
 - `npx --yes pnpm@12.4.1 lint | check | test | test:e2e` — the four frontend gates
 - `npx --yes pnpm@12.4.1 check:docs` — doc pointers resolve and comments stay short

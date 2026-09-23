@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "web",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "1422"],
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "pnpm@12.4.1", "dev", "--port", "1422", "--strictPort"],
       "port": 1422
     },
     {

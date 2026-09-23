@@ -15,7 +15,7 @@ version through `npx`:
 | | |
 | --- | --- |
 | `npx --yes pnpm@12.4.1 install` | install, from the lockfile |
-| `npx --yes pnpm@12.4.1 dev -- --port 1422` | dev server for checking the UI |
+| `npx --yes pnpm@12.4.1 dev --port 1422 --strictPort` | dev server for checking the UI |
 | `npx --yes pnpm@12.4.1 tauri dev` | the real app, in its own window |
 | `npx --yes pnpm@12.4.1 lint` | Biome, format and lint |
 | `npx --yes pnpm@12.4.1 check` | TypeScript |
