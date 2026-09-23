@@ -13,10 +13,13 @@ use ts_rs::TS;
 use crate::db::folders::{self, FolderNode};
 use crate::db::items::{self, ItemDetail, ItemRow};
 use crate::db::jobs::{self as job_table, Failure};
+use crate::db::journal;
 use crate::db::sources::{self, Refusal, Source, SourceKind};
 use crate::db::tags::{self, EffectiveTag};
 use crate::error::{AppError, Result};
+use crate::fs::folders as fs_folders;
 use crate::fs::paths;
+use crate::fs::undo::{self, UndoReport};
 use crate::jobs::{self, JobQueue, Progress};
 
 pub struct AppState {
@@ -140,6 +143,60 @@ pub fn folder_to_reveal(conn: &Connection, folder_id: i64) -> Result<PathBuf> {
         return Err(AppError::invalid("that folder is no longer in the index"));
     }
     paths::folder_dir(conn, folder_id)
+}
+
+/// A folder the app made, and the batch that undoes it.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct FolderMade {
+    pub folder_id: i64,
+    pub batch_id: String,
+}
+
+/// A new folder inside another, on disk and in the index. DECISIONS.md "Undo".
+#[tauri::command]
+pub async fn create_folder(
+    state: State<'_, AppState>,
+    parent_id: i64,
+    title: String,
+) -> Result<FolderMade> {
+    run(&state, move |conn| {
+        let batch_id = journal::new_batch();
+        let folder_id = fs_folders::create(conn, parent_id, &title, &batch_id)?;
+        Ok(FolderMade {
+            folder_id,
+            batch_id,
+        })
+    })
+    .await
+}
+
+/// A folder renamed on disk; the batch that undoes it, or nothing when the name did not change.
+#[tauri::command]
+pub async fn rename_folder(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    title: String,
+) -> Result<Option<String>> {
+    run(&state, move |conn| {
+        let batch_id = journal::new_batch();
+        let changed = fs_folders::rename(conn, folder_id, &title, &batch_id)?;
+        Ok(changed.then_some(batch_id))
+    })
+    .await
+}
+
+/// Reverses whatever the app did last, in this session or an earlier one.
+#[tauri::command]
+pub async fn undo_last(state: State<'_, AppState>) -> Result<Option<UndoReport>> {
+    run(&state, undo::undo_last).await
+}
+
+/// Reverses one batch by id, as a notice offering Undo names it.
+#[tauri::command]
+pub async fn undo_batch(state: State<'_, AppState>, batch_id: String) -> Result<UndoReport> {
+    run(&state, move |conn| undo::undo_batch(conn, &batch_id)).await
 }
 
 /// The walk the app runs at launch, aimed at one folder and everything under it.

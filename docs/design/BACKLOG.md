@@ -16,6 +16,27 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
+## Every label and line reads as a draft · DEFECT
+
+The words were never reviewed as a whole; each was written with the surface that needed it, so they
+read as drafts, not as a finished app's.
+
+- **Case.** Every label is drawn in sentence case ("Manage sources…", "Add a folder…"), settled in
+  a pass by counting which case the build already used, never on its merits. The user wants Title
+  Case on every label, as the apps they use have it: each word capitalised but for short articles,
+  conjunctions and prepositions. That covers buttons, menu rows, tooltips, segmented options and
+  Settings' row labels; a sentence stays a sentence. Correct the Components card "A title is Title
+  Case; a label is not" and the Notes entry that settled it.
+- **Wording.** Re-read every label, title and line on every sheet as production copy: the fewest
+  words that stay unambiguous, the verb and noun a Windows user already knows, one name for one
+  thing everywhere it appears, and an ellipsis only where a choice follows. "Open with the default
+  app" says nothing "Open with Default App" does not; "Read it again", "Reveal in Explorer",
+  "Nominate a folder" and the ⋯ menu's name "Everything else" are asked the same question. This is
+  not only removing words: rephrase whatever reads as a note to the builder, not a word to the user.
+
+Recommended: one pass over all five sheets that states the case rule and a short word list (each
+verb, and the small words that stay lowercase), then redraws every label and line against them.
+
 ## The app's own right-click menus: the verbs that change the disk · DRAWN
 
 Drawn on the Components sheet; what exists is built, DECISIONS.md "Right-click menus". What waits,
@@ -100,3 +121,10 @@ the track and the time never leave. Losing half the time is not in that order, s
 oversight or the time abbreviates and the rule has to say so.
 
 Say what the time does as the plate narrows.
+
+## Undo, on screen
+
+Everything the app changes on disk can be undone, across a restart (DECISIONS.md "Undo"), but
+nothing is drawn for it: the Notes sheet says so. Draw what follows an act that can be undone, the
+way back from it, and Ctrl+Z; what an undo that came back only in part says, naming what stayed;
+and what Ctrl+Z does when there is nothing left to undo.

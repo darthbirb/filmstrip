@@ -168,7 +168,43 @@ pub fn create(conn: &Connection, parent_id: i64, title: &str) -> Result<i64> {
     Ok(id)
 }
 
-/// Soft-deletes a folder and everything beneath it; returns how many folders.
+/// The folder a folder sits in; `None` for a source's own folder, or for no such folder.
+pub fn parent(conn: &Connection, folder_id: i64) -> Result<Option<i64>> {
+    Ok(conn
+        .query_row(
+            "SELECT parent_id FROM folder WHERE id = ?1",
+            params![folder_id],
+            |r| r.get(0),
+        )
+        .optional()?
+        .flatten())
+}
+
+/// A new title, with the title tag it carries kept in step.
+pub fn set_title(conn: &Connection, folder_id: i64, title: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE folder SET title = ?1 WHERE id = ?2",
+        params![title, folder_id],
+    )?;
+    tags::sync_title_tag(conn, folder_id, title)
+}
+
+/// Whether anything live, folder or item, sits directly in the folder.
+pub fn holds_anything(conn: &Connection, folder_id: i64) -> Result<bool> {
+    Ok(conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM folder WHERE parent_id = ?1 AND deleted_at IS NULL)
+             OR EXISTS(SELECT 1 FROM item WHERE folder_id = ?1 AND deleted_at IS NULL)",
+        params![folder_id],
+        |r| r.get(0),
+    )?)
+}
+
+/// Removes a folder's row outright, for a folder the app made and has now unmade.
+pub fn forget(conn: &Connection, folder_id: i64) -> Result<()> {
+    conn.execute("DELETE FROM folder WHERE id = ?1", params![folder_id])?;
+    Ok(())
+}
+
 /// Whether the folder is in the index and not retired.
 pub fn is_live(conn: &Connection, folder_id: i64) -> Result<bool> {
     Ok(conn.query_row(
@@ -195,6 +231,7 @@ pub fn descendants(conn: &Connection, folder_id: i64) -> Result<Vec<i64>> {
     Ok(ids)
 }
 
+/// Soft-deletes a folder and everything beneath it; returns how many folders.
 pub fn trash_subtree(conn: &Connection, folder_id: i64) -> Result<i64> {
     let count = conn.execute(
         "WITH RECURSIVE subtree(id) AS (

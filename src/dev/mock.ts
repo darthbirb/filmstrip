@@ -162,6 +162,11 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   remove_source: () => null,
   reveal_folder: () => null,
   read_folder_again: () => null,
+  create_folder: () =>
+    Promise.reject<AppError>({ kind: "invalid", message: "Making a folder needs the real app." }),
+  rename_folder: () => null,
+  undo_last: () => null,
+  undo_batch: () => ({ reversed: 0, errors: [] }),
   folder_children: ({ folderId }) => FOLDERS[folderId as number] ?? [],
   folder_items: ({ folderId }) => ITEMS[folderId as number] ?? [],
   item_tags: () => [],

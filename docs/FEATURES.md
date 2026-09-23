@@ -44,10 +44,10 @@ drawn. **Not started** — neither.
 | Reveal a folder in Explorer | Built | `reveal_folder`, its row's menu |
 | Read one folder again | Built | `read_folder_again`, its row's menu; ggallery walked only whole sources |
 | A folder's own details | Backlogged, and not in Rust | "A folder's details" |
-| Create a folder | Drawn, waiting on the undo journal | the folder row's menu |
+| Create a folder | Built in Rust, journalled; not on screen yet | `create_folder`; drawn on the folder row's menu |
 | Move a folder | Drawn, waiting on the undo journal | the folder row's menu |
 | Delete a folder, choosing what happens to what is inside | Drawn, waiting on the undo journal | PRODUCT.md "Folders and sources" |
-| Rename a folder, on disk | Drawn on its tree row | no command yet |
+| Rename a folder, on disk | Built in Rust, journalled; not on screen yet | `rename_folder`; drawn on its tree row |
 | A folder's cover | Not started | `folder.cover_item_id` exists |
 | A folder's status, notes, favourite | Not started | |
 | A folder's labels and tags, inherited by everything under it | Not started | items inherit labels, and never own one |
@@ -117,8 +117,8 @@ drawn. **Not started** — neither.
 | Capability | Filmstrip | Where |
 | --- | --- | --- |
 | Export a folder's subtree or a selection as a zip, as a job | Not started | Filmstrip's own change: renaming the files or keeping their own names is chosen at export |
-| An undo journal that survives a restart | Not started | comes before any verb that changes the disk: folder rename, move and delete wait on it |
-| Undo the last batch, or a named one | Not started | |
+| An undo journal that survives a restart | Built in Rust | `journal`, DECISIONS.md "Undo"; how it is offered on screen is not drawn |
+| Undo the last batch, or a named one | Built in Rust | `undo_last`, `undo_batch`; the interface is backlogged |
 
 ## The interface
 
