@@ -107,3 +107,22 @@ Artboards › Trash, Components › Right-click and Pane › 02: the Trash's gri
 heading per day, each tile captioned with the folder it came from ("gone" when that folder is); the
 pane's From and Deleted rows; a trashed file's bar and menu, Restore and Restore to… and nothing that
 purges; Restore refused, in the undo's banner; and Restore as the undo table's eighth act.
+
+## A delete that is refused, and what shows after one, is not drawn · DEFECT
+
+A move that finished in part has its banner over the grid ("3 of 5 files moved to Cairo", Not
+Moved, Reason). Nothing is drawn for a delete that could not finish:
+
+- **Files.** Some of a delete's files cannot go to the Trash: open in another app, permission
+  denied, or no longer on disk where the index has them.
+- **A folder.** A folder's delete is refused, or stops partway. A file the app does not show (any
+  but Windows' desktop.ini and Thumbs.db, which go with the folder) keeps the folder where it is;
+  and moving its contents to a sorting source can meet a name already taken there. What moved
+  before the refusal stays moved, and one undo takes it back.
+
+Nor is it drawn what shows after a delete that worked: what the pane shows when the file it was
+showing has been deleted, and where you are when the folder you are standing in is deleted or
+moved.
+
+Recommended: the move's banner for both refusals, by the undo banner's three rules, and a sentence
+each for what the pane and the grid show after a delete.
