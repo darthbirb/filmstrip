@@ -168,7 +168,6 @@ pub fn create(conn: &Connection, parent_id: i64, title: &str) -> Result<i64> {
     Ok(id)
 }
 
-/// Soft-deletes a folder and everything beneath it; returns how many folders.
 /// Whether the folder is in the index and not retired.
 pub fn is_live(conn: &Connection, folder_id: i64) -> Result<bool> {
     Ok(conn.query_row(
@@ -195,6 +194,7 @@ pub fn descendants(conn: &Connection, folder_id: i64) -> Result<Vec<i64>> {
     Ok(ids)
 }
 
+/// Soft-deletes a folder and everything beneath it; returns how many folders.
 pub fn trash_subtree(conn: &Connection, folder_id: i64) -> Result<i64> {
     let count = conn.execute(
         "WITH RECURSIVE subtree(id) AS (
