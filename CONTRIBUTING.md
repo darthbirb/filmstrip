@@ -82,7 +82,8 @@ Dependabot's branches keep the names it gives them.
   in `main`'s first-parent history as `feat(menu): right-click menus for files, folders and
   sources (#26)`. The description says what changed for someone using the app, how it was
   checked, and what was deliberately left out.
-- **CI passes before merging.** A red `main` is fixed before anything else lands.
+- **CI is expected to pass before merging**, but it is not a required check: merging on red is
+  a deliberate choice, never an accident. A red `main` is fixed before anything else lands.
 
 ### Commits
 
