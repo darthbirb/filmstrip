@@ -1,12 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AddOutcome } from "./bindings/AddOutcome";
+import type { Contents } from "./bindings/Contents";
 import type { EffectiveTag } from "./bindings/EffectiveTag";
 import type { Failure } from "./bindings/Failure";
+import type { FolderDeleted } from "./bindings/FolderDeleted";
 import type { FolderMade } from "./bindings/FolderMade";
 import type { FolderNode } from "./bindings/FolderNode";
 import type { ItemDetail } from "./bindings/ItemDetail";
 import type { ItemRow } from "./bindings/ItemRow";
 import type { ItemsMoved } from "./bindings/ItemsMoved";
+import type { ItemsTrashed } from "./bindings/ItemsTrashed";
 import type { Progress } from "./bindings/Progress";
 import type { SourceKind } from "./bindings/SourceKind";
 import type { SourceSummary } from "./bindings/SourceSummary";
@@ -51,6 +54,14 @@ export const moveFolder = (folderId: number, parentId: number) =>
 
 export const moveItems = (itemIds: number[], folderId: number) =>
   invoke<ItemsMoved>("move_items", { itemIds, folderId });
+
+export const trashItems = (itemIds: number[]) => invoke<ItemsTrashed>("trash_items", { itemIds });
+
+export const folderFileCount = (folderId: number) =>
+  invoke<number>("folder_file_count", { folderId });
+
+export const deleteFolder = (folderId: number, contents: Contents | null) =>
+  invoke<FolderDeleted>("delete_folder", { folderId, contents });
 
 export const undoLast = () => invoke<UndoReport | null>("undo_last");
 
