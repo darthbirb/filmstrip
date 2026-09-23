@@ -12,6 +12,8 @@ pub const FOLDER_CREATE: &str = "folder_create";
 pub const FOLDER_RENAME: &str = "folder_rename";
 pub const FOLDER_MOVE: &str = "folder_move";
 pub const ITEM_MOVE: &str = "item_move";
+pub const ITEM_TRASH: &str = "item_trash";
+pub const FOLDER_DELETE: &str = "folder_delete";
 
 /// A folder the app made. Its inverse is itself: undoing it removes that folder again.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -46,6 +48,22 @@ pub struct ItemMoved {
     pub item_id: i64,
     pub from_folder_id: i64,
     pub to_folder_id: i64,
+}
+
+/// An item sent to the trash. Its inverse is itself: undoing it brings the item back.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemTrashed {
+    pub item_id: i64,
+}
+
+/// A folder deleted, and every folder under it retired with the same stamp, which is how undo
+/// finds them again. Its inverse is itself.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderDeleted {
+    pub folder_id: i64,
+    pub retired_at: i64,
 }
 
 /// One row, as undo reads it back. The inverse stays JSON until its op says what it is.
@@ -153,6 +171,24 @@ pub fn record_item_move(
         to_folder_id: from_folder_id,
     };
     record(conn, batch_id, ITEM_MOVE, &forward, &inverse)
+}
+
+pub fn record_item_trash(conn: &Connection, batch_id: &str, item_id: i64) -> Result<()> {
+    let trashed = ItemTrashed { item_id };
+    record(conn, batch_id, ITEM_TRASH, &trashed, &trashed)
+}
+
+pub fn record_folder_delete(
+    conn: &Connection,
+    batch_id: &str,
+    folder_id: i64,
+    retired_at: i64,
+) -> Result<()> {
+    let deleted = FolderDeleted {
+        folder_id,
+        retired_at,
+    };
+    record(conn, batch_id, FOLDER_DELETE, &deleted, &deleted)
 }
 
 /// Every row in a batch, newest first: the order an undo applies them in, since a later row can

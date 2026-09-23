@@ -267,6 +267,12 @@ pub fn descendants(conn: &Connection, folder_id: i64) -> Result<Vec<i64>> {
 
 /// Soft-deletes a folder and everything beneath it; returns how many folders.
 pub fn trash_subtree(conn: &Connection, folder_id: i64) -> Result<i64> {
+    retire_subtree_at(conn, folder_id, now())
+}
+
+/// Retires a folder and everything live beneath it with one stamp, which is what brings exactly
+/// those back again.
+pub fn retire_subtree_at(conn: &Connection, folder_id: i64, at: i64) -> Result<i64> {
     let count = conn.execute(
         "WITH RECURSIVE subtree(id) AS (
              SELECT ?1
@@ -275,9 +281,49 @@ pub fn trash_subtree(conn: &Connection, folder_id: i64) -> Result<i64> {
          )
          UPDATE folder SET deleted_at = ?2
           WHERE id IN (SELECT id FROM subtree) AND deleted_at IS NULL",
-        params![folder_id, now()],
+        params![folder_id, at],
     )?;
     Ok(count as i64)
+}
+
+/// The folders at or below `folder_id` retired with the stamp `at`, parents before children.
+pub fn retired_with(conn: &Connection, folder_id: i64, at: i64) -> Result<Vec<i64>> {
+    let mut stmt = conn.prepare(
+        "WITH RECURSIVE subtree(id, depth) AS (
+             SELECT ?1, 0
+           UNION ALL
+             SELECT f.id, s.depth + 1 FROM folder f JOIN subtree s ON f.parent_id = s.id
+              WHERE f.deleted_at = ?2
+         )
+         SELECT s.id FROM subtree s JOIN folder f ON f.id = s.id
+          WHERE f.deleted_at = ?2
+          ORDER BY s.depth, s.id",
+    )?;
+    let ids = stmt
+        .query_map(params![folder_id, at], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(ids)
+}
+
+/// Brings back the folders `retired_with` names.
+pub fn restore_retired_with(conn: &Connection, folder_id: i64, at: i64) -> Result<()> {
+    for id in retired_with(conn, folder_id, at)? {
+        conn.execute(
+            "UPDATE folder SET deleted_at = NULL WHERE id = ?1",
+            params![id],
+        )?;
+    }
+    Ok(())
+}
+
+/// The live folders directly inside one.
+pub fn live_children(conn: &Connection, folder_id: i64) -> Result<Vec<i64>> {
+    let mut stmt = conn
+        .prepare("SELECT id FROM folder WHERE parent_id = ?1 AND deleted_at IS NULL ORDER BY id")?;
+    let ids = stmt
+        .query_map(params![folder_id], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(ids)
 }
 
 #[cfg(test)]
