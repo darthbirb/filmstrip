@@ -428,6 +428,27 @@ Shift+F10 did nothing at all.
   outside it. **Only one walk runs at a time:** each retires what it did not see, so a folder walk
   beside the whole walk would have the whole walk retire what the folder walk had just found.
 
+## Undo
+
+**Every change the app makes on disk is journalled and can be undone, across a restart**, ported
+from ggallery on 23 September 2026. It came before any verb that changes the disk, so none of
+them ever existed without a way back. The interface for it is not drawn yet; the journal is what
+that interface will drive.
+
+- **The disk changes first, then the index and the journal together.** A disk that refuses leaves
+  nothing claiming it succeeded, and a transaction that fails puts the disk back.
+- **One act, one batch, one undo.** A batch comes back newest row first. One that comes back only
+  in part stays in the journal, so what failed can be tried again; ggallery's rule, kept.
+- **An undo never destroys.** A folder the app made is taken back only while it is still empty,
+  on disk as well as in the index: files the index has not read yet would go with it otherwise.
+- **One change to the disk at a time.** A walk that read a directory while a verb renamed it would
+  find the old name gone and retire everything under it. So the walk takes a turn per source and
+  a verb waits for the turn, which bounds the wait by one source's walk, never the whole pass.
+- **A source's own folder is not renamed on disk.** Its name in the app is the source's label, and
+  its directory is the source's root; renaming that is removing one source and adding another.
+- **The journal keeps everything for now.** Its rows are small, and what to prune is settled with
+  the trash's limits.
+
 ## Settings
 
 **A dialog over the window**, drawn by Claude Design and built on 14 September 2026. The frame is

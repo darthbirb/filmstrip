@@ -18,6 +18,7 @@ migration arrives with the feature that needs it and is never edited once shippe
 | `item_tag` | Tags an item carries itself. |
 | `item_effective_tag` | Everything an item carries once inheritance is resolved. |
 | `setting` | Key-value pairs. |
+| `journal` | Every change the app made on disk, with what reverses it, grouped into batches. |
 | `job` | Background work: waiting, running, or failed with its error. |
 
 ## Where things live on disk
@@ -68,7 +69,17 @@ migration arrives with the feature that needs it and is never edited once shippe
 - `captured_at` is only ever the file's own metadata, and `captured_src` says which: `exif` or
   `container`. Neither is ever filled with a guess.
 
+## The undo journal
+
+- A row holds one change: its `op`, the change itself as JSON in `forward`, and what reverses it
+  in `inverse`. `batch_id` groups the rows one act wrote, so one undo reverses the act.
+- Rows are written in the same transaction as the change to the index they describe, and only
+  after the disk has changed.
+- An undo applies a batch's rows newest first and writes no row of its own. The batch is deleted
+  once every row has come back, and kept whole when any did not.
+- Nothing prunes the journal yet.
+
 ## Not here yet
 
-Search indexes, the undo journal and destination hotkeys each arrive as a new migration
-alongside the feature that uses them.
+Search indexes and destination hotkeys each arrive as a new migration alongside the feature that
+uses them.

@@ -100,3 +100,10 @@ the track and the time never leave. Losing half the time is not in that order, s
 oversight or the time abbreviates and the rule has to say so.
 
 Say what the time does as the plate narrows.
+
+## Undo, on screen
+
+Everything the app changes on disk can be undone, across a restart (DECISIONS.md "Undo"), but
+nothing is drawn for it: the Notes sheet says so. Draw what follows an act that can be undone, the
+way back from it, and Ctrl+Z; what an undo that came back only in part says, naming what stayed;
+and what Ctrl+Z does when there is nothing left to undo.
