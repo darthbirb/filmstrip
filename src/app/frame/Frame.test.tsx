@@ -51,7 +51,7 @@ test("a wide window docks navigation, grid and pane", async () => {
   await expect.element(screen.getByRole("complementary", { name: "Pane" })).toBeVisible();
   await expect.element(screen.getByText("grid content")).toBeVisible();
   await expect.element(screen.getByText("location content")).toBeVisible();
-  expect(screen.getByRole("button", { name: "Show pane" }).elements()).toHaveLength(0);
+  expect(screen.getByRole("button", { name: "Show Pane" }).elements()).toHaveLength(0);
 });
 
 test("the pane's header row holds what the pane puts there, beside its fold button", async () => {
@@ -63,7 +63,7 @@ test("the pane's header row holds what the pane puts there, beside its fold butt
   );
   const header = screen.getByText("pane header");
   await expect.element(header).toBeVisible();
-  const row = screen.getByRole("button", { name: "Hide pane" }).element().parentElement;
+  const row = screen.getByRole("button", { name: "Hide Pane" }).element().parentElement;
   expect(row?.contains(header.element())).toBe(true);
 });
 
@@ -72,7 +72,7 @@ test("the pane folds first as room runs out, then navigation", async () => {
   const screen = await renderFrame();
   await expect.element(screen.getByRole("navigation", { name: "Navigation" })).toBeVisible();
   expect(inSight(screen.getByText("pane content"))).toBe(false);
-  await expect.element(screen.getByRole("button", { name: "Show pane" })).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "Show Pane" })).toBeVisible();
 
   document.documentElement.style.fontSize = "24px";
   await expect.poll(() => inSight(screen.getByText("nav content"))).toBe(false);
@@ -81,7 +81,7 @@ test("the pane folds first as room runs out, then navigation", async () => {
 test("a folded panel opens over the grid, and Escape puts it away", async () => {
   await page.viewport(640, 480);
   const screen = await renderFrame();
-  await screen.getByRole("button", { name: "Show pane" }).click();
+  await screen.getByRole("button", { name: "Show Pane" }).click();
   await expect.element(screen.getByText("pane content")).toBeVisible();
 
   await userEvent.keyboard("{Escape}");
@@ -91,10 +91,10 @@ test("a folded panel opens over the grid, and Escape puts it away", async () => 
 test("a panel can be hidden while it fits, and shown again", async () => {
   await page.viewport(1600, 900);
   const screen = await renderFrame();
-  await screen.getByRole("button", { name: "Hide navigation" }).click();
+  await screen.getByRole("button", { name: "Hide Navigation" }).click();
   await expect.poll(() => inSight(screen.getByText("nav content"))).toBe(false);
 
-  await screen.getByRole("button", { name: "Show navigation" }).click();
+  await screen.getByRole("button", { name: "Show Navigation" }).click();
   await expect.element(screen.getByRole("navigation", { name: "Navigation" })).toBeVisible();
 });
 
@@ -108,7 +108,7 @@ test("clicking a picture docks a pane hidden by hand, where it fits", async () =
   await expect.poll(() => inSight(screen.getByText("pane content"))).toBe(true);
   expect(getPreferences().hidden?.pane).toBe(false);
   // The rail it docked out of takes the cross-fade to leave, so it is gone a moment later.
-  await expect.poll(() => inSight(screen.getByRole("button", { name: "Show pane" }))).toBe(false);
+  await expect.poll(() => inSight(screen.getByRole("button", { name: "Show Pane" }))).toBe(false);
 });
 
 test("clicking a picture opens a pane that did not fit, over the grid", async () => {
@@ -171,9 +171,9 @@ test("a folded rail keeps its places, and its way back to the tree has a name of
   );
   await expect.element(screen.getByText("rail places")).toBeVisible();
   // Two controls in one rail may not answer to a single name.
-  await expect.element(screen.getByRole("button", { name: "Show navigation" })).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "Show Navigation" })).toBeVisible();
 
-  await screen.getByRole("button", { name: "Show the tree" }).click();
+  await screen.getByRole("button", { name: "Show Folders" }).click();
   await expect.poll(() => inSight(screen.getByText("nav content"))).toBe(true);
   // The rail stays in the tree under the rows it cross-faded with, out of sight and out of reach.
   expect(screen.getByText("rail places").elements()).toHaveLength(1);
@@ -189,7 +189,7 @@ test("full screen gives the pane the window, and leaves the columns standing beh
   );
   await expect.element(screen.getByText("pane content")).toBeVisible();
   // There is nothing left to fold away from, so the fold button goes rather than moves.
-  expect(screen.getByRole("button", { name: "Hide pane" }).elements()).toHaveLength(0);
+  expect(screen.getByRole("button", { name: "Hide Pane" }).elements()).toHaveLength(0);
 
   // Both columns stay in the tree, so nothing they hold is rebuilt on the way back out.
   expect(screen.getByText("grid content").elements()).toHaveLength(1);
@@ -218,7 +218,7 @@ function Growing() {
         pane={<Kept />}
         paneHeader={
           <button type="button" onClick={() => setFull(!full)}>
-            {full ? "Leave full screen" : "Full screen"}
+            {full ? "Exit Full Screen" : "Full Screen"}
           </button>
         }
         full={full}
@@ -235,14 +235,14 @@ test("full screen grows the pane's own box rather than building a new one", asyn
   await screen.getByRole("button", { name: /^kept/ }).click();
   await expect.element(screen.getByText("kept 1")).toBeVisible();
 
-  await screen.getByRole("button", { name: "Full screen" }).click();
-  await expect.element(screen.getByRole("button", { name: "Leave full screen" })).toBeVisible();
+  await screen.getByRole("button", { name: "Full Screen" }).click();
+  await expect.element(screen.getByRole("button", { name: "Exit Full Screen" })).toBeVisible();
   // The same box grew, so nothing it holds was rebuilt: a picture is not reloaded, a video plays on.
   expect(screen.getByRole("complementary", { name: "Pane" }).element()).toBe(pane);
   await expect.element(screen.getByText("kept 1")).toBeVisible();
   await expect.poll(() => pane.getBoundingClientRect().width).toBe(frame.clientWidth);
 
-  await screen.getByRole("button", { name: "Leave full screen" }).click();
+  await screen.getByRole("button", { name: "Exit Full Screen" }).click();
   await expect.element(screen.getByText("kept 1")).toBeVisible();
   expect(screen.getByRole("complementary", { name: "Pane" }).element()).toBe(pane);
 });
@@ -250,7 +250,7 @@ test("full screen grows the pane's own box rather than building a new one", asyn
 test("resizing a panel is saved to the preferences", async () => {
   await page.viewport(1600, 900);
   const screen = await renderFrame();
-  (screen.getByRole("separator", { name: "Resize navigation" }).element() as HTMLElement).focus();
+  (screen.getByRole("separator", { name: "Resize Navigation" }).element() as HTMLElement).focus();
   await userEvent.keyboard("{ArrowRight}");
   expect(getPreferences().widths?.nav).toBe(16);
 });
@@ -270,7 +270,7 @@ test("a panel will not be squeezed until a button's label is cut", async () => {
     </div>,
   );
   const nav = screen.getByRole("navigation", { name: "Navigation" }).element();
-  const splitter = screen.getByRole("separator", { name: "Resize navigation" });
+  const splitter = screen.getByRole("separator", { name: "Resize Navigation" });
 
   // Home asks for the narrowest navigation the tokens allow, which is narrower than this label.
   await splitter.click();

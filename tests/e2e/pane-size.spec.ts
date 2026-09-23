@@ -38,7 +38,7 @@ test("a picture keeps to its own room in full screen, and gives way to the detai
   page,
 }) => {
   const pane = await showThePortrait(page);
-  await pane.getByRole("button", { name: "Full screen" }).click();
+  await pane.getByRole("button", { name: "Full Screen" }).click();
   const full = await settled(page);
   expect(full.bottom).toBeLessThanOrEqual(full.actions);
 

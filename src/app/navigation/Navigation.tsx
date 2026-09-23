@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { readFolderAgain, renameSource, revealFolder, revealSource } from "../../ipc/commands";
-import type { MenuAction, MenuGroups } from "../../ui/Menu";
+import type { HeadedMenu, MenuAction, MenuGroups } from "../../ui/Menu";
 import { Tree, type TreeRow } from "../../ui/Tree";
 import { type Place, setPlace, usePlace } from "../place";
 import { openSettings } from "../settings/settings-store";
@@ -71,15 +71,15 @@ export function Navigation() {
     return sources.find((source) => source.id === at.sourceId);
   };
 
-  const menuFor = (id: string): MenuGroups => {
+  const menuFor = (id: string): HeadedMenu => {
     const source = sourceOf(id);
     const folder = rowFolder(id);
-    if (!source || folder === undefined) return [];
+    if (!source || folder === undefined) return { groups: [] };
     if (folder === source.rootFolderId) {
-      return sourceMenu(source, () => setRenaming(id));
+      return { heading: "Source", groups: sourceMenu(source, () => setRenaming(id)) };
     }
     // Neither can act on a folder whose drive is away, and an empty menu opens nothing.
-    return source.reachable ? [[revealFolderRow(folder), readAgainRow(folder)]] : [];
+    return { groups: source.reachable ? [[revealFolderRow(folder), readAgainRow(folder)]] : [] };
   };
 
   const renamed = sourceOf(renaming ?? "");
@@ -122,7 +122,7 @@ function sourceMenu(source: SourceSummary, rename: () => void): MenuGroups {
   const folder = source.rootFolderId;
   const reveal: MenuAction = {
     id: "reveal",
-    label: "Reveal in Explorer",
+    label: "Show in Explorer",
     glyph: "folderOpen",
     onSelect: () => void revealSource(source.id).catch(() => undefined),
   };
@@ -132,13 +132,13 @@ function sourceMenu(source: SourceSummary, rename: () => void): MenuGroups {
     [
       {
         id: "manage",
-        label: "Manage sources…",
+        label: "Manage Sources",
         glyph: "settings",
         onSelect: () => openSettings({ section: "sources" }),
       },
       {
         id: "remove",
-        label: "Remove source",
+        label: "Remove Source",
         glyph: "minusCircle",
         tone: "danger",
         onSelect: () => openSettings({ section: "sources", asking: source.id }),
@@ -150,7 +150,7 @@ function sourceMenu(source: SourceSummary, rename: () => void): MenuGroups {
 function revealFolderRow(folder: number): MenuAction {
   return {
     id: "reveal",
-    label: "Reveal in Explorer",
+    label: "Show in Explorer",
     glyph: "folderOpen",
     onSelect: () => void revealFolder(folder).catch(() => undefined),
   };
@@ -159,7 +159,7 @@ function revealFolderRow(folder: number): MenuAction {
 function readAgainRow(folder: number): MenuAction {
   return {
     id: "read-again",
-    label: "Read it again",
+    label: "Refresh",
     glyph: "readAgain",
     onSelect: () => void readFolderAgain(folder).catch(() => undefined),
   };

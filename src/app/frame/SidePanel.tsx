@@ -10,18 +10,18 @@ const COPY = {
   nav: {
     label: "Navigation",
     caption: "Library",
-    show: "Show navigation",
-    hide: "Hide navigation",
+    show: "Show Navigation",
+    hide: "Hide Navigation",
     /** The rail's own way back to the tree, which must not answer to the unfold button's name. */
-    tree: "Show the tree",
+    tree: "Show Folders",
     flip: false,
     edge: "border-r",
   },
   pane: {
     label: "Pane",
     caption: undefined,
-    show: "Show pane",
-    hide: "Hide pane",
+    show: "Show Pane",
+    hide: "Hide Pane",
     tree: undefined,
     flip: true,
     edge: "border-l",
@@ -130,7 +130,7 @@ export function SidePanel({
 
   const splitter = (
     <Splitter
-      label={`Resize ${copy.label.toLowerCase()}`}
+      label={`Resize ${copy.label}`}
       value={layout.widths[side]}
       min={Math.max(limits.min, layout.floors[side])}
       max={limits.max}

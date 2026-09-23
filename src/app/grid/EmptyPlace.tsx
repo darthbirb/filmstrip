@@ -17,7 +17,7 @@ export function EmptyPlace({ place }: { place: Place }) {
   }, [folderId]);
 
   if (place.kind === "sorting") {
-    return <EmptyState glyph="checkCircle" title="Nothing To Sort" />;
+    return <EmptyState glyph="checkCircle" title="Nothing to Sort" />;
   }
   if (place.kind === "trash") {
     return <EmptyState glyph="trash" title="Trash Is Empty" />;
@@ -31,7 +31,7 @@ export function EmptyPlace({ place }: { place: Place }) {
       <EmptyState
         glyph="unplugged"
         title={`${source.title} Is Offline`}
-        note={`${formatCount(source.itemCount)} items when it was last read.`}
+        note={`${formatCount(source.itemCount)} items when last indexed.`}
       />
     );
   }
@@ -46,7 +46,7 @@ export function EmptyPlace({ place }: { place: Place }) {
     <EmptyState
       glyph="folders"
       title="No Pictures Here"
-      note={`${folder.title} holds ${formatCount(inside.length)} ${inside.length === 1 ? "folder" : "folders"} and no loose files.`}
+      note={`${folder.title} holds ${formatCount(inside.length)} ${inside.length === 1 ? "folder" : "folders"}.`}
     >
       {inside.map((child) => (
         <Button

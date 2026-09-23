@@ -44,13 +44,13 @@ test("the tile size is one of four named steps, and the grid follows the one cho
   await expect.poll(side).toBeGreaterThan(0);
   const medium = side();
 
-  await screen.getByRole("button", { name: "Tile size: Medium" }).click();
-  const steps = screen.getByRole("listbox", { name: "Tile size" }).getByRole("option");
+  await screen.getByRole("button", { name: "Tile Size: Medium" }).click();
+  const steps = screen.getByRole("listbox", { name: "Tile Size" }).getByRole("option");
   expect(steps.elements().map((step) => step.textContent)).toEqual([
     "Small",
     "Medium",
     "Large",
-    "Extra large",
+    "Extra Large",
   ]);
 
   await screen.getByRole("option", { name: "Large" }).click();
@@ -61,10 +61,10 @@ test("the tile size is one of four named steps, and the grid follows the one cho
 test("a size saved before the steps existed lands on the nearest one", async () => {
   updatePreferences({ tile: 10 });
   const screen = await render(<TileSize />);
-  await expect.element(screen.getByRole("button", { name: "Tile size: Medium" })).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "Tile Size: Medium" })).toBeVisible();
 
   updatePreferences({ tile: 19 });
   await expect
-    .element(screen.getByRole("button", { name: "Tile size: Extra large" }))
+    .element(screen.getByRole("button", { name: "Tile Size: Extra Large" }))
     .toBeVisible();
 });

@@ -14,7 +14,7 @@ export function refusalSentence(why: Refusal, clash: string | null) {
     case "contains":
       return `That folder contains ${clash}, which Filmstrip already reads.`;
     case "appFolder":
-      return "That folder belongs to Filmstrip itself.";
+      return "That folder holds Filmstrip's own files.";
   }
 }
 

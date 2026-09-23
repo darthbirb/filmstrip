@@ -7,7 +7,7 @@ test("in full screen the wheel zooms, the figure sits in the area's corner, and 
   await page.goto("/");
   await page.getByRole("button", { name: "cover.jpg" }).click();
   const pane = page.getByRole("complementary", { name: "Pane" });
-  await pane.getByRole("button", { name: "Full screen" }).click();
+  await pane.getByRole("button", { name: "Full Screen" }).click();
   const area = pane.getByRole("group", { name: "Zoom" });
   await expect(area).toBeVisible();
   await page.waitForTimeout(300);

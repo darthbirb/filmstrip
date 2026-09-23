@@ -20,8 +20,8 @@ const lines = (container: HTMLElement) =>
 
 test("the app's own two places are named, and explain nothing", async () => {
   const sorting = await render(<EmptyPlace place={{ kind: "sorting" }} />);
-  await expect.element(sorting.getByText("Nothing To Sort")).toBeVisible();
-  expect(lines(sorting.container)).toEqual(["Nothing To Sort"]);
+  await expect.element(sorting.getByText("Nothing to Sort")).toBeVisible();
+  expect(lines(sorting.container)).toEqual(["Nothing to Sort"]);
 
   const trash = await render(<EmptyPlace place={{ kind: "trash" }} />);
   await expect.element(trash.getByText("Trash Is Empty")).toBeVisible();
@@ -31,9 +31,7 @@ test("the app's own two places are named, and explain nothing", async () => {
 test("a folder of folders lists them, and choosing one goes there", async () => {
   const screen = await render(<EmptyPlace place={PICTURES} />);
   await expect.element(screen.getByText("No Pictures Here")).toBeVisible();
-  await expect
-    .element(screen.getByText("Pictures holds 2 folders and no loose files."))
-    .toBeVisible();
+  await expect.element(screen.getByText("Pictures holds 2 folders.")).toBeVisible();
   // A folder with nothing of its own carries no count, exactly as its row in the tree carries no pill.
   await expect.element(screen.getByRole("button", { name: "People" })).toBeVisible();
 
@@ -63,6 +61,6 @@ test("a source that cannot be reached says so, not that it is empty", async () =
   await expect.element(screen.getByText("Archive Is Offline")).toBeVisible();
   expect(lines(screen.container)).toEqual([
     "Archive Is Offline",
-    expect.stringMatching(/^[\d,]+ items when it was last read\.$/),
+    expect.stringMatching(/^[\d,]+ items when last indexed\.$/),
   ]);
 });

@@ -3,7 +3,7 @@ import { Fragment, type KeyboardEvent, useEffect, useRef, useState } from "react
 import { formatCount } from "../lib/format";
 import { Glyph } from "./Glyph";
 import type { GlyphName } from "./glyphs";
-import { type MenuGroups, useContextMenu } from "./Menu";
+import { type HeadedMenu, useContextMenu } from "./Menu";
 
 export type TreeRow = {
   id: string;
@@ -32,7 +32,7 @@ type Props = {
   onExpand: (id: string) => void;
   onCollapse: (id: string) => void;
   /** A row's right-click menu; an empty one opens nothing. */
-  menuFor?: (id: string) => MenuGroups;
+  menuFor?: (id: string) => HeadedMenu;
   /** The row whose name is a field for now, and what becomes of what is typed there. */
   renaming?: Renaming | null;
 };
@@ -151,7 +151,9 @@ export function Tree({
               }}
               onKeyDown={(event) => onKeyDown(event, index)}
               onContextMenu={(event) => {
-                if (menuFor) context.open(event, row.label, menuFor(row.id));
+                if (!menuFor) return;
+                const { heading, groups } = menuFor(row.id);
+                context.open(event, row.label, groups, heading);
               }}
               className={`focus-ring mx-row-inset flex h-row shrink-0 cursor-default items-center gap-2 rounded-control pr-2 pl-1 text-row transition-colors duration-(--motion-quick) motion-reduce:transition-none ${tone}`}
             >

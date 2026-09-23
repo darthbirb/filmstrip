@@ -107,7 +107,7 @@ test("the Sorting Box keeps its own way in, reachable after the row it sits on",
   await expect.element(row).toBeVisible();
 
   // Drawn at rest, not on hover: it is the only way to nominate a sorting folder.
-  const nominate = screen.getByRole("button", { name: "Nominate a folder" });
+  const nominate = screen.getByRole("button", { name: "Add Sorting Source…" });
   await expect.element(nominate).toBeVisible();
   expect(row.element().contains(nominate.element())).toBe(true);
 
@@ -138,7 +138,7 @@ test("with no sources at all, the doorway stands where the tree will", async () 
   const screen = await render(<Navigation />);
 
   await expect.element(screen.getByText("No Sources Yet")).toBeVisible();
-  await expect.element(screen.getByRole("button", { name: /Add a folder/ })).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: /Add Source/ })).toBeVisible();
   // A glyph, the title and the button: no line explaining what adding does.
   expect(screen.container.querySelectorAll("p")).toHaveLength(1);
 });

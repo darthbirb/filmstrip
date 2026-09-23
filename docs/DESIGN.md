@@ -456,10 +456,20 @@ names an action. All three ship inside the app and are never fetched.
 | `row` | 14 on 20 | A navigation row; a step back in the breadcrumb. |
 | `ui` | 13 on 20 | The working size: a control's label, a fact's value, a setting, prose. |
 | `small` | 12 on 16 | A count, a chip, a video's length. |
-| `eyebrow` | 11 on 16, semibold, spaced, capitals | A panel's caption, a fact's term, a group of settings, the in-pane plate. |
+| `eyebrow` | 11 on 16, semibold, spaced, capitals | A panel's caption, a fact's term, a group of settings, a menu's heading, the in-pane plate. |
 | `wordmark` | 14 on 20, extra bold, tight | The name beside the mark in the bar. |
 | `glyph-small`, `glyph`, `icon` | 12, 15 and 18 | The maximise square, the in-pane eye, a dropdown's caret. Caption glyphs, chevrons, a strip step, a menu option. A control's or a row's glyph. |
 | `glyph-large` | 32 | The glyph that stands in an empty pane or an empty place. |
+
+### Words
+
+Every label is Title Case: a button, a menu row, a tooltip, a segmented option, a dropdown's value,
+a Settings row, a section's name and a caption. Each word is capitalised but *a an the and but or
+nor as at by for from in into of off on to up via with*, unless it opens or closes the label. A
+sentence stays a sentence, and so do a field's placeholder, an error a file carries, a state word
+on a row ("offline", "current") and a name the person chose. An ellipsis only where a choice or
+typing follows before anything happens, and figures for a count. One act has one name everywhere
+it appears; the Components sheet's Words block lists them, with the reason each changed.
 
 ## Layout
 
@@ -514,7 +524,7 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   before the label in `fg-dim` where it has one and a count or chevron after it. Raised on
   `raised` with a `line-control` ring, or quiet with no ground until the pointer brings a `wash`.
   One that destroys or forgets is `danger` ink on `danger-tint` in a `line-danger` ring, filled
-  `danger` under the pointer. Its label is sentence case; only a title takes Title Case.
+  `danger` under the pointer. Its label is Title Case, as every label is: "Words" above.
   A label never wraps: too little room ends it in an ellipsis, and the panel it sits in stops
   before it comes to that. DECISIONS.md "The frame".
 - **Glyph button.** A `control` square on `raised` with a `line-control` ring. Disabled, it sinks
@@ -546,7 +556,7 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   away. The tile size is one, with the grid glyph before its step.
 - **Tile.** The picture cropped to a `control`-cornered cell, over the hatch until its thumbnail
   exists. A `line-strong` ring under the pointer. The tile the pane shows carries an `in-pane`
-  ring drawn inside its edge and an *In pane* plate with an eye, which never wraps and drops its
+  ring drawn inside its edge and an *In Pane* plate with an eye, which never wraps and drops its
   words on a tile narrower than `--container-badge`. A video's tile writes its length on `veil`
   in the opposite corner. Keyboard focus is the `focus` ring outside, so both can show at once.
 - **The pane's picture.** Sized by its own shape and centred in what the pane has left, at the
@@ -562,7 +572,9 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Menu.** A `menu`-wide list of actions on `panel` at the `control` corner, with the
   `line-control` hairline and the overlay shadow. Its rows are `control` tall in `fg`, each glyph
   `glyph`-sized in `fg-dim`, and `raised-hi` under the pointer. A rule in `line` stands between two
-  groups only when both hold rows. The one row that cannot be taken back is `danger`, over
+  groups only when both hold rows. A menu about a thing that is not the row itself, as a
+  source's is, opens under a heading: `eyebrow` capitals in `fg-dim`, `chip` tall. The one row
+  that cannot be taken back is `danger`, over
   `danger-tint` under the pointer. It opens from a glyph button, anchored to it, or from a
   right-click: at the pointer, or, from the menu key or Shift+F10, one `tile-gap` clear of the
   focused element's ring, left edges met, flipping above when there is no room below and sliding

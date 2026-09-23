@@ -22,7 +22,7 @@ test("a real right-click on a tile opens its menu at the pointer, and Favourite 
   await menu.getByRole("menuitem", { name: "Favourite" }).click();
   await expect(menu).toHaveCount(0);
   const bar = page.getByRole("toolbar", { name: "Actions" });
-  await expect(bar.getByRole("button", { name: "Favourited" })).toBeVisible();
+  await expect(bar.getByRole("button", { name: "Remove Favourite" })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -36,7 +36,7 @@ test("Shift+F10 on a focused tree row opens its menu under the row, and Escape g
   await page.keyboard.press("Shift+F10");
   const menu = page.getByRole("menu", { name: "Pictures" });
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole("menuitem", { name: "Reveal in Explorer" })).toBeFocused();
+  await expect(menu.getByRole("menuitem", { name: "Show in Explorer" })).toBeFocused();
 
   const [under, opened] = [await row.boundingBox(), await menu.boundingBox()];
   const rem = await page.evaluate(() =>

@@ -115,7 +115,7 @@ function Tags({ tags }: { tags: EffectiveTag[] }) {
           value={tag.value}
           tagKey={tag.key}
           inherited={tag.originId !== null}
-          title={tag.originTitle ? `From ${tag.originTitle}` : "On this file"}
+          title={tag.originTitle ? `From ${tag.originTitle}` : "On This File"}
         />
       ))}
     </span>

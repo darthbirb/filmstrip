@@ -55,7 +55,7 @@ test("a tile too narrow for the in-pane words keeps the mark alone", async () =>
       </button>
     </>,
   );
-  const words = screen.getByText("In pane").elements();
+  const words = screen.getByText("In Pane").elements();
   const shown = words.map((word) => getComputedStyle(word).display !== "none");
   expect(shown).toEqual([false, true]);
 });
@@ -147,7 +147,7 @@ test("a button keeps its label on one line, however little room it is given", as
   const screen = await render(
     <div style={{ width: "5rem" }}>
       <Button glyph="plus" onClick={() => {}}>
-        Add a folder…
+        Add Source…
       </Button>
     </div>,
   );

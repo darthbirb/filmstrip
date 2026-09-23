@@ -162,7 +162,7 @@ test("an empty place says which kind of empty it is, in its own words", async ()
   await expect.element(screen.getByText("This Folder Is Empty")).toBeVisible();
 
   setPlace({ kind: "sorting" });
-  await expect.element(screen.getByText("Nothing To Sort")).toBeVisible();
+  await expect.element(screen.getByText("Nothing to Sort")).toBeVisible();
 });
 
 test("while a place is read, stand-ins fill the rows, and its tiles replace them", async () => {

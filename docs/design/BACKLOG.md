@@ -16,60 +16,23 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## Every label and line reads as a draft · DEFECT
-
-The words were never reviewed as a whole; each was written with the surface that needed it, so they
-read as drafts, not as a finished app's.
-
-- **Case.** Every label is drawn in sentence case ("Manage sources…", "Add a folder…"), settled in
-  a pass by counting which case the build already used, never on its merits. The user wants Title
-  Case on every label, as the apps they use have it: each word capitalised but for short articles,
-  conjunctions and prepositions. That covers buttons, menu rows, tooltips, segmented options and
-  Settings' row labels; a sentence stays a sentence. Correct the Components card "A title is Title
-  Case; a label is not" and the Notes entry that settled it.
-- **Wording.** Re-read every label, title and line on every sheet as production copy: the fewest
-  words that stay unambiguous, the verb and noun a Windows user already knows, one name for one
-  thing everywhere it appears, and an ellipsis only where a choice follows. "Open with the default
-  app" says nothing "Open with Default App" does not; "Read it again", "Reveal in Explorer",
-  "Nominate a folder" and the ⋯ menu's name "Everything else" are asked the same question. This is
-  not only removing words: rephrase whatever reads as a note to the builder, not a word to the user.
-
-Recommended: one pass over all five sheets that states the case rule and a short word list (each
-verb, and the small words that stay lowercase), then redraws every label and line against them.
-
 ## The app's own right-click menus: the verbs that change the disk · DRAWN
 
 Drawn on the Components sheet; what exists is built, DECISIONS.md "Right-click menus". What waits,
 on the undo journal (FEATURES.md "Export and undo"): a file's Move to…, Rename and Delete, and a
-folder's New folder, Move to…, Rename and Delete. New folder lands a row already in its name field,
+folder's New Folder, Move to…, Rename and Delete. New Folder lands a row already in its name field,
 and on a source's row makes a folder at its top level. Move to… is the file picker, with a folder's
 own descendants refused in it. A folder's Rename is the in-place field with its Taken state. Delete
 asks only when the folder holds something, naming each sorting source as its own answer, with a box
 that keeps the pick as the default in Settings › Sources; more sorting sources than the line holds
-fold into one Move them to…. The selection's menu, with its count and "Delete five files", waits on
+fold into one Move Files to…. The selection's menu, with its count and "Delete 5 Files", waits on
 selecting.
 
-## A menu's heading is drawn off the token sheet · DEFECT
+## Favourite places · DRAWN
 
-A source's menu opens under "Source" and a selection's under "5 files", both drawn in `#6e6e6e`,
-mono at 0.6875rem with 0.08em tracking. None of that colour or tracking is a token; the nearest is
-`eyebrow` at 0.12em in `fg-faint`. Recommended: draw the heading from the sheet's own type and
-colour. Until then a source's menu is built without it.
-
-## A keyboard menu's flip still says 4px, and the menu's width is on no sheet · DEFECT
-
-Components › Right-click, "The keyboard's menu hangs off the ring", says it flips above "the same
-4px clear of the ring"; its cards and the Notes settle one distance, the ring's 4px then a
-tile-gap. Every sheet draws menus 14rem wide, and the token sheet names no width for them; the
-build carries it as `menu`. Recommended: correct the sentence, and add the width to the token
-sheet. Neither blocks: the build follows the settled distance and the drawn width.
-
-## Where a favourite place shows
-
-Components draws Favourite on a folder's and a source's menu, but nothing shows which places are
-favourites, and the Artboards sheet leaves "whether favourite folders belong in the rail" open. A
-verb whose result nobody can see is not built. Recommended: draw where a favourite place shows, a
-mark on its row or a place of their own, and Favourite joins both menus.
+Components › Places, "Favourite places": a group of their own between the app's two places and the
+sources, each row a star, the name and its parent; choosing one plates both its rows. Not in the
+folded rail. Favourite joins a folder's and a source's menu, reading Remove Favourite when on.
 
 ## A folder's details · DRAWN
 
@@ -122,9 +85,26 @@ oversight or the time abbreviates and the rule has to say so.
 
 Say what the time does as the plate narrows.
 
-## Undo, on screen
+## Undo, on screen · DRAWN
 
-Everything the app changes on disk can be undone, across a restart (DECISIONS.md "Undo"), but
-nothing is drawn for it: the Notes sheet says so. Draw what follows an act that can be undone, the
-way back from it, and Ctrl+Z; what an undo that came back only in part says, naming what stayed;
-and what Ctrl+Z does when there is nothing left to undo.
+Artboards › Undo: after an act, one line at the foot of navigation in the refusal band's slot,
+saying what it did, with Undo and no timer, for all seven acts and a move that finished in part;
+Ctrl+Z does the same wherever the focus is not in a field, across a restart; "Nothing to undo."
+once, beside the rail when it is folded. An undo refused in whole or in part opens the failures
+banner with Retry, its rows grouped under the place each is still in.
+
+## The Trash, holding files · DRAWN
+
+Artboards › Trash, Components › Right-click and Pane › 02: the Trash's grid, newest first under a
+heading per day, each tile captioned with the folder it came from ("gone" when that folder is); the
+pane's From and Deleted rows; a trashed file's bar and menu, Restore and Restore to… and nothing that
+purges; Restore refused, in the undo's banner; and Restore as the undo table's eighth act.
+
+## A delete that is refused, and what shows after one · DRAWN
+
+Artboards › Undo, "When a delete is refused": the move's banner, by the undo banner's rules, for
+files that could not go to the Trash, a file no longer on disk ("Gone from Cairo", no button), a
+folder kept by a file the app does not show ("Holds notes.txt"), and a folder's delete stopped
+partway. What went is one batch, with Undo at the foot. After a delete that worked, the pane shows
+the file that took the deleted tile's place; a deleted folder leaves you in its parent, and a moved
+one takes you with it.

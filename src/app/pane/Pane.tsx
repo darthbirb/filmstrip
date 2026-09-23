@@ -27,7 +27,7 @@ export function PaneHeader() {
     <div className="flex min-w-0 items-center gap-1.5">
       <GlyphButton
         glyph={full ? "leaveFullScreen" : "fullScreen"}
-        label={full ? "Leave full screen" : "Full screen"}
+        label={full ? "Exit Full Screen" : "Full Screen"}
         pressed={full}
         onClick={() => setFullScreen(!full)}
       />
