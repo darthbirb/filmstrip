@@ -3,8 +3,10 @@ import { type ReactElement, type RefObject, useLayoutEffect, useRef, useState } 
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { formatDuration } from "../../lib/format";
+import { useContextMenu } from "../../ui/Menu";
 import { SkeletonTile } from "../../ui/Skeleton";
 import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
+import { itemMenu } from "../menus/item-menu";
 import { setFullScreen } from "../pane/full-screen";
 import { showInPane, usePaneItem } from "../pane/pane-store";
 import { type Place, usePlace } from "../place";
@@ -146,11 +148,21 @@ type TileProps = {
 };
 
 function Tile({ item, from, shown, left, top, width, height }: TileProps) {
+  // Opening it moves nothing: the pane keeps what it shows until a verb says otherwise.
+  const context = useContextMenu();
   return (
     <figure title={item.diskName} className="absolute m-0" style={{ left, top, width, height }}>
+      {context.menu}
       <button
         type="button"
         aria-label={item.diskName}
+        onContextMenu={(event) =>
+          context.open(
+            event,
+            item.diskName,
+            itemMenu(item, () => showInPane(item.id, from)),
+          )
+        }
         aria-current={shown || undefined}
         onClick={() => showInPane(item.id, from)}
         // Folded or hidden, the pane has no header to hold the control, so the tile is the way in.

@@ -2,6 +2,8 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import { type ReactNode, useRef, useState } from "react";
 
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
+import { useContextMenu } from "../../ui/Menu";
+import { itemMenu } from "../menus/item-menu";
 import { useZoom, ZoomPlate } from "./useZoom";
 import type { Size } from "./zoom";
 
@@ -23,6 +25,8 @@ export function Media({ item, fill = false }: Props) {
   const [own, setOwn] = useState<Size | null>(null);
   const known = item.width && item.height ? { width: item.width, height: item.height } : null;
   const zoom = useZoom(area, fill && item.kind === "image" ? (own ?? known) : null, own !== null);
+  // The item is already the one shown, so its menu's Full screen only has to go there.
+  const context = useContextMenu();
 
   let body: ReactNode;
   if (item.kind === "video") {
@@ -75,14 +79,24 @@ export function Media({ item, fill = false }: Props) {
     <figure className={`m-0 flex flex-col ${fill ? "min-h-0 min-w-0 flex-1" : "w-full"}`}>
       {/* A box that can be smaller than what it holds, so a tall picture shrinks to it rather than
           running past the actions below. DESIGN.md "Shapes". */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: the right-click menu repeats the bar's verbs, which the keyboard reaches there; a zoomable picture is a focusable group */}
       <div
         ref={area}
         {...zoom.handlers}
+        onContextMenu={(event) =>
+          context.open(
+            event,
+            item.diskName,
+            itemMenu(item, () => {}),
+          )
+        }
         className={`relative flex min-h-0 items-center justify-center ${fill ? "flex-1" : "max-h-(--pane-media-max) w-full"} ${own ? "focus-ring rounded-control" : ""} ${zoom.zoomed ? "overflow-hidden" : ""} ${zoom.cursor}`}
       >
         {body}
         {zoom.zoomed && <ZoomPlate percent={zoom.percent} onFit={zoom.fit} />}
       </div>
+      {/* Beside the area, not in it: a wheel over the open menu is not a wheel over the picture. */}
+      {context.menu}
       {state === "failed" && (
         <figcaption className="px-1 pt-2 font-mono text-fg-dim text-small">.{item.ext}</figcaption>
       )}

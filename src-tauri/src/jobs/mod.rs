@@ -215,6 +215,15 @@ pub fn enqueue_index_again(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Queues a walk of one folder's subtree, unless one for it is already waiting.
+pub fn enqueue_folder_walk(conn: &Connection, folder_id: i64) -> Result<()> {
+    let payload = serde_json::to_string(&kinds::FolderPayload { folder_id })?;
+    if !table::is_pending(conn, kinds::INDEX_FOLDER, &payload)? {
+        table::enqueue(conn, kinds::INDEX_FOLDER, &payload, kinds::PRIORITY_INDEX)?;
+    }
+    Ok(())
+}
+
 pub fn enqueue_thumb(conn: &Connection, item_id: i64) -> Result<()> {
     let payload = serde_json::to_string(&kinds::ItemPayload { item_id })?;
     table::enqueue(conn, kinds::THUMB, &payload, kinds::PRIORITY_THUMB)?;
@@ -287,5 +296,62 @@ mod tests {
             thumbnails, 1,
             "one picture, one thumbnail; the text file gets none"
         );
+    }
+
+    #[test]
+    fn a_folder_asked_for_twice_is_walked_once() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        db::migrate(&mut conn).unwrap();
+        enqueue_folder_walk(&conn, 7).unwrap();
+        enqueue_folder_walk(&conn, 7).unwrap();
+        enqueue_folder_walk(&conn, 8).unwrap();
+        assert_eq!(table::counts(&conn).unwrap().pending, 2);
+    }
+
+    #[test]
+    fn a_folder_read_again_through_the_queue_picks_up_a_new_picture_and_thumbnails_it() {
+        let dir = scratch("folder-walk");
+        let db_path = dir.join("library.db");
+        let mut conn = db::open(&db_path).unwrap();
+        db::migrate(&mut conn).unwrap();
+        sources::add(&conn, &dir.join("library"), "Library", SourceKind::Library).unwrap();
+        crate::fs::walk::reconcile(&conn).unwrap();
+        let root = crate::db::folders::source_root_folder(&conn, 1).unwrap();
+        let trips = crate::db::folders::child_id(&conn, root, "Trips")
+            .unwrap()
+            .unwrap();
+
+        image::DynamicImage::new_rgb8(32, 24)
+            .save(dir.join("library/Trips/later.png"))
+            .unwrap();
+        enqueue_folder_walk(&conn, trips).unwrap();
+
+        let (sent, received) = mpsc::channel();
+        let queue = JobQueue::start(
+            db_path,
+            dir.join("thumbs"),
+            None,
+            Box::new(move |progress| {
+                let _ = sent.send(progress.clone());
+            }),
+        );
+        let deadline = Instant::now() + Duration::from_secs(60);
+        let mut settled = false;
+        while !settled && Instant::now() < deadline {
+            settled = received
+                .recv_timeout(Duration::from_secs(1))
+                .is_ok_and(|progress| progress.phase == Phase::Idle && progress.completed >= 2);
+        }
+        queue.stop();
+
+        assert!(settled, "the queue reported itself idle after the work");
+        let width: i64 = conn
+            .query_row(
+                "SELECT width FROM item WHERE disk_name = 'later.png' AND deleted_at IS NULL",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(width, 32);
     }
 }

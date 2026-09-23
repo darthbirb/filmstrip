@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode, useEffect, useRef, useState } from "react";
+import { Fragment, type ReactNode, useLayoutEffect, useRef, useState } from "react";
 
 import { Dropdown } from "../../ui/Dropdown";
 import { Glyph } from "../../ui/Glyph";
@@ -30,7 +30,7 @@ const LAYOUTS: readonly { value: LayoutMode; label: string; glyph: GlyphName }[]
 ];
 
 /** Every preference with nowhere on screen to set it. DECISIONS.md "Settings". */
-function useSections(): Section[] {
+function useSections(asking?: number): Section[] {
   const { scale, layout = DEFAULT_LAYOUT } = usePreferences();
   return [
     {
@@ -73,18 +73,26 @@ function useSections(): Section[] {
       glyph: "source",
       caption: "Sources",
       rows: [],
-      body: <Sources />,
+      body: <Sources asking={asking} />,
     },
   ];
 }
 
-type Props = { open: boolean; onClose: () => void };
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  /** The section it opens on, when it is opened to do something there. */
+  section?: string;
+  /** A source whose row opens already asking whether to remove it. */
+  asking?: number;
+};
 
 /** A dialog over the window. Every control writes as it is touched, so nothing needs saving. */
-export function Settings({ open, onClose }: Props) {
+export function Settings({ open, onClose, section, asking }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
 
-  useEffect(() => {
+  // Before any effect inside it runs, so a row that takes the focus on opening keeps it.
+  useLayoutEffect(() => {
     const element = dialog.current;
     if (!element) return;
     if (open && !element.open) element.showModal();
@@ -103,16 +111,16 @@ export function Settings({ open, onClose }: Props) {
       }}
       className="m-auto h-dialog-height w-dialog overflow-hidden rounded-control border-0 bg-panel p-0 text-fg shadow-overlay inset-ring inset-ring-line-control backdrop:bg-scrim"
     >
-      {open && <Body onClose={onClose} />}
+      {open && <Body onClose={onClose} section={section} asking={asking} />}
     </dialog>
   );
 }
 
-function Body({ onClose }: { onClose: () => void }) {
+function Body({ onClose, section, asking }: Omit<Props, "open">) {
   const [query, setQuery] = useState("");
-  const [chosen, setChosen] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<string | null>(section ?? null);
   const term = query.trim().toLowerCase();
-  const found = useSections()
+  const found = useSections(asking)
     .map((section) => ({
       ...section,
       rows: section.rows.filter((row) => row.label.toLowerCase().includes(term)),

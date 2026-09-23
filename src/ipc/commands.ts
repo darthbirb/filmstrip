@@ -32,6 +32,11 @@ export const revealSource = (id: number) => invoke<void>("reveal_source", { id }
 
 export const removeSource = (id: number) => invoke<void>("remove_source", { id });
 
+export const revealFolder = (folderId: number) => invoke<void>("reveal_folder", { folderId });
+
+export const readFolderAgain = (folderId: number) =>
+  invoke<void>("read_folder_again", { folderId });
+
 export const folderChildren = (folderId: number) =>
   invoke<FolderNode[]>("folder_children", { folderId });
 

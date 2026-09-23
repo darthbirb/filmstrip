@@ -122,6 +122,7 @@ spacing:
   strip-step: 1.5rem
   strip-step-height: 3.25rem
   strip-fade: 3rem
+  menu: 14rem
   dialog: 41rem
   dialog-height: 27rem
   dialog-rail: 12rem
@@ -293,13 +294,26 @@ components:
     backgroundColor: "{colors.raised-hi}"
     textColor: "{colors.fg}"
   menu:
-    backgroundColor: "{colors.raised}"
+    backgroundColor: "{colors.panel}"
     rounded: "{rounded.control}"
+    width: "{spacing.menu}"
   menu-item:
-    textColor: "{colors.fg-mid}"
+    textColor: "{colors.fg}"
     typography: "{typography.ui}"
     rounded: "{rounded.nested}"
     height: "{spacing.control}"
+  menu-item-hover:
+    backgroundColor: "{colors.raised-hi}"
+  menu-item-danger:
+    textColor: "{colors.danger}"
+  menu-item-danger-hover:
+    backgroundColor: "{colors.danger-tint}"
+  menu-rule:
+    backgroundColor: "{colors.line}"
+  tree-row-field:
+    backgroundColor: "{colors.well}"
+    rounded: "{rounded.nested}"
+    height: "{spacing.chip}"
   empty-state-glyph:
     textColor: "{colors.fg-faint}"
     typography: "{typography.glyph-large}"
@@ -508,7 +522,9 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   button's `danger` colours.
 - **Tree row.** Chevron, glyph, name and count. At rest the name is `fg-mid`; under the pointer a
   `wash`; selected, a `plate` with `on-plate` ink. An offline source is `fg-dim` with an
-  `fg-faint` glyph. The app's own places sit above a `line` rule.
+  `fg-faint` glyph. The app's own places sit above a `line` rule. Renamed in place, the name
+  becomes a `chip`-tall field on `well` at the `nested` corner with a `line-strong` hairline, the
+  whole name selected in `plate` with `on-plate` ink; the row keeps everything else.
 - **Count pill.** A row's own item count, `badge` tall at the `badge` corner, on `raised` with a
   `line-control` ring; on a selected row it sinks to `on-plate-wash` with `on-plate` ink. A place
   with no items of its own carries no pill, and an offline source shows its word instead.
@@ -543,9 +559,15 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   each one that does not fit moves into a menu under a `more` glyph. What fits is measured against
   the real width, never a width written down. Favourite marks itself with the filled glyph on a
   `raised-hi` plate and never a hue: a flag needing a colour to be legible is drawn too small.
-- **Menu.** A list of actions on `raised` at the `control` corner under the overlay shadow, opened from
-  a glyph button and anchored to it. A dropdown offers a choice and marks the one taken; a menu
-  marks nothing, because every row in it is a thing to do rather than a thing to be.
+- **Menu.** A `menu`-wide list of actions on `panel` at the `control` corner, with the
+  `line-control` hairline and the overlay shadow. Its rows are `control` tall in `fg`, each glyph
+  `glyph`-sized in `fg-dim`, and `raised-hi` under the pointer. A rule in `line` stands between two
+  groups only when both hold rows. The one row that cannot be taken back is `danger`, over
+  `danger-tint` under the pointer. It opens from a glyph button, anchored to it, or from a
+  right-click: at the pointer, or, from the menu key or Shift+F10, one `tile-gap` clear of the
+  focused element's ring, left edges met, flipping above when there is no room below and sliding
+  along the window's edge rather than shrinking. A dropdown offers a choice and marks the one taken;
+  a menu marks nothing, because every row in it is a thing to do rather than a thing to be.
 - **Full screen.** The pane takes the frame below the bar, keeping its header, picture and
   filmstrip and losing only the columns beside it. Its control is a glyph button at the header's
   left end, an arrow pointing along the edge that moves: left going in, right coming out, where it

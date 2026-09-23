@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 
+import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
+import { readFolderAgain, renameSource, revealFolder, revealSource } from "../../ipc/commands";
+import type { MenuAction, MenuGroups } from "../../ui/Menu";
 import { Tree, type TreeRow } from "../../ui/Tree";
 import { type Place, setPlace, usePlace } from "../place";
+import { openSettings } from "../settings/settings-store";
 import { addFolder } from "./add-source";
-import { ensureChildren, useIndex } from "./index-store";
+import { ensureChildren, loadIndex, useIndex } from "./index-store";
 import {
   addFolderRows,
   libraries,
@@ -23,6 +27,7 @@ export function Navigation() {
   const { sources, children } = useIndex();
   const place = usePlace();
   const [expanded, setExpanded] = useState<ReadonlySet<number>>(new Set());
+  const [renaming, setRenaming] = useState<string | null>(null);
 
   useEffect(() => {
     ensureChildren([...expanded]);
@@ -60,6 +65,24 @@ export function Navigation() {
     setExpanded(next);
   };
 
+  const sourceOf = (id: string) => {
+    const at = places.get(id);
+    if (at?.kind !== "folder") return undefined;
+    return sources.find((source) => source.id === at.sourceId);
+  };
+
+  const menuFor = (id: string): MenuGroups => {
+    const source = sourceOf(id);
+    const folder = rowFolder(id);
+    if (!source || folder === undefined) return [];
+    if (folder === source.rootFolderId) {
+      return sourceMenu(source, () => setRenaming(id));
+    }
+    // Neither can act on a folder whose drive is away, and an empty menu opens nothing.
+    return source.reachable ? [[revealFolderRow(folder), readAgainRow(folder)]] : [];
+  };
+
+  const renamed = sourceOf(renaming ?? "");
   return (
     <Tree
       label="Places"
@@ -71,6 +94,73 @@ export function Navigation() {
       }}
       onExpand={(id) => setOpen(id, true)}
       onCollapse={(id) => setOpen(id, false)}
+      menuFor={menuFor}
+      renaming={
+        renaming && renamed
+          ? {
+              id: renaming,
+              onCommit: (name) => {
+                setRenaming(null);
+                void renameSource(renamed.id, name)
+                  .then(() => loadIndex())
+                  .catch(() => undefined);
+              },
+              onCancel: () => setRenaming(null),
+            }
+          : null
+      }
     />
   );
+}
+
+/**
+ * A source's row: the verbs a folder's row has that a source can take, then the two that only a
+ * source has, which point at the Sources section rather than holding anything of their own.
+ * DECISIONS.md "Right-click menus".
+ */
+function sourceMenu(source: SourceSummary, rename: () => void): MenuGroups {
+  const folder = source.rootFolderId;
+  const reveal: MenuAction = {
+    id: "reveal",
+    label: "Reveal in Explorer",
+    glyph: "folderOpen",
+    onSelect: () => void revealSource(source.id).catch(() => undefined),
+  };
+  const naming: MenuAction = { id: "rename", label: "Rename", glyph: "rename", onSelect: rename };
+  return [
+    source.reachable ? [reveal, naming, readAgainRow(folder)] : [naming],
+    [
+      {
+        id: "manage",
+        label: "Manage sources…",
+        glyph: "settings",
+        onSelect: () => openSettings({ section: "sources" }),
+      },
+      {
+        id: "remove",
+        label: "Remove source",
+        glyph: "minusCircle",
+        tone: "danger",
+        onSelect: () => openSettings({ section: "sources", asking: source.id }),
+      },
+    ],
+  ];
+}
+
+function revealFolderRow(folder: number): MenuAction {
+  return {
+    id: "reveal",
+    label: "Reveal in Explorer",
+    glyph: "folderOpen",
+    onSelect: () => void revealFolder(folder).catch(() => undefined),
+  };
+}
+
+function readAgainRow(folder: number): MenuAction {
+  return {
+    id: "read-again",
+    label: "Read it again",
+    glyph: "readAgain",
+    onSelect: () => void readFolderAgain(folder).catch(() => undefined),
+  };
 }

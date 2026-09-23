@@ -18,6 +18,7 @@ import { PaneDetailProvider } from "./pane/pane-detail";
 import { whenShownInPane } from "./pane/pane-store";
 import { usePreferences, useScaleHotkeys } from "./preferences";
 import { Settings } from "./settings/Settings";
+import { closeSettings, openSettings, useSettingsRequest } from "./settings/settings-store";
 import { WindowBar } from "./window-bar/WindowBar";
 
 // Until the search slice lands, the bar holds a dev stand-in, and nothing in production.
@@ -26,13 +27,17 @@ const SEARCH = import.meta.env.DEV ? <SearchStandIn /> : undefined;
 export function App() {
   useScaleHotkeys();
   const layout = usePreferences().layout ?? DEFAULT_LAYOUT;
-  const [settings, setSettings] = useState(false);
+  const settings = useSettingsRequest();
   const full = useFullScreen();
   useEscapeLeavesFullScreen();
 
   return (
     <div className="flex h-dvh flex-col bg-ground text-fg">
-      <WindowBar search={SEARCH} onSettings={() => setSettings(true)} settingsOpen={settings} />
+      <WindowBar
+        search={SEARCH}
+        onSettings={() => openSettings()}
+        settingsOpen={settings !== null}
+      />
       <PaneDetailProvider>
         <Frame
           nav={<Navigation />}
@@ -60,7 +65,12 @@ export function App() {
           full={full}
         />
       </PaneDetailProvider>
-      <Settings open={settings} onClose={() => setSettings(false)} />
+      <Settings
+        open={settings !== null}
+        onClose={closeSettings}
+        section={settings?.section}
+        asking={settings?.asking}
+      />
       {import.meta.env.DEV && (
         <footer className="flex items-center gap-4 border-line border-t px-3 py-1 text-fg-dim text-small">
           <DisplayReadout />

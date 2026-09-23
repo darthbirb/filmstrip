@@ -393,6 +393,41 @@ thumbnail, at the size the original would fit at, from the shape the index read 
 rotated recording's true shape are read when the thumbnail is made; "Capture dates" and "Video
 and ffmpeg" above say how.
 
+## Right-click menus
+
+**A right-click is a shortcut to what the interface already does**, drawn by Claude Design and
+built in part on 23 September 2026. A file's menu is the pane's bar in the bar's order; a folder's
+and a source's hold the verbs the bar cannot reach because it is about a file. The browser's own
+menu was already off everywhere but in a field, so until these a right-click, the menu key and
+Shift+F10 did nothing at all.
+
+- **A verb that does not exist yet is absent, never greyed.** A greyed row describes a feature at
+  the moment it refuses it. Move to…, Rename and Delete for a file, and New folder, Move to…,
+  Rename and Delete for a folder, wait on the undo journal; the menu for a selection waits on
+  selecting. A rule only stands between two groups that both hold rows, so an absent verb leaves
+  no stray line, and a menu with nothing in it opens nothing.
+- **What a drive that is away cannot do is absent too.** An offline source keeps Rename, Manage
+  sources… and Remove source, which touch only the index; its folders have nothing left.
+- **Favourite on a place waits.** The drawing puts it on a folder's and a source's menu, but nothing
+  shows which places are favourites, so the verb would be one whose result nobody could see.
+- **Remove source goes through the question Settings already asks.** It opens Sources with that
+  source's row asking, Cancel focused. Forgetting a source drops the tags and notes on its files;
+  a menu row must not do that in one press when the section that owns it asks first.
+- **Opening a menu changes nothing.** The pane keeps what it shows until a verb in the menu says
+  otherwise, and Full screen on a tile is that verb. While the pane is in full screen every file's
+  menu, a filmstrip frame's included, leads with the way out.
+- **The keyboard's menu hangs off the ring.** The menu key and Shift+F10 reach the page as a
+  context menu event with no button, placed at the element's centre, so the element is the anchor
+  instead: left edges met, the ring's 2px and its 2px gap, then a tile-gap. It flips above when the
+  room below is shorter than the menu and slides along the window's edge rather than shrinking.
+  Escape closes it and puts the focus back; a verb that takes the focus, as Rename does, keeps it.
+- **A source is renamed on its own row**, with the same keys as its name field in Settings:
+  sending someone to Settings to rename the row they are on would be the menu pointing at a place
+  instead of doing the act. It edits the app's label for the source, never the folder.
+- **Read it again walks one folder's subtree**, as the launch walk walks a source, judging nothing
+  outside it. **Only one walk runs at a time:** each retires what it did not see, so a folder walk
+  beside the whole walk would have the whole walk retire what the folder walk had just found.
+
 ## Settings
 
 **A dialog over the window**, drawn by Claude Design and built on 14 September 2026. The frame is

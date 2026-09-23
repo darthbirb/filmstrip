@@ -18,7 +18,7 @@ drawn. **Not started** — neither.
 | --- | --- | --- |
 | Register a folder as a source | Built | `add_source`, and both doorways |
 | Several sources at once, library and sorting | Built | `list_sources`, `set_source_kind` |
-| Rename a source | Built in Settings | `rename_source`; renaming on its tree row is drawn |
+| Rename a source | Built | `rename_source`, in Settings and on its tree row |
 | Remove a source, leaving the folder alone | Built | `remove_source` |
 | Reveal a source in Explorer | Built | `reveal_source` |
 | Remember the interface's own state | Built | `ui_preferences` |
@@ -41,6 +41,8 @@ drawn. **Not started** — neither.
 | Capability | Filmstrip | Where |
 | --- | --- | --- |
 | The tree, and a folder's children | Built | `folder_children` |
+| Reveal a folder in Explorer | Built | `reveal_folder`, its row's menu |
+| Read one folder again | Built | `read_folder_again`, its row's menu; ggallery walked only whole sources |
 | A folder's own details | Backlogged, and not in Rust | "A folder's details" |
 | Create a folder | Drawn, waiting on the undo journal | the folder row's menu |
 | Move a folder | Drawn, waiting on the undo journal | the folder row's menu |
@@ -125,6 +127,6 @@ drawn. **Not started** — neither.
 | Three panels, splitters, folding, the rail | Built | |
 | The app's own window chrome | Built | |
 | Settings | Built, with Sources in it | |
-| The app's own right-click menus | Drawn | the folder verbs among them wait on the undo journal |
+| The app's own right-click menus | Built in part | on a tile, a frame, the pane's picture, a folder and a source; the verbs that change the disk wait on the undo journal, and a selection's on selecting |
 | A scrubber for very large folders | Backlogged | |
 | Compression review, duplicate detection, a storage screen, a tags screen | Not started | PRODUCT.md "Later" |
