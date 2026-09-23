@@ -122,7 +122,7 @@ function sourceMenu(source: SourceSummary, rename: () => void): MenuGroups {
   const folder = source.rootFolderId;
   const reveal: MenuAction = {
     id: "reveal",
-    label: "Reveal in Explorer",
+    label: "Show in Explorer",
     glyph: "folderOpen",
     onSelect: () => void revealSource(source.id).catch(() => undefined),
   };
@@ -132,13 +132,13 @@ function sourceMenu(source: SourceSummary, rename: () => void): MenuGroups {
     [
       {
         id: "manage",
-        label: "Manage sources…",
+        label: "Manage Sources",
         glyph: "settings",
         onSelect: () => openSettings({ section: "sources" }),
       },
       {
         id: "remove",
-        label: "Remove source",
+        label: "Remove Source",
         glyph: "minusCircle",
         tone: "danger",
         onSelect: () => openSettings({ section: "sources", asking: source.id }),
@@ -150,7 +150,7 @@ function sourceMenu(source: SourceSummary, rename: () => void): MenuGroups {
 function revealFolderRow(folder: number): MenuAction {
   return {
     id: "reveal",
-    label: "Reveal in Explorer",
+    label: "Show in Explorer",
     glyph: "folderOpen",
     onSelect: () => void revealFolder(folder).catch(() => undefined),
   };
@@ -159,7 +159,7 @@ function revealFolderRow(folder: number): MenuAction {
 function readAgainRow(folder: number): MenuAction {
   return {
     id: "read-again",
-    label: "Read it again",
+    label: "Refresh",
     glyph: "readAgain",
     onSelect: () => void readFolderAgain(folder).catch(() => undefined),
   };

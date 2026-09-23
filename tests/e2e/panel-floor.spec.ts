@@ -4,7 +4,7 @@ const NAV = 'nav[aria-label="Navigation"]';
 
 /** Drags the splitter left in small steps, reporting how wide navigation was after each one. */
 async function dragNarrower(page: Page, steps: number) {
-  const splitter = page.getByRole("separator", { name: "Resize navigation" });
+  const splitter = page.getByRole("separator", { name: "Resize Navigation" });
   const grip = await splitter.boundingBox();
   if (!grip) throw new Error("navigation has no splitter");
   const width = () =>
@@ -41,7 +41,8 @@ test("a panel being dragged narrower never pushes back", async ({ page }) => {
 test("the doorway keeps its whole label at the narrowest navigation", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/?no-sources");
-  const add = page.getByRole("button", { name: "Add a folder…" });
+  // The doorway in the empty state, not the header's + that shares its name.
+  const add = page.getByRole("button", { name: "Add Source…" }).filter({ hasText: "Add Source…" });
   await expect(add).toBeVisible();
 
   await dragNarrower(page, 18);

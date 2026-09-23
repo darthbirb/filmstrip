@@ -35,7 +35,7 @@ export function sortingRow(sources: SourceSummary[], onNominate?: () => void): T
     count: waiting > 0 ? waiting : undefined,
     // Which + was pressed is what decides a source's kind, so this one is never hidden.
     action: onNominate
-      ? { glyph: "plus", label: "Nominate a folder", onClick: onNominate }
+      ? { glyph: "plus", label: "Add Sorting Source…", onClick: onNominate }
       : undefined,
   };
 }
@@ -107,7 +107,7 @@ export function NoSources({ onAdd }: { onAdd: () => void }) {
   return (
     <EmptyState glyph="folders" title="No Sources Yet">
       <Button glyph="plus" onClick={onAdd}>
-        Add a folder…
+        Add Source…
       </Button>
     </EmptyState>
   );

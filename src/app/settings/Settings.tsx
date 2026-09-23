@@ -35,16 +35,16 @@ function useSections(asking?: number): Section[] {
   return [
     {
       id: "appearance",
-      group: "This app",
+      group: "App",
       title: "Appearance",
       glyph: "appearance",
-      caption: "The interface",
+      caption: "Interface",
       rows: [
         {
-          label: "Interface size",
+          label: "Interface Size",
           control: (
             <Dropdown
-              label="Interface size"
+              label="Interface Size"
               align="end"
               options={SIZES}
               value={String(scale)}
@@ -53,10 +53,10 @@ function useSections(asking?: number): Section[] {
           ),
         },
         {
-          label: "Grid layout",
+          label: "Grid Layout",
           control: (
             <Dropdown
-              label="Grid layout"
+              label="Grid Layout"
               align="end"
               options={LAYOUTS}
               value={layout}
@@ -68,7 +68,7 @@ function useSections(asking?: number): Section[] {
     },
     {
       id: "sources",
-      group: "Your library",
+      group: "Library",
       title: "Sources",
       glyph: "source",
       caption: "Sources",
@@ -137,7 +137,7 @@ function Body({ onClose, section, asking }: Omit<Props, "open">) {
         <h2 id="settings-title" className="m-0 min-w-0 flex-1 truncate text-fg-hi text-title">
           Settings
         </h2>
-        <GlyphButton glyph="close" label="Close settings" onClick={onClose} />
+        <GlyphButton glyph="close" label="Close Settings" onClick={onClose} />
       </header>
       <div className="flex min-h-0 flex-1">
         <nav

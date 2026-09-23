@@ -73,7 +73,7 @@ test("the grid's layout is chosen in Settings, and the grid follows and remember
   await expect.poll(() => widths().length).toBe(12);
   expect(new Set(widths()).size).toBeGreaterThan(1);
 
-  await screen.getByRole("button", { name: "Grid layout: Rows" }).click();
+  await screen.getByRole("button", { name: "Grid Layout: Rows" }).click();
   await screen.getByRole("option", { name: "Squares" }).click();
   await expect.poll(() => new Set(widths()).size).toBe(1);
   expect(getPreferences().layout).toBe("uniform");
@@ -81,8 +81,8 @@ test("the grid's layout is chosen in Settings, and the grid follows and remember
 
 test("the interface size is one of five named steps, and choosing one scales everything", async () => {
   const screen = await render(<Harness />);
-  await screen.getByRole("button", { name: "Interface size: 100%" }).click();
-  const sizes = screen.getByRole("listbox", { name: "Interface size" }).getByRole("option");
+  await screen.getByRole("button", { name: "Interface Size: 100%" }).click();
+  const sizes = screen.getByRole("listbox", { name: "Interface Size" }).getByRole("option");
   expect(sizes.elements().map((option) => option.textContent)).toEqual([
     "80%",
     "100%",
@@ -114,8 +114,8 @@ test("Settings is modal, and Escape or a click on the backdrop puts it away", as
 
 test("Escape in an open menu closes the menu and leaves Settings open", async () => {
   const screen = await render(<Harness />);
-  await screen.getByRole("button", { name: "Grid layout: Rows" }).click();
-  const menu = screen.getByRole("listbox", { name: "Grid layout" });
+  await screen.getByRole("button", { name: "Grid Layout: Rows" }).click();
+  const menu = screen.getByRole("listbox", { name: "Grid Layout" });
   await expect.element(menu).toBeVisible();
   const opened = menu.element();
   await userEvent.keyboard("{Escape}");
@@ -128,8 +128,8 @@ test("the filter narrows Settings to the rows that match, and says when none do"
   const screen = await render(<Harness />);
   const filter = screen.getByRole("searchbox", { name: "Find a setting" });
   await filter.fill("layout");
-  await expect.element(screen.getByText("Grid layout", { exact: true })).toBeVisible();
-  expect(screen.getByText("Interface size", { exact: true }).elements()).toHaveLength(0);
+  await expect.element(screen.getByText("Grid Layout", { exact: true })).toBeVisible();
+  expect(screen.getByText("Interface Size", { exact: true }).elements()).toHaveLength(0);
 
   await filter.fill("nothing like it");
   await expect.element(screen.getByText(/No setting matches/)).toBeVisible();
@@ -201,10 +201,14 @@ test("Sources lists every folder read, and an offline one keeps remove but loses
   await expect.element(section.getByText("6 items")).toBeVisible();
   await expect.element(section.getByRole("radio", { name: "Library" }).first()).toBeChecked();
 
-  await expect.element(section.getByRole("button", { name: "Reveal Pictures" })).toBeVisible();
+  await expect
+    .element(section.getByRole("button", { name: "Show Pictures in Explorer" }))
+    .toBeVisible();
   await expect.element(section.getByRole("button", { name: "Remove Pictures" })).toBeVisible();
   // The folder is not there to open, so the reveal goes and the remove stays.
-  expect(section.getByRole("button", { name: "Reveal Archive" }).elements()).toHaveLength(0);
+  expect(section.getByRole("button", { name: "Show Archive in Explorer" }).elements()).toHaveLength(
+    0,
+  );
   await expect.element(section.getByRole("button", { name: "Remove Archive" })).toBeVisible();
 });
 
@@ -233,7 +237,9 @@ test("pressing remove asks on the row, and Cancel or Escape puts the row back", 
   // The name and the count stay; the kind, reveal and remove give up their space.
   await expect.element(question.getByText("Pictures", { exact: true })).toBeVisible();
   await expect.element(question.getByText("6 items")).toBeVisible();
-  expect(section.getByRole("button", { name: "Reveal Pictures" }).elements()).toHaveLength(0);
+  expect(
+    section.getByRole("button", { name: "Show Pictures in Explorer" }).elements(),
+  ).toHaveLength(0);
   await expect.element(question.getByRole("button", { name: "Cancel" })).toHaveFocus();
   expect(removed).toEqual([]);
 
@@ -249,15 +255,15 @@ test("pressing remove asks on the row, and Cancel or Escape puts the row back", 
   expect(removed).toEqual([]);
 });
 
-test("Remove source is the answer that removes it", async () => {
+test("Remove Source is the answer that removes it", async () => {
   const removed: number[] = [];
   const section = await onSources(removed);
   await section.getByRole("button", { name: "Remove Pictures" }).click();
-  await section.getByRole("button", { name: "Remove source" }).click();
+  await section.getByRole("button", { name: "Remove Source" }).click();
   await expect.poll(() => removed).toEqual([1]);
 });
 
-test("Sources sits under Your library, and its caption is its name", async () => {
+test("Sources sits under Library, and its caption is its name", async () => {
   const section = await onSources();
   await expect
     .element(section.getByRole("heading", { name: "Sources", exact: true }))
@@ -266,6 +272,6 @@ test("Sources sits under Your library, and its caption is its name", async () =>
   const rail = [...document.querySelectorAll("dialog nav > p, dialog nav button .truncate")].map(
     (entry) => entry.textContent,
   );
-  expect(rail.indexOf("Your library")).toBeGreaterThan(rail.indexOf("Appearance"));
-  expect(rail.indexOf("Sources")).toBeGreaterThan(rail.indexOf("Your library"));
+  expect(rail.indexOf("Library")).toBeGreaterThan(rail.indexOf("Appearance"));
+  expect(rail.indexOf("Sources")).toBeGreaterThan(rail.indexOf("Library"));
 });

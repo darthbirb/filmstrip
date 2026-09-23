@@ -48,7 +48,7 @@ export function Sources({ asking }: { asking?: number }) {
       )}
       <div className="flex">
         <Button glyph="plus" onClick={() => void addFolder("library")}>
-          Add a folder…
+          Add Source…
         </Button>
       </div>
     </div>
@@ -137,7 +137,7 @@ function Settled({ source, onRemove }: { source: SourceSummary; onRemove: () => 
         {source.reachable && (
           <GlyphButton
             glyph="folderOpen"
-            label={`Reveal ${source.title}`}
+            label={`Show ${source.title} in Explorer`}
             onClick={() => void revealSource(source.id).catch(() => undefined)}
           />
         )}
@@ -185,8 +185,7 @@ function Asking({ source, onCancel }: { source: SourceSummary; onCancel: () => v
         </span>
       </div>
       <p className="m-0 pl-7 text-fg-mid text-small">
-        The folder stays on disk. Filmstrip drops what it knows about it, including the tags and
-        notes on its files.
+        The folder stays on disk. Its tags and notes are lost.
       </p>
       <div className="flex gap-1.5 pl-7">
         <Button
@@ -197,7 +196,7 @@ function Asking({ source, onCancel }: { source: SourceSummary; onCancel: () => v
               .catch(() => undefined);
           }}
         >
-          Remove source
+          Remove Source
         </Button>
         <Button ref={cancel} tone="quiet" onClick={onCancel}>
           Cancel

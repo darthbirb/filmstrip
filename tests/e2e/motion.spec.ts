@@ -50,7 +50,7 @@ test("under reduced motion a box lands in the frame it changes in", async ({ pag
   const panel = await page.evaluate(async (selector) => {
     const box = () => document.querySelector(selector)?.getBoundingClientRect().width ?? 0;
     const docked = box();
-    document.querySelector<HTMLElement>('button[aria-label="Hide pane"]')?.click();
+    document.querySelector<HTMLElement>('button[aria-label="Hide Pane"]')?.click();
     await new Promise((settle) => requestAnimationFrame(() => requestAnimationFrame(settle)));
     return { docked, folded: box() };
   }, PANEL);
@@ -77,7 +77,7 @@ test("nothing animates on first paint", async ({ page }) => {
   });
   await page.goto("/");
 
-  await expect(page.getByRole("button", { name: "Show pane" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Show Pane" })).toBeVisible();
   await page.waitForTimeout(500);
   expect(await page.evaluate(() => (window as unknown as { moves: string[] }).moves)).toEqual([]);
 });

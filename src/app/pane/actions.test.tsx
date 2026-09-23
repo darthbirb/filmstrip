@@ -37,9 +37,9 @@ async function renderBar(width: number) {
 
 test("each button does its own thing to the file the pane is showing", async () => {
   const screen = await renderBar(400);
-  await screen.getByRole("button", { name: "Reveal in Explorer" }).click();
+  await screen.getByRole("button", { name: "Show in Explorer" }).click();
   await screen.getByRole("button", { name: "Copy" }).click();
-  await screen.getByRole("button", { name: "Open with the default app" }).click();
+  await screen.getByRole("button", { name: "Open with Default App" }).click();
 
   expect(sent.map((call) => call.cmd)).toEqual(["reveal_item", "copy_item_file", "open_item"]);
   expect(sent[0]?.payload).toEqual({ itemId: sample.id });
@@ -56,7 +56,7 @@ test("favourite reports itself, and says so without a hue", async () => {
     cmd: "set_item_favorite",
     payload: { itemIds: [sample.id], favorite: true },
   });
-  const marked = screen.getByRole("button", { name: "Favourited" });
+  const marked = screen.getByRole("button", { name: "Remove Favourite" });
   await expect.element(marked).toHaveAttribute("aria-pressed", "true");
   // The state is carried by the filled glyph and the plate, never by a colour this app does not have.
   expect(marked.element().querySelector(".glyph-fill")).not.toBeNull();
@@ -64,20 +64,18 @@ test("favourite reports itself, and says so without a hue", async () => {
 
 test("what does not fit moves into the menu, and stays out of the bar", async () => {
   const screen = await renderBar(120);
-  await expect.element(screen.getByRole("button", { name: "Reveal in Explorer" })).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "Show in Explorer" })).toBeVisible();
   expect(screen.getByRole("button", { name: "Copy" }).elements()).toHaveLength(0);
 
-  await screen.getByRole("button", { name: "Everything else" }).click();
-  const menu = screen.getByRole("menu", { name: "Everything else" });
+  await screen.getByRole("button", { name: "More" }).click();
+  const menu = screen.getByRole("menu", { name: "More" });
   await expect.element(menu.getByRole("menuitem", { name: "Copy" })).toBeVisible();
-  await menu.getByRole("menuitem", { name: "Open with the default app" }).click();
+  await menu.getByRole("menuitem", { name: "Open with Default App" }).click();
   expect(sent.map((call) => call.cmd)).toEqual(["open_item"]);
 });
 
 test("with room for all of them the menu is not drawn at all", async () => {
   const screen = await renderBar(400);
-  await expect
-    .element(screen.getByRole("button", { name: "Open with the default app" }))
-    .toBeVisible();
-  expect(screen.getByRole("button", { name: "Everything else" }).elements()).toHaveLength(0);
+  await expect.element(screen.getByRole("button", { name: "Open with Default App" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "More" }).elements()).toHaveLength(0);
 });

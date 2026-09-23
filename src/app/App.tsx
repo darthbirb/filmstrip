@@ -44,7 +44,7 @@ export function App() {
           navControl={
             <GlyphButton
               glyph="plus"
-              label="Add a folder"
+              label="Add Source…"
               onClick={() => void addFolder("library")}
             />
           }

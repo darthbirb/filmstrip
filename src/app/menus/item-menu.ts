@@ -17,13 +17,13 @@ export function itemMenu(item: Item, show: () => void): MenuGroups {
       getFullScreen()
         ? {
             id: "leave",
-            label: "Leave full screen",
+            label: "Exit Full Screen",
             glyph: "leaveFullScreen",
             onSelect: () => setFullScreen(false),
           }
         : {
             id: "full",
-            label: "Full screen",
+            label: "Full Screen",
             glyph: "fullScreen",
             onSelect: () => {
               show();
@@ -32,7 +32,7 @@ export function itemMenu(item: Item, show: () => void): MenuGroups {
           },
       {
         id: "favourite",
-        label: favourite ? "Unfavourite" : "Favourite",
+        label: favourite ? "Remove Favourite" : "Favourite",
         glyph: "star",
         filled: favourite,
         onSelect: () => setFavourite(item.id, !favourite),
@@ -41,14 +41,14 @@ export function itemMenu(item: Item, show: () => void): MenuGroups {
     [
       {
         id: "reveal",
-        label: "Reveal in Explorer",
+        label: "Show in Explorer",
         glyph: "folderOpen",
         onSelect: () => quietly(revealItem(item.id)),
       },
       { id: "copy", label: "Copy", glyph: "copy", onSelect: () => quietly(copyItemFile(item.id)) },
       {
         id: "open",
-        label: "Open with the default app",
+        label: "Open with Default App",
         glyph: "openExternal",
         onSelect: () => quietly(openItem(item.id)),
       },

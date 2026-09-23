@@ -34,7 +34,7 @@ export function ThumbFace({ src, current = false, badge = true, duration }: Face
       {current && badge && (
         <span className="pointer-events-none absolute bottom-tile-inset left-tile-inset flex h-badge items-center gap-1 whitespace-nowrap rounded-badge bg-in-pane px-1.5 text-eyebrow text-on-mark uppercase @max-badge:w-badge @max-badge:justify-center @max-badge:px-0">
           <Glyph name="view" filled className="text-glyph-small" />
-          <span className="@max-badge:hidden">In pane</span>
+          <span className="@max-badge:hidden">In Pane</span>
         </span>
       )}
       {duration && (

@@ -47,7 +47,7 @@ test("Settings opens from the gear and fits at every width and text size", async
       await page.getByRole("button", { name: "Settings" }).click();
       const dialog = page.getByRole("dialog", { name: "Settings" });
       await expect(dialog).toBeInViewport({ ratio: 1 });
-      await expect(dialog.getByRole("button", { name: /^Grid layout/ })).toBeInViewport();
+      await expect(dialog.getByRole("button", { name: /^Grid Layout/ })).toBeInViewport();
       await page.keyboard.press("Escape");
       await expect(dialog).toBeHidden();
     }

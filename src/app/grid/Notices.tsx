@@ -26,14 +26,14 @@ export function Notices() {
           <span className="min-w-0 flex-1 text-fg text-ui tabular-nums">
             {formatCount(count)} {count === 1 ? "file" : "files"} could not be indexed
           </span>
-          <Button onClick={() => void retryFailures()}>Retry these</Button>
+          <Button onClick={() => void retryFailures()}>Retry</Button>
           <Button
             tone="quiet"
             expanded={open}
             detail={open && <Glyph name="chevronDown" className="rotate-180 text-glyph-small" />}
             onClick={() => setOpen(!open)}
           >
-            {open ? "Hide the list" : `Show the ${formatCount(count)}`}
+            {open ? "Hide Files" : "Show Files"}
           </Button>
           <button
             type="button"
@@ -49,8 +49,8 @@ export function Notices() {
           <div className="max-h-45 overflow-auto">
             <div className={`${COLUMNS} h-7 text-eyebrow text-fg-dim uppercase`}>
               <span>File</span>
-              <span>What went wrong</span>
-              <span className="text-right">Tries</span>
+              <span>Error</span>
+              <span className="text-right">Attempts</span>
             </div>
             {failures.map((failure) => (
               <div

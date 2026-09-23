@@ -88,10 +88,10 @@ test("the way into full screen leads the header row, and goes with the item", as
   const screen = await render(<Harness />);
   const pane = screen.getByRole("complementary", { name: "Pane" });
   await expect.element(pane.getByText("Nothing Chosen Yet")).toBeVisible();
-  expect(pane.getByRole("button", { name: "Full screen" }).elements()).toHaveLength(0);
+  expect(pane.getByRole("button", { name: "Full Screen" }).elements()).toHaveLength(0);
 
   showInPane((await inCairo("pyramid.jpg")).id);
-  const into = pane.getByRole("button", { name: "Full screen" });
+  const into = pane.getByRole("button", { name: "Full Screen" });
   await expect.element(into).toBeVisible();
   // First in the row, before the disclosure, so it stands at the edge that full screen moves.
   expect(pane.getByRole("button").elements()[0]).toBe(into.element());
@@ -99,11 +99,11 @@ test("the way into full screen leads the header row, and goes with the item", as
   expect(arrow()).toBe(String.fromCodePoint(0xe062));
 
   await into.click();
-  const out = pane.getByRole("button", { name: "Leave full screen" });
+  const out = pane.getByRole("button", { name: "Exit Full Screen" });
   await expect.element(out).toHaveAttribute("aria-pressed", "true");
   expect(out.element().querySelector(".glyph")?.textContent).toBe(String.fromCodePoint(0xe064));
   await out.click();
-  await expect.element(pane.getByRole("button", { name: "Full screen" })).toBeVisible();
+  await expect.element(pane.getByRole("button", { name: "Full Screen" })).toBeVisible();
 });
 
 test("the header row gives the shape and size, and opens onto the rest, remembered", async () => {

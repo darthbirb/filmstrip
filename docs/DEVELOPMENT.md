@@ -163,7 +163,7 @@ Its interface is never read for the look, which comes from Claude Design (DECISI
 | Performance fixture | `bin/synth_library.rs` | grid and tiles |
 | Probing video and capture dates | `media/probe.rs`, `sidecar/` | the pane |
 | Scrub sprites | `media/sprites.rs`, `sidecar/ffmpeg.rs` `frames` | not yet scheduled: nothing shows one yet |
-| Reveal in Explorer, open with the default app | `commands/items.rs`, `tauri-plugin-opener` | the pane |
+| Show in Explorer, Open with Default App | `commands/items.rs`, `tauri-plugin-opener` | the pane |
 | Copying a file to the clipboard | `fs/clipboard.rs` | the pane |
 | Moving, renaming, undo | `fs/relocate.rs`, `fs/undo.rs`, `db/journal.rs`, `commands/triage.rs` | selection and moving |
 | Trash | `fs/trash.rs` | selection and moving |

@@ -33,7 +33,7 @@ function Surface({
 }
 
 const rows = (onSelect = () => {}): MenuGroups => [
-  [{ id: "a", label: "Full screen", glyph: "fullScreen", onSelect }],
+  [{ id: "a", label: "Full Screen", glyph: "fullScreen", onSelect }],
   [],
   [
     { id: "b", label: "Copy", glyph: "copy", onSelect },
@@ -66,11 +66,9 @@ test("a menu is the drawn shape: 14rem wide, 2rem rows, one rule between groups 
 });
 
 test("the ⋯ menu wears the same shape", async () => {
-  const screen = await render(
-    <Menu label="Everything else" glyph="more" groups={rows()} align="start" />,
-  );
-  await screen.getByRole("button", { name: "Everything else" }).click();
-  const menu = screen.getByRole("menu", { name: "Everything else" });
+  const screen = await render(<Menu label="More" glyph="more" groups={rows()} align="start" />);
+  await screen.getByRole("button", { name: "More" }).click();
+  const menu = screen.getByRole("menu", { name: "More" });
   await expect.element(menu).toBeVisible();
   expect(menu.element().getBoundingClientRect().width).toBeCloseTo(14 * rem(), 0);
   expect(getComputedStyle(menu.element()).backgroundColor).toBe(hexToRgb(token("--color-panel")));
@@ -117,7 +115,7 @@ test("Escape closes it and the focus goes back; a choice runs and the focus goes
   const screen = await render(<Surface groups={rows(chosen)} />);
   const thing = screen.getByRole("button", { name: "thing" });
   await openByKeyboard(screen);
-  await expect.element(screen.getByRole("menuitem", { name: "Full screen" })).toHaveFocus();
+  await expect.element(screen.getByRole("menuitem", { name: "Full Screen" })).toHaveFocus();
   await userEvent.keyboard("{Escape}");
   await expect.element(screen.getByRole("menu", { name: "Thing" })).not.toBeInTheDocument();
   await expect.element(thing).toHaveFocus();

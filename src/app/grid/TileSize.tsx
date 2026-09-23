@@ -6,7 +6,7 @@ const STEPS = [
   { value: "small", label: "Small" },
   { value: "medium", label: "Medium" },
   { value: "large", label: "Large" },
-  { value: "extra-large", label: "Extra large" },
+  { value: "extra-large", label: "Extra Large" },
 ] as const;
 
 type Step = (typeof STEPS)[number]["value"];
@@ -38,7 +38,7 @@ export function TileSize() {
   const { tile } = usePreferences();
   return (
     <Dropdown
-      label="Tile size"
+      label="Tile Size"
       glyph="tileSize"
       align="end"
       options={STEPS}

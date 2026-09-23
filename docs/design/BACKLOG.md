@@ -16,14 +16,6 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## Every label in Title Case, in reviewed words · DRAWN
-
-Components › Words gives the case rule, the small words that stay lowercase, and every label that
-changed and why. Every built label follows it: the pane's bar and its tooltips, every menu row, the
-fold buttons, the failures banner's Retry, Show Files and Hide Files, the empty titles ("Nothing to
-Sort"), Settings' rail and rows, and the foot's "last indexed". The three lines the pass cut come out
-of the build too.
-
 ## The app's own right-click menus: the verbs that change the disk · DRAWN
 
 Drawn on the Components sheet; what exists is built, DECISIONS.md "Right-click menus". What waits,

@@ -123,11 +123,11 @@ test("a tile's menu is the bar's verbs in the bar's order, and opening it leaves
     "pyramid.jpg",
   );
   expect(labels(menu)).toEqual([
-    "Full screen",
+    "Full Screen",
     "Favourite",
-    "Reveal in Explorer",
+    "Show in Explorer",
     "Copy",
-    "Open with the default app",
+    "Open with Default App",
   ]);
   expect(menu.element().querySelectorAll("hr")).toHaveLength(1);
   expect(getPaneItem()).toBeNull();
@@ -141,7 +141,7 @@ test("Full screen from a tile shows it there, and the picture's own menu then le
     screen.getByRole("button", { name: "pyramid.jpg" }),
     "pyramid.jpg",
   );
-  await menu.getByRole("menuitem", { name: "Full screen" }).click();
+  await menu.getByRole("menuitem", { name: "Full Screen" }).click();
   expect(getPaneItem()).toBe(pyramid.id);
 
   const picture = screen.getByRole("complementary", { name: "Pane" }).getByRole("group", {
@@ -149,8 +149,8 @@ test("Full screen from a tile shows it there, and the picture's own menu then le
   });
   await expect.element(picture).toBeVisible();
   const own = await menuOn(screen, picture, "pyramid.jpg");
-  expect(labels(own)[0]).toBe("Leave full screen");
-  await own.getByRole("menuitem", { name: "Leave full screen" }).click();
+  expect(labels(own)[0]).toBe("Exit Full Screen");
+  await own.getByRole("menuitem", { name: "Exit Full Screen" }).click();
   await expect.element(own).not.toBeInTheDocument();
 });
 
@@ -177,11 +177,11 @@ test("a filmstrip frame is a tile, and gets the tile's menu", async () => {
   });
   const menu = await menuOn(screen, frame, "sphinx.jpg");
   expect(labels(menu)).toEqual([
-    "Full screen",
+    "Full Screen",
     "Favourite",
-    "Reveal in Explorer",
+    "Show in Explorer",
     "Copy",
-    "Open with the default app",
+    "Open with Default App",
   ]);
 });
 
@@ -197,13 +197,13 @@ test("Favourite from a tile's menu shows on the pane's bar at once", async () =>
     "sphinx.jpg",
   );
   await menu.getByRole("menuitem", { name: "Favourite" }).click();
-  await expect.element(bar.getByRole("button", { name: "Favourited" })).toBeVisible();
+  await expect.element(bar.getByRole("button", { name: "Remove Favourite" })).toBeVisible();
   const again = await menuOn(
     screen,
     screen.getByRole("button", { name: "sphinx.jpg" }),
     "sphinx.jpg",
   );
-  expect(labels(again)[1]).toBe("Unfavourite");
+  expect(labels(again)[1]).toBe("Remove Favourite");
 });
 
 test("a folder's row reveals and reads again; a source's adds Rename, then the Sources section", async () => {
@@ -211,11 +211,11 @@ test("a folder's row reveals and reads again; a source's adds Rename, then the S
   const source = screen.getByRole("treeitem", { name: "Pictures" });
   const sourceMenu = await menuOn(screen, source, "Pictures");
   expect(labels(sourceMenu)).toEqual([
-    "Reveal in Explorer",
+    "Show in Explorer",
     "Rename",
-    "Read it again",
-    "Manage sources…",
-    "Remove source",
+    "Refresh",
+    "Manage Sources",
+    "Remove Source",
   ]);
   await userEvent.keyboard("{Escape}");
 
@@ -223,7 +223,7 @@ test("a folder's row reveals and reads again; a source's adds Rename, then the S
   await userEvent.keyboard("{ArrowRight}");
   const trips = screen.getByRole("treeitem", { name: "Trips 2" });
   const folderMenu = await menuOn(screen, trips, "Trips");
-  expect(labels(folderMenu)).toEqual(["Reveal in Explorer", "Read it again"]);
+  expect(labels(folderMenu)).toEqual(["Show in Explorer", "Refresh"]);
   expect(folderMenu.element().querySelectorAll("hr")).toHaveLength(0);
 });
 
@@ -232,14 +232,14 @@ test("the verbs reach the commands they name, for the folder they were opened on
   await recording(async (calls) => {
     const source = screen.getByRole("treeitem", { name: "Pictures" });
     let menu = await menuOn(screen, source, "Pictures");
-    await menu.getByRole("menuitem", { name: "Read it again" }).click();
+    await menu.getByRole("menuitem", { name: "Refresh" }).click();
     await source.click();
     await userEvent.keyboard("{ArrowRight}");
     const trips = screen.getByRole("treeitem", { name: "Trips 2" });
     menu = await menuOn(screen, trips, "Trips");
-    await menu.getByRole("menuitem", { name: "Reveal in Explorer" }).click();
+    await menu.getByRole("menuitem", { name: "Show in Explorer" }).click();
     menu = await menuOn(screen, trips, "Trips");
-    await menu.getByRole("menuitem", { name: "Read it again" }).click();
+    await menu.getByRole("menuitem", { name: "Refresh" }).click();
     const sent = calls.filter(([cmd]) => ["read_folder_again", "reveal_folder"].includes(cmd));
     expect(sent).toEqual([
       ["read_folder_again", { folderId: 1 }],
@@ -258,7 +258,7 @@ test("an offline source keeps what needs no drive, and an offline folder opens n
       const screen = await render(<Harness />);
       const archive = screen.getByRole("treeitem", { name: "Archive offline" });
       const menu = await menuOn(screen, archive, "Archive");
-      expect(labels(menu)).toEqual(["Rename", "Manage sources…", "Remove source"]);
+      expect(labels(menu)).toEqual(["Rename", "Manage Sources", "Remove Source"]);
       await userEvent.keyboard("{Escape}");
 
       await archive.click();
@@ -275,20 +275,20 @@ test("an offline source keeps what needs no drive, and an offline folder opens n
   );
 });
 
-test("Manage sources… opens Settings on Sources, and Remove source opens it asking", async () => {
+test("Manage Sources opens Settings on Sources, and Remove Source opens it asking", async () => {
   const screen = await render(<Harness />);
   const source = screen.getByRole("treeitem", { name: "Pictures" });
   let menu = await menuOn(screen, source, "Pictures");
-  await menu.getByRole("menuitem", { name: "Manage sources…" }).click();
+  await menu.getByRole("menuitem", { name: "Manage Sources" }).click();
   const dialog = screen.getByRole("dialog", { name: "Settings" });
   await expect.element(dialog.getByRole("region", { name: "Sources" })).toBeVisible();
   expect(dialog.getByRole("button", { name: "Cancel" }).elements()).toHaveLength(0);
   closeSettings();
 
   menu = await menuOn(screen, source, "Pictures");
-  await menu.getByRole("menuitem", { name: "Remove source" }).click();
+  await menu.getByRole("menuitem", { name: "Remove Source" }).click();
   await expect.element(dialog.getByRole("button", { name: "Cancel" })).toHaveFocus();
-  expect(dialog.getByRole("button", { name: "Remove source" }).elements()).toHaveLength(1);
+  expect(dialog.getByRole("button", { name: "Remove Source" }).elements()).toHaveLength(1);
 });
 
 test("Rename makes the source's row a field: Escape and a blank keep the name, Enter and leaving rename", async () => {

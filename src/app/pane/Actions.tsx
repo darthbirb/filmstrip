@@ -18,7 +18,7 @@ export function Actions({ item }: { item: ItemDetail }) {
   const actions: Action[] = [
     {
       id: "reveal",
-      label: "Reveal in Explorer",
+      label: "Show in Explorer",
       glyph: "folderOpen",
       run: () => void revealItem(item.id).catch(() => undefined),
     },
@@ -30,7 +30,7 @@ export function Actions({ item }: { item: ItemDetail }) {
     },
     {
       id: "open",
-      label: "Open with the default app",
+      label: "Open with Default App",
       glyph: "openExternal",
       run: () => void openItem(item.id).catch(() => undefined),
     },
@@ -52,7 +52,7 @@ export function Actions({ item }: { item: ItemDetail }) {
         glyph="star"
         filled={favorite}
         pressed={favorite}
-        label={favorite ? "Favourited" : "Favourite"}
+        label={favorite ? "Remove Favourite" : "Favourite"}
         onClick={() => setFavourite(item.id, !favorite)}
       />
       <div className="ml-auto flex items-center gap-1.5">
@@ -67,7 +67,7 @@ export function Actions({ item }: { item: ItemDetail }) {
         {/* The drawing keeps the menu always, for a Rename that has nothing behind it yet. */}
         {folded.length > 0 && (
           <Menu
-            label="Everything else"
+            label="More"
             glyph="more"
             groups={[
               folded.map((action) => ({
