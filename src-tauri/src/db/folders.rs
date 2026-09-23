@@ -189,6 +189,40 @@ pub fn set_title(conn: &Connection, folder_id: i64, title: &str) -> Result<()> {
     tags::sync_title_tag(conn, folder_id, title)
 }
 
+/// Moves a folder's row under another; its items follow into the new parent's source.
+pub fn set_parent(conn: &Connection, folder_id: i64, parent_id: i64) -> Result<()> {
+    conn.execute(
+        "UPDATE folder SET parent_id = ?1 WHERE id = ?2",
+        params![parent_id, folder_id],
+    )?;
+    let source_id = location(conn, parent_id)?.source_id;
+    conn.execute(
+        "WITH RECURSIVE subtree(id) AS (
+             SELECT ?1
+           UNION ALL
+             SELECT f.id FROM folder f JOIN subtree s ON f.parent_id = s.id
+         )
+         UPDATE item SET source_id = ?2 WHERE folder_id IN (SELECT id FROM subtree)",
+        params![folder_id, source_id],
+    )?;
+    Ok(())
+}
+
+/// Whether `candidate` is `folder_id` itself or anywhere beneath it.
+pub fn is_within(conn: &Connection, candidate: i64, folder_id: i64) -> Result<bool> {
+    Ok(conn.query_row(
+        "WITH RECURSIVE ancestry(id) AS (
+             SELECT ?1
+           UNION ALL
+             SELECT f.parent_id FROM folder f JOIN ancestry a ON f.id = a.id
+              WHERE f.parent_id IS NOT NULL
+         )
+         SELECT EXISTS(SELECT 1 FROM ancestry WHERE id = ?2)",
+        params![candidate, folder_id],
+        |r| r.get(0),
+    )?)
+}
+
 /// Whether anything live, folder or item, sits directly in the folder.
 pub fn holds_anything(conn: &Connection, folder_id: i64) -> Result<bool> {
     Ok(conn.query_row(

@@ -186,6 +186,15 @@ pub fn in_folder(conn: &Connection, folder_id: i64) -> Result<Vec<ItemRow>> {
     Ok(rows)
 }
 
+/// Whether the item is in the index and not retired.
+pub fn is_live(conn: &Connection, id: i64) -> Result<bool> {
+    Ok(conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM item WHERE id = ?1 AND deleted_at IS NULL)",
+        params![id],
+        |r| r.get(0),
+    )?)
+}
+
 pub fn folder_of(conn: &Connection, id: i64) -> Result<Option<i64>> {
     Ok(conn
         .query_row(
@@ -203,6 +212,16 @@ pub fn set_folder(conn: &Connection, id: i64, folder_id: i64, disk_name: &str) -
     conn.execute(
         "UPDATE item SET source_id = ?1, folder_id = ?2, disk_name = ?3 WHERE id = ?4",
         params![source_id, folder_id, disk_name, id],
+    )?;
+    Ok(())
+}
+
+/// Removes a retired row outright: one whose file a walk found gone, holding a name another file
+/// is now arriving at.
+pub fn forget_retired(conn: &Connection, id: i64) -> Result<()> {
+    conn.execute(
+        "DELETE FROM item WHERE id = ?1 AND deleted_at IS NOT NULL",
+        params![id],
     )?;
     Ok(())
 }
