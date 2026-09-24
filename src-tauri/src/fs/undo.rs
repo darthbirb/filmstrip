@@ -11,15 +11,16 @@ use crate::db::journal::{
     self, Entry, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, ItemMoved, ItemTrashed,
 };
 use crate::error::{AppError, Result};
+use crate::fs::stayed::{self, Stayed};
 use crate::fs::{folders, items, trash};
 
-/// What an undo put back, and what it could not, each with its reason.
+/// What an undo put back, and what it could not, each with where it still is and why.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct UndoReport {
     pub reversed: u32,
-    pub errors: Vec<String>,
+    pub stayed: Vec<Stayed>,
 }
 
 /// Reverses one batch by id.
@@ -50,10 +51,29 @@ fn reverse_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
                 journal::drop_entry(conn, entry.id)?;
                 report.reversed += 1;
             }
-            Err(err) => report.errors.push(err.to_string()),
+            Err(err) => report.stayed.push(stayed_of(conn, entry, &err)?),
         }
     }
     Ok(report)
+}
+
+/// The file or folder a row that failed to come back is about.
+fn stayed_of(conn: &Connection, entry: &Entry, err: &AppError) -> Result<Stayed> {
+    match entry.op.as_str() {
+        journal::ITEM_MOVE => stayed::file(conn, inverse::<ItemMoved>(entry)?.item_id, err),
+        journal::ITEM_TRASH => stayed::file(conn, inverse::<ItemTrashed>(entry)?.item_id, err),
+        journal::FOLDER_CREATE => {
+            stayed::folder(conn, inverse::<FolderCreated>(entry)?.folder_id, err)
+        }
+        journal::FOLDER_RENAME => {
+            stayed::folder(conn, inverse::<FolderRenamed>(entry)?.folder_id, err)
+        }
+        journal::FOLDER_MOVE => stayed::folder(conn, inverse::<FolderMoved>(entry)?.folder_id, err),
+        journal::FOLDER_DELETE => {
+            stayed::folder(conn, inverse::<FolderDeleted>(entry)?.folder_id, err)
+        }
+        other => Err(AppError::invalid(format!("{other} cannot be undone"))),
+    }
 }
 
 fn reverse(conn: &Connection, entry: &Entry) -> Result<()> {
@@ -142,7 +162,7 @@ mod tests {
             first,
             UndoReport {
                 reversed: 1,
-                errors: vec![]
+                stayed: vec![]
             }
         );
         assert!(dir.join("library/Trips/Cairo/pyramid.jpg").is_file());
@@ -185,7 +205,7 @@ mod tests {
 
         let report = undo_batch(&conn, &batch).unwrap();
         assert_eq!(report.reversed, 0);
-        assert_eq!(report.errors.len(), 1);
+        assert_eq!(report.stayed.len(), 1);
         assert!(dir.join("library/Trips/Lisbon/tram.jpg").is_file());
         assert_eq!(journal::latest_batch(&conn).unwrap(), Some(batch));
     }
@@ -249,7 +269,7 @@ mod tests {
             report,
             UndoReport {
                 reversed: 2,
-                errors: vec![]
+                stayed: vec![]
             }
         );
         assert!(dir.join("library/Trips/Cairo/pyramid.jpg").is_file());
@@ -274,7 +294,15 @@ mod tests {
 
         let report = undo_batch(&conn, &batch).unwrap();
         assert_eq!(report.reversed, 0);
-        assert!(report.errors[0].contains("Cairo already holds a file called pyramid.jpg"));
+        assert_eq!(report.stayed[0].id, pyramid);
+        assert_eq!(
+            report.stayed[0].reason,
+            crate::error::Reason::NameTaken {
+                place: "Cairo".into(),
+                name: "pyramid.jpg".into(),
+                folder: false
+            }
+        );
         assert!(dir.join("library/People/pyramid.jpg").is_file());
         assert_eq!(journal::latest_batch(&conn).unwrap(), Some(batch));
     }
@@ -295,7 +323,7 @@ mod tests {
         std::fs::write(dir.join("library/Trips/Cairo/sphinx.jpg"), "in the way").unwrap();
 
         let first = undo_batch(&conn, &batch).unwrap();
-        assert_eq!((first.reversed, first.errors.len()), (1, 1));
+        assert_eq!((first.reversed, first.stayed.len()), (1, 1));
 
         std::fs::remove_file(dir.join("library/Trips/Cairo/sphinx.jpg")).unwrap();
         let retry = undo_batch(&conn, &batch).unwrap();
@@ -303,7 +331,7 @@ mod tests {
             retry,
             UndoReport {
                 reversed: 1,
-                errors: vec![]
+                stayed: vec![]
             }
         );
         assert!(dir.join("library/Trips/Cairo/pyramid.jpg").is_file());

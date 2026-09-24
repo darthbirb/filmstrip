@@ -6,7 +6,8 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::db::{folders, items, journal, tags};
-use crate::error::{AppError, Result};
+use crate::error::{AppError, Reason, Result};
+use crate::fs::stayed::{self, Stayed};
 use crate::fs::{paths, relocate};
 
 /// What a move of several items did: how many went, and each one that did not, with why.
@@ -15,15 +16,7 @@ use crate::fs::{paths, relocate};
 #[ts(export)]
 pub struct MoveReport {
     pub moved: u32,
-    pub refused: Vec<Refused>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export)]
-pub struct Refused {
-    pub item_id: i64,
-    pub reason: String,
+    pub refused: Vec<Stayed>,
 }
 
 /// Moves each item into `folder_id` under one batch, so one undo brings the whole selection back.
@@ -40,10 +33,7 @@ pub fn move_items(
         match move_unjournalled(conn, item_id, folder_id, Some(batch_id)) {
             Ok(true) => report.moved += 1,
             Ok(false) => {}
-            Err(err) => report.refused.push(Refused {
-                item_id,
-                reason: err.to_string(),
-            }),
+            Err(err) => report.refused.push(stayed::file(conn, item_id, &err)?),
         }
     }
     Ok(report)
@@ -70,14 +60,14 @@ pub(super) fn move_unjournalled(
     }
 
     let taken = || {
-        let place = folders::title(conn, folder_id)
-            .ok()
-            .flatten()
-            .unwrap_or_default();
-        AppError::invalid(format!(
-            "{place} already holds a file called {}",
-            file.disk_name
-        ))
+        AppError::refused(Reason::NameTaken {
+            place: folders::title(conn, folder_id)
+                .ok()
+                .flatten()
+                .unwrap_or_default(),
+            name: file.disk_name.clone(),
+            folder: false,
+        })
     };
     let held = items::existing_by_disk_name(conn, folder_id, &file.disk_name)?;
     if held.as_ref().is_some_and(|row| !row.deleted) {
@@ -162,11 +152,14 @@ mod tests {
         let report = move_items(&conn, &[pyramid, sphinx], people, &journal::new_batch()).unwrap();
         assert_eq!(report.moved, 1);
         assert_eq!(report.refused.len(), 1);
-        assert_eq!(report.refused[0].item_id, sphinx);
-        assert!(
-            report.refused[0]
-                .reason
-                .contains("People already holds a file called sphinx.jpg")
+        assert_eq!(report.refused[0].id, sphinx);
+        assert_eq!(
+            report.refused[0].reason,
+            Reason::NameTaken {
+                place: "People".into(),
+                name: "sphinx.jpg".into(),
+                folder: false
+            }
         );
 
         assert!(root.join("People/pyramid.jpg").is_file());
@@ -180,6 +173,25 @@ mod tests {
             .map(|tag| tag.value)
             .collect();
         assert!(carried.iter().any(|value| value == "people"), "{carried:?}");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_file_another_program_holds_open_stays_and_says_so() {
+        use std::os::windows::fs::OpenOptionsExt;
+        let (conn, root, cairo, people) = library("in-use");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        // Opened sharing nothing, as a program that locks its file does.
+        let _held = std::fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(root.join("Trips/Cairo/pyramid.jpg"))
+            .unwrap();
+
+        let report = move_items(&conn, &[pyramid], people, &journal::new_batch()).unwrap();
+        assert_eq!(report.moved, 0);
+        assert_eq!(report.refused[0].reason, Reason::InUse);
+        assert!(root.join("Trips/Cairo/pyramid.jpg").is_file());
     }
 
     #[test]

@@ -452,6 +452,10 @@ that interface will drive.
   ("IMG_0031 (2).jpg"); Filmstrip refuses that one file and says where the name is taken, and the
   rest of the selection still moves. The picker drawn on the Pane sheet reports a clash and never
   resolves it for you.
+- **What stayed says where it is and why.** A verb or an undo that could not move something
+  reports it as a row: the file or folder, the place it is still in, and a typed reason (the
+  name is taken there, its folder is gone, another app has it open). The interface words each
+  reason itself; the sentence Rust gives it is for logs.
 - **A name held only by a file a walk found gone is freed** for the file arriving at it.
 - **A trashed item gives up its name; a retired one keeps it.** `trashed_at` tells them apart. A
   file vanishing and coming back is the same file, so it keeps its tags. A file sent to the trash

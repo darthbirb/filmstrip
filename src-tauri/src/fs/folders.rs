@@ -10,7 +10,8 @@ use ts_rs::TS;
 
 use crate::db::sources::{self, SourceKind};
 use crate::db::{folders, items, journal, now, tags};
-use crate::error::{AppError, Result};
+use crate::error::{AppError, Reason, Result};
+use crate::fs::stayed::{self, Stayed};
 use crate::fs::{items as fs_items, paths, relocate, sanitize, trash, walk};
 
 /// Makes a folder inside `parent_id` under `title`, as a directory and then a row.
@@ -25,7 +26,7 @@ pub fn create(conn: &Connection, parent_id: i64, title: &str, batch_id: &str) ->
     let dir = paths::folder_dir(conn, parent_id)?.join(&title);
     // Not create_dir_all: a directory already there is a folder the index has not read yet.
     std::fs::create_dir(&dir).map_err(|err| match err.kind() {
-        std::io::ErrorKind::AlreadyExists => taken(&title),
+        std::io::ErrorKind::AlreadyExists => taken(conn, parent_id, &title),
         _ => err.into(),
     })?;
 
@@ -73,7 +74,7 @@ pub(super) fn rename_unjournalled(
     let from = paths::folder_dir(conn, folder_id)?;
     let to = from.with_file_name(&title);
     if old.to_lowercase() != title.to_lowercase() && to.exists() {
-        return Err(taken(&title));
+        return Err(taken(conn, parent_id, &title));
     }
     std::fs::rename(&from, &to)?;
 
@@ -129,7 +130,7 @@ pub(super) fn move_unjournalled(
     let from = paths::folder_dir(conn, folder_id)?;
     let to = paths::folder_dir(conn, parent_id)?.join(&title);
     if to.exists() {
-        return Err(taken(&title));
+        return Err(taken(conn, parent_id, &title));
     }
     relocate::relocate(&from, &to)?;
 
@@ -167,7 +168,7 @@ pub enum Contents {
 #[ts(export)]
 pub struct DeleteReport {
     pub deleted: bool,
-    pub refused: Vec<String>,
+    pub refused: Vec<Stayed>,
 }
 
 /// Deletes a folder, trashing or moving what it holds first, under the same batch, as `contents`
@@ -201,7 +202,7 @@ pub fn delete(
         (Some(Contents::Trash), false) => {
             for item_id in held {
                 if let Err(err) = trash::trash_unjournalled(conn, item_id, Some(batch_id)) {
-                    report.refused.push(err.to_string());
+                    report.refused.push(stayed::file(conn, item_id, &err)?);
                 }
             }
         }
@@ -209,7 +210,7 @@ pub fn delete(
             let inbox = sorting_root(conn, source_id)?;
             for child in folders::live_children(conn, folder_id)? {
                 if let Err(err) = move_unjournalled(conn, child, inbox, Some(batch_id)) {
-                    report.refused.push(err.to_string());
+                    report.refused.push(stayed::folder(conn, child, &err)?);
                 }
             }
             for item_id in items::in_folder(conn, folder_id)?
@@ -218,7 +219,7 @@ pub fn delete(
             {
                 if let Err(err) = fs_items::move_unjournalled(conn, item_id, inbox, Some(batch_id))
                 {
-                    report.refused.push(err.to_string());
+                    report.refused.push(stayed::file(conn, item_id, &err)?);
                 }
             }
         }
@@ -229,11 +230,14 @@ pub fn delete(
 
     let dir = paths::folder_dir(conn, folder_id)?;
     let unseen = unseen_files(&dir)?;
-    if !unseen.is_empty() {
-        report.refused.push(format!(
-            "{title} still holds files Filmstrip does not show: {}",
-            unseen.join(", ")
-        ));
+    if let Some(first) = unseen.first() {
+        let holds = AppError::refused(Reason::Holds {
+            name: first.clone(),
+            more: unseen.len() as u32 - 1,
+        });
+        report
+            .refused
+            .push(stayed::folder(conn, folder_id, &holds)?);
         return Ok(report);
     }
     clear_litter(&dir)?;
@@ -267,14 +271,14 @@ pub(super) fn undelete(conn: &Connection, folder_id: i64, retired_at: i64) -> Re
     let parent = folders::parent(conn, folder_id)?
         .ok_or_else(|| AppError::invalid("a source's own folder is never deleted"))?;
     if !folders::is_live(conn, parent)? {
-        return Err(AppError::invalid(format!(
-            "the folder {title} was in is gone, so it cannot come back"
-        )));
+        return Err(AppError::refused(Reason::FolderGone {
+            name: folders::title(conn, parent)?.unwrap_or_default(),
+        }));
     }
     refuse_clash(conn, parent, &title, Some(folder_id))?;
     let top = paths::folder_dir(conn, folder_id)?;
     if top.exists() {
-        return Err(taken(&title));
+        return Err(taken(conn, parent, &title));
     }
     for id in &back {
         std::fs::create_dir_all(paths::folder_dir(conn, *id)?)?;
@@ -367,13 +371,20 @@ pub(super) fn unmake(conn: &Connection, folder_id: i64) -> Result<()> {
 
 fn refuse_clash(conn: &Connection, parent_id: i64, title: &str, own: Option<i64>) -> Result<()> {
     match folders::child_id(conn, parent_id, title)? {
-        Some(id) if Some(id) != own => Err(taken(title)),
+        Some(id) if Some(id) != own => Err(taken(conn, parent_id, title)),
         _ => Ok(()),
     }
 }
 
-fn taken(title: &str) -> AppError {
-    AppError::invalid(format!("a folder named {title} is already there"))
+fn taken(conn: &Connection, parent_id: i64, title: &str) -> AppError {
+    AppError::refused(Reason::NameTaken {
+        place: folders::title(conn, parent_id)
+            .ok()
+            .flatten()
+            .unwrap_or_default(),
+        name: title.to_string(),
+        folder: true,
+    })
 }
 
 fn in_transaction<T>(conn: &Connection, work: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
@@ -601,7 +612,7 @@ mod tests {
         assert!(!folders::is_live(&conn, night).unwrap());
 
         let back = crate::fs::undo::undo_batch(&conn, &batch).unwrap();
-        assert!(back.errors.is_empty(), "{:?}", back.errors);
+        assert!(back.stayed.is_empty(), "{:?}", back.stayed);
         assert!(root.join("Trips/Cairo/pyramid.jpg").is_file());
         assert!(root.join("Trips/Cairo/Night/stars.jpg").is_file());
         assert!(folders::is_live(&conn, night).unwrap());
@@ -647,7 +658,14 @@ mod tests {
         let contents = Some(Contents::MoveTo { source_id: inbox });
         let report = delete(&conn, cairo, contents, &journal::new_batch()).unwrap();
         assert!(!report.deleted);
-        assert!(report.refused[0].contains("Inbox already holds a file called pyramid.jpg"));
+        assert_eq!(
+            report.refused[0].reason,
+            Reason::NameTaken {
+                place: "Inbox".into(),
+                name: "pyramid.jpg".into(),
+                folder: false
+            }
+        );
         assert!(root.join("Trips/Cairo/pyramid.jpg").is_file());
         assert!(folders::is_live(&conn, cairo).unwrap());
     }
@@ -660,7 +678,14 @@ mod tests {
 
         let report = delete(&conn, made, None, &journal::new_batch()).unwrap();
         assert!(!report.deleted);
-        assert!(report.refused[0].contains(".notes"));
+        assert_eq!(report.refused[0].id, made);
+        assert_eq!(
+            report.refused[0].reason,
+            Reason::Holds {
+                name: ".notes".into(),
+                more: 0
+            }
+        );
         assert!(root.join("Trips/Lisbon/.notes").is_file());
         assert!(folders::is_live(&conn, made).unwrap());
     }

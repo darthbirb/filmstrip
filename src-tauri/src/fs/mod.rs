@@ -4,6 +4,7 @@ pub mod items;
 pub mod paths;
 pub mod relocate;
 pub mod sanitize;
+pub mod stayed;
 pub mod trash;
 pub mod undo;
 pub mod walk;

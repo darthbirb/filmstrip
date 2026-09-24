@@ -171,7 +171,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   folder_file_count: () => 0,
   delete_folder: () => ({ batchId: null, report: { deleted: false, refused: [] } }),
   undo_last: () => null,
-  undo_batch: () => ({ reversed: 0, errors: [] }),
+  undo_batch: () => ({ reversed: 0, stayed: [] }),
   folder_children: ({ folderId }) => FOLDERS[folderId as number] ?? [],
   folder_items: ({ folderId }) => ITEMS[folderId as number] ?? [],
   item_tags: () => [],

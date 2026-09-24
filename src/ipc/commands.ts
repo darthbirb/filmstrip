@@ -19,7 +19,10 @@ import type { UndoReport } from "./bindings/UndoReport";
 // DEVELOPMENT.md "The command boundary".
 
 /** What a failed command rejects with; `kind` mirrors `AppError::kind` in Rust. */
-export type AppError = { kind: "io" | "db" | "json" | "invalid" | "media"; message: string };
+export type AppError = {
+  kind: "io" | "db" | "json" | "invalid" | "media" | "refused";
+  message: string;
+};
 
 export const listSources = () => invoke<SourceSummary[]>("list_sources");
 
