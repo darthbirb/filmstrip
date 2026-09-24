@@ -13,6 +13,7 @@ pub const FOLDER_RENAME: &str = "folder_rename";
 pub const FOLDER_MOVE: &str = "folder_move";
 pub const ITEM_MOVE: &str = "item_move";
 pub const ITEM_TRASH: &str = "item_trash";
+pub const ITEM_RENAME: &str = "item_rename";
 pub const FOLDER_DELETE: &str = "folder_delete";
 
 /// A folder the app made. Its inverse is itself: undoing it removes that folder again.
@@ -48,6 +49,15 @@ pub struct ItemMoved {
     pub item_id: i64,
     pub from_folder_id: i64,
     pub to_folder_id: i64,
+}
+
+/// A file renamed on disk. The inverse swaps `from` and `to`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemRenamed {
+    pub item_id: i64,
+    pub from: String,
+    pub to: String,
 }
 
 /// An item sent to the trash. Its inverse is itself: undoing it brings the item back.
@@ -172,6 +182,26 @@ pub fn record_item_move(
         to_folder_id: from_folder_id,
     };
     record(conn, batch_id, ITEM_MOVE, &forward, &inverse)
+}
+
+pub fn record_item_rename(
+    conn: &Connection,
+    batch_id: &str,
+    item_id: i64,
+    from: &str,
+    to: &str,
+) -> Result<()> {
+    let forward = ItemRenamed {
+        item_id,
+        from: from.to_string(),
+        to: to.to_string(),
+    };
+    let inverse = ItemRenamed {
+        item_id,
+        from: to.to_string(),
+        to: from.to_string(),
+    };
+    record(conn, batch_id, ITEM_RENAME, &forward, &inverse)
 }
 
 pub fn record_item_trash(conn: &Connection, batch_id: &str, item_id: i64) -> Result<()> {

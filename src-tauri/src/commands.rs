@@ -238,6 +238,21 @@ pub async fn move_items(
     .await
 }
 
+/// A file renamed where it is; the batch that undoes it, or nothing when the name did not change.
+#[tauri::command]
+pub async fn rename_item(
+    state: State<'_, AppState>,
+    item_id: i64,
+    name: String,
+) -> Result<Option<Batch>> {
+    run(&state, move |conn| {
+        let batch_id = journal::new_batch();
+        let changed = fs_items::rename(conn, item_id, &name, &batch_id)?;
+        described(conn, changed, &batch_id)
+    })
+    .await
+}
+
 /// What sending files to the trash did, and the batch that undoes it when anything went.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(rename_all = "camelCase")]

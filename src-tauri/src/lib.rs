@@ -92,6 +92,7 @@ pub fn run() {
             commands::rename_folder,
             commands::move_folder,
             commands::move_items,
+            commands::rename_item,
             commands::trash_items,
             commands::folder_file_count,
             commands::delete_folder,

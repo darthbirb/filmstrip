@@ -8,7 +8,8 @@ use serde::de::DeserializeOwned;
 use ts_rs::TS;
 
 use crate::db::journal::{
-    self, Entry, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, ItemMoved, ItemTrashed,
+    self, Entry, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, ItemMoved, ItemRenamed,
+    ItemTrashed,
 };
 use crate::error::{AppError, Result};
 use crate::fs::acts::{self, Batch};
@@ -71,6 +72,7 @@ fn stayed_of(conn: &Connection, entry: &Entry, err: &AppError) -> Result<Stayed>
     match entry.op.as_str() {
         journal::ITEM_MOVE => stayed::file(conn, inverse::<ItemMoved>(entry)?.item_id, err),
         journal::ITEM_TRASH => stayed::file(conn, inverse::<ItemTrashed>(entry)?.item_id, err),
+        journal::ITEM_RENAME => stayed::file(conn, inverse::<ItemRenamed>(entry)?.item_id, err),
         journal::FOLDER_CREATE => {
             stayed::folder(conn, inverse::<FolderCreated>(entry)?.folder_id, err)
         }
@@ -102,6 +104,10 @@ fn reverse(conn: &Connection, entry: &Entry) -> Result<()> {
         journal::ITEM_MOVE => {
             let back: ItemMoved = inverse(entry)?;
             items::move_unjournalled(conn, back.item_id, back.to_folder_id, None).map(|_| ())
+        }
+        journal::ITEM_RENAME => {
+            let back: ItemRenamed = inverse(entry)?;
+            items::rename_unjournalled(conn, back.item_id, &back.to, None).map(|_| ())
         }
         journal::ITEM_TRASH => {
             let back: ItemTrashed = inverse(entry)?;

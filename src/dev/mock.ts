@@ -167,6 +167,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   rename_folder: () => null,
   move_folder: () => null,
   move_items: () => ({ batch: null, report: { moved: 0, refused: [] } }),
+  rename_item: () => null,
   trash_items: () => ({ batch: null, report: { trashed: 0, refused: [] } }),
   folder_file_count: () => 0,
   delete_folder: () => ({ batch: null, report: { deleted: false, refused: [] } }),

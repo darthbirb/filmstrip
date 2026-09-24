@@ -59,6 +59,9 @@ export const moveFolder = (folderId: number, parentId: number) =>
 export const moveItems = (itemIds: number[], folderId: number) =>
   invoke<ItemsMoved>("move_items", { itemIds, folderId });
 
+export const renameItem = (itemId: number, name: string) =>
+  invoke<Batch | null>("rename_item", { itemId, name });
+
 export const trashItems = (itemIds: number[]) => invoke<ItemsTrashed>("trash_items", { itemIds });
 
 export const folderFileCount = (folderId: number) =>

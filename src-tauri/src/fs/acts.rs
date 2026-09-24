@@ -9,7 +9,8 @@ use serde::de::DeserializeOwned;
 use ts_rs::TS;
 
 use crate::db::journal::{
-    self, Entry, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, ItemMoved, ItemTrashed,
+    self, Entry, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, ItemMoved, ItemRenamed,
+    ItemTrashed,
 };
 use crate::db::{folders, items};
 use crate::error::{AppError, Result};
@@ -48,6 +49,10 @@ pub enum Act {
         from: Option<String>,
         one: Option<String>,
     },
+    RenameFile {
+        from: String,
+        to: String,
+    },
     RenameFolder {
         from: String,
         to: String,
@@ -82,7 +87,7 @@ pub fn count(conn: &Connection, entries: &[Entry]) -> Result<(u32, u32)> {
     let (mut files, mut folders_held) = (0, 0);
     for entry in entries {
         match entry.op.as_str() {
-            journal::ITEM_MOVE | journal::ITEM_TRASH => files += 1,
+            journal::ITEM_MOVE | journal::ITEM_TRASH | journal::ITEM_RENAME => files += 1,
             journal::FOLDER_MOVE => {
                 let moved: FolderMoved = forward(entry)?;
                 files += items::live_under(conn, moved.folder_id)?.len() as u32;
@@ -118,6 +123,13 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
         return Ok(Act::CreateFolder {
             name: name(conn, made.folder_id)?,
             parent: name(conn, made.parent_id)?,
+        });
+    }
+    if let Some(entry) = of(journal::ITEM_RENAME).next() {
+        let renamed: ItemRenamed = forward(entry)?;
+        return Ok(Act::RenameFile {
+            from: renamed.from,
+            to: renamed.to,
         });
     }
     if let Some(entry) = of(journal::FOLDER_RENAME).next() {
