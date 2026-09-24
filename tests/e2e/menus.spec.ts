@@ -36,7 +36,7 @@ test("Shift+F10 on a focused tree row opens its menu under the row, and Escape g
   await page.keyboard.press("Shift+F10");
   const menu = page.getByRole("menu", { name: "Pictures" });
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole("menuitem", { name: "Show in Explorer" })).toBeFocused();
+  await expect(menu.getByRole("menuitem", { name: "New Folder" })).toBeFocused();
 
   const [under, opened] = [await row.boundingBox(), await menu.boundingBox()];
   const rem = await page.evaluate(() =>
