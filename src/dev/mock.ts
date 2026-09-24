@@ -124,7 +124,8 @@ const everyItem = () =>
 const allItems = () => Object.values(ITEMS).flat();
 
 /** What the trash holds: when each went, and the folder it left, named as it was then. */
-const trashed = new Map<number, { at: number; folders: Crumb[]; home: SourceSummary }>();
+type Trashing = { at: number; folders: Crumb[]; home: SourceSummary };
+const trashed = new Map<number, Trashing>();
 /** Now, in seconds, and one later than the last file sent, so the newest is always first. */
 let lastTrashed = 0;
 
@@ -199,7 +200,8 @@ type Step =
   | { op: "createFolder"; node: FolderNode; parent: number }
   | { op: "renameFolder"; node: FolderNode; from: string; to: string }
   | { op: "moveFolder"; node: FolderNode; from: number; to: number }
-  | { op: "deleteFolder"; node: FolderNode; parent: number };
+  | { op: "deleteFolder"; node: FolderNode; parent: number }
+  | { op: "restore"; item: ItemRow; left: number; to: number; went: Trashing };
 const journal: { batchId: string; steps: Step[] }[] = [];
 let nextBatch = 1;
 
@@ -233,6 +235,10 @@ function toTrash(item: ItemRow) {
   ITEMS[TRASH] = [...(ITEMS[TRASH] ?? []), item];
   recount();
 }
+
+/** A folder that is there: a source's own, or one under it. */
+const liveFolder = (id: number) =>
+  SOURCES.some((one) => one.rootFolderId === id) || parents().has(id);
 
 /** Takes an item out of the trash into a folder. */
 function fromTrash(item: ItemRow, to: number) {
@@ -313,6 +319,13 @@ function act(steps: Step[]): Act {
     return { kind: "deleteFolder", name: gone.node.title, parent: folderName(gone.parent), into };
   }
   const [first] = steps;
+  const restores = steps.filter((step) => step.op === "restore");
+  if (restores.length > 0) {
+    const homes = new Set(restores.map((step) => step.to));
+    const [home] = homes;
+    const one = steps.length === 1 && first?.op === "restore" ? first.item.diskName : null;
+    return { kind: "restore", to: homes.size === 1 ? folderName(home ?? 0) : null, one };
+  }
   if (first?.op === "createFolder")
     return { kind: "createFolder", name: first.node.title, parent: folderName(first.parent) };
   if (first?.op === "renameFolder") return { kind: "renameFolder", from: first.from, to: first.to };
@@ -370,6 +383,11 @@ function takeBack(at: number): UndoReport {
         break;
       case "deleteFolder":
         attach(step.node, step.parent);
+        break;
+      case "restore":
+        toTrash(step.item);
+        step.item.folderId = step.left;
+        trashed.set(step.item.id, step.went);
         break;
     }
   }
@@ -476,6 +494,28 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     }
     return { batch: record(steps), report: { trashed: steps.length, refused: [] } };
   },
+  restore_items: ({ itemIds, folderId }) => {
+    const steps: Step[] = [];
+    const refused: Stayed[] = [];
+    const wanted = itemIds as number[];
+    for (const item of (ITEMS[TRASH] ?? []).filter((one) => wanted.includes(one.id))) {
+      const went = trashed.get(item.id);
+      const to = (folderId as number | null) ?? item.folderId;
+      const at = { kind: "trash" as const };
+      const stayed = (reason: Reason) =>
+        refused.push({ kind: "file", id: item.id, name: item.diskName, at, reason });
+      if (!went || !liveFolder(to)) {
+        stayed({ kind: "folderGone", name: went?.folders.at(-1)?.title ?? "" });
+      } else if (taken(to, item.diskName, item)) {
+        const place = folderName(to);
+        stayed({ kind: "nameTaken", place, name: item.diskName, folder: false });
+      } else {
+        steps.push({ op: "restore", item, left: item.folderId, to, went });
+        fromTrash(item, to);
+      }
+    }
+    return { batch: record(steps), report: { restored: steps.length, refused } };
+  },
   folder_file_count: ({ folderId }) => under(folderId as number).length,
   // Everything under the folder goes where `contents` says, then the folder, as the Rust side does.
   delete_folder: ({ folderId, contents }) => {
@@ -548,12 +588,10 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     (ITEMS[TRASH] ?? [])
       .map((item) => {
         const gone = trashed.get(item.id);
-        const live = (id: number) =>
-          SOURCES.some((one) => one.rootFolderId === id) || parents().has(id);
         const from = {
           folderId: item.folderId,
           path: (gone?.folders ?? []).map((crumb) => crumb.title),
-          gone: !live(item.folderId),
+          gone: !liveFolder(item.folderId),
         };
         return { ...item, trashedAt: gone?.at ?? 0, from };
       })

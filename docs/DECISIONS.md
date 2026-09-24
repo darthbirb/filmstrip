@@ -514,6 +514,11 @@ it.
   name is taken there, its folder is gone, another app has it open). The interface words each
   reason itself; the sentence Rust gives it is for logs.
 - **A name held only by a file a walk found gone is freed** for the file arriving at it.
+- **Restore is an act of its own, not an undo.** It takes a file out of the trash into the folder
+  it left, or into one the person picks, under its own name; a name taken there is refused, never
+  changed. A folder that has gone is found again by its place, title by title from its source, so
+  making it again under the same name is how a refused restore resolves in place. Undoing a
+  restore sends the file back as it was: from the folder it had left, at the moment it first went.
 - **A trashed item gives up its name; a retired one keeps it.** `trashed_at` tells them apart. A
   file vanishing and coming back is the same file, so it keeps its tags. A file sent to the trash
   and then replaced under the same name is a different file: the newcomer is a new item, and the

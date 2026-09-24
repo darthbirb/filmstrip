@@ -11,6 +11,7 @@ import type { FolderNode } from "./bindings/FolderNode";
 import type { ItemDetail } from "./bindings/ItemDetail";
 import type { ItemRow } from "./bindings/ItemRow";
 import type { ItemsMoved } from "./bindings/ItemsMoved";
+import type { ItemsRestored } from "./bindings/ItemsRestored";
 import type { ItemsTrashed } from "./bindings/ItemsTrashed";
 import type { Progress } from "./bindings/Progress";
 import type { Reason } from "./bindings/Reason";
@@ -71,6 +72,9 @@ export const renameItem = (itemId: number, name: string) =>
   invoke<Batch | null>("rename_item", { itemId, name });
 
 export const trashItems = (itemIds: number[]) => invoke<ItemsTrashed>("trash_items", { itemIds });
+
+export const restoreItems = (itemIds: number[], folderId: number | null) =>
+  invoke<ItemsRestored>("restore_items", { itemIds, folderId });
 
 export const folderFileCount = (folderId: number) =>
   invoke<number>("folder_file_count", { folderId });

@@ -21,7 +21,7 @@ use crate::fs::acts::{self, Batch};
 use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
 use crate::fs::items::{self as fs_items, MoveReport};
 use crate::fs::paths;
-use crate::fs::trash::{self, TrashReport, TrashSummary, Trashed};
+use crate::fs::trash::{self, RestoreReport, TrashReport, TrashSummary, Trashed};
 use crate::fs::undo::{self, UndoReport};
 use crate::jobs::{self, JobQueue, Progress};
 
@@ -284,6 +284,33 @@ pub async fn trash_items(state: State<'_, AppState>, item_ids: Vec<i64>) -> Resu
         let report = trash::trash_items(conn, &item_ids, &batch_id)?;
         Ok(ItemsTrashed {
             batch: described(conn, report.trashed > 0, &batch_id)?,
+            report,
+        })
+    })
+    .await
+}
+
+/// What restoring files did, and the batch that undoes it when anything came back.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct ItemsRestored {
+    pub batch: Option<Batch>,
+    pub report: RestoreReport,
+}
+
+/// Files out of the trash: each into the folder it left, or all into `folder_id` when one is given.
+#[tauri::command]
+pub async fn restore_items(
+    state: State<'_, AppState>,
+    item_ids: Vec<i64>,
+    folder_id: Option<i64>,
+) -> Result<ItemsRestored> {
+    run(&state, move |conn| {
+        let batch_id = journal::new_batch();
+        let report = trash::restore_items(conn, &item_ids, folder_id, &batch_id)?;
+        Ok(ItemsRestored {
+            batch: described(conn, report.restored > 0, &batch_id)?,
             report,
         })
     })

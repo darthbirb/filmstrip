@@ -106,6 +106,7 @@ pub fn run() {
             commands::sorting_items,
             commands::trash_listing,
             commands::trash_summary,
+            commands::restore_items,
             commands::item_tags,
             commands::item_detail,
             commands::item_path,

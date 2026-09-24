@@ -31,6 +31,11 @@ export function actLine({ act, files: carried }: Batch, stayed = 0): string {
       return `Created ${act.name} in ${act.parent}.`;
     case "moveFolder":
       return `Moved ${act.name} to ${act.to}.`;
+    case "restore": {
+      const where = act.to ? ` to ${act.to}` : "";
+      if (stayed > 0) return `Restored ${formatCount(carried)} of ${files(whole)}${where}. ${rest}`;
+      return `Restored ${act.one ?? files(carried)}${where}.`;
+    }
     case "deleteFolder":
       if (carried === 0) return `Deleted ${act.name}.`;
       if (act.into)
@@ -56,6 +61,8 @@ export function undoneLine({ batch }: UndoReport): string {
       return `${act.to} is ${act.from} again.`;
     case "createFolder":
       return `${act.name} is gone from ${act.parent}.`;
+    case "restore":
+      return `${act.one ?? files(carried)} ${act.one ? "is" : are(carried)} back in the Trash.`;
     case "moveFolder":
       return `${act.name} is back in ${act.from}.`;
     case "deleteFolder":
@@ -82,6 +89,11 @@ export function undoBannerLine({ batch, filesBack, stayed }: UndoReport): string
       return `${act.to} could not be ${act.from} again`;
     case "createFolder":
       return `${act.name} is still in ${act.parent}`;
+    case "restore":
+      if (filesBack > 0) {
+        return `${formatCount(filesBack)} of ${files(carried)} ${are(filesBack)} back in the Trash`;
+      }
+      return `${act.one ?? `The ${files(carried)}`} could not go back to the Trash`;
     case "moveFolder":
       return `${act.name} could not go back to ${act.from}`;
     case "deleteFolder": {
@@ -102,6 +114,26 @@ export function movedBannerLine(moved: number, whole: number, to: string, one?: 
 export function deletedBannerLine(trashed: number, whole: number, one?: string) {
   if (trashed > 0) return `${formatCount(trashed)} of ${files(whole)} went to the Trash`;
   return `${one ?? `The ${files(whole)}`} could not go to the Trash`;
+}
+
+/**
+ * The banner's sentence for a restore that finished in part, or not at all. `to` is where they
+ * were going, when that was one place; `back` when it was where they came from.
+ */
+export function restoredBannerLine(
+  restored: number,
+  whole: number,
+  to: string | null,
+  back: boolean,
+  one?: string,
+) {
+  if (restored > 0) {
+    const where = to ? `${back ? "back in" : "in"} ${to}` : "back where they were";
+    return `${formatCount(restored)} of ${files(whole)} ${are(restored)} ${where}`;
+  }
+  const what = one ?? `The ${files(whole)}`;
+  if (!to) return `${what} could not go back`;
+  return `${what} could not go ${back ? "back " : ""}to ${to}`;
 }
 
 /** The question a folder with files in it asks before it is deleted. */

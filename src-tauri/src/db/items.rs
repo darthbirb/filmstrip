@@ -254,6 +254,27 @@ pub fn send_to_trash(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
+/// When an item went to the trash, for one that is there.
+pub fn trashed_at(conn: &Connection, id: i64) -> Result<Option<i64>> {
+    Ok(conn
+        .query_row(
+            "SELECT trashed_at FROM item WHERE id = ?1",
+            params![id],
+            |r| r.get(0),
+        )
+        .optional()?
+        .flatten())
+}
+
+/// Puts back the moment an item went to the trash, as undoing its restore does.
+pub fn set_trashed_at(conn: &Connection, id: i64, at: i64) -> Result<()> {
+    conn.execute(
+        "UPDATE item SET deleted_at = ?1, trashed_at = ?1 WHERE id = ?2 AND trashed_at IS NOT NULL",
+        params![at, id],
+    )?;
+    Ok(())
+}
+
 /// Records an item as back from the trash, in the folder it left.
 pub fn take_from_trash(conn: &Connection, id: i64) -> Result<()> {
     conn.execute(

@@ -12,6 +12,7 @@ import {
   movedBannerLine,
   reasonText,
   refusedName,
+  restoredBannerLine,
   stayedGroups,
   undoBannerLine,
   undoneLine,
@@ -160,4 +161,20 @@ test("a folder's delete asks, and says what went when the folder stayed, as the 
     "211 of Lisbon’s 214 files are in the Trash · Lisbon stayed",
   );
   expect(folderStayedBanner("Egypt", 0, 0, null)).toBe("Egypt could not go");
+});
+
+test("Restore's line, its undo, and its refusal read as Artboards › Trash words them", () => {
+  const one: Act = { kind: "restore", to: "Cairo", one: "IMG_0031.jpg" };
+  expect(actLine(batch(one, 1))).toBe("Restored IMG_0031.jpg to Cairo.");
+  expect(undoneLine(undone(one, 1))).toBe("IMG_0031.jpg is back in the Trash.");
+  const scattered: Act = { kind: "restore", to: null, one: null };
+  expect(actLine(batch(scattered, 2), 2)).toBe(
+    "Restored 2 of 4 files. The other 2 are in the banner.",
+  );
+  expect(restoredBannerLine(0, 1, "Egypt", true, "IMG_0052.jpg")).toBe(
+    "IMG_0052.jpg could not go back to Egypt",
+  );
+  expect(restoredBannerLine(2, 4, null, true)).toBe("2 of 4 files are back where they were");
+  expect(restoredBannerLine(2, 4, "Cairo", true)).toBe("2 of 4 files are back in Cairo");
+  expect(restoredBannerLine(0, 1, "People", false, "a.jpg")).toBe("a.jpg could not go to People");
 });

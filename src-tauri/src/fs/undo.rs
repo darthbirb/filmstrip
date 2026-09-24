@@ -9,7 +9,7 @@ use ts_rs::TS;
 
 use crate::db::journal::{
     self, Entry, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, ItemMoved, ItemRenamed,
-    ItemTrashed,
+    ItemRestored, ItemTrashed,
 };
 use crate::error::{AppError, Result};
 use crate::fs::acts::{self, Batch};
@@ -73,6 +73,7 @@ fn stayed_of(conn: &Connection, entry: &Entry, err: &AppError) -> Result<Stayed>
         journal::ITEM_MOVE => stayed::file(conn, inverse::<ItemMoved>(entry)?.item_id, err),
         journal::ITEM_TRASH => stayed::file(conn, inverse::<ItemTrashed>(entry)?.item_id, err),
         journal::ITEM_RENAME => stayed::file(conn, inverse::<ItemRenamed>(entry)?.item_id, err),
+        journal::ITEM_RESTORE => stayed::file(conn, inverse::<ItemRestored>(entry)?.item_id, err),
         journal::FOLDER_CREATE => {
             stayed::folder(conn, inverse::<FolderCreated>(entry)?.folder_id, err)
         }
@@ -111,8 +112,9 @@ fn reverse(conn: &Connection, entry: &Entry) -> Result<()> {
         }
         journal::ITEM_TRASH => {
             let back: ItemTrashed = inverse(entry)?;
-            trash::restore_unjournalled(conn, back.item_id)
+            trash::restore_unjournalled(conn, back.item_id, None, None)
         }
+        journal::ITEM_RESTORE => trash::unrestore(conn, &inverse(entry)?),
         journal::FOLDER_DELETE => {
             let back: FolderDeleted = inverse(entry)?;
             folders::undelete(conn, back.folder_id, back.retired_at)

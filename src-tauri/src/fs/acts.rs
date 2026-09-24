@@ -10,7 +10,7 @@ use ts_rs::TS;
 
 use crate::db::journal::{
     self, Entry, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, ItemMoved, ItemRenamed,
-    ItemTrashed,
+    ItemRestored, ItemTrashed,
 };
 use crate::db::{folders, items};
 use crate::error::{AppError, Result};
@@ -61,6 +61,11 @@ pub enum Act {
         name: String,
         parent: String,
     },
+    /// Files taken out of the trash; `to` is `None` when they went to more than one folder.
+    Restore {
+        to: Option<String>,
+        one: Option<String>,
+    },
     /// A folder deleted; `into` names the sorting source its contents went to, and is `None`
     /// when they went to the trash with it or it held nothing.
     DeleteFolder {
@@ -87,7 +92,10 @@ pub fn count(conn: &Connection, entries: &[Entry]) -> Result<(u32, u32)> {
     let (mut files, mut folders_held) = (0, 0);
     for entry in entries {
         match entry.op.as_str() {
-            journal::ITEM_MOVE | journal::ITEM_TRASH | journal::ITEM_RENAME => files += 1,
+            journal::ITEM_MOVE
+            | journal::ITEM_TRASH
+            | journal::ITEM_RENAME
+            | journal::ITEM_RESTORE => files += 1,
             journal::FOLDER_MOVE => {
                 let moved: FolderMoved = forward(entry)?;
                 files += items::live_under(conn, moved.folder_id)?.len() as u32;
@@ -137,6 +145,17 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
         return Ok(Act::RenameFolder {
             from: renamed.from,
             to: renamed.to,
+        });
+    }
+    let restored: Vec<ItemRestored> = of(journal::ITEM_RESTORE)
+        .map(forward)
+        .collect::<Result<_>>()?;
+    if !restored.is_empty() {
+        let homes = restored.iter().map(|one| one.to_folder_id).collect();
+        let ids: Vec<i64> = restored.iter().map(|one| one.item_id).collect();
+        return Ok(Act::Restore {
+            to: only(conn, homes)?,
+            one: one_name(conn, &ids)?,
         });
     }
     let trashed: Vec<ItemTrashed> = of(journal::ITEM_TRASH)

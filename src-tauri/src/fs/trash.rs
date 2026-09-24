@@ -7,6 +7,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::db::items::ItemRow;
+use crate::db::journal::ItemRestored;
 use crate::db::{folders, items, journal, tags};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::stayed::{self, Stayed};
@@ -129,47 +130,130 @@ pub(super) fn trash_unjournalled(
     recorded
 }
 
-/// Takes an item back out of the trash into the folder it left, under its own name.
-pub(super) fn restore_unjournalled(conn: &Connection, item_id: i64) -> Result<()> {
+/// What restoring several items did: how many came back, and each one that did not, with why.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct RestoreReport {
+    pub restored: u32,
+    pub refused: Vec<Stayed>,
+}
+
+/// Takes each item out of the trash under one batch: into the folder it left, or into `to`.
+pub fn restore_items(
+    conn: &Connection,
+    item_ids: &[i64],
+    to: Option<i64>,
+    batch_id: &str,
+) -> Result<RestoreReport> {
+    let _turn = super::turn();
+    let mut report = RestoreReport::default();
+    for &item_id in item_ids {
+        match restore_unjournalled(conn, item_id, to, Some(batch_id)) {
+            Ok(()) => report.restored += 1,
+            Err(err) => report.refused.push(stayed::file(conn, item_id, &err)?),
+        }
+    }
+    Ok(report)
+}
+
+/// Takes an item back out of the trash under its own name: into `to`, or into the folder it left,
+/// or a live one at that folder's place once it has gone. A name taken there is never changed.
+pub(super) fn restore_unjournalled(
+    conn: &Connection,
+    item_id: i64,
+    to: Option<i64>,
+    batch_id: Option<&str>,
+) -> Result<()> {
     if !items::is_trashed(conn, item_id)? {
         return Err(AppError::invalid("that file is not in the trash"));
     }
     let file = items::file_of(conn, item_id)?
         .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
-    let place = folders::title(conn, file.folder_id)?.unwrap_or_default();
-    if !folders::is_live(conn, file.folder_id)? {
-        return Err(AppError::refused(Reason::FolderGone { name: place }));
-    }
+    let home = match to {
+        Some(folder) if folders::is_live(conn, folder)? => folder,
+        Some(_) => return Err(AppError::invalid("that folder is no longer in the index")),
+        None => folders::live_at(conn, file.folder_id)?.ok_or_else(|| {
+            AppError::refused(Reason::FolderGone {
+                name: folders::title(conn, file.folder_id)
+                    .ok()
+                    .flatten()
+                    .unwrap_or_default(),
+            })
+        })?,
+    };
     let taken = || {
         AppError::refused(Reason::NameTaken {
-            place: place.clone(),
+            place: place_name(conn, home),
             name: file.disk_name.clone(),
             folder: false,
         })
     };
-    let held = items::existing_by_disk_name(conn, file.folder_id, &file.disk_name)?;
+    let held = items::existing_by_disk_name(conn, home, &file.disk_name)?;
     if held.as_ref().is_some_and(|row| !row.deleted) {
         return Err(taken());
     }
     let from = paths::trash_path(&file.uuid, &file.disk_name)?;
-    let to = paths::item_path(conn, file.folder_id, &file.disk_name)?;
-    if to.exists() {
+    let dest = paths::item_path(conn, home, &file.disk_name)?;
+    if dest.exists() {
         return Err(taken());
     }
-    relocate::relocate(&from, &to)?;
+    let trashed_at = items::trashed_at(conn, item_id)?.unwrap_or_default();
+    relocate::relocate(&from, &dest)?;
 
     let recorded = in_transaction(conn, |tx| {
         // A retired row holding the name describes a file that is gone; the returning one takes it.
         if let Some(stale) = &held {
             items::forget_retired(tx, stale.id)?;
         }
+        if home != file.folder_id {
+            items::set_folder(tx, item_id, home, &file.disk_name)?;
+        }
         items::take_from_trash(tx, item_id)?;
-        tags::rebuild_item(tx, item_id)
+        tags::rebuild_item(tx, item_id)?;
+        if let Some(batch_id) = batch_id {
+            let restored = ItemRestored {
+                item_id,
+                left_folder_id: file.folder_id,
+                to_folder_id: home,
+                trashed_at,
+            };
+            journal::record_item_restore(tx, batch_id, &restored)?;
+        }
+        Ok(())
     });
     if recorded.is_err() {
-        let _ = relocate::relocate(&to, &from);
+        let _ = relocate::relocate(&dest, &from);
     }
     recorded
+}
+
+/// Undoes a restore: the file goes back to the trash, from the folder it had left and at the
+/// moment it first went, so the Trash shows it as it was.
+pub(super) fn unrestore(conn: &Connection, restored: &ItemRestored) -> Result<()> {
+    trash_unjournalled(conn, restored.item_id, None)?;
+    in_transaction(conn, |tx| {
+        if restored.left_folder_id != restored.to_folder_id {
+            let file = items::file_of(tx, restored.item_id)?
+                .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
+            items::set_folder(
+                tx,
+                restored.item_id,
+                restored.left_folder_id,
+                &file.disk_name,
+            )?;
+        }
+        items::set_trashed_at(tx, restored.item_id, restored.trashed_at)
+    })
+}
+
+/// A folder as navigation names it: a source's own folder goes by the source's title.
+fn place_name(conn: &Connection, folder_id: i64) -> String {
+    folders::ancestry(conn, folder_id)
+        .ok()
+        .and_then(|mut crumbs| crumbs.pop())
+        .map(|crumb| crumb.title)
+        .unwrap_or_default()
 }
 
 fn in_transaction<T>(conn: &Connection, work: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
@@ -319,6 +403,81 @@ mod tests {
         assert_eq!(Path::new(&detail.path), trash_file(&conn, pyramid));
         let path = crate::commands::last_path(&conn, pyramid).unwrap().unwrap();
         assert_eq!(Path::new(&path), trash_file(&conn, pyramid));
+    }
+
+    #[test]
+    fn restore_puts_a_file_back_where_it_was_and_its_undo_returns_it_to_the_trash_as_it_was() {
+        let (conn, root, cairo) = library("restore");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+        let went = items::trashed_at(&conn, pyramid).unwrap();
+
+        let batch = journal::new_batch();
+        let report = restore_items(&conn, &[pyramid], None, &batch).unwrap();
+        assert_eq!(report.restored, 1);
+        assert!(root.join("Trips/Cairo/pyramid.jpg").is_file());
+        assert!(items::is_live(&conn, pyramid).unwrap());
+        assert_eq!(
+            crate::fs::acts::describe(&conn, &batch).unwrap().act,
+            crate::fs::acts::Act::Restore {
+                to: Some("Cairo".into()),
+                one: Some("pyramid.jpg".into())
+            }
+        );
+
+        let back = undo::undo_batch(&conn, &batch).unwrap();
+        assert!(back.stayed.is_empty(), "{:?}", back.stayed);
+        assert!(trash_file(&conn, pyramid).is_file());
+        assert_eq!(items::trashed_at(&conn, pyramid).unwrap(), went);
+    }
+
+    #[test]
+    fn restore_to_another_folder_leaves_the_trash_remembering_where_the_file_came_from() {
+        let (conn, root, cairo) = library("restore-to");
+        std::fs::create_dir_all(root.join("People")).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let top = folders::source_root_folder(&conn, 1).unwrap();
+        let people = folders::child_id(&conn, top, "People").unwrap().unwrap();
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+
+        let batch = journal::new_batch();
+        restore_items(&conn, &[pyramid], Some(people), &batch).unwrap();
+        assert!(root.join("People/pyramid.jpg").is_file());
+        assert_eq!(items::folder_of(&conn, pyramid).unwrap(), Some(people));
+
+        undo::undo_batch(&conn, &batch).unwrap();
+        assert!(!root.join("People/pyramid.jpg").exists());
+        assert_eq!(
+            listing(&conn).unwrap()[0].from.path,
+            ["Library", "Trips", "Cairo"]
+        );
+    }
+
+    #[test]
+    fn a_file_whose_folder_has_gone_stays_until_a_folder_stands_in_its_place_again() {
+        let (conn, root, cairo) = library("restore-gone");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        trash_items(&conn, &[pyramid, sphinx], &journal::new_batch()).unwrap();
+        std::fs::remove_dir_all(root.join("Trips/Cairo")).unwrap();
+        walk::reconcile(&conn).unwrap();
+
+        let report = restore_items(&conn, &[pyramid], None, &journal::new_batch()).unwrap();
+        assert_eq!(report.restored, 0);
+        assert_eq!(
+            report.refused[0].reason,
+            Reason::FolderGone {
+                name: "Cairo".into()
+            }
+        );
+        assert_eq!(report.refused[0].at, stayed::Whereabouts::Trash);
+
+        std::fs::create_dir_all(root.join("Trips/Cairo")).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let report = restore_items(&conn, &[pyramid], None, &journal::new_batch()).unwrap();
+        assert_eq!(report.restored, 1, "{:?}", report.refused);
+        assert!(root.join("Trips/Cairo/pyramid.jpg").is_file());
     }
 
     #[test]
