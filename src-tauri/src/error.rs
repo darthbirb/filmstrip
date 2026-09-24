@@ -5,7 +5,8 @@ use ts_rs::TS;
 
 pub type Result<T> = std::result::Result<T, AppError>;
 
-/// Serialises as `{ kind, message }`, so the frontend branches on `kind`.
+/// Serialises as `{ kind, message }`, so the frontend branches on `kind`; a refusal adds its
+/// `reason`, which the interface words itself.
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
     #[error("{0}")]
@@ -132,9 +133,16 @@ impl AppError {
 impl serde::Serialize for AppError {
     fn serialize<S: serde::Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
         use serde::ser::SerializeStruct;
-        let mut st = s.serialize_struct("AppError", 2)?;
+        let reason = match self {
+            AppError::Refused(reason) => Some(reason),
+            _ => None,
+        };
+        let mut st = s.serialize_struct("AppError", 2 + usize::from(reason.is_some()))?;
         st.serialize_field("kind", self.kind())?;
         st.serialize_field("message", &self.to_string())?;
+        if let Some(reason) = reason {
+            st.serialize_field("reason", reason)?;
+        }
         st.end()
     }
 }
@@ -148,5 +156,30 @@ impl From<image::ImageError> for AppError {
 impl From<tauri::Error> for AppError {
     fn from(e: tauri::Error) -> Self {
         AppError::Invalid(e.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn a_refusal_carries_its_reason_so_the_interface_can_word_it() {
+        let taken = AppError::refused(Reason::NameTaken {
+            place: "Trips".into(),
+            name: "Cairo".into(),
+            folder: true,
+        });
+        assert_eq!(
+            serde_json::to_value(&taken).unwrap(),
+            json!({
+                "kind": "refused",
+                "message": "Trips already has a folder named Cairo",
+                "reason": { "kind": "nameTaken", "place": "Trips", "name": "Cairo", "folder": true }
+            })
+        );
+        let other = serde_json::to_value(AppError::invalid("no")).unwrap();
+        assert_eq!(other, json!({ "kind": "invalid", "message": "no" }));
     }
 }

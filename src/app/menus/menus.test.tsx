@@ -2,6 +2,7 @@ import { beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
+import { recording } from "../../dev/recording";
 import type { FolderNode } from "../../ipc/bindings/FolderNode";
 import { folderItems } from "../../ipc/commands";
 import { Grid } from "../grid/Grid";
@@ -27,29 +28,6 @@ const CAIRO: Place = {
     { id: 6, title: "Cairo" },
   ],
 };
-
-type Internals = { invoke: (cmd: string, args?: unknown, options?: unknown) => Promise<unknown> };
-const internals = () =>
-  (window as unknown as { __TAURI_INTERNALS__: Internals }).__TAURI_INTERNALS__;
-
-/** Every command the app sends while `work` runs, answered as the dev mock answers it. */
-async function recording(
-  work: (calls: [string, unknown][]) => Promise<void>,
-  answer?: (cmd: string, args: unknown) => unknown,
-) {
-  const real = internals().invoke;
-  const calls: [string, unknown][] = [];
-  internals().invoke = (cmd, args, options) => {
-    calls.push([cmd, args]);
-    const answered = answer?.(cmd, args);
-    return answered === undefined ? real(cmd, args, options) : Promise.resolve(answered);
-  };
-  try {
-    await work(calls);
-  } finally {
-    internals().invoke = real;
-  }
-}
 
 function SettingsFromStore() {
   const request = useSettingsRequest();

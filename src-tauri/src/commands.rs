@@ -140,6 +140,20 @@ pub async fn reveal_folder(
         .map_err(AppError::invalid)
 }
 
+/// The file that kept a folder from being deleted, selected in Explorer; the folder itself when
+/// nothing keeps it any more.
+#[tauri::command]
+pub async fn reveal_held(app: AppHandle, state: State<'_, AppState>, folder_id: i64) -> Result<()> {
+    let path = run(&state, move |conn| {
+        let dir = folder_to_reveal(conn, folder_id)?;
+        Ok(fs_folders::first_unseen(&dir)?.unwrap_or(dir))
+    })
+    .await?;
+    app.opener()
+        .reveal_item_in_dir(path)
+        .map_err(AppError::invalid)
+}
+
 /// Where a folder is on disk; a folder the index has retired has nowhere to show.
 pub fn folder_to_reveal(conn: &Connection, folder_id: i64) -> Result<PathBuf> {
     if !folders::is_live(conn, folder_id)? {

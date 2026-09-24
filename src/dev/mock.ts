@@ -246,6 +246,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   reveal_source: () => null,
   remove_source: () => null,
   reveal_folder: () => null,
+  reveal_held: () => null,
   read_folder_again: () => null,
   create_folder: () =>
     Promise.reject<AppError>({ kind: "invalid", message: "Making a folder needs the real app." }),
