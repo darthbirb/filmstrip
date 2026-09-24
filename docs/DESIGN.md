@@ -536,7 +536,8 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   becomes a `chip`-tall field on `well` at the `nested` corner with a `line-strong` hairline, the
   whole name selected in `plate` with `on-plate` ink; the row keeps everything else. A folder's
   name that is taken turns the hairline `line-danger`, and where it is taken comes down under the
-  row as a push-down, in `small` `fg-dim`, lined up with the name.
+  row as a push-down, in `small` `fg-dim`, lined up with the name. New Folder's row is the same
+  field, arriving in its place among the folders it joins.
 - **Count pill.** A row's own item count, `badge` tall at the `badge` corner, on `raised` with a
   `line-control` ring; on a selected row it sinks to `on-plate-wash` with `on-plate` ink. A place
   with no items of its own carries no pill, and an offline source shows its word instead.

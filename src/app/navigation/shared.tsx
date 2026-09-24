@@ -58,26 +58,46 @@ export function sourceRow(source: SourceSummary, row: Partial<TreeRow> = {}): Tr
   };
 }
 
+/** A folder New Folder is about to make: a row in its place, not yet on disk. */
+export type Draft = { parent: number; title: string };
+
+export const DRAFT_ID = "draft";
+
 type Walk = {
   children: ReadonlyMap<number, FolderNode[]>;
   expanded: ReadonlySet<number>;
   sourceId: number;
   rows: TreeRow[];
   places: Map<string, Place>;
+  draft?: Draft | null;
 };
 
 /** A folder's subtree as rows, down through whichever folders are open. */
 export function addFolderRows(walk: Walk, parent: Crumb[], level: number) {
   const parentId = parent.at(-1)?.id;
   if (parentId === undefined) return;
-  for (const node of walk.children.get(parentId) ?? []) {
+  const nodes: (FolderNode | Draft)[] = [...(walk.children.get(parentId) ?? [])];
+  // The draft lands where its name puts it, as the folder will once it is made.
+  if (walk.draft?.parent === parentId) nodes.push(walk.draft);
+  nodes.sort((a, b) => a.title.localeCompare(b.title, undefined, { sensitivity: "base" }));
+  for (const node of nodes) {
+    if (!("id" in node)) {
+      walk.rows.push({
+        id: DRAFT_ID,
+        label: node.title,
+        level,
+        expandable: false,
+        glyph: "folder",
+      });
+      continue;
+    }
     const path = [...parent, { id: node.id, title: node.title }];
     const id = folderRowId(node.id);
     walk.rows.push({
       id,
       label: node.title,
       level,
-      expandable: node.childCount > 0,
+      expandable: node.childCount > 0 || walk.draft?.parent === node.id,
       expanded: walk.expanded.has(node.id),
       glyph: "folder",
       // Its own items, not the ones below it: the grid's header says both when both are wanted.
@@ -85,6 +105,15 @@ export function addFolderRows(walk: Walk, parent: Crumb[], level: number) {
     });
     walk.places.set(id, { kind: "folder", sourceId: walk.sourceId, path });
     if (walk.expanded.has(node.id)) addFolderRows(walk, path, level + 1);
+  }
+}
+
+/** The name a new folder starts with: the first of Windows' own that is free there. */
+export function freshTitle(siblings: readonly FolderNode[]) {
+  const held = new Set(siblings.map((one) => one.title.toLowerCase()));
+  for (let n = 1; ; n++) {
+    const title = n === 1 ? "New folder" : `New folder (${n})`;
+    if (!held.has(title.toLowerCase())) return title;
   }
 }
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import {
+  createFolder,
   readFolderAgain,
   renameFolder,
   renameSource,
@@ -17,9 +18,12 @@ import { refusedName } from "../undo/lines";
 import { afterAct } from "../undo/undo";
 import { addFolder } from "./add-source";
 import { ensureChildren, loadIndex, useIndex } from "./index-store";
-import { setOpenFolders, useOpenFolders } from "./open-folders";
+import { openFolders, setOpenFolders, useOpenFolders } from "./open-folders";
 import {
   addFolderRows,
+  DRAFT_ID,
+  type Draft,
+  freshTitle,
   libraries,
   NoSources,
   rowFolder,
@@ -39,6 +43,7 @@ export function Navigation() {
   const expanded = useOpenFolders();
   const [renaming, setRenaming] = useState<string | null>(null);
   const [taken, setTaken] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
 
   useEffect(() => {
     ensureChildren([...expanded]);
@@ -55,7 +60,7 @@ export function Navigation() {
   libraries(sources).forEach((source, index) => {
     const root = source.rootFolderId;
     const row = sourceRow(source, {
-      expandable: (children.get(root)?.length ?? 0) > 0,
+      expandable: (children.get(root)?.length ?? 0) > 0 || draft?.parent === root,
       expanded: expanded.has(root),
       separated: index === 0,
     });
@@ -63,7 +68,8 @@ export function Navigation() {
     const at = sourcePlace(source);
     places.set(row.id, at);
     if (expanded.has(root) && at.kind === "folder") {
-      addFolderRows({ children, expanded, sourceId: source.id, rows, places }, at.path, 2);
+      const walk = { children, expanded, sourceId: source.id, rows, places, draft };
+      addFolderRows(walk, at.path, 2);
     }
   });
 
@@ -88,19 +94,49 @@ export function Navigation() {
     if (!source || folder === undefined) return { groups: [] };
     const rename = () => {
       setTaken(null);
+      setDraft(null);
       setRenaming(id);
     };
+    // The parent opens if it was shut, and the row arrives already in its field.
+    const newFolder: MenuAction = {
+      id: "new-folder",
+      label: "New Folder",
+      glyph: "newFolder",
+      onSelect: () => {
+        setTaken(null);
+        setDraft({ parent: folder, title: freshTitle(children.get(folder) ?? []) });
+        setRenaming(DRAFT_ID);
+        openFolders([folder]);
+      },
+    };
     if (folder === source.rootFolderId) {
-      return { heading: "Source", groups: sourceMenu(source, rename) };
+      return { heading: "Source", groups: sourceMenu(source, rename, newFolder) };
     }
     // Nothing on it can act on a folder whose drive is away, and an empty menu opens nothing.
     if (!source.reachable) return { groups: [] };
-    return { groups: [[], [revealFolderRow(folder), renameRow(rename), readAgainRow(folder)]] };
+    return {
+      groups: [[newFolder], [revealFolderRow(folder), renameRow(rename), readAgainRow(folder)]],
+    };
   };
 
   const stopRenaming = () => {
     setRenaming(null);
     setTaken(null);
+    setDraft(null);
+  };
+
+  // Nothing is on disk until the name is given; a name already there is said under the row.
+  const make = async (made: Draft, name: string) => {
+    try {
+      const { batch } = await createFolder(made.parent, name);
+      afterAct(batch);
+      await libraryChanged();
+      stopRenaming();
+    } catch (error) {
+      const refused = refusedName(error);
+      if (refused) setTaken(refused);
+      else stopRenaming();
+    }
   };
   // A source's name is the app's own label; a folder's is its directory's, so it can be taken.
   const rename = async (id: string, name: string) => {
@@ -141,7 +177,8 @@ export function Navigation() {
         renaming
           ? {
               id: renaming,
-              onCommit: (name) => void rename(renaming, name),
+              onCommit: (name) => void (draft ? make(draft, name) : rename(renaming, name)),
+              fresh: draft !== null,
               onCancel: stopRenaming,
               taken,
               onEdit: () => setTaken(null),
@@ -157,7 +194,7 @@ export function Navigation() {
  * source has, which point at the Sources section rather than holding anything of their own.
  * DECISIONS.md "Right-click menus".
  */
-function sourceMenu(source: SourceSummary, rename: () => void): MenuGroups {
+function sourceMenu(source: SourceSummary, rename: () => void, newFolder: MenuAction): MenuGroups {
   const folder = source.rootFolderId;
   const reveal: MenuAction = {
     id: "reveal",
@@ -166,8 +203,9 @@ function sourceMenu(source: SourceSummary, rename: () => void): MenuGroups {
     onSelect: () => void revealSource(source.id).catch(() => undefined),
   };
   const naming = renameRow(rename);
+  // New Folder is on it because a source's row is the only row that stands for its top level.
   return [
-    [],
+    source.reachable ? [newFolder] : [],
     source.reachable ? [reveal, naming, readAgainRow(folder)] : [naming],
     [
       {

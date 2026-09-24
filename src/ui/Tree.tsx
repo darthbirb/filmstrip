@@ -45,6 +45,8 @@ export type Renaming = {
   /** Why the name typed cannot be used, said under the row until the name is edited. */
   taken?: string | null;
   onEdit?: () => void;
+  /** A row not made yet, whose name as it stands is one to make rather than one to keep. */
+  fresh?: boolean;
 };
 
 /** An ARIA tree: one tab stop, arrows to move, Right and Left to open and close, Enter to go. */
@@ -307,7 +309,7 @@ function NameField({
     if (settled.current || taken) return;
     settled.current = true;
     const typed = field.current?.value.trim() ?? "";
-    if (typed && typed !== name) renaming.onCommit(typed);
+    if (typed && (renaming.fresh || typed !== name)) renaming.onCommit(typed);
     else renaming.onCancel();
   };
   const cancel = () => {
@@ -318,7 +320,7 @@ function NameField({
   return (
     <input
       ref={field}
-      aria-label={`Rename ${name}`}
+      aria-label={renaming.fresh ? "Folder Name" : `Rename ${name}`}
       aria-invalid={taken !== null}
       aria-describedby={taken ? `${id}-taken` : undefined}
       defaultValue={name}

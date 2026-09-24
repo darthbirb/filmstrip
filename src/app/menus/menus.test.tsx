@@ -192,11 +192,12 @@ test("Favourite from a tile's menu shows on the pane's bar at once", async () =>
   expect(labels(again)[1]).toBe("Remove Favourite");
 });
 
-test("a folder's row reveals, renames and reads again; a source's adds the Sources section", async () => {
+test("a folder's row makes, reveals, renames and reads again; a source's adds the Sources section", async () => {
   const screen = await render(<Harness />);
   const source = screen.getByRole("treeitem", { name: "Pictures" });
   const sourceMenu = await menuOn(screen, source, "Pictures");
   expect(labels(sourceMenu)).toEqual([
+    "New Folder",
     "Show in Explorer",
     "Rename",
     "Refresh",
@@ -213,8 +214,8 @@ test("a folder's row reveals, renames and reads again; a source's adds the Sourc
   await userEvent.keyboard("{ArrowRight}");
   const trips = screen.getByRole("treeitem", { name: "Trips 2" });
   const folderMenu = await menuOn(screen, trips, "Trips");
-  expect(labels(folderMenu)).toEqual(["Show in Explorer", "Rename", "Refresh"]);
-  expect(folderMenu.element().querySelectorAll("hr")).toHaveLength(0);
+  expect(labels(folderMenu)).toEqual(["New Folder", "Show in Explorer", "Rename", "Refresh"]);
+  expect(folderMenu.element().querySelectorAll("hr")).toHaveLength(1);
   expect(folderMenu.element().querySelector("p")).toBeNull();
 });
 

@@ -421,8 +421,8 @@ menu was already off everywhere but in a field, so until these a right-click, th
 Shift+F10 did nothing at all.
 
 - **A verb that does not exist yet is absent, never greyed.** A greyed row describes a feature at
-  the moment it refuses it. New Folder, Move to… and Delete for a folder wait on their slice; the
-  menu for a selection waits on selecting. A rule only stands between two groups that both hold
+  the moment it refuses it. Move to… and Delete for a folder wait on their slice; the menu for a
+  selection waits on selecting. A rule only stands between two groups that both hold
   rows, so an absent verb leaves no stray line, and a menu with nothing in it opens nothing.
 - **What a drive that is away cannot do is absent too.** An offline source keeps Rename, Manage
   Sources and Remove Source, which touch only the index; its folders have nothing left.
@@ -445,6 +445,11 @@ Shift+F10 did nothing at all.
 - **A folder is renamed on its row too, and that one is on disk.** A name already there is said
   under the row, and Enter waits until it is edited; leaving the field then keeps the name it
   had, since what was typed cannot be used. The rename is an act like any other, with its line.
+- **New Folder is a row before it is a folder.** It lands inside the folder, opened if it was
+  shut, in its place in the order and already in the rename field, under the first of Windows' own
+  names free there. Nothing is on disk until the name is given, by Enter or by leaving the field as
+  a rename is; Escape or an empty name leaves nothing. A source's row has it too, since that row is
+  the only one that stands for a source's top level.
 - **Refresh walks one folder's subtree**, as the launch walk walks a source, judging nothing
   outside it. **Only one walk runs at a time:** each retires what it did not see, so a folder walk
   beside the whole walk would have the whole walk retire what the folder walk had just found.
