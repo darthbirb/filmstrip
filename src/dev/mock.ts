@@ -2,6 +2,7 @@ import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import type { Act } from "../ipc/bindings/Act";
 import type { Batch } from "../ipc/bindings/Batch";
 import type { Crumb } from "../ipc/bindings/Crumb";
+import type { FolderEntry } from "../ipc/bindings/FolderEntry";
 import type { FolderNode } from "../ipc/bindings/FolderNode";
 import type { ItemDetail } from "../ipc/bindings/ItemDetail";
 import type { ItemRow } from "../ipc/bindings/ItemRow";
@@ -299,6 +300,20 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     return Promise.reject<AppError>({ kind: "invalid", message: "nothing left to undo here" });
   },
   folder_children: ({ folderId }) => FOLDERS[folderId as number] ?? [],
+  list_folders: (): FolderEntry[] => [
+    ...SOURCES.map((one) => ({
+      id: one.rootFolderId,
+      parentId: null,
+      sourceId: one.id,
+      title: one.title,
+    })),
+    ...[...PARENTS].map(([id, { parent, title }]) => ({
+      id,
+      parentId: parent,
+      sourceId: crumbs(id).home?.id ?? 0,
+      title,
+    })),
+  ],
   folder_items: ({ folderId }) => ITEMS[folderId as number] ?? [],
   item_tags: () => [],
   item_detail: ({ itemId }) => detail(itemId as number),

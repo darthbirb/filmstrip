@@ -100,6 +100,7 @@ pub fn run() {
             commands::undo_batch,
             commands::remove_source,
             commands::folder_children,
+            commands::list_folders,
             commands::folder_items,
             commands::sorting_items,
             commands::item_tags,

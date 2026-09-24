@@ -10,7 +10,7 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 use ts_rs::TS;
 
-use crate::db::folders::{self, FolderNode};
+use crate::db::folders::{self, FolderEntry, FolderNode};
 use crate::db::items::{self, ItemDetail, ItemRow};
 use crate::db::jobs::{self as job_table, Failure};
 use crate::db::journal;
@@ -348,6 +348,12 @@ pub async fn folder_children(
     folder_id: i64,
 ) -> Result<Vec<FolderNode>> {
     run(&state, move |conn| folders::children(conn, folder_id)).await
+}
+
+/// Every live folder in the library, for a picker that shows the whole tree and filters it.
+#[tauri::command]
+pub async fn list_folders(state: State<'_, AppState>) -> Result<Vec<FolderEntry>> {
+    run(&state, folders::every_live).await
 }
 
 #[tauri::command]

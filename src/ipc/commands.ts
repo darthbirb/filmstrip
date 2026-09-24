@@ -5,6 +5,7 @@ import type { Contents } from "./bindings/Contents";
 import type { EffectiveTag } from "./bindings/EffectiveTag";
 import type { Failure } from "./bindings/Failure";
 import type { FolderDeleted } from "./bindings/FolderDeleted";
+import type { FolderEntry } from "./bindings/FolderEntry";
 import type { FolderMade } from "./bindings/FolderMade";
 import type { FolderNode } from "./bindings/FolderNode";
 import type { ItemDetail } from "./bindings/ItemDetail";
@@ -76,6 +77,8 @@ export const undoBatch = (batchId: string) => invoke<UndoReport>("undo_batch", {
 
 export const folderChildren = (folderId: number) =>
   invoke<FolderNode[]>("folder_children", { folderId });
+
+export const listFolders = () => invoke<FolderEntry[]>("list_folders");
 
 export const folderItems = (folderId: number) => invoke<ItemRow[]>("folder_items", { folderId });
 

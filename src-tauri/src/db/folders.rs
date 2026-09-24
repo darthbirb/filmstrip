@@ -141,6 +141,46 @@ pub fn children(conn: &Connection, parent_id: i64) -> Result<Vec<FolderNode>> {
     Ok(rows)
 }
 
+/// A live folder anywhere in the library, as a picker lays out the whole tree at once.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct FolderEntry {
+    pub id: i64,
+    /// `None` for a source's own folder.
+    pub parent_id: Option<i64>,
+    pub source_id: i64,
+    /// A source's own folder goes by the source's title, as navigation shows it.
+    pub title: String,
+}
+
+/// Every live folder in every source, parents before their children.
+pub fn every_live(conn: &Connection) -> Result<Vec<FolderEntry>> {
+    let mut stmt = conn.prepare(
+        "WITH RECURSIVE tree(id, parent_id, source_id, title, depth) AS (
+             SELECT f.id, f.parent_id, f.source_id, s.title, 0
+               FROM folder f JOIN source s ON s.id = f.source_id
+              WHERE f.parent_id IS NULL AND f.deleted_at IS NULL
+           UNION ALL
+             SELECT f.id, f.parent_id, t.source_id, f.title, t.depth + 1
+               FROM folder f JOIN tree t ON f.parent_id = t.id
+              WHERE f.deleted_at IS NULL
+         )
+         SELECT id, parent_id, source_id, title FROM tree ORDER BY depth, title COLLATE NOCASE",
+    )?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok(FolderEntry {
+                id: r.get(0)?,
+                parent_id: r.get(1)?,
+                source_id: r.get(2)?,
+                title: r.get(3)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(rows)
+}
+
 /// A source's own folder. Created with the source, so nothing can observe one
 /// without the other.
 pub fn create_root(conn: &Connection, source_id: i64, title: &str) -> Result<i64> {
@@ -350,6 +390,29 @@ mod tests {
                 source_id: 1,
                 titles: vec![]
             }
+        );
+    }
+
+    #[test]
+    fn every_live_folder_comes_parents_first_and_a_retired_one_not_at_all() {
+        let (conn, root) = library();
+        let trips = create(&conn, root, "Trips").unwrap();
+        let cairo = create(&conn, trips, "Cairo").unwrap();
+        let gone = create(&conn, root, "Gone").unwrap();
+        retire_subtree_at(&conn, gone, 1).unwrap();
+
+        let every = every_live(&conn).unwrap();
+        let seen: Vec<(i64, Option<i64>, &str)> = every
+            .iter()
+            .map(|folder| (folder.id, folder.parent_id, folder.title.as_str()))
+            .collect();
+        assert_eq!(
+            seen,
+            [
+                (root, None, "Library"),
+                (trips, Some(root), "Trips"),
+                (cairo, Some(trips), "Cairo")
+            ]
         );
     }
 
