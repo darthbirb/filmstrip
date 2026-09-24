@@ -85,14 +85,6 @@ oversight or the time abbreviates and the rule has to say so.
 
 Say what the time does as the plate narrows.
 
-## Undo, on screen · DRAWN
-
-Artboards › Undo: after an act, one line at the foot of navigation in the refusal band's slot,
-saying what it did, with Undo and no timer, for all seven acts and a move that finished in part;
-Ctrl+Z does the same wherever the focus is not in a field, across a restart; "Nothing to undo."
-once, beside the rail when it is folded. An undo refused in whole or in part opens the failures
-banner with Retry, its rows grouped under the place each is still in.
-
 ## The Trash, holding files · DRAWN
 
 Artboards › Trash, Components › Right-click and Pane › 02: the Trash's grid, newest first under a

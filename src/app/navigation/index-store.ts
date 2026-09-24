@@ -56,6 +56,25 @@ export function useIndex() {
   return useSyncExternalStore(subscribe, () => snapshot);
 }
 
+/**
+ * Reads the sources and every folder already known again, after the app itself changed the disk,
+ * so what is open stays open and every count is current.
+ */
+export async function refreshIndex() {
+  const known = [...snapshot.children.keys()];
+  const [sources, lists] = await Promise.all([
+    listSources(),
+    Promise.all(known.map((id) => folderChildren(id).catch(() => null))),
+  ]);
+  const children = new Map<number, FolderNode[]>();
+  known.forEach((id, at) => {
+    const list = lists[at];
+    if (list) children.set(id, list);
+  });
+  publish({ sources, children });
+  settle(sources);
+}
+
 /** Asks for any of these folders' children not yet known. */
 export function ensureChildren(folderIds: number[]) {
   for (const id of folderIds) {

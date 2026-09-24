@@ -548,7 +548,9 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Notice.** A banner above the grid on `panel` at the `control` corner, holding a glyph, a line,
   its actions and a dismiss. What needs a decision takes a `line-danger` hairline and a `danger`
   glyph, never a fill; what is only worth knowing takes the ordinary `line-control` ring. Its list
-  opens in place beneath it rather than in a dialog.
+  opens in place beneath it rather than in a dialog: `eyebrow` headings over rows `control` tall,
+  each row the name, why, and at its end a quiet way to go and look. What an act or an undo could
+  not finish is grouped under a heading per place it is still in, "Reason" said over the first.
 - **Breadcrumb.** Folders above as quiet `row` steps back, the place itself as the `title`.
 - **Dropdown.** One named choice: a `control`-tall button on `raised` naming what it is on, a
   caret after it, opening a menu of every choice beneath it on `raised` with the overlay shadow.
@@ -618,6 +620,11 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Band.** What could not be done, at the foot of the panel it was asked from: a sentence, the
   folder's path under it in `--font-mono`, and a dismiss, on a `danger-wash` ground. There is only
   ever one, and a second refusal replaces it rather than stacking.
+- **Line.** What an act did, in the Band's slot and shape without its alarm: a `glyph` in `fg-dim`
+  (a check after an act, the undo arrow after an undo), the sentence in `ui`, the way back under it
+  as a raised Undo button, and a dismiss. It shares the one slot with the Band, and the newest of
+  the two replaces the other. Folded, the rail keeps the Undo glyph button alone, its sentence in
+  the tooltip; "Nothing to undo." comes out beside the rail on `panel` with the overlay shadow.
 - **Segmented.** A value with few enough answers to show them all at once, the one it is on filled
   on `raised-hi` inside an `inset` trough. Real radios, so the arrow keys move between them.
 - **Source row.** In Settings, two lines: the source's glyph, its name as a field where it stands,

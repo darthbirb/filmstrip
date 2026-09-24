@@ -1,17 +1,25 @@
+import { type CSSProperties, useId, useLayoutEffect, useRef } from "react";
+
 import { formatCount } from "../../lib/format";
 import { Band } from "../../ui/Band";
+import { Button } from "../../ui/Button";
 import { Glyph } from "../../ui/Glyph";
+import { GlyphButton } from "../../ui/GlyphButton";
+import { Line } from "../../ui/Line";
 import { PushDown } from "../../ui/PushDown";
+import { undo } from "../undo/undo";
 import { refusalSentence } from "./add-source";
+import { type FootNews, setNews, useNews } from "./foot-slot";
 import { useIndex } from "./index-store";
-import { setRefused, useRefused } from "./refusal-store";
 import { useWork } from "./work-store";
 
 /** The panel's baseline and, above it, the walk in progress. DECISIONS.md "Background work". */
 export function Foot({ rail = false }: { rail?: boolean }) {
   const { sources } = useIndex();
   const { progress } = useWork();
-  const refused = useRefused();
+  const news = useNews();
+  // Folded, a line that has been answered leaves: the grid is what shows the files are back.
+  const shown = news !== null && !(rail && news.kind === "undone");
   const held = (sources ?? []).reduce((sum, source) => sum + source.itemCount, 0);
   const count = sources?.length ?? 0;
   const totals = `${formatCount(held)} items · ${formatCount(count)} ${count === 1 ? "source" : "sources"}`;
@@ -24,15 +32,7 @@ export function Foot({ rail = false }: { rail?: boolean }) {
   return (
     // Ordered by permanence from the bottom: the count, the walk, then what waits to be read.
     <div className="shrink-0">
-      <PushDown open={refused !== null}>
-        {refused && (
-          <Band
-            sentence={refusalSentence(refused.why, refused.clash)}
-            path={refused.path}
-            onDismiss={() => setRefused(null)}
-          />
-        )}
-      </PushDown>
+      <PushDown open={shown}>{shown && <News news={news} rail={rail} />}</PushDown>
       <PushDown open={busy}>
         {rail ? (
           <div className="border-line border-t px-1.5 pt-2 pb-1.5">
@@ -58,6 +58,78 @@ export function Foot({ rail = false }: { rail?: boolean }) {
         {!rail && <span className="min-w-0 flex-1 truncate tabular-nums">{totals}</span>}
       </div>
     </div>
+  );
+}
+
+/** The slot's one piece of news: a refusal, or what an act or an undo did. DECISIONS.md "Undo". */
+function News({ news, rail }: { news: FootNews; rail: boolean }) {
+  const dismiss = () => setNews(null);
+  if (news.kind === "refused") {
+    const { why, clash, path } = news.refused;
+    return <Band sentence={refusalSentence(why, clash)} path={path} onDismiss={dismiss} />;
+  }
+  if (rail) {
+    return (
+      <div className="grid place-items-center border-line border-t py-1.5">
+        {news.kind === "done" ? (
+          <GlyphButton
+            glyph="undo"
+            label={`Undo · ${news.line} · Ctrl+Z`}
+            onClick={() => void undo(news.batchId)}
+          />
+        ) : (
+          <Nothing />
+        )}
+      </div>
+    );
+  }
+  if (news.kind === "done") {
+    return (
+      <Line
+        glyph="done"
+        sentence={news.line}
+        action={
+          <Button glyph="undo" title="Undo · Ctrl+Z" onClick={() => void undo(news.batchId)}>
+            Undo
+          </Button>
+        }
+        onDismiss={dismiss}
+      />
+    );
+  }
+  return (
+    <Line
+      glyph="undo"
+      sentence={news.kind === "undone" ? news.line : "Nothing to undo."}
+      onDismiss={dismiss}
+    />
+  );
+}
+
+/** Folded, the rail has no room for the sentence, so it comes out beside the slot. */
+function Nothing() {
+  const line = useRef<HTMLDivElement>(null);
+  const anchor = `--nothing-${useId().replace(/[^\w-]/g, "")}`;
+  useLayoutEffect(() => {
+    line.current?.showPopover();
+  }, []);
+  return (
+    <span
+      style={{ anchorName: anchor } as CSSProperties}
+      className="grid size-control place-items-center text-fg-dim text-icon"
+    >
+      <Glyph name="undo" />
+      <div
+        ref={line}
+        popover="manual"
+        style={
+          { positionAnchor: anchor, left: "anchor(right)", top: "anchor(top)" } as CSSProperties
+        }
+        className="m-0 ml-1.5 flex h-control items-center whitespace-nowrap rounded-control border-0 bg-panel px-2.5 text-fg text-ui shadow-overlay inset-ring inset-ring-line-control"
+      >
+        Nothing to undo.
+      </div>
+    </span>
   );
 }
 

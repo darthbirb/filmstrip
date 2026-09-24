@@ -432,8 +432,17 @@ Shift+F10 did nothing at all.
 
 **Every change the app makes on disk is journalled and can be undone, across a restart**, ported
 from ggallery on 23 September 2026. It came before any verb that changes the disk, so none of
-them ever existed without a way back. The interface for it is not drawn yet; the journal is what
-that interface will drive.
+them ever existed without a way back. On screen since 24 September 2026, as Artboards › Undo draws
+it.
+
+- **The line has no timer.** An act ends with one line at the foot of navigation, in the slot the
+  refusal band uses, and it stays until dismissed or replaced by the next news: a line gone
+  before it is read is no way back at all. Ctrl+Z keeps working after it has gone, and after a
+  restart, because the journal does.
+- **Ctrl+Z belongs to a field while one has the focus**, and does nothing while Settings is open:
+  the dialog holds the keyboard, and an undo behind it would change what the person cannot see.
+- **An undo that came back in part answers with the banner, not the line.** What stayed is
+  something only the person can settle, so it sits over the grid, open, with Retry.
 
 - **The disk changes first, then the index and the journal together.** A disk that refuses leaves
   nothing claiming it succeeded, and a transaction that fails puts the disk back.

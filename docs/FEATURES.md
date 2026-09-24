@@ -118,8 +118,8 @@ drawn. **Not started** — neither.
 | Capability | Filmstrip | Where |
 | --- | --- | --- |
 | Export a folder's subtree or a selection as a zip, as a job | Not started | Filmstrip's own change: renaming the files or keeping their own names is chosen at export |
-| An undo journal that survives a restart | Built in Rust | `journal`, DECISIONS.md "Undo"; how it is offered on screen is not drawn |
-| Undo the last batch, or a named one | Built in Rust | `undo_last`, `undo_batch`; the interface is backlogged |
+| An undo journal that survives a restart | Built | `journal`, DECISIONS.md "Undo"; the line at the foot of navigation, Ctrl+Z |
+| Undo the last batch, or a named one | Built | Ctrl+Z takes the last, the line's Undo its own batch; no list of batches yet |
 
 ## The interface
 

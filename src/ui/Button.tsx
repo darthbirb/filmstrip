@@ -13,6 +13,8 @@ type Props = {
   /** Raised carries the move worth making; quiet stands beside it as the lesser one; danger destroys or forgets. */
   tone?: "raised" | "quiet" | "danger";
   expanded?: boolean;
+  /** A tooltip, for a button whose key is worth knowing. */
+  title?: string;
   onClick: () => void;
   ref?: Ref<HTMLButtonElement>;
 };
@@ -36,6 +38,7 @@ export function Button({
   detail,
   tone = "raised",
   expanded,
+  title,
   onClick,
   ref,
 }: Props) {
@@ -43,6 +46,7 @@ export function Button({
     <button
       ref={ref}
       type="button"
+      title={title}
       aria-expanded={expanded}
       onClick={onClick}
       className={`${SHAPE} ${TONES[tone]}`}
