@@ -9,6 +9,8 @@ import { formatCount } from "../../lib/format";
 
 const files = (n: number) => `${formatCount(n)} ${n === 1 ? "file" : "files"}`;
 const are = (n: number) => (n === 1 ? "is" : "are");
+/** Lisbon’s, and Trips’: a name that ends in s takes the apostrophe alone. */
+const whose = (name: string) => (name.endsWith("s") ? `${name}’` : `${name}’s`);
 
 /** The line at the foot after an act. `stayed` counts what the act could not carry. */
 export function actLine({ act, files: carried }: Batch, stayed = 0): string {
@@ -100,6 +102,44 @@ export function movedBannerLine(moved: number, whole: number, to: string, one?: 
 export function deletedBannerLine(trashed: number, whole: number, one?: string) {
   if (trashed > 0) return `${formatCount(trashed)} of ${files(whole)} went to the Trash`;
   return `${one ?? `The ${files(whole)}`} could not go to the Trash`;
+}
+
+/** The question a folder with files in it asks before it is deleted. */
+export const holdsLine = (name: string, held: number) => `${name} holds ${files(held)}`;
+
+/**
+ * The line at the foot after a folder's delete that kept the folder: what went is the act, and
+ * it is undone as any move or delete of files is. `into` is the sorting source, or the Trash.
+ */
+export function folderStayedLine(
+  name: string,
+  carried: number,
+  whole: number,
+  into: string | null,
+) {
+  const what =
+    carried === whole
+      ? `${whose(name)} ${files(whole)}`
+      : `${formatCount(carried)} of ${whose(name)} ${files(whole)}`;
+  const act = into ? `Moved ${what} to ${into}.` : `Deleted ${what}.`;
+  return `${act} ${name} is in the banner.`;
+}
+
+/** The banner's sentence for a folder that stayed: where its files went, counted, or why not. */
+export function folderStayedBanner(
+  name: string,
+  carried: number,
+  whole: number,
+  into: string | null,
+) {
+  const place = into ?? "the Trash";
+  if (whole === 0) return `${name} could not go`;
+  if (carried === whole)
+    return `${name} could not go · its ${files(whole)} ${are(whole)} in ${place}`;
+  if (carried === 0)
+    return `${whose(name)} ${files(whole)} could not go to ${place} · ${name} stayed`;
+  const counted = `${formatCount(carried)} of ${whose(name)} ${files(whole)}`;
+  return `${counted} ${are(carried)} in ${place} · ${name} stayed`;
 }
 
 /** What a name field says under itself when the name was refused; nothing for any other failure. */

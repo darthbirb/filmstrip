@@ -18,6 +18,7 @@ import { openSettings } from "../settings/settings-store";
 import { refusedName } from "../undo/lines";
 import { afterAct } from "../undo/undo";
 import { addFolder } from "./add-source";
+import { deleteFolderAsking } from "./delete-folder";
 import { ensureChildren, loadIndex, useIndex } from "./index-store";
 import { openFolders, setOpenFolders, useOpenFolders } from "./open-folders";
 import {
@@ -128,10 +129,19 @@ export function Navigation() {
         openMovePicker({ folder: { id: folder, name }, folderId: parent, anchor });
       },
     };
+    const remove: MenuAction = {
+      id: "delete",
+      label: "Delete",
+      glyph: "trash",
+      tone: "danger",
+      onSelect: () =>
+        void deleteFolderAsking({ id: folder, name: path.at(-1)?.title ?? "" }, sources),
+    };
     return {
       groups: [
         [newFolder, moveTo],
         [revealFolderRow(folder), renameRow(rename), readAgainRow(folder)],
+        [remove],
       ],
     };
   };

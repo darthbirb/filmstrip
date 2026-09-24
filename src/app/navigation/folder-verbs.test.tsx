@@ -2,11 +2,21 @@ import { beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
-import { createFolder, folderChildren, undoLast } from "../../ipc/commands";
+import { recording } from "../../dev/recording";
+import {
+  createFolder,
+  folderChildren,
+  folderItems,
+  listSources,
+  renameItem,
+  undoLast,
+} from "../../ipc/commands";
 import { MovePickerHost } from "../pane/move-picker";
 import { getPlace, type Place, setPlace } from "../place";
+import { getPreferences, updatePreferences } from "../preferences";
 import { ReportBanner } from "../undo/ReportBanner";
 import { showReport } from "../undo/report-store";
+import { DeleteQuestion, resetDeleteQuestion } from "./delete-folder";
 import { Foot } from "./Foot";
 import { setNews } from "./foot-slot";
 import { loadIndex, resetIndex } from "./index-store";
@@ -28,6 +38,7 @@ function Harness() {
         <Foot />
       </nav>
       <main style={{ flex: 1 }}>
+        <DeleteQuestion />
         <ReportBanner />
       </main>
       <MovePickerHost />
@@ -58,6 +69,8 @@ beforeEach(async () => {
   while (await undoLast()) {}
   setNews(null);
   showReport(null);
+  resetDeleteQuestion();
+  updatePreferences({ deleteInto: undefined });
   setPlace(PICTURES);
   resetIndex();
   await loadIndex();
@@ -175,4 +188,126 @@ test("a folder whose name is taken where it was going stays, and says so in the 
   await expect.element(screen.getByText("Not Moved")).toBeVisible();
   await expect.element(screen.getByText("Name taken in Pictures")).toBeVisible();
   expect(await titles(4)).toEqual(["Cairo"]);
+});
+
+test("an empty folder goes without asking, and Undo brings it back", async () => {
+  const screen = await render(<Harness />);
+  await openPictures(screen);
+  await choose(screen, "People", "People", "Delete");
+  await expect.element(screen.getByText("Deleted People.")).toBeVisible();
+  expect(await titles(1)).toEqual(["Trips"]);
+
+  await screen.getByRole("button", { name: "Undo" }).click();
+  await expect.element(screen.getByText("People is back in Pictures.")).toBeVisible();
+  expect(await titles(1)).toEqual(["People", "Trips"]);
+});
+
+test("a folder with files asks where they go, and × answers none", async () => {
+  const screen = await render(<Harness />);
+  await openPictures(screen);
+  await choose(screen, "Trips 2", "Trips", "Delete");
+  const question = screen.getByRole("region", { name: "Trips holds 5 files" });
+  await expect.element(question).toHaveFocus();
+  await expect
+    .element(question.getByRole("button", { name: "Move Files to Incoming" }))
+    .toBeVisible();
+  await expect.element(question.getByRole("button", { name: "Delete Files Too" })).toBeVisible();
+  await expect
+    .element(question.getByRole("checkbox", { name: "Always Move to the One I Choose" }))
+    .not.toBeChecked();
+
+  await question.getByRole("button", { name: "Cancel" }).click();
+  await expect.element(question).not.toBeInTheDocument();
+  await expect.element(screen.getByRole("treeitem", { name: "Trips 2" })).toHaveFocus();
+  expect(await titles(1)).toEqual(["People", "Trips"]);
+});
+
+test("moving its files to the sorting source deletes it, and the box keeps that answer", async () => {
+  const screen = await render(<Harness />);
+  await openPictures(screen);
+  await choose(screen, "Trips 2", "Trips", "Delete");
+  await screen.getByRole("checkbox", { name: "Always Move to the One I Choose" }).click();
+  await screen.getByRole("button", { name: "Move Files to Incoming" }).click();
+
+  await expect
+    .element(screen.getByText("Deleted Trips. Its 5 files are in Incoming."))
+    .toBeVisible();
+  expect(await titles(1)).toEqual(["People"]);
+  expect(await titles(2)).toEqual(["Cairo"]);
+  expect(getPreferences().deleteInto).toBe(2);
+
+  await screen.getByRole("button", { name: "Undo" }).click();
+  await expect
+    .element(screen.getByText("Trips and its 5 files are back in Pictures."))
+    .toBeVisible();
+
+  // Kept as the default, the next delete moves there without asking.
+  await choose(screen, "Trips 2", "Trips", "Delete");
+  await expect
+    .element(screen.getByText("Deleted Trips. Its 5 files are in Incoming."))
+    .toBeVisible();
+  expect(screen.getByRole("region", { name: "Trips holds 5 files" }).elements()).toHaveLength(0);
+});
+
+test("with no sorting source the Trash is the only answer, and there is no box", async () => {
+  const libraries = (await listSources()).filter((source) => source.kind === "library");
+  await recording(
+    async () => {
+      resetIndex();
+      await loadIndex();
+      const screen = await render(<Harness />);
+      await openPictures(screen);
+      await choose(screen, "Trips 2", "Trips", "Delete");
+      const question = screen.getByRole("region", { name: "Trips holds 5 files" });
+      await expect.element(question).toBeVisible();
+      expect(question.getByRole("checkbox").elements()).toHaveLength(0);
+      expect(question.getByRole("button", { name: /Move Files/ }).elements()).toHaveLength(0);
+      await question.getByRole("button", { name: "Delete Files Too" }).click();
+      await expect.element(screen.getByText("Deleted Trips and its 5 files.")).toBeVisible();
+    },
+    (cmd) => (cmd === "list_sources" ? libraries : undefined),
+  );
+});
+
+test("a folder deleted while you stand in it leaves you in its parent", async () => {
+  setPlace({
+    kind: "folder",
+    sourceId: 1,
+    path: [
+      { id: 1, title: "Pictures" },
+      { id: 4, title: "Trips" },
+      { id: 6, title: "Cairo" },
+    ],
+  });
+  openFolders([1, 4]);
+  const screen = await render(<Harness />);
+  await choose(screen, "Cairo 3", "Cairo", "Delete");
+  await screen.getByRole("button", { name: "Delete Files Too" }).click();
+  await expect.poll(where).toBe("Pictures/Trips");
+  await expect
+    .element(screen.getByRole("treeitem", { name: "Trips 2" }))
+    .toHaveAttribute("aria-selected", "true");
+});
+
+test("a folder whose files could not all go stays, and the banner says where the rest are", async () => {
+  const [first] = await folderItems(2);
+  if (!first) throw new Error("the mock's sorting source is empty");
+  await renameItem(first.id, "hotel.jpg");
+  const screen = await render(<Harness />);
+  await openPictures(screen);
+  await choose(screen, "Trips 2", "Trips", "Delete");
+  await screen.getByRole("button", { name: "Move Files to Incoming" }).click();
+
+  await expect
+    .element(screen.getByText("4 of Trips’ 5 files are in Incoming · Trips stayed"))
+    .toBeVisible();
+  await expect
+    .element(screen.getByText("Moved 4 of Trips’ 5 files to Incoming. Trips is in the banner."))
+    .toBeVisible();
+  await expect.element(screen.getByText("Still in Trips")).toBeVisible();
+  await expect.element(screen.getByText("Name taken in Incoming")).toBeVisible();
+  expect(await titles(1)).toEqual(["People", "Trips"]);
+
+  await screen.getByRole("button", { name: "Undo" }).click();
+  await expect.element(screen.getByText("4 files are back in Trips.")).toBeVisible();
 });

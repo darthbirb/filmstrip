@@ -554,6 +554,14 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   opens in place beneath it rather than in a dialog: `eyebrow` headings over rows `control` tall,
   each row the name, why, and at its end a quiet way to go and look. What an act or an undo could
   not finish is grouped under a heading per place it is still in, "Reason" said over the first.
+- **Question.** The notice's shape, asking: the `danger` glyph, the question and × to answer none
+  on one line; under the question its answers as buttons, the one that destroys last in `danger`;
+  under them, where an answer can be kept, a checkbox. The answers hold the line or all fold into
+  one raised button with a caret, whose menu names them a `tile-gap` under it; folded answers that
+  still do not fit take a line each, left-aligned. Only the answers ever change shape.
+- **Checkbox.** A `badge` square at the `badge` corner on `raised` in a `line-control` ring,
+  filled with `plate` and a check in `on-plate` when ticked; its sentence beside it in `fg-mid`,
+  `fg` under the pointer or ticked. The ring the keyboard sees is on the square.
 - **Breadcrumb.** Folders above as quiet `row` steps back, the place itself as the `title`.
 - **Dropdown.** One named choice: a `control`-tall button on `raised` naming what it is on, a
   caret after it, opening a menu of every choice beneath it on `raised` with the overlay shadow.

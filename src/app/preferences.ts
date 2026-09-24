@@ -16,6 +16,8 @@ export type Preferences = {
   details?: boolean;
   /** The folders files were last moved to, newest first: the move picker's Recent. */
   recent?: number[];
+  /** The sorting source a deleted folder's files move to without asking; absent, it asks. */
+  deleteInto?: number;
 };
 
 /** How many folders the move picker's Recent keeps. */
@@ -84,7 +86,10 @@ function applyScale() {
 
 function validated(value: unknown): Partial<Preferences> {
   if (typeof value !== "object" || value === null) return {};
-  const { scale, widths, hidden, tile, layout, details, recent } = value as Record<string, unknown>;
+  const { scale, widths, hidden, tile, layout, details, recent, deleteInto } = value as Record<
+    string,
+    unknown
+  >;
   const valid: Partial<Preferences> = {};
   if (typeof scale === "number" && Number.isFinite(scale)) valid.scale = nearestScale(scale);
   const savedWidths = pair<number>(widths, "number");
@@ -95,6 +100,7 @@ function validated(value: unknown): Partial<Preferences> {
   if (layout === "justified" || layout === "uniform") valid.layout = layout;
   if (typeof details === "boolean") valid.details = details;
   if (Array.isArray(recent)) valid.recent = recent.filter(Number.isInteger).slice(0, RECENT);
+  if (typeof deleteInto === "number" && Number.isInteger(deleteInto)) valid.deleteInto = deleteInto;
   return valid;
 }
 

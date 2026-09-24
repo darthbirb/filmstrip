@@ -421,9 +421,9 @@ menu was already off everywhere but in a field, so until these a right-click, th
 Shift+F10 did nothing at all.
 
 - **A verb that does not exist yet is absent, never greyed.** A greyed row describes a feature at
-  the moment it refuses it. Delete for a folder waits on its slice; the menu for a selection
-  waits on selecting. A rule only stands between two groups that both hold
-  rows, so an absent verb leaves no stray line, and a menu with nothing in it opens nothing.
+  the moment it refuses it. The menu for a selection waits on selecting. A rule only stands
+  between two groups that both hold rows, so an absent verb leaves no stray line, and a menu with
+  nothing in it opens nothing.
 - **What a drive that is away cannot do is absent too.** An offline source keeps Rename, Manage
   Sources and Remove Source, which touch only the index; its folders have nothing left.
 - **Favourite on a place waits.** The drawing puts it on a folder's and a source's menu, but nothing
@@ -453,6 +453,21 @@ Shift+F10 did nothing at all.
 - **Move to… for a folder is the files' picker**, with the same tree and the same Recent. A folder
   cannot go inside itself, so its own branch cannot be picked rather than being refused after the
   pick. A name already where it was going is the move's banner, the folder its one row.
+- **Delete asks only when there is something to decide.** An empty folder goes at once. One with
+  files asks where they go, in the banner's shape above the grid rather than in a dialog, with no
+  answer pressed for you: each sorting source is its own answer, so the pick and the act are one
+  press, then Delete Files Too, and × answers none. With no sorting source the Trash is the only
+  answer, and nothing stands in for the missing ones.
+- **The answers hold one line or all fold into one.** Two of six on the line and four behind a
+  button would say the set is smaller than it is, so every sorting source is named, or none is and
+  Move Files to… names them in its menu; a fold that still does not fit stacks. The test is the
+  band's own line, never the window's width, so interface size and grid width fold it alike.
+- **A box keeps the answer as the default**, "Always Move to the One I Choose", written into
+  Settings › Sources, where it is changed or given up; with a default, the question is not asked.
+  It is the only setting written by answering a question elsewhere, which is why the box says so.
+- **A folder that stayed is the move's banner.** What went before the refusal stays gone and is
+  one batch, undone from the foot's line; the banner holds what kept the folder, grouped by where
+  each is, and Retry tries the rest again.
 - **Refresh walks one folder's subtree**, as the launch walk walks a source, judging nothing
   outside it. **Only one walk runs at a time:** each retires what it did not see, so a folder walk
   beside the whole walk would have the whole walk retire what the folder walk had just found.

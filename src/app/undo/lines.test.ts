@@ -6,6 +6,9 @@ import type { UndoReport } from "../../ipc/bindings/UndoReport";
 import {
   actLine,
   deletedBannerLine,
+  folderStayedBanner,
+  folderStayedLine,
+  holdsLine,
   movedBannerLine,
   reasonText,
   refusedName,
@@ -137,4 +140,24 @@ test("a name field says where the name is taken, or why else it was refused", ()
     "Open in another app.",
   );
   expect(refusedName({ kind: "invalid", message: "no" })).toBeNull();
+});
+
+test("a folder's delete asks, and says what went when the folder stayed, as the table words it", () => {
+  expect(holdsLine("Lisbon", 214)).toBe("Lisbon holds 214 files");
+  expect(folderStayedLine("Lisbon", 211, 214, "Inbox")).toBe(
+    "Moved 211 of Lisbon’s 214 files to Inbox. Lisbon is in the banner.",
+  );
+  expect(folderStayedLine("Trips", 5, 5, null)).toBe(
+    "Deleted Trips’ 5 files. Trips is in the banner.",
+  );
+  expect(folderStayedBanner("Lisbon", 214, 214, "Inbox")).toBe(
+    "Lisbon could not go · its 214 files are in Inbox",
+  );
+  expect(folderStayedBanner("Lisbon", 211, 214, "Inbox")).toBe(
+    "211 of Lisbon’s 214 files are in Inbox · Lisbon stayed",
+  );
+  expect(folderStayedBanner("Lisbon", 211, 214, null)).toBe(
+    "211 of Lisbon’s 214 files are in the Trash · Lisbon stayed",
+  );
+  expect(folderStayedBanner("Egypt", 0, 0, null)).toBe("Egypt could not go");
 });
