@@ -21,7 +21,7 @@ use crate::fs::acts::{self, Batch};
 use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
 use crate::fs::items::{self as fs_items, MoveReport};
 use crate::fs::paths;
-use crate::fs::trash::{self, TrashReport};
+use crate::fs::trash::{self, TrashReport, TrashSummary, Trashed};
 use crate::fs::undo::{self, UndoReport};
 use crate::jobs::{self, JobQueue, Progress};
 
@@ -388,6 +388,26 @@ pub async fn sorting_items(state: State<'_, AppState>) -> Result<Vec<ItemRow>> {
     .await
 }
 
+/// What the trash holds, the most recent first, each with the folder it left.
+#[tauri::command]
+pub async fn trash_listing(state: State<'_, AppState>) -> Result<Vec<Trashed>> {
+    let thumbs = state.thumbs.clone();
+    run(&state, move |conn| {
+        let mut held = trash::listing(conn)?;
+        for one in &mut held {
+            one.row.thumb = thumb_of(&one.row.uuid, &thumbs);
+        }
+        Ok(held)
+    })
+    .await
+}
+
+/// How many files the trash holds, and their size.
+#[tauri::command]
+pub async fn trash_summary(state: State<'_, AppState>) -> Result<TrashSummary> {
+    run(&state, trash::summary).await
+}
+
 #[tauri::command]
 pub async fn item_tags(state: State<'_, AppState>, item_id: i64) -> Result<Vec<EffectiveTag>> {
     run(&state, move |conn| tags::item_effective_tags(conn, item_id)).await
@@ -512,13 +532,22 @@ fn item_abs_path(conn: &Connection, item_id: i64) -> Result<PathBuf> {
     paths::item_path(conn, file.folder_id, &file.disk_name)
 }
 
-/// The path an item's file had when it was last read, live or retired; nothing for no such item.
+/// The path an item's file had when it was last read, live, retired or in the trash; nothing for
+/// no such item.
 pub fn last_path(conn: &Connection, item_id: i64) -> Result<Option<String>> {
     let Some(file) = items::file_of(conn, item_id)? else {
         return Ok(None);
     };
-    let path = paths::item_path(conn, file.folder_id, &file.disk_name)?;
+    let path = file_path(conn, item_id, &file)?;
     Ok(Some(path.to_string_lossy().into_owned()))
+}
+
+/// Where a file is: in its folder, or where the trash keeps it under its uuid.
+fn file_path(conn: &Connection, item_id: i64, file: &items::ItemFile) -> Result<PathBuf> {
+    if items::is_trashed(conn, item_id)? {
+        return paths::trash_path(&file.uuid, &file.disk_name);
+    }
+    paths::item_path(conn, file.folder_id, &file.disk_name)
 }
 
 /// An item in full, with the paths to its file and its thumbnail.
@@ -526,7 +555,11 @@ pub fn detail_of(conn: &Connection, item_id: i64, thumbs: &Path) -> Result<Optio
     let Some(mut detail) = items::detail(conn, item_id)? else {
         return Ok(None);
     };
-    let file = paths::item_path(conn, detail.row.folder_id, &detail.row.disk_name)?;
+    let file = if detail.trashed_at.is_some() {
+        paths::trash_path(&detail.row.uuid, &detail.row.disk_name)?
+    } else {
+        paths::item_path(conn, detail.row.folder_id, &detail.row.disk_name)?
+    };
     detail.path = file.to_string_lossy().into_owned();
     detail.row.thumb = thumb_of(&detail.row.uuid, thumbs);
     Ok(Some(detail))

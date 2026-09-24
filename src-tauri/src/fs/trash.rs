@@ -6,6 +6,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
 
+use crate::db::items::ItemRow;
 use crate::db::{folders, items, journal, tags};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::stayed::{self, Stayed};
@@ -18,6 +19,64 @@ use crate::fs::{paths, relocate};
 pub struct TrashReport {
     pub trashed: u32,
     pub refused: Vec<Stayed>,
+}
+
+/// A file in the trash, when it went, and the folder it left.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Trashed {
+    #[serde(flatten)]
+    pub row: ItemRow,
+    pub trashed_at: i64,
+    pub from: Origin,
+}
+
+/// The folder a trashed file left, named from its source's own folder down. `gone` when neither
+/// it nor a folder at its place is live, so Restore would be refused.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Origin {
+    pub folder_id: i64,
+    pub path: Vec<String>,
+    pub gone: bool,
+}
+
+/// How much the trash holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct TrashSummary {
+    pub count: u32,
+    pub bytes: i64,
+}
+
+/// Everything in the trash, the most recent first.
+pub fn listing(conn: &Connection) -> Result<Vec<Trashed>> {
+    items::in_trash(conn)?
+        .into_iter()
+        .map(|(row, trashed_at)| {
+            let from = Origin {
+                folder_id: row.folder_id,
+                path: folders::ancestry(conn, row.folder_id)?
+                    .into_iter()
+                    .map(|crumb| crumb.title)
+                    .collect(),
+                gone: folders::live_at(conn, row.folder_id)?.is_none(),
+            };
+            Ok(Trashed {
+                row,
+                trashed_at,
+                from,
+            })
+        })
+        .collect()
+}
+
+pub fn summary(conn: &Connection) -> Result<TrashSummary> {
+    let (count, bytes) = items::trash_totals(conn)?;
+    Ok(TrashSummary { count, bytes })
 }
 
 /// Sends each item to the trash under one batch, so one undo brings the whole selection back.
@@ -216,6 +275,50 @@ mod tests {
         assert_eq!(report.stayed[0].at, stayed::Whereabouts::Trash);
         assert!(trash_file(&conn, pyramid).is_file());
         assert_eq!(journal::latest_batch(&conn).unwrap(), Some(batch));
+    }
+
+    #[test]
+    fn the_trash_lists_what_it_holds_newest_first_with_the_folder_each_left() {
+        let (conn, root, cairo) = library("listing");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+        trash_items(&conn, &[sphinx], &journal::new_batch()).unwrap();
+
+        let held = listing(&conn).unwrap();
+        let ids: Vec<i64> = held.iter().map(|one| one.row.id).collect();
+        assert_eq!(ids, [sphinx, pyramid]);
+        assert_eq!(held[0].from.path, ["Library", "Trips", "Cairo"]);
+        assert!(!held[0].from.gone);
+        assert_eq!(summary(&conn).unwrap(), TrashSummary { count: 2, bytes: 2 });
+
+        // Its folder gone, the file says so; made again under the same name, it is not.
+        std::fs::remove_dir_all(root.join("Trips/Cairo")).unwrap();
+        walk::reconcile(&conn).unwrap();
+        assert!(listing(&conn).unwrap()[0].from.gone);
+        std::fs::create_dir_all(root.join("Trips/Cairo")).unwrap();
+        walk::reconcile(&conn).unwrap();
+        assert!(!listing(&conn).unwrap()[0].from.gone);
+    }
+
+    #[test]
+    fn a_trashed_file_is_shown_in_full_from_where_the_trash_keeps_it() {
+        let (conn, _, cairo) = library("detail");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+
+        let thumbs = Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-trash/no-thumbs");
+        let detail = crate::commands::detail_of(&conn, pyramid, &thumbs)
+            .unwrap()
+            .unwrap();
+        assert!(detail.trashed_at.is_some());
+        assert_eq!(
+            detail.folders.last().map(|crumb| crumb.title.as_str()),
+            Some("Cairo")
+        );
+        assert_eq!(Path::new(&detail.path), trash_file(&conn, pyramid));
+        let path = crate::commands::last_path(&conn, pyramid).unwrap().unwrap();
+        assert_eq!(Path::new(&path), trash_file(&conn, pyramid));
     }
 
     #[test]

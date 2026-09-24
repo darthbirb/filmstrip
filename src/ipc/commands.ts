@@ -16,6 +16,8 @@ import type { Progress } from "./bindings/Progress";
 import type { Reason } from "./bindings/Reason";
 import type { SourceKind } from "./bindings/SourceKind";
 import type { SourceSummary } from "./bindings/SourceSummary";
+import type { Trashed } from "./bindings/Trashed";
+import type { TrashSummary } from "./bindings/TrashSummary";
 import type { UndoReport } from "./bindings/UndoReport";
 
 // One wrapper per Rust command, each typed invoke on one line: a Rust test reads this file.
@@ -94,6 +96,10 @@ export const itemDetail = (itemId: number) => invoke<ItemDetail | null>("item_de
 export const itemPath = (itemId: number) => invoke<string | null>("item_path", { itemId });
 
 export const sortingItems = () => invoke<ItemRow[]>("sorting_items");
+
+export const trashListing = () => invoke<Trashed[]>("trash_listing");
+
+export const trashSummary = () => invoke<TrashSummary>("trash_summary");
 
 export const setItemFavorite = (itemIds: number[], favorite: boolean) =>
   invoke<void>("set_item_favorite", { itemIds, favorite });
