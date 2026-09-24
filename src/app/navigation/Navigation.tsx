@@ -1,11 +1,20 @@
 import { useEffect, useState } from "react";
 
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
-import { readFolderAgain, renameSource, revealFolder, revealSource } from "../../ipc/commands";
+import {
+  readFolderAgain,
+  renameFolder,
+  renameSource,
+  revealFolder,
+  revealSource,
+} from "../../ipc/commands";
 import type { HeadedMenu, MenuAction, MenuGroups } from "../../ui/Menu";
 import { Tree, type TreeRow } from "../../ui/Tree";
+import { libraryChanged } from "../library";
 import { type Place, setPlace, usePlace } from "../place";
 import { openSettings } from "../settings/settings-store";
+import { refusedName } from "../undo/lines";
+import { afterAct } from "../undo/undo";
 import { addFolder } from "./add-source";
 import { ensureChildren, loadIndex, useIndex } from "./index-store";
 import { setOpenFolders, useOpenFolders } from "./open-folders";
@@ -29,6 +38,7 @@ export function Navigation() {
   const place = usePlace();
   const expanded = useOpenFolders();
   const [renaming, setRenaming] = useState<string | null>(null);
+  const [taken, setTaken] = useState<string | null>(null);
 
   useEffect(() => {
     ensureChildren([...expanded]);
@@ -76,14 +86,45 @@ export function Navigation() {
     const source = sourceOf(id);
     const folder = rowFolder(id);
     if (!source || folder === undefined) return { groups: [] };
+    const rename = () => {
+      setTaken(null);
+      setRenaming(id);
+    };
     if (folder === source.rootFolderId) {
-      return { heading: "Source", groups: sourceMenu(source, () => setRenaming(id)) };
+      return { heading: "Source", groups: sourceMenu(source, rename) };
     }
-    // Neither can act on a folder whose drive is away, and an empty menu opens nothing.
-    return { groups: source.reachable ? [[revealFolderRow(folder), readAgainRow(folder)]] : [] };
+    // Nothing on it can act on a folder whose drive is away, and an empty menu opens nothing.
+    if (!source.reachable) return { groups: [] };
+    return { groups: [[], [revealFolderRow(folder), renameRow(rename), readAgainRow(folder)]] };
   };
 
-  const renamed = sourceOf(renaming ?? "");
+  const stopRenaming = () => {
+    setRenaming(null);
+    setTaken(null);
+  };
+  // A source's name is the app's own label; a folder's is its directory's, so it can be taken.
+  const rename = async (id: string, name: string) => {
+    const source = sourceOf(id);
+    const folder = rowFolder(id);
+    if (!source || folder === undefined) return stopRenaming();
+    if (folder === source.rootFolderId) {
+      stopRenaming();
+      await renameSource(source.id, name).catch(() => undefined);
+      await loadIndex().catch(() => undefined);
+      return;
+    }
+    try {
+      const batch = await renameFolder(folder, name);
+      if (batch) afterAct(batch);
+      await libraryChanged();
+      stopRenaming();
+    } catch (error) {
+      const refused = refusedName(error);
+      if (refused) setTaken(refused);
+      else stopRenaming();
+    }
+  };
+
   return (
     <Tree
       label="Places"
@@ -97,16 +138,13 @@ export function Navigation() {
       onCollapse={(id) => setOpen(id, false)}
       menuFor={menuFor}
       renaming={
-        renaming && renamed
+        renaming
           ? {
               id: renaming,
-              onCommit: (name) => {
-                setRenaming(null);
-                void renameSource(renamed.id, name)
-                  .then(() => loadIndex())
-                  .catch(() => undefined);
-              },
-              onCancel: () => setRenaming(null),
+              onCommit: (name) => void rename(renaming, name),
+              onCancel: stopRenaming,
+              taken,
+              onEdit: () => setTaken(null),
             }
           : null
       }
@@ -127,8 +165,9 @@ function sourceMenu(source: SourceSummary, rename: () => void): MenuGroups {
     glyph: "folderOpen",
     onSelect: () => void revealSource(source.id).catch(() => undefined),
   };
-  const naming: MenuAction = { id: "rename", label: "Rename", glyph: "rename", onSelect: rename };
+  const naming = renameRow(rename);
   return [
+    [],
     source.reachable ? [reveal, naming, readAgainRow(folder)] : [naming],
     [
       {
@@ -155,6 +194,10 @@ function revealFolderRow(folder: number): MenuAction {
     glyph: "folderOpen",
     onSelect: () => void revealFolder(folder).catch(() => undefined),
   };
+}
+
+function renameRow(rename: () => void): MenuAction {
+  return { id: "rename", label: "Rename", glyph: "rename", onSelect: rename };
 }
 
 function readAgainRow(folder: number): MenuAction {

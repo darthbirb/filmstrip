@@ -421,10 +421,9 @@ menu was already off everywhere but in a field, so until these a right-click, th
 Shift+F10 did nothing at all.
 
 - **A verb that does not exist yet is absent, never greyed.** A greyed row describes a feature at
-  the moment it refuses it. Move to…, Rename and Delete for a file, and New Folder, Move to…,
-  Rename and Delete for a folder, wait on the undo journal; the menu for a selection waits on
-  selecting. A rule only stands between two groups that both hold rows, so an absent verb leaves
-  no stray line, and a menu with nothing in it opens nothing.
+  the moment it refuses it. New Folder, Move to… and Delete for a folder wait on their slice; the
+  menu for a selection waits on selecting. A rule only stands between two groups that both hold
+  rows, so an absent verb leaves no stray line, and a menu with nothing in it opens nothing.
 - **What a drive that is away cannot do is absent too.** An offline source keeps Rename, Manage
   Sources and Remove Source, which touch only the index; its folders have nothing left.
 - **Favourite on a place waits.** The drawing puts it on a folder's and a source's menu, but nothing
@@ -443,6 +442,9 @@ Shift+F10 did nothing at all.
 - **A source is renamed on its own row**, with the same keys as its name field in Settings:
   sending someone to Settings to rename the row they are on would be the menu pointing at a place
   instead of doing the act. It edits the app's label for the source, never the folder.
+- **A folder is renamed on its row too, and that one is on disk.** A name already there is said
+  under the row, and Enter waits until it is edited; leaving the field then keeps the name it
+  had, since what was typed cannot be used. The rename is an act like any other, with its line.
 - **Refresh walks one folder's subtree**, as the launch walk walks a source, judging nothing
   outside it. **Only one walk runs at a time:** each retires what it did not see, so a folder walk
   beside the whole walk would have the whole walk retire what the folder walk had just found.

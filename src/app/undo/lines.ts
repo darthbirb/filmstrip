@@ -2,6 +2,7 @@ import type { Batch } from "../../ipc/bindings/Batch";
 import type { Reason } from "../../ipc/bindings/Reason";
 import type { Stayed } from "../../ipc/bindings/Stayed";
 import type { UndoReport } from "../../ipc/bindings/UndoReport";
+import type { AppError } from "../../ipc/commands";
 import { formatCount } from "../../lib/format";
 
 // Every sentence an act and its undo say, as Artboards › Undo words them. DECISIONS.md "Undo".
@@ -99,6 +100,14 @@ export function movedBannerLine(moved: number, whole: number, to: string, one?: 
 export function deletedBannerLine(trashed: number, whole: number, one?: string) {
   if (trashed > 0) return `${formatCount(trashed)} of ${files(whole)} went to the Trash`;
   return `${one ?? `The ${files(whole)}`} could not go to the Trash`;
+}
+
+/** What a name field says under itself when the name was refused; nothing for any other failure. */
+export function refusedName(error: unknown): string | null {
+  const { kind, reason } = (error ?? {}) as AppError;
+  if (kind !== "refused" || !reason) return null;
+  if (reason.kind !== "nameTaken") return `${reasonText(reason)}.`;
+  return `${reason.place} already has a ${reason.folder ? "folder" : "file"} named ${reason.name}.`;
 }
 
 /** Why one row stayed, in the banner's Reason column. */

@@ -4,7 +4,7 @@ import { render } from "vitest-browser-react";
 
 import { recording } from "../../dev/recording";
 import type { FolderNode } from "../../ipc/bindings/FolderNode";
-import { folderItems } from "../../ipc/commands";
+import { folderItems, undoLast } from "../../ipc/commands";
 import { Grid } from "../grid/Grid";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { Navigation } from "../navigation/Navigation";
@@ -84,6 +84,8 @@ async function inCairo(name: string) {
 }
 
 beforeEach(async () => {
+  // Whatever an earlier test did to the mock's library is taken back first.
+  while (await undoLast()) {}
   closeSettings();
   setFullScreen(false);
   showInPane(null);
@@ -190,7 +192,7 @@ test("Favourite from a tile's menu shows on the pane's bar at once", async () =>
   expect(labels(again)[1]).toBe("Remove Favourite");
 });
 
-test("a folder's row reveals and reads again; a source's adds Rename, then the Sources section", async () => {
+test("a folder's row reveals, renames and reads again; a source's adds the Sources section", async () => {
   const screen = await render(<Harness />);
   const source = screen.getByRole("treeitem", { name: "Pictures" });
   const sourceMenu = await menuOn(screen, source, "Pictures");
@@ -211,7 +213,7 @@ test("a folder's row reveals and reads again; a source's adds Rename, then the S
   await userEvent.keyboard("{ArrowRight}");
   const trips = screen.getByRole("treeitem", { name: "Trips 2" });
   const folderMenu = await menuOn(screen, trips, "Trips");
-  expect(labels(folderMenu)).toEqual(["Show in Explorer", "Refresh"]);
+  expect(labels(folderMenu)).toEqual(["Show in Explorer", "Rename", "Refresh"]);
   expect(folderMenu.element().querySelectorAll("hr")).toHaveLength(0);
   expect(folderMenu.element().querySelector("p")).toBeNull();
 });
@@ -316,4 +318,50 @@ test("Rename makes the source's row a field: Escape and a blank keep the name, E
     await expect.element(field).not.toBeInTheDocument();
     expect(renames().at(-1)).toEqual(["rename_source", { id: 1, title: "Summer" }]);
   });
+});
+
+test("a folder's Rename says when the name is taken, holds Enter, and renames once it is mended", async () => {
+  const screen = await render(<Harness />);
+  await screen.getByRole("treeitem", { name: "Pictures" }).click();
+  await userEvent.keyboard("{ArrowRight}");
+  const trips = screen.getByRole("treeitem", { name: "Trips 2" });
+  const menu = await menuOn(screen, trips, "Trips");
+  await menu.getByRole("menuitem", { name: "Rename" }).click();
+  const field = screen.getByRole("textbox", { name: "Rename Trips" });
+  await expect.element(field).toHaveFocus();
+
+  await userEvent.keyboard("people{Enter}");
+  const taken = screen.getByText("Pictures already has a folder named people.");
+  await expect.element(taken).toBeVisible();
+  await expect.element(field).toHaveAttribute("aria-invalid", "true");
+  await userEvent.keyboard("{Enter}");
+  await expect.element(field).toHaveFocus();
+
+  await userEvent.keyboard("{Control>}a{/Control}Journeys");
+  await expect.element(field).toHaveAttribute("aria-invalid", "false");
+  await userEvent.keyboard("{Enter}");
+  await expect.element(screen.getByRole("treeitem", { name: "Journeys 2" })).toHaveFocus();
+  expect(screen.getByText("Pictures already has a folder named people.").elements()).toHaveLength(
+    0,
+  );
+});
+
+test("leaving a folder's field while its name is taken keeps the name it had", async () => {
+  const screen = await render(<Harness />);
+  await screen.getByRole("treeitem", { name: "Pictures" }).click();
+  await userEvent.keyboard("{ArrowRight}");
+  const trips = screen.getByRole("treeitem", { name: "Trips 2" });
+  const menu = await menuOn(screen, trips, "Trips");
+  await menu.getByRole("menuitem", { name: "Rename" }).click();
+  await userEvent.keyboard("People{Enter}");
+  await expect
+    .element(screen.getByText("Pictures already has a folder named People."))
+    .toBeVisible();
+
+  // Choosing Pictures to open it went there, so its own file is what is in the grid.
+  await screen.getByRole("button", { name: "cover.jpg" }).click();
+  await expect
+    .element(screen.getByRole("textbox", { name: "Rename Trips" }))
+    .not.toBeInTheDocument();
+  await expect.element(screen.getByRole("treeitem", { name: "Trips 2" })).toBeVisible();
 });

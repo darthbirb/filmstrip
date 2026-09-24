@@ -8,6 +8,7 @@ import {
   deletedBannerLine,
   movedBannerLine,
   reasonText,
+  refusedName,
   stayedGroups,
   undoBannerLine,
   undoneLine,
@@ -125,4 +126,15 @@ test("rows are grouped under the place each is still in, named from the folder t
     row("a.jpg", ["Pictures", "Cairo"], { kind: "notOnDisk", name: "a" }),
   ]);
   expect(gone[0]?.heading).toBe("Gone from Cairo");
+});
+
+test("a name field says where the name is taken, or why else it was refused", () => {
+  const taken = { kind: "nameTaken", place: "Trips", name: "Cairo", folder: true } as const;
+  expect(refusedName({ kind: "refused", message: "", reason: taken })).toBe(
+    "Trips already has a folder named Cairo.",
+  );
+  expect(refusedName({ kind: "refused", message: "", reason: { kind: "inUse" } })).toBe(
+    "Open in another app.",
+  );
+  expect(refusedName({ kind: "invalid", message: "no" })).toBeNull();
 });

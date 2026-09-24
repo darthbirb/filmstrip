@@ -3,6 +3,7 @@ import { useSyncExternalStore } from "react";
 import { renameItem } from "../../ipc/commands";
 import { libraryChanged } from "../library";
 import { updatePreferences } from "../preferences";
+import { refusedName } from "../undo/lines";
 import { afterAct } from "../undo/undo";
 
 // The file whose Name row is a field for now. Rename, from the ⋯ or a file's menu, opens the
@@ -36,11 +37,9 @@ export async function renameFile(itemId: number, name: string): Promise<string |
     }
     return null;
   } catch (error) {
-    const { kind, message } = error as { kind?: string; message?: string };
-    if (kind === "refused" && message)
-      return `${message.charAt(0).toUpperCase()}${message.slice(1)}.`;
-    stopRename();
-    return null;
+    const refused = refusedName(error);
+    if (!refused) stopRename();
+    return refused;
   }
 }
 
