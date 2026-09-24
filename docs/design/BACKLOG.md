@@ -16,17 +16,10 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## The app's own right-click menus: the verbs that change the disk · DRAWN
+## The selection's right-click menu · DRAWN
 
-Drawn on the Components sheet; what exists is built, DECISIONS.md "Right-click menus". What waits,
-on the undo journal (FEATURES.md "Export and undo"): a folder's New Folder, Move to…, Rename and
-Delete. New Folder lands a row already in its name field,
-and on a source's row makes a folder at its top level. Move to… is the file picker, with a folder's
-own descendants refused in it. A folder's Rename is the in-place field with its Taken state. Delete
-asks only when the folder holds something, naming each sorting source as its own answer, with a box
-that keeps the pick as the default in Settings › Sources; more sorting sources than the line holds
-fold into one Move Files to…. The selection's menu, with its count and "Delete 5 Files", waits on
-selecting.
+Components › Right-click: the selection's menu, with its count at the head and "Delete 5 Files".
+Everything else on a folder's and a source's menu is built; this waits on selecting.
 
 ## Favourite places · DRAWN
 
@@ -91,9 +84,3 @@ Artboards › Trash, Components › Right-click and Pane › 02: the Trash's gri
 heading per day, each tile captioned with the folder it came from ("gone" when that folder is); the
 pane's From and Deleted rows; a trashed file's bar and menu, Restore and Restore to… and nothing that
 purges; Restore refused, in the undo's banner; and Restore as the undo table's eighth act.
-
-## A delete that is refused, and what shows after one · DRAWN
-
-Artboards › Undo, "When a delete is refused": what is built is a file's. What waits is a folder's:
-the banner for a folder kept by a file the app does not show ("Holds notes.txt") and for one whose
-delete stopped partway, and where you stand after one, in its parent, or with it when it moved.
