@@ -6,6 +6,7 @@ import { removeSource, renameSource, revealSource, setSourceKind } from "../../i
 import { formatCount } from "../../lib/format";
 import { Band } from "../../ui/Band";
 import { Button } from "../../ui/Button";
+import { Dropdown } from "../../ui/Dropdown";
 import { EmptyState } from "../../ui/EmptyState";
 import { Glyph } from "../../ui/Glyph";
 import { GlyphButton } from "../../ui/GlyphButton";
@@ -14,6 +15,8 @@ import { addFolder, refusalSentence } from "../navigation/add-source";
 import { loadIndex, useIndex } from "../navigation/index-store";
 import { setRefused, useRefused } from "../navigation/refusal-store";
 import { useWork } from "../navigation/work-store";
+import { updatePreferences, usePreferences } from "../preferences";
+import { Caption, Rows } from "./Rows";
 
 const KINDS: readonly { value: SourceKind; label: string }[] = [
   { value: "library", label: "Library" },
@@ -51,6 +54,45 @@ export function Sources({ asking }: { asking?: number }) {
           Add Source…
         </Button>
       </div>
+      <DeleteDefault sources={held} />
+    </div>
+  );
+}
+
+const ASK = "ask";
+
+/**
+ * Where a deleted folder's files go without asking. It lives with the sorting sources it names,
+ * so a sorting source removed takes its default with it. DECISIONS.md "Right-click menus".
+ */
+function DeleteDefault({ sources }: { sources: readonly SourceSummary[] }) {
+  const { deleteInto } = usePreferences();
+  const sorting = sources.filter((source) => source.kind === "sorting");
+  if (sorting.length === 0) return null;
+  const value = sorting.some((source) => source.id === deleteInto) ? String(deleteInto) : ASK;
+  const options = [
+    { value: ASK, label: "Ask Each Time" },
+    ...sorting.map((source) => ({
+      value: String(source.id),
+      label: source.title,
+      glyph: "sortingBox" as const,
+    })),
+  ];
+  const control = (
+    <Dropdown
+      label="Move Its Files To"
+      align="end"
+      options={options}
+      value={value}
+      onChange={(next) =>
+        updatePreferences({ deleteInto: next === ASK ? undefined : Number(next) })
+      }
+    />
+  );
+  return (
+    <div className="mt-2 flex flex-col gap-1.5">
+      <Caption>Deleting a Folder</Caption>
+      <Rows rows={[{ label: "Move Its Files To", control }]} />
     </div>
   );
 }

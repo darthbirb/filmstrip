@@ -6,9 +6,8 @@ import { GlyphButton } from "../../ui/GlyphButton";
 import type { GlyphName } from "../../ui/glyphs";
 import { DEFAULT_LAYOUT, type LayoutMode } from "../grid/layout";
 import { SCALES, updatePreferences, usePreferences } from "../preferences";
+import { Caption, type Row, Rows } from "./Rows";
 import { Sources } from "./Sources";
-
-type Row = { label: string; control: ReactNode };
 
 type Section = {
   id: string;
@@ -188,20 +187,8 @@ function Body({ onClose, section, asking }: Omit<Props, "open">) {
         <div className="min-w-0 flex-1 overflow-auto p-3.5">
           {shown ? (
             <section aria-label={shown.title} className="flex flex-col gap-1.5">
-              <h3 className="m-0 pl-0.5 text-eyebrow text-fg-dim uppercase">{shown.caption}</h3>
-              {shown.body ?? (
-                <div className="flex flex-col rounded-control bg-inset inset-ring inset-ring-line-control">
-                  {shown.rows.map((row) => (
-                    <div
-                      key={row.label}
-                      className="flex min-h-toolbar items-center gap-4 border-line px-3 py-1.5 not-first:border-t"
-                    >
-                      <span className="min-w-0 flex-1 text-fg text-ui">{row.label}</span>
-                      {row.control}
-                    </div>
-                  ))}
-                </div>
-              )}
+              <Caption>{shown.caption}</Caption>
+              {shown.body ?? <Rows rows={shown.rows} />}
             </section>
           ) : (
             <p className="m-0 text-fg-dim text-ui">No setting matches “{query.trim()}”.</p>

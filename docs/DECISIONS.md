@@ -539,7 +539,10 @@ and Escape or a click outside leaves nothing behind. It is the only thing over t
 the only use of the scrim.
 
 **A preference belongs there only when there is nowhere on screen to set it.** Today that is the
-interface size and the grid's layout. The panel widths, which panels are folded, the tile size
+interface size, the grid's layout, and where a deleted folder's files go without asking. That
+last one sits in Sources under the sorting sources it names, not under Appearance, so removing a
+sorting source takes its default with it and the row falls back to asking; with no sorting source
+there is nothing for it to name and the row is not there. The panel widths, which panels are folded, the tile size
 and whether the pane's details are open all keep their controls where they are: a second control
 for the same thing is a second thing to keep in sync.
 

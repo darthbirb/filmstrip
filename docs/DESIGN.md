@@ -638,7 +638,8 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Settings.** A dialog over the `scrim`: a header with its `title` and a close button; a rail of
   sections grouped under `eyebrow` captions, with a filter field on `ground` above them, the one
   shown on `raised-hi`; and the section's settings as rows in an `inset` group, each a label and
-  its control.
+  its control. A section whose body is its own, as Sources is, can close with a caption of its
+  own over such rows.
 - **Band.** What could not be done, at the foot of the panel it was asked from: a sentence, the
   folder's path under it in `--font-mono`, and a dismiss, on a `danger-wash` ground. There is only
   ever one, and a second refusal replaces it rather than stacking.
