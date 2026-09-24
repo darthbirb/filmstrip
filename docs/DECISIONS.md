@@ -331,6 +331,15 @@ already known; a button that only restates the situation is worse than no button
 folders are not known yet says nothing at all rather than guessing at "empty", and an unreachable
 source says what it last held — see "A walk only judges what it read".
 
+**The Trash is a place like any folder, with two differences**, drawn by Claude Design and built
+on 25 September 2026. It runs newest first under a heading for each day something went, Today and
+Yesterday and then the date, and a day starts a row of its own; the minute is in the pane's
+Deleted row. **Each tile says where it came from**, in one line under the tile rather than on it,
+because in the Trash that is what a person needs before putting it back: the folder's name only,
+its whole path in the tooltip and the pane, and "gone" when that folder no longer stands, so a
+refused Restore is not the first they hear of it. The line ellipsises and the tile never grows to
+fit it. The Trash counts itself on its row, its rail square and its header, with its size there.
+
 ## The pane
 
 **The picture, a row that opens onto what is known, and a filmstrip**: the predecessor's

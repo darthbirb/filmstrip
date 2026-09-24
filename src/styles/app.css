@@ -158,6 +158,10 @@
   --spacing-mark-badge: 0.875rem;
   --spacing-tile-gap: 0.375rem;
   --spacing-tile-inset: 0.5rem;
+  /* A heading over a run of tiles, as each day is in the Trash. */
+  --spacing-heading: 1.5rem;
+  /* The room under a tile for the one line said about it, the gap above that line included. */
+  --spacing-tile-caption: 1.3125rem;
   --spacing-strip: 6rem;
   --spacing-strip-inset: 0.375rem;
   --spacing-strip-step: 1.5rem;

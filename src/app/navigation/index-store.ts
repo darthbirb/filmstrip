@@ -4,25 +4,30 @@ import type { FolderEntry } from "../../ipc/bindings/FolderEntry";
 import type { FolderNode } from "../../ipc/bindings/FolderNode";
 import type { Progress } from "../../ipc/bindings/Progress";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
-import { folderChildren, listFolders, listSources } from "../../ipc/commands";
+import type { TrashSummary } from "../../ipc/bindings/TrashSummary";
+import { folderChildren, listFolders, listSources, trashSummary } from "../../ipc/commands";
 import { getPaneOrigin, movePaneOrigin, showInPane } from "../pane/pane-store";
 import { type Crumb, getPlace, type Place, setPlace } from "../place";
 import { openFolders, setOpenFolders } from "./open-folders";
 
-/** The index as navigation reads it: the sources, and each folder's children once asked for. */
+/**
+ * The index as navigation reads it: the sources, each folder's children once asked for, and how
+ * much the Trash holds.
+ */
 type Snapshot = {
   sources: SourceSummary[] | null;
   children: ReadonlyMap<number, FolderNode[]>;
+  trash: TrashSummary | null;
 };
 
-let snapshot: Snapshot = { sources: null, children: new Map() };
+let snapshot: Snapshot = { sources: null, children: new Map(), trash: null };
 const pending = new Set<number>();
 const listeners = new Set<() => void>();
 
 /** Reads the sources and their top-level folders, then settles where the window is looking. */
 export async function loadIndex() {
-  const sources = await listSources();
-  publish({ sources, children: new Map() });
+  const [sources, trash] = await Promise.all([listSources(), trashSummary().catch(() => null)]);
+  publish({ sources, children: new Map(), trash });
   ensureChildren(sources.map((source) => source.rootFolderId));
   await settle(sources);
 }
@@ -80,16 +85,17 @@ export function useIndex() {
  */
 export async function refreshIndex() {
   const known = [...snapshot.children.keys()];
-  const [sources, lists] = await Promise.all([
+  const [sources, lists, trash] = await Promise.all([
     listSources(),
     Promise.all(known.map((id) => folderChildren(id).catch(() => null))),
+    trashSummary().catch(() => null),
   ]);
   const children = new Map<number, FolderNode[]>();
   known.forEach((id, at) => {
     const list = lists[at];
     if (list) children.set(id, list);
   });
-  publish({ sources, children });
+  publish({ sources, children, trash });
   await settle(sources);
 }
 
@@ -145,7 +151,7 @@ export function ensureChildren(folderIds: number[]) {
 export function resetIndex() {
   pending.clear();
   setOpenFolders(new Set());
-  publish({ sources: null, children: new Map() });
+  publish({ sources: null, children: new Map(), trash: null });
 }
 
 function publish(next: Snapshot) {

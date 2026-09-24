@@ -14,6 +14,12 @@ export type LayoutRequest = {
   /** A justified row's height before it is fitted; a uniform cell's side. */
   target: number;
   gap: number;
+  /** Where each run of tiles under its own heading begins, as indexes, ascending from 0. */
+  groups?: Uint32Array;
+  /** The room above each group, for its heading. */
+  lead?: number;
+  /** The room under each row, for the words under its tiles. */
+  below?: number;
 };
 
 export type LayoutResult = {
@@ -27,6 +33,8 @@ export type LayoutResult = {
   rowLength: Uint32Array;
   itemLeft: Float32Array;
   itemWidth: Float32Array;
+  /** Where each group's heading stands; none when the request had no groups. */
+  groupTops: Float32Array;
 };
 
 /** A row may grow to fill the width, but not past this multiple of the target height. */
@@ -35,7 +43,64 @@ const MAX_ROW_SCALE = 2.4;
 const MIN_ASPECT = 0.08;
 
 export function layout(request: LayoutRequest): LayoutResult {
-  return request.mode === "uniform" ? uniform(request) : justified(request);
+  const one = request.mode === "uniform" ? uniform : justified;
+  const { groups, lead = 0, below = 0 } = request;
+  if (!groups?.length && lead === 0 && below === 0) return one(request);
+  return stacked(request, one, groups?.length ? [...groups] : [0], lead, below);
+}
+
+/**
+ * Each group laid out on its own, one under the next, a gap between them and the lead above each,
+ * so a group always starts a row of its own; every row keeps `below` free under it.
+ */
+function stacked(
+  request: LayoutRequest,
+  one: (request: LayoutRequest) => LayoutResult,
+  starts: number[],
+  lead: number,
+  below: number,
+): LayoutResult {
+  const count = request.aspects.length;
+  const itemLeft = new Float32Array(count);
+  const itemWidth = new Float32Array(count);
+  const groupTops = new Float32Array(starts.length);
+  const tops: number[] = [];
+  const heights: number[] = [];
+  const rowStarts: number[] = [];
+  const lengths: number[] = [];
+  let y = 0;
+  starts.forEach((start, group) => {
+    const end = starts[group + 1] ?? count;
+    if (group > 0) y += request.gap;
+    groupTops[group] = y;
+    y += lead;
+    const part = one({ ...request, aspects: request.aspects.subarray(start, end) });
+    for (let row = 0; row < part.rows; row += 1) {
+      tops.push(y + (part.rowTops[row] ?? 0) + row * below);
+      heights.push(part.rowHeights[row] ?? 0);
+      rowStarts.push(start + (part.rowStart[row] ?? 0));
+      lengths.push(part.rowLength[row] ?? 0);
+    }
+    itemLeft.set(part.itemLeft, start);
+    itemWidth.set(part.itemWidth, start);
+    y += part.totalHeight + part.rows * below;
+  });
+  const rows = tops.length;
+  const rowTops = new Float32Array(rows + 1);
+  rowTops.set(tops);
+  rowTops[rows] = y;
+  return {
+    id: request.id,
+    rows,
+    totalHeight: y,
+    rowTops,
+    rowHeights: Float32Array.from(heights),
+    rowStart: Uint32Array.from(rowStarts),
+    rowLength: Uint32Array.from(lengths),
+    itemLeft,
+    itemWidth,
+    groupTops,
+  };
 }
 
 /** Rows filled edge to edge, each picture at its own shape; the last row keeps the target height. */
@@ -96,6 +161,7 @@ export function justified({ id, aspects, width, target, gap }: LayoutRequest): L
     rowLength: Uint32Array.from(lengths),
     itemLeft,
     itemWidth,
+    groupTops: new Float32Array(0),
   };
 }
 
@@ -113,6 +179,7 @@ export function uniform({ id, aspects, width, target, gap }: LayoutRequest): Lay
       rowLength: new Uint32Array(0),
       itemLeft: new Float32Array(0),
       itemWidth: new Float32Array(0),
+      groupTops: new Float32Array(0),
     };
   }
 
@@ -146,6 +213,7 @@ export function uniform({ id, aspects, width, target, gap }: LayoutRequest): Lay
     rowLength,
     itemLeft,
     itemWidth,
+    groupTops: new Float32Array(0),
   };
 }
 

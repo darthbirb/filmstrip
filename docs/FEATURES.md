@@ -68,7 +68,7 @@ drawn. **Not started** — neither.
 | Rename a file, on disk | Built | `rename_item`, the pane's Name row; not in ggallery; a name already taken is refused |
 | Paste files in, and take an OS drop | Not started | |
 | Copy an item's path | Not started | |
-| Counts: unsorted, trashed, totals, arrival duplicates | Partly | the foot counts items and sources |
+| Counts: unsorted, trashed, totals, arrival duplicates | Partly | the foot counts items and sources, the Trash its files and their size |
 
 ## The pane
 
@@ -110,7 +110,8 @@ drawn. **Not started** — neither.
 | Select in a grid, and act on the selection | Not started | |
 | Move a selection somewhere | Not started | |
 | Destination hotkeys | Not started | no migration yet |
-| The trash as a place, with its own limits | Partly | the row and its empty state are built, and items can be trashed; the place does not list them yet, and there are no limits |
+| The trash as a place, with its own limits | Partly | `trash_listing`, `trash_summary`: newest first under a heading per day, each tile saying where it came from, counted on its row and header; there are no limits yet |
+| Restore from the trash, or restore to another folder | Built | `restore_items`, journalled; Restore and Restore to… on a trashed file's bar and menu, refused into the banner |
 | Purge the trash, the one irreversible act | Not started | |
 
 ## Export and undo

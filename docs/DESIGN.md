@@ -117,6 +117,8 @@ spacing:
   mark-badge: 0.875rem
   tile-gap: 0.375rem
   tile-inset: 0.5rem
+  heading: 1.5rem
+  tile-caption: 1.3125rem
   strip: 6rem
   strip-inset: 0.375rem
   strip-step: 1.5rem
@@ -562,7 +564,8 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Checkbox.** A `badge` square at the `badge` corner on `raised` in a `line-control` ring,
   filled with `plate` and a check in `on-plate` when ticked; its sentence beside it in `fg-mid`,
   `fg` under the pointer or ticked. The ring the keyboard sees is on the square.
-- **Breadcrumb.** Folders above as quiet `row` steps back, the place itself as the `title`.
+- **Breadcrumb.** Folders above as quiet `row` steps back, the place itself as the `title`. The
+  Trash's header adds what it holds and its size after the title, in `small` tabular `fg-dim`.
 - **Dropdown.** One named choice: a `control`-tall button on `raised` naming what it is on, a
   caret after it, opening a menu of every choice beneath it on `raised` with the overlay shadow.
   The chosen option wears the `plate`. The keyboard opens it with the arrows and Escape puts it
@@ -572,6 +575,10 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   ring drawn inside its edge and an *In Pane* plate with an eye, which never wraps and drops its
   words on a tile narrower than `--container-badge`. A video's tile writes its length on `veil`
   in the opposite corner. Keyboard focus is the `focus` ring outside, so both can show at once.
+  In the Trash a line goes under the tile, in the `tile-caption` room below it: the folder it came
+  from in `small` `fg-mid`, and "· gone" after it in `fg-dim`. It ellipsises at the tile's width.
+- **Day heading.** Over each run of tiles in the Trash, `eyebrow` capitals in `fg-dim`, standing
+  on the `heading` room above the run, a `tile-gap` over its first row.
 - **The pane's picture.** Sized by its own shape and centred in what the pane has left, at the
   `control` corner, with nothing drawn behind it: the space around it is the pane.
 - **Pane disclosure.** The pane's header row: a chevron and the item's shape, length and size in
@@ -582,6 +589,7 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   each one that does not fit moves into a menu under a `more` glyph. What fits is measured against
   the real width, never a width written down. Favourite marks itself with the filled glyph on a
   `raised-hi` plate and never a hue: a flag needing a colour to be legible is drawn too small.
+  A file in the Trash has two worded buttons from the left, Restore and Restore to…, and no ⋯.
 - **Menu.** A `menu`-wide list of actions on `panel` at the `control` corner, with the
   `line-control` hairline and the overlay shadow. Its rows are `control` tall in `fg`, each glyph
   `glyph`-sized in `fg-dim`, and `raised-hi` under the pointer. A rule in `line` stands between two

@@ -1,8 +1,17 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { type ReactElement, type RefObject, useLayoutEffect, useRef, useState } from "react";
+import {
+  type ReactElement,
+  type RefObject,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
-import { formatDuration } from "../../lib/format";
+import type { Origin } from "../../ipc/bindings/Origin";
+import type { Trashed } from "../../ipc/bindings/Trashed";
+import { formatDay, formatDuration } from "../../lib/format";
 import { useContextMenu } from "../../ui/Menu";
 import { SkeletonTile } from "../../ui/Skeleton";
 import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
@@ -27,7 +36,18 @@ export function Grid({ mode }: { mode: LayoutMode }) {
   const view = useViewport(scroller);
   const gap = view.gap;
   const rowHeight = tileSize(tile) * view.rem;
-  const result = useLayout(items ?? [], view.width - gap * 2, rowHeight, gap, mode);
+  // The Trash runs newest first under a heading per day, each tile saying where it came from.
+  // Only once its own rows have come: the place changes a render before the items do.
+  const trashed =
+    place?.kind === "trash" && items?.every((item) => "trashedAt" in item)
+      ? (items as Trashed[])
+      : null;
+  const days = useMemo(() => (trashed ? byDay(trashed) : null), [trashed]);
+  const sections = useMemo(
+    () => days && { groups: days.starts, lead: view.heading + gap, below: view.caption },
+    [days, view.heading, view.caption, gap],
+  );
+  const result = useLayout(items ?? [], view.width - gap * 2, rowHeight, gap, mode, sections);
   const reading = place !== null && items === null;
 
   const tiles: ReactElement[] = [];
@@ -51,6 +71,8 @@ export function Grid({ mode }: { mode: LayoutMode }) {
             top={(result.rowTops[row] ?? 0) + gap}
             width={result.itemWidth[index] ?? 0}
             height={result.rowHeights[row] ?? 0}
+            origin={trashed?.[index]?.from}
+            below={sections?.below ?? 0}
           />,
         );
       }
@@ -74,11 +96,35 @@ export function Grid({ mode }: { mode: LayoutMode }) {
           className="relative"
           style={{ height: result && items?.length ? result.totalHeight + gap * 2 : 0 }}
         >
+          {/* Drawn once the layout that made room for them has come back. */}
+          {result?.groupTops.length === days?.headings.length &&
+            days?.headings.map((day, group) => (
+              <h3
+                key={day}
+                className="absolute m-0 flex h-heading items-end px-0.5 text-eyebrow text-fg-dim uppercase"
+                style={{ top: (result?.groupTops[group] ?? 0) + gap, left: gap, right: gap }}
+              >
+                {day}
+              </h3>
+            ))}
           {tiles}
         </div>
       )}
     </div>
   );
+}
+
+/** Where each day's run begins, newest first, and the heading it goes under. */
+function byDay(items: readonly Trashed[]) {
+  const starts: number[] = [];
+  const headings: string[] = [];
+  items.forEach((item, index) => {
+    const day = formatDay(item.trashedAt);
+    if (day === headings.at(-1)) return;
+    starts.push(index);
+    headings.push(day);
+  });
+  return { starts: Uint32Array.from(starts), headings };
 }
 
 // Common photograph shapes, so the stand-ins look like the rows that replace them.
@@ -145,13 +191,21 @@ type TileProps = {
   top: number;
   width: number;
   height: number;
+  /** For a file in the Trash: the folder it came from, said under the tile. */
+  origin?: Origin;
+  /** The room under the tile for that line. */
+  below: number;
 };
 
-function Tile({ item, from, shown, left, top, width, height }: TileProps) {
+function Tile({ item, from, shown, left, top, width, height, origin, below }: TileProps) {
   // Opening it moves nothing: the pane keeps what it shows until a verb says otherwise.
   const context = useContextMenu();
   return (
-    <figure title={item.diskName} className="absolute m-0" style={{ left, top, width, height }}>
+    <figure
+      title={item.diskName}
+      className="absolute m-0"
+      style={{ left, top, width, height: height + below }}
+    >
       {context.menu}
       <button
         type="button"
@@ -177,7 +231,8 @@ function Tile({ item, from, shown, left, top, width, height }: TileProps) {
           showInPane(item.id, from);
           setFullScreen(true);
         }}
-        className={`focus-ring block size-full ${THUMB_FRAME}`}
+        className={`focus-ring block w-full ${THUMB_FRAME}`}
+        style={{ height }}
       >
         <ThumbFace
           src={item.thumb ? convertFileSrc(item.thumb) : undefined}
@@ -189,13 +244,33 @@ function Tile({ item, from, shown, left, top, width, height }: TileProps) {
           }
         />
       </button>
+      {origin && (
+        // The folder's name only; its whole path is the tooltip, and the pane's From row.
+        <figcaption
+          title={origin.path.join(" › ")}
+          className="flex h-tile-caption items-end px-0.5 text-small"
+        >
+          <span className="truncate text-fg-mid">
+            {origin.path.at(-1)}
+            {origin.gone && <span className="text-fg-dim"> · gone</span>}
+          </span>
+        </figcaption>
+      )}
     </figure>
   );
 }
 
 /** The scroller's size and position in pixels, with the root size and the tile gap they turn on. */
 function useViewport(ref: RefObject<HTMLElement | null>) {
-  const [view, setView] = useState({ width: 0, height: 0, top: 0, rem: 16, gap: 0 });
+  const [view, setView] = useState({
+    width: 0,
+    height: 0,
+    top: 0,
+    rem: 16,
+    gap: 0,
+    heading: 0,
+    caption: 0,
+  });
 
   useLayoutEffect(() => {
     const scroller = ref.current;
@@ -206,16 +281,16 @@ function useViewport(ref: RefObject<HTMLElement | null>) {
     document.body.append(probe);
     const measure = () => {
       const rem = probe.getBoundingClientRect().width;
-      const gap =
-        Number.parseFloat(
-          getComputedStyle(document.documentElement).getPropertyValue("--spacing-tile-gap"),
-        ) * rem;
+      const root = getComputedStyle(document.documentElement);
+      const token = (name: string) => Number.parseFloat(root.getPropertyValue(name)) * rem;
       setView({
         width: scroller.clientWidth,
         height: scroller.clientHeight,
         top: scroller.scrollTop,
         rem,
-        gap,
+        gap: token("--spacing-tile-gap"),
+        heading: token("--spacing-heading"),
+        caption: token("--spacing-tile-caption"),
       });
     };
     measure();

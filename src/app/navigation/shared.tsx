@@ -1,5 +1,6 @@
 import type { FolderNode } from "../../ipc/bindings/FolderNode";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
+import type { TrashSummary } from "../../ipc/bindings/TrashSummary";
 import { Button } from "../../ui/Button";
 import { EmptyState } from "../../ui/EmptyState";
 import type { TreeRow } from "../../ui/Tree";
@@ -40,8 +41,10 @@ export function sortingRow(sources: SourceSummary[], onNominate?: () => void): T
   };
 }
 
-export function trashRow(): TreeRow {
-  return { id: TRASH_ID, label: "Trash", level: 1, expandable: false, glyph: "trash" };
+/** The Trash, with the number of files waiting in it. */
+export function trashRow(trash: TrashSummary | null = null): TreeRow {
+  const count = trash && trash.count > 0 ? trash.count : undefined;
+  return { id: TRASH_ID, label: "Trash", level: 1, expandable: false, glyph: "trash", count };
 }
 
 /** A source's own row. One that cannot be read is muted and says so, but keeps its folders. */

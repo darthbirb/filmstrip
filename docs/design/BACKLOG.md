@@ -77,10 +77,3 @@ the track and the time never leave. Losing half the time is not in that order, s
 oversight or the time abbreviates and the rule has to say so.
 
 Say what the time does as the plate narrows.
-
-## The Trash, holding files · DRAWN
-
-Artboards › Trash, Components › Right-click and Pane › 02: the Trash's grid, newest first under a
-heading per day, each tile captioned with the folder it came from ("gone" when that folder is); the
-pane's From and Deleted rows; a trashed file's bar and menu, Restore and Restore to… and nothing that
-purges; Restore refused, in the undo's banner; and Restore as the undo table's eighth act.
