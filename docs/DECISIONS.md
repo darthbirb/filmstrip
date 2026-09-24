@@ -382,6 +382,15 @@ the field but outside the selection, so it can be changed on purpose and not by 
 already taken is said under the field, which keeps it and holds Enter until it is edited; nothing
 is renamed behind the person's back and no suffix is invented.
 
+**A file in the Trash has the way back and nothing else**, drawn by Claude Design and built on 25
+September 2026. Its bar holds Restore and Restore to…, worded and from the left, and no ⋯, since
+nothing is left to fold; its menu holds the same two under Full Screen. Favourite, Move to… and
+Rename would change a file that is not in the library, and Show in Explorer, Copy and Open with
+Default App would hand Windows the name the Trash keeps it under, never the one it was given; all
+of them are absent rather than greyed. Nothing purges: emptying the Trash is under Later. Its
+details say where it came from and when it went, in place of where it is, and the Name row is
+only its name. Restored from the Trash, the pane moves on as it does after a delete.
+
 **Full screen is a state of the pane, not a place you go**, drawn on 15 September 2026 and built
 the day after. The pane takes the frame below the bar and keeps every part it has; the bar stays,
 because native decorations are off and it is the only way left to close or minimise the window.
@@ -487,6 +496,9 @@ it.
   the dialog holds the keyboard, and an undo behind it would change what the person cannot see.
 - **An undo that came back in part answers with the banner, not the line.** What stayed is
   something only the person can settle, so it sits over the grid, open, with Retry.
+- **A row still in the Trash is never shown in Explorer**, which would show the name the Trash
+  keeps it under. After an undo its button is Show in Trash, which goes there with the file in
+  the pane; after a refused Restore it is Restore to…, since the answer is a place to choose.
 
 - **The disk changes first, then the index and the journal together.** A disk that refuses leaves
   nothing claiming it succeeded, and a transaction that fails puts the disk back.

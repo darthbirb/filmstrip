@@ -43,6 +43,7 @@ export const GLYPHS = {
   undo: { icon: "arrow-counter-clockwise", code: 0xe038 },
   moveTo: { icon: "folder-simple-plus", code: 0xe25e },
   newFolder: { icon: "folder-plus", code: 0xe258 },
+  putBack: { icon: "arrow-u-up-left", code: 0xe08a },
 } as const;
 
 export type GlyphName = keyof typeof GLYPHS;

@@ -2,7 +2,13 @@ import { Fragment, type ReactNode, useState } from "react";
 
 import type { EffectiveTag } from "../../ipc/bindings/EffectiveTag";
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
-import { formatBytes, formatDate, formatDimensions, formatDuration } from "../../lib/format";
+import {
+  formatBytes,
+  formatDate,
+  formatDimensions,
+  formatDuration,
+  formatWhen,
+} from "../../lib/format";
 import { Chip, Stat } from "../../ui/Chip";
 import { type Fact, Facts } from "../../ui/Facts";
 import { Glyph } from "../../ui/Glyph";
@@ -12,6 +18,24 @@ import { renameFile, startRename, stopRename, useRenaming } from "./rename";
 
 /** Where the item is, its file, its dates, its labels and tags, and the name it has on disk. */
 export function Details({ item, tags }: { item: ItemDetail; tags: EffectiveTag[] }) {
+  // In the Trash it is where it came from and when it went; its own name, never the Trash's.
+  if (item.trashedAt !== null) {
+    return (
+      <Facts
+        facts={[
+          ["From", <From key="from" item={item} />],
+          ["Deleted", formatWhen(item.trashedAt)],
+          ["File", <File key="file" item={item} />],
+          [
+            "Name",
+            <span key="name" className="break-all">
+              {item.diskName}
+            </span>,
+          ],
+        ]}
+      />
+    );
+  }
   const facts: Fact[] = [
     ["Where", <Where key="where" item={item} />],
     ["File", <File key="file" item={item} />],
@@ -86,6 +110,20 @@ function Where({ item }: { item: ItemDetail }) {
               {folder.title}
             </Step>
           )}
+        </Fragment>
+      ))}
+    </span>
+  );
+}
+
+/** The folder a trashed file left, named down from its source; it may have gone, so it goes nowhere. */
+function From({ item }: { item: ItemDetail }) {
+  return (
+    <span className="flex flex-wrap items-center gap-x-1.5 text-fg-mid">
+      {item.folders.map((folder, index) => (
+        <Fragment key={folder.id}>
+          {index > 0 && <Glyph name="chevronRight" className="text-fg-faint text-glyph-small" />}
+          <span>{folder.title}</span>
         </Fragment>
       ))}
     </span>

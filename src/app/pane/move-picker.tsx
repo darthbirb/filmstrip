@@ -10,12 +10,20 @@ import { getPreferences, RECENT, updatePreferences, usePreferences } from "../pr
 import { movedBannerLine } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
+import { restoreFiles } from "./restore";
 
 /** A folder to move, with everything in it. */
 export type MovingFolder = { id: number; name: string };
 
-/** Files or a folder to move, the folder they are in now, and what asked for the picker. */
-export type MoveRequest = ({ itemIds: number[] } | { folder: MovingFolder }) & {
+/**
+ * Files or a folder to move, or files to take out of the Trash; the folder they are in now, or
+ * came from; and what asked for the picker.
+ */
+export type MoveRequest = (
+  | { itemIds: number[] }
+  | { folder: MovingFolder }
+  | { restoring: number[] }
+) & {
   folderId: number;
   anchor: MenuAnchor;
 };
@@ -102,7 +110,7 @@ function MovePicker({ request }: { request: MoveRequest }) {
 
   return (
     <Picker
-      label="Move to"
+      label={"restoring" in request ? "Restore to" : "Move to"}
       placeholder="Filter folders"
       anchor={request.anchor}
       sections={sections}
@@ -117,6 +125,7 @@ function MovePicker({ request }: { request: MoveRequest }) {
       onPick={(id) => {
         const to = byId.get(id);
         if (!to) return;
+        if ("restoring" in request) return void restoreFiles(request.restoring, to);
         if (!("folder" in request)) return void moveFiles(request.itemIds, to);
         const from = { folderId: request.folderId, path: pathOf(byId, request.folderId) };
         void moveFolderTo(request.folder, to, from);

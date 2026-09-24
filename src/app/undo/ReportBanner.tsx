@@ -4,6 +4,9 @@ import type { Stayed } from "../../ipc/bindings/Stayed";
 import { revealFolder, revealHeld, revealItem } from "../../ipc/commands";
 import { Banner, LIST_HEADING, LIST_ROW, listRow } from "../../ui/Banner";
 import { Glyph } from "../../ui/Glyph";
+import { openMovePicker } from "../pane/move-picker";
+import { showInPane } from "../pane/pane-store";
+import { setPlace } from "../place";
 import { reasonText, stayedGroups } from "./lines";
 import { type Report, showReport, useReport } from "./report-store";
 
@@ -38,7 +41,7 @@ function Shown({ report }: { report: Report }) {
             <span />
           </div>
           {group.rows.map((row) => (
-            <Row key={`${row.kind}-${row.id}`} row={row} />
+            <Row key={`${row.kind}-${row.id}`} row={row} inTrash={report.inTrash ?? "show"} />
           ))}
         </Fragment>
       ))}
@@ -52,7 +55,10 @@ function reveal(row: Stayed) {
   return row.reason.kind === "holds" ? revealHeld(row.id) : revealFolder(row.id);
 }
 
-function Row({ row }: { row: Stayed }) {
+const GO =
+  "focus-ring grid size-control place-items-center justify-self-end rounded-control text-fg-dim text-glyph transition-colors duration-(--motion-quick) hover:bg-wash hover:text-fg motion-reduce:transition-none";
+
+function Row({ row, inTrash }: { row: Stayed; inTrash: "show" | "restoreTo" }) {
   // Explorer has nothing to show for a file gone from disk, or one under the trash's own name.
   const showable = row.at.kind === "folder" && row.reason.kind !== "notOnDisk";
   return (
@@ -70,13 +76,56 @@ function Row({ row }: { row: Stayed }) {
           aria-label={`Show ${row.name} in Explorer`}
           title="Show in Explorer"
           onClick={() => void reveal(row).catch(() => undefined)}
-          className="focus-ring grid size-control place-items-center justify-self-end rounded-control text-fg-dim text-glyph transition-colors duration-(--motion-quick) hover:bg-wash hover:text-fg motion-reduce:transition-none"
+          className={GO}
         >
           <Glyph name="folderOpen" />
         </button>
+      ) : row.at.kind === "trash" ? (
+        <InTrash row={row} offers={inTrash} />
       ) : (
         <span />
       )}
     </div>
+  );
+}
+
+/**
+ * A file still in the Trash, which Explorer would show under a name never given it: its own place
+ * in navigation shows it instead, or, after a refused Restore, the picker offers another folder.
+ */
+function InTrash({ row, offers }: { row: Stayed; offers: "show" | "restoreTo" }) {
+  if (offers === "restoreTo") {
+    return (
+      <button
+        type="button"
+        aria-label={`Restore ${row.name} to…`}
+        title="Restore to…"
+        onClick={(event) =>
+          openMovePicker({
+            restoring: [row.id],
+            folderId: 0,
+            anchor: { element: event.currentTarget },
+          })
+        }
+        className={GO}
+      >
+        <Glyph name="moveTo" />
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      aria-label={`Show ${row.name} in Trash`}
+      title="Show in Trash"
+      onClick={() => {
+        const trash = { kind: "trash" } as const;
+        setPlace(trash);
+        showInPane(row.id, trash);
+      }}
+      className={GO}
+    >
+      <Glyph name="trash" />
+    </button>
   );
 }
