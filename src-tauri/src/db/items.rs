@@ -216,6 +216,15 @@ pub fn set_folder(conn: &Connection, id: i64, folder_id: i64, disk_name: &str) -
     Ok(())
 }
 
+/// Records a rename; the caller renames the file. The extension follows the name.
+pub fn set_name(conn: &Connection, id: i64, disk_name: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE item SET disk_name = ?1, ext = ?2 WHERE id = ?3",
+        params![disk_name, crate::fs::paths::extension_of(disk_name), id],
+    )?;
+    Ok(())
+}
+
 /// Removes a retired row outright: one whose file a walk found gone, holding a name another file
 /// is now arriving at.
 pub fn forget_retired(conn: &Connection, id: i64) -> Result<()> {

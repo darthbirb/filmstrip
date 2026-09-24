@@ -1,31 +1,23 @@
 import { useSyncExternalStore } from "react";
 
-import type { Refusal } from "../../ipc/bindings/Refusal";
+import { getNews, type Refused, setNews, subscribeNews } from "./foot-slot";
 
-/** A folder the app would not take, and the source that stands in the way. */
-export type Refused = { why: Refusal; clash: string | null; path: string };
+export type { Refused };
 
-// There is only ever one: a folder refused while the last is still showing takes its
-// place, because two bands are two folders. DECISIONS.md "Places, not queries".
-let refused: Refused | null = null;
-const listeners = new Set<() => void>();
+// There is only ever one: a folder refused while the last is still showing takes its place,
+// because two bands are two folders. DECISIONS.md "Places, not queries".
 
 export function getRefused() {
-  return refused;
+  const news = getNews();
+  return news?.kind === "refused" ? news.refused : null;
 }
 
+/** Shows a refusal in the foot's slot, or clears it; clearing leaves any other news alone. */
 export function setRefused(next: Refused | null) {
-  refused = next;
-  for (const listener of listeners) listener();
+  if (next) setNews({ kind: "refused", refused: next });
+  else if (getNews()?.kind === "refused") setNews(null);
 }
 
 export function useRefused() {
-  return useSyncExternalStore(subscribe, getRefused);
-}
-
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
+  return useSyncExternalStore(subscribeNews, getRefused);
 }

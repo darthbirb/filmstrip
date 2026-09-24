@@ -356,12 +356,24 @@ turned down live on 13 September 2026, and re-derived from ggallery's drawing.
 September 2026: favourite at the left, and reveal, copy and open filling in from the right.
 **What fits is measured, never written down** — each button that does not fit moves into a menu
 under a ⋯ glyph, so the list of what the app can do to a file never depends on the width of the
-window. The drawing keeps that menu on screen always, because Rename lives in it; until Rename has
-a command behind it the menu appears only when it holds something, since a control that cannot act
-is worse than an absence. **Favourite is not yellow:** the predecessor's amber star is an accent
+window. That menu is on screen always, because Rename lives in it. **Favourite is not yellow:** the predecessor's amber star is an accent
 this app does not have, so the state is carried by the filled glyph and the raised plate, as every
-other toggle carries it. Move To…, Rename… and Delete are drawn but absent, each waiting on a
-command and two of them on a drawing of what they open.
+other toggle carries it.
+
+**Move to… and Delete joined the bar on 24 September 2026.** Move to… is the one worded button, and
+stays beside Favourite at every width: the two change the library. **Delete keeps its place beside
+the ⋯ at every width**, as every bar on the Pane sheet draws it; the sheet's ⋯ at 20rem also lists
+Delete, which would be the one verb in two places at once, so the ⋯ holds only what has left the
+bar. Delete asks nothing, because Undo is the answer to a delete. **When the pane was showing the
+file, it moves on** to the file that takes its tile's place, or the one before when it was the
+last, and to its empty state when none is left; "This File Has Gone" is for a file that went
+outside the app, never for the person's own act.
+
+**Rename is the Name row, where the name already is.** From the ⋯ or a file's menu it opens the
+details if they are shut and turns that row into a field, the stem selected and the extension in
+the field but outside the selection, so it can be changed on purpose and not by typing. A name
+already taken is said under the field, which keeps it and holds Enter until it is edited; nothing
+is renamed behind the person's back and no suffix is invented.
 
 **Full screen is a state of the pane, not a place you go**, drawn on 15 September 2026 and built
 the day after. The pane takes the frame below the bar and keeps every part it has; the bar stays,
@@ -432,13 +444,22 @@ Shift+F10 did nothing at all.
 
 **Every change the app makes on disk is journalled and can be undone, across a restart**, ported
 from ggallery on 23 September 2026. It came before any verb that changes the disk, so none of
-them ever existed without a way back. The interface for it is not drawn yet; the journal is what
-that interface will drive.
+them ever existed without a way back. On screen since 24 September 2026, as Artboards › Undo draws
+it.
+
+- **The line has no timer.** An act ends with one line at the foot of navigation, in the slot the
+  refusal band uses, and it stays until dismissed or replaced by the next news: a line gone
+  before it is read is no way back at all. Ctrl+Z keeps working after it has gone, and after a
+  restart, because the journal does.
+- **Ctrl+Z belongs to a field while one has the focus**, and does nothing while Settings is open:
+  the dialog holds the keyboard, and an undo behind it would change what the person cannot see.
+- **An undo that came back in part answers with the banner, not the line.** What stayed is
+  something only the person can settle, so it sits over the grid, open, with Retry.
 
 - **The disk changes first, then the index and the journal together.** A disk that refuses leaves
   nothing claiming it succeeded, and a transaction that fails puts the disk back.
-- **One act, one batch, one undo.** A batch comes back newest row first. One that comes back only
-  in part stays in the journal, so what failed can be tried again; ggallery's rule, kept.
+- **One act, one batch, one undo.** A batch comes back newest row first. Each row leaves the
+  journal as it comes back and what failed stays, so trying again takes back only what stayed.
 - **An undo never destroys.** A folder the app made is taken back only while it is still empty,
   on disk as well as in the index: files the index has not read yet would go with it otherwise.
 - **One change to the disk at a time.** A walk that read a directory while a verb renamed it would
@@ -452,6 +473,14 @@ that interface will drive.
   ("IMG_0031 (2).jpg"); Filmstrip refuses that one file and says where the name is taken, and the
   rest of the selection still moves. The picker drawn on the Pane sheet reports a clash and never
   resolves it for you.
+- **An act is described from its own journal rows**: what kind of act, the names and places it
+  touched, and how many files and folders it carried. A verb returns that description with its
+  batch, and an undo reads it before anything comes back, so the line after yesterday's act,
+  undone today, names it as well as the line after an act just made.
+- **What stayed says where it is and why.** A verb or an undo that could not move something
+  reports it as a row: the file or folder, the place it is still in, and a typed reason (the
+  name is taken there, its folder is gone, another app has it open). The interface words each
+  reason itself; the sentence Rust gives it is for logs.
 - **A name held only by a file a walk found gone is freed** for the file arriving at it.
 - **A trashed item gives up its name; a retired one keeps it.** `trashed_at` tells them apart. A
   file vanishing and coming back is the same file, so it keeps its tags. A file sent to the trash

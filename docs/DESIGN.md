@@ -548,7 +548,9 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Notice.** A banner above the grid on `panel` at the `control` corner, holding a glyph, a line,
   its actions and a dismiss. What needs a decision takes a `line-danger` hairline and a `danger`
   glyph, never a fill; what is only worth knowing takes the ordinary `line-control` ring. Its list
-  opens in place beneath it rather than in a dialog.
+  opens in place beneath it rather than in a dialog: `eyebrow` headings over rows `control` tall,
+  each row the name, why, and at its end a quiet way to go and look. What an act or an undo could
+  not finish is grouped under a heading per place it is still in, "Reason" said over the first.
 - **Breadcrumb.** Folders above as quiet `row` steps back, the place itself as the `title`.
 - **Dropdown.** One named choice: a `control`-tall button on `raised` naming what it is on, a
   caret after it, opening a menu of every choice beneath it on `raised` with the overlay shadow.
@@ -574,12 +576,23 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   `glyph`-sized in `fg-dim`, and `raised-hi` under the pointer. A rule in `line` stands between two
   groups only when both hold rows. A menu about a thing that is not the row itself, as a
   source's is, opens under a heading: `eyebrow` capitals in `fg-dim`, `chip` tall. The one row
-  that cannot be taken back is `danger`, over
-  `danger-tint` under the pointer. It opens from a glyph button, anchored to it, or from a
+  that cannot be taken back is `danger`, over `danger-tint` under the pointer. It opens from a glyph button, anchored to it, or from a
   right-click: at the pointer, or, from the menu key or Shift+F10, one `tile-gap` clear of the
   focused element's ring, left edges met, flipping above when there is no room below and sliding
   along the window's edge rather than shrinking. A dropdown offers a choice and marks the one taken;
   a menu marks nothing, because every row in it is a thing to do rather than a thing to be.
+- **Name field.** A file's name as a field where it stands: `bar-field` tall on `ground` at the
+  `nested` corner with a `line-control` ring, the text in `fg-hi` and the selection on `plate`.
+  At rest the row is the name, and the `rename` glyph in `fg-dim` shows beside it under the
+  pointer. A name that is taken turns the ring `line-danger` and says where under the field, in
+  `small` `danger`.
+- **Picker.** A place to send something: the menu's surface and width, opened against what asked
+  for it, with a filter field on `ground` at its head, Recent under an `eyebrow` heading, a rule,
+  then the tree. Rows are `control` tall, indented a `chevron` a level with the chevron's square
+  kept on every row, a filled glyph in `fg-dim`, the name, and quieter words at the end in
+  `small`: a folder's parent, or "current" on the one the file is in, drawn in `fg-faint`
+  and never picked. The field keeps the focus; the arrows move a `raised-hi` row, Enter picks it,
+  Right and Left open and shut it.
 - **Full screen.** The pane takes the frame below the bar, keeping its header, picture and
   filmstrip and losing only the columns beside it. Its control is a glyph button at the header's
   left end, an arrow pointing along the edge that moves: left going in, right coming out, where it
@@ -618,6 +631,11 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Band.** What could not be done, at the foot of the panel it was asked from: a sentence, the
   folder's path under it in `--font-mono`, and a dismiss, on a `danger-wash` ground. There is only
   ever one, and a second refusal replaces it rather than stacking.
+- **Line.** What an act did, in the Band's slot and shape without its alarm: a `glyph` in `fg-dim`
+  (a check after an act, the undo arrow after an undo), the sentence in `ui`, the way back under it
+  as a raised Undo button, and a dismiss. It shares the one slot with the Band, and the newest of
+  the two replaces the other. Folded, the rail keeps the Undo glyph button alone, its sentence in
+  the tooltip; "Nothing to undo." comes out beside the rail on `panel` with the overlay shadow.
 - **Segmented.** A value with few enough answers to show them all at once, the one it is on filled
   on `raised-hi` inside an `inset` trough. Real radios, so the arrow keys move between them.
 - **Source row.** In Settings, two lines: the source's glyph, its name as a field where it stands,

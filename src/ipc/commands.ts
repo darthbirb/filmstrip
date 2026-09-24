@@ -1,9 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AddOutcome } from "./bindings/AddOutcome";
+import type { Batch } from "./bindings/Batch";
 import type { Contents } from "./bindings/Contents";
 import type { EffectiveTag } from "./bindings/EffectiveTag";
 import type { Failure } from "./bindings/Failure";
 import type { FolderDeleted } from "./bindings/FolderDeleted";
+import type { FolderEntry } from "./bindings/FolderEntry";
 import type { FolderMade } from "./bindings/FolderMade";
 import type { FolderNode } from "./bindings/FolderNode";
 import type { ItemDetail } from "./bindings/ItemDetail";
@@ -19,7 +21,10 @@ import type { UndoReport } from "./bindings/UndoReport";
 // DEVELOPMENT.md "The command boundary".
 
 /** What a failed command rejects with; `kind` mirrors `AppError::kind` in Rust. */
-export type AppError = { kind: "io" | "db" | "json" | "invalid" | "media"; message: string };
+export type AppError = {
+  kind: "io" | "db" | "json" | "invalid" | "media" | "refused";
+  message: string;
+};
 
 export const listSources = () => invoke<SourceSummary[]>("list_sources");
 
@@ -47,13 +52,16 @@ export const createFolder = (parentId: number, title: string) =>
   invoke<FolderMade>("create_folder", { parentId, title });
 
 export const renameFolder = (folderId: number, title: string) =>
-  invoke<string | null>("rename_folder", { folderId, title });
+  invoke<Batch | null>("rename_folder", { folderId, title });
 
 export const moveFolder = (folderId: number, parentId: number) =>
-  invoke<string | null>("move_folder", { folderId, parentId });
+  invoke<Batch | null>("move_folder", { folderId, parentId });
 
 export const moveItems = (itemIds: number[], folderId: number) =>
   invoke<ItemsMoved>("move_items", { itemIds, folderId });
+
+export const renameItem = (itemId: number, name: string) =>
+  invoke<Batch | null>("rename_item", { itemId, name });
 
 export const trashItems = (itemIds: number[]) => invoke<ItemsTrashed>("trash_items", { itemIds });
 
@@ -69,6 +77,8 @@ export const undoBatch = (batchId: string) => invoke<UndoReport>("undo_batch", {
 
 export const folderChildren = (folderId: number) =>
   invoke<FolderNode[]>("folder_children", { folderId });
+
+export const listFolders = () => invoke<FolderEntry[]>("list_folders");
 
 export const folderItems = (folderId: number) => invoke<ItemRow[]>("folder_items", { folderId });
 

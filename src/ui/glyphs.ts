@@ -39,6 +39,9 @@ export const GLYPHS = {
   minusCircle: { icon: "minus-circle", code: 0xe32c },
   readAgain: { icon: "arrows-clockwise", code: 0xe094 },
   rename: { icon: "textbox", code: 0xeb0a },
+  done: { icon: "check", code: 0xe182 },
+  undo: { icon: "arrow-counter-clockwise", code: 0xe038 },
+  moveTo: { icon: "folder-simple-plus", code: 0xe25e },
 } as const;
 
 export type GlyphName = keyof typeof GLYPHS;

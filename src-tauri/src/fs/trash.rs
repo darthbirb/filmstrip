@@ -7,8 +7,8 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::db::{folders, items, journal, tags};
-use crate::error::{AppError, Result};
-use crate::fs::items::Refused;
+use crate::error::{AppError, Reason, Result};
+use crate::fs::stayed::{self, Stayed};
 use crate::fs::{paths, relocate};
 
 /// What sending several items to the trash did: how many went, and each one that did not, with why.
@@ -17,7 +17,7 @@ use crate::fs::{paths, relocate};
 #[ts(export)]
 pub struct TrashReport {
     pub trashed: u32,
-    pub refused: Vec<Refused>,
+    pub refused: Vec<Stayed>,
 }
 
 /// Sends each item to the trash under one batch, so one undo brings the whole selection back.
@@ -27,10 +27,7 @@ pub fn trash_items(conn: &Connection, item_ids: &[i64], batch_id: &str) -> Resul
     for &item_id in item_ids {
         match trash_unjournalled(conn, item_id, Some(batch_id)) {
             Ok(()) => report.trashed += 1,
-            Err(err) => report.refused.push(Refused {
-                item_id,
-                reason: err.to_string(),
-            }),
+            Err(err) => report.refused.push(stayed::file(conn, item_id, &err)?),
         }
     }
     Ok(report)
@@ -50,10 +47,9 @@ pub(super) fn trash_unjournalled(
         .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
     let from = paths::item_path(conn, file.folder_id, &file.disk_name)?;
     if !from.is_file() {
-        return Err(AppError::invalid(format!(
-            "{} is not on disk where the index has it",
-            file.disk_name
-        )));
+        return Err(AppError::refused(Reason::NotOnDisk {
+            name: file.disk_name,
+        }));
     }
     let to = paths::trash_path(&file.uuid, &file.disk_name)?;
     if let Some(shard) = to.parent() {
@@ -83,16 +79,14 @@ pub(super) fn restore_unjournalled(conn: &Connection, item_id: i64) -> Result<()
         .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
     let place = folders::title(conn, file.folder_id)?.unwrap_or_default();
     if !folders::is_live(conn, file.folder_id)? {
-        return Err(AppError::invalid(format!(
-            "{place} is gone, so {} cannot go back",
-            file.disk_name
-        )));
+        return Err(AppError::refused(Reason::FolderGone { name: place }));
     }
     let taken = || {
-        AppError::invalid(format!(
-            "{place} already holds a file called {}",
-            file.disk_name
-        ))
+        AppError::refused(Reason::NameTaken {
+            place: place.clone(),
+            name: file.disk_name.clone(),
+            folder: false,
+        })
     };
     let held = items::existing_by_disk_name(conn, file.folder_id, &file.disk_name)?;
     if held.as_ref().is_some_and(|row| !row.deleted) {
@@ -210,8 +204,16 @@ mod tests {
         std::fs::write(root.join("Trips/Cairo/pyramid.jpg"), "another").unwrap();
 
         let report = undo::undo_batch(&conn, &batch).unwrap();
-        assert_eq!(report.reversed, 0);
-        assert!(report.errors[0].contains("Cairo already holds a file called pyramid.jpg"));
+        assert_eq!(report.files_back, 0);
+        assert_eq!(
+            report.stayed[0].reason,
+            Reason::NameTaken {
+                place: "Cairo".into(),
+                name: "pyramid.jpg".into(),
+                folder: false
+            }
+        );
+        assert_eq!(report.stayed[0].at, stayed::Whereabouts::Trash);
         assert!(trash_file(&conn, pyramid).is_file());
         assert_eq!(journal::latest_batch(&conn).unwrap(), Some(batch));
     }
@@ -224,10 +226,11 @@ mod tests {
 
         let report = trash_items(&conn, &[sphinx], &journal::new_batch()).unwrap();
         assert_eq!(report.trashed, 0);
-        assert!(
-            report.refused[0]
-                .reason
-                .contains("sphinx.jpg is not on disk")
+        assert_eq!(
+            report.refused[0].reason,
+            Reason::NotOnDisk {
+                name: "sphinx.jpg".into()
+            }
         );
         assert!(!items::is_trashed(&conn, sphinx).unwrap());
     }

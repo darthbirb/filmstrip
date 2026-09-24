@@ -13,12 +13,15 @@ import { Foot } from "./navigation/Foot";
 import { Navigation } from "./navigation/Navigation";
 import { Rail } from "./navigation/Rail";
 import { useEscapeLeavesFullScreen, useFullScreen } from "./pane/full-screen";
+import { MovePickerHost } from "./pane/move-picker";
 import { Pane, PaneHeader } from "./pane/Pane";
 import { PaneDetailProvider } from "./pane/pane-detail";
 import { whenShownInPane } from "./pane/pane-store";
 import { usePreferences, useScaleHotkeys } from "./preferences";
 import { Settings } from "./settings/Settings";
 import { closeSettings, openSettings, useSettingsRequest } from "./settings/settings-store";
+import { ReportBanner } from "./undo/ReportBanner";
+import { useUndoKey } from "./undo/undo";
 import { WindowBar } from "./window-bar/WindowBar";
 
 // Until the search slice lands, the bar holds a dev stand-in, and nothing in production.
@@ -30,6 +33,7 @@ export function App() {
   const settings = useSettingsRequest();
   const full = useFullScreen();
   useEscapeLeavesFullScreen();
+  useUndoKey();
 
   return (
     <div className="flex h-dvh flex-col bg-ground text-fg">
@@ -57,7 +61,12 @@ export function App() {
               <TileSize />
             </>
           }
-          notices={<Notices />}
+          notices={
+            <>
+              <ReportBanner />
+              <Notices />
+            </>
+          }
           grid={<Grid mode={layout} />}
           pane={<Pane />}
           paneHeader={<PaneHeader />}
@@ -65,6 +74,7 @@ export function App() {
           full={full}
         />
       </PaneDetailProvider>
+      <MovePickerHost />
       <Settings
         open={settings !== null}
         onClose={closeSettings}

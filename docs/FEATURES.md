@@ -63,8 +63,9 @@ drawn. **Not started** — neither.
 | Favourite an item | Built | `set_item_favorite` |
 | Reveal, open, copy the file | Built | the pane's bar |
 | Sort by key and direction, random order held steady | Not started | |
-| Move items between folders | Built in Rust, journalled; not on screen yet | `move_items`; a name already taken is reported, never changed |
-| Delete items to the trash | Built in Rust, journalled; not on screen yet | `trash_items`; undo takes an item back |
+| Move items between folders | Built | `move_items`, Move to… on the pane's bar and a file's menu; a name already taken is reported, never changed |
+| Delete items to the trash | Built | `trash_items`, Delete on the pane's bar and a file's menu; undo takes an item back |
+| Rename a file, on disk | Built | `rename_item`, the pane's Name row; not in ggallery; a name already taken is refused |
 | Paste files in, and take an OS drop | Not started | |
 | Copy an item's path | Not started | |
 | Counts: unsorted, trashed, totals, arrival duplicates | Partly | the foot counts items and sources |
@@ -117,8 +118,8 @@ drawn. **Not started** — neither.
 | Capability | Filmstrip | Where |
 | --- | --- | --- |
 | Export a folder's subtree or a selection as a zip, as a job | Not started | Filmstrip's own change: renaming the files or keeping their own names is chosen at export |
-| An undo journal that survives a restart | Built in Rust | `journal`, DECISIONS.md "Undo"; how it is offered on screen is not drawn |
-| Undo the last batch, or a named one | Built in Rust | `undo_last`, `undo_batch`; the interface is backlogged |
+| An undo journal that survives a restart | Built | `journal`, DECISIONS.md "Undo"; the line at the foot of navigation, Ctrl+Z |
+| Undo the last batch, or a named one | Built | Ctrl+Z takes the last, the line's Undo its own batch; no list of batches yet |
 
 ## The interface
 

@@ -13,6 +13,7 @@ pub const FOLDER_RENAME: &str = "folder_rename";
 pub const FOLDER_MOVE: &str = "folder_move";
 pub const ITEM_MOVE: &str = "item_move";
 pub const ITEM_TRASH: &str = "item_trash";
+pub const ITEM_RENAME: &str = "item_rename";
 pub const FOLDER_DELETE: &str = "folder_delete";
 
 /// A folder the app made. Its inverse is itself: undoing it removes that folder again.
@@ -50,6 +51,15 @@ pub struct ItemMoved {
     pub to_folder_id: i64,
 }
 
+/// A file renamed on disk. The inverse swaps `from` and `to`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemRenamed {
+    pub item_id: i64,
+    pub from: String,
+    pub to: String,
+}
+
 /// An item sent to the trash. Its inverse is itself: undoing it brings the item back.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -66,11 +76,12 @@ pub struct FolderDeleted {
     pub retired_at: i64,
 }
 
-/// One row, as undo reads it back. The inverse stays JSON until its op says what it is.
+/// One row, as undo reads it back. Both halves stay JSON until its op says what they are.
 #[derive(Debug, Clone)]
 pub struct Entry {
     pub id: i64,
     pub op: String,
+    pub forward: Value,
     pub inverse: Value,
 }
 
@@ -173,6 +184,26 @@ pub fn record_item_move(
     record(conn, batch_id, ITEM_MOVE, &forward, &inverse)
 }
 
+pub fn record_item_rename(
+    conn: &Connection,
+    batch_id: &str,
+    item_id: i64,
+    from: &str,
+    to: &str,
+) -> Result<()> {
+    let forward = ItemRenamed {
+        item_id,
+        from: from.to_string(),
+        to: to.to_string(),
+    };
+    let inverse = ItemRenamed {
+        item_id,
+        from: to.to_string(),
+        to: from.to_string(),
+    };
+    record(conn, batch_id, ITEM_RENAME, &forward, &inverse)
+}
+
 pub fn record_item_trash(conn: &Connection, batch_id: &str, item_id: i64) -> Result<()> {
     let trashed = ItemTrashed { item_id };
     record(conn, batch_id, ITEM_TRASH, &trashed, &trashed)
@@ -194,24 +225,27 @@ pub fn record_folder_delete(
 /// Every row in a batch, newest first: the order an undo applies them in, since a later row can
 /// depend on an earlier one.
 pub fn batch(conn: &Connection, batch_id: &str) -> Result<Vec<Entry>> {
-    let mut stmt =
-        conn.prepare("SELECT id, op, inverse FROM journal WHERE batch_id = ?1 ORDER BY id DESC")?;
+    let mut stmt = conn.prepare(
+        "SELECT id, op, forward, inverse FROM journal WHERE batch_id = ?1 ORDER BY id DESC",
+    )?;
+    let json = |raw: String| serde_json::from_str(&raw).unwrap_or(Value::Null);
     let rows = stmt
         .query_map(params![batch_id], |r| {
-            let raw: String = r.get(2)?;
             Ok(Entry {
                 id: r.get(0)?,
                 op: r.get(1)?,
-                inverse: serde_json::from_str(&raw).unwrap_or(Value::Null),
+                forward: json(r.get(2)?),
+                inverse: json(r.get(3)?),
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
     Ok(rows)
 }
 
-/// Removes a batch once all of it has been reversed; a reversed act is not history to reverse again.
-pub fn drop_batch(conn: &Connection, batch_id: &str) -> Result<()> {
-    conn.execute("DELETE FROM journal WHERE batch_id = ?1", params![batch_id])?;
+/// Removes one row once it has been reversed: a reversed act is not history to reverse again, and
+/// a batch that came back only in part keeps exactly what stayed.
+pub fn drop_entry(conn: &Connection, entry_id: i64) -> Result<()> {
+    conn.execute("DELETE FROM journal WHERE id = ?1", params![entry_id])?;
     Ok(())
 }
 
@@ -248,7 +282,9 @@ mod tests {
         record_folder_rename(&conn, &second, 7, "Cairo", "Giza").unwrap();
         assert_eq!(latest_batch(&conn).unwrap(), Some(second.clone()));
 
-        drop_batch(&conn, &second).unwrap();
+        for entry in batch(&conn, &second).unwrap() {
+            drop_entry(&conn, entry.id).unwrap();
+        }
         assert_eq!(latest_batch(&conn).unwrap(), Some(first));
     }
 

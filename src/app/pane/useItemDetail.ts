@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { EffectiveTag } from "../../ipc/bindings/EffectiveTag";
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import { itemDetail, itemPath, itemTags } from "../../ipc/commands";
+import { whenLibraryChanges } from "../library";
 
 export type Shown =
   | { status: "empty" }
@@ -12,7 +13,7 @@ export type Shown =
   | { status: "gone"; path: string | null }
   | { status: "ready"; item: ItemDetail; tags: EffectiveTag[] };
 
-/** An item in full with its tags, read again whenever background work moves on. */
+/** An item in full with its tags, read again whenever the library changes. */
 export function useItemDetail(itemId: number | null) {
   const [shown, setShown] = useState<Shown>({ status: "empty" });
 
@@ -41,8 +42,10 @@ export function useItemDetail(itemId: number | null) {
     };
     load();
     const unlisten = listen("job-progress", load).catch(() => undefined);
+    const stop = whenLibraryChanges(load);
     return () => {
       live = false;
+      stop();
       void unlisten.then((stop) => stop?.());
     };
   }, [itemId]);

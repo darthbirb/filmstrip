@@ -19,8 +19,8 @@ already lives on, never in a file of its own.
 ## The app's own right-click menus: the verbs that change the disk · DRAWN
 
 Drawn on the Components sheet; what exists is built, DECISIONS.md "Right-click menus". What waits,
-on the undo journal (FEATURES.md "Export and undo"): a file's Move to…, Rename and Delete, and a
-folder's New Folder, Move to…, Rename and Delete. New Folder lands a row already in its name field,
+on the undo journal (FEATURES.md "Export and undo"): a folder's New Folder, Move to…, Rename and
+Delete. New Folder lands a row already in its name field,
 and on a source's row makes a folder at its top level. Move to… is the file picker, with a folder's
 own descendants refused in it. A folder's Rename is the in-place field with its Taken state. Delete
 asks only when the folder holds something, naming each sorting source as its own answer, with a box
@@ -85,14 +85,6 @@ oversight or the time abbreviates and the rule has to say so.
 
 Say what the time does as the plate narrows.
 
-## Undo, on screen · DRAWN
-
-Artboards › Undo: after an act, one line at the foot of navigation in the refusal band's slot,
-saying what it did, with Undo and no timer, for all seven acts and a move that finished in part;
-Ctrl+Z does the same wherever the focus is not in a field, across a restart; "Nothing to undo."
-once, beside the rail when it is folded. An undo refused in whole or in part opens the failures
-banner with Retry, its rows grouped under the place each is still in.
-
 ## The Trash, holding files · DRAWN
 
 Artboards › Trash, Components › Right-click and Pane › 02: the Trash's grid, newest first under a
@@ -102,9 +94,6 @@ purges; Restore refused, in the undo's banner; and Restore as the undo table's e
 
 ## A delete that is refused, and what shows after one · DRAWN
 
-Artboards › Undo, "When a delete is refused": the move's banner, by the undo banner's rules, for
-files that could not go to the Trash, a file no longer on disk ("Gone from Cairo", no button), a
-folder kept by a file the app does not show ("Holds notes.txt"), and a folder's delete stopped
-partway. What went is one batch, with Undo at the foot. After a delete that worked, the pane shows
-the file that took the deleted tile's place; a deleted folder leaves you in its parent, and a moved
-one takes you with it.
+Artboards › Undo, "When a delete is refused": what is built is a file's. What waits is a folder's:
+the banner for a folder kept by a file the app does not show ("Holds notes.txt") and for one whose
+delete stopped partway, and where you stand after one, in its parent, or with it when it moved.

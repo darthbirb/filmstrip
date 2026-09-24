@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, type ReactNode, useState } from "react";
 
 import type { EffectiveTag } from "../../ipc/bindings/EffectiveTag";
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
@@ -6,7 +6,9 @@ import { formatBytes, formatDate, formatDimensions, formatDuration } from "../..
 import { Chip, Stat } from "../../ui/Chip";
 import { type Fact, Facts } from "../../ui/Facts";
 import { Glyph } from "../../ui/Glyph";
+import { NameField } from "../../ui/NameField";
 import { setPlace } from "../place";
+import { renameFile, startRename, stopRename, useRenaming } from "./rename";
 
 /** Where the item is, its file, its dates, its labels and tags, and the name it has on disk. */
 export function Details({ item, tags }: { item: ItemDetail; tags: EffectiveTag[] }) {
@@ -19,13 +21,43 @@ export function Details({ item, tags }: { item: ItemDetail; tags: EffectiveTag[]
   const plain = tags.filter((tag) => !tag.key);
   if (labels.length > 0) facts.push(["Labels", <Tags key="labels" tags={labels} />]);
   if (plain.length > 0) facts.push(["Tags", <Tags key="tags" tags={plain} />]);
-  facts.push([
-    "Name",
-    <span key="name" className="break-all">
-      {item.diskName}
-    </span>,
-  ]);
+  facts.push(["Name", <Name key="name" item={item} />]);
   return <Facts facts={facts} />;
+}
+
+/** The name on disk; pressed, or asked for from a menu, it becomes the field that renames it. */
+function Name({ item }: { item: ItemDetail }) {
+  const renaming = useRenaming() === item.id;
+  const [taken, setTaken] = useState<string | null>(null);
+  if (!renaming) {
+    return (
+      <button
+        type="button"
+        title="Rename"
+        onClick={() => startRename(item.id)}
+        className="group focus-ring flex items-center gap-1.5 rounded-badge text-left"
+      >
+        <span className="break-all">{item.diskName}</span>
+        <Glyph
+          name="rename"
+          className="shrink-0 text-fg-dim text-glyph opacity-0 transition-opacity duration-(--motion-quick) group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none"
+        />
+      </button>
+    );
+  }
+  return (
+    <NameField
+      label={`Rename ${item.diskName}`}
+      name={item.diskName}
+      taken={taken}
+      onEdit={() => setTaken(null)}
+      onCommit={(name) => void renameFile(item.id, name).then(setTaken)}
+      onCancel={() => {
+        setTaken(null);
+        stopRename();
+      }}
+    />
+  );
 }
 
 /** Each folder down to the item goes there; the Sorting Box is one place, so only it does. */

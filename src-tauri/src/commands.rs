@@ -10,13 +10,14 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 use ts_rs::TS;
 
-use crate::db::folders::{self, FolderNode};
+use crate::db::folders::{self, FolderEntry, FolderNode};
 use crate::db::items::{self, ItemDetail, ItemRow};
 use crate::db::jobs::{self as job_table, Failure};
 use crate::db::journal;
 use crate::db::sources::{self, Refusal, Source, SourceKind};
 use crate::db::tags::{self, EffectiveTag};
 use crate::error::{AppError, Result};
+use crate::fs::acts::{self, Batch};
 use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
 use crate::fs::items::{self as fs_items, MoveReport};
 use crate::fs::paths;
@@ -153,7 +154,7 @@ pub fn folder_to_reveal(conn: &Connection, folder_id: i64) -> Result<PathBuf> {
 #[ts(export)]
 pub struct FolderMade {
     pub folder_id: i64,
-    pub batch_id: String,
+    pub batch: Batch,
 }
 
 /// A new folder inside another, on disk and in the index. DECISIONS.md "Undo".
@@ -168,7 +169,7 @@ pub async fn create_folder(
         let folder_id = fs_folders::create(conn, parent_id, &title, &batch_id)?;
         Ok(FolderMade {
             folder_id,
-            batch_id,
+            batch: acts::describe(conn, &batch_id)?,
         })
     })
     .await
@@ -180,11 +181,11 @@ pub async fn rename_folder(
     state: State<'_, AppState>,
     folder_id: i64,
     title: String,
-) -> Result<Option<String>> {
+) -> Result<Option<Batch>> {
     run(&state, move |conn| {
         let batch_id = journal::new_batch();
         let changed = fs_folders::rename(conn, folder_id, &title, &batch_id)?;
-        Ok(changed.then_some(batch_id))
+        described(conn, changed, &batch_id)
     })
     .await
 }
@@ -196,13 +197,18 @@ pub async fn move_folder(
     state: State<'_, AppState>,
     folder_id: i64,
     parent_id: i64,
-) -> Result<Option<String>> {
+) -> Result<Option<Batch>> {
     run(&state, move |conn| {
         let batch_id = journal::new_batch();
         let moved = fs_folders::move_into(conn, folder_id, parent_id, &batch_id)?;
-        Ok(moved.then_some(batch_id))
+        described(conn, moved, &batch_id)
     })
     .await
+}
+
+/// The batch an act wrote, described, or nothing when the act changed nothing.
+fn described(conn: &Connection, changed: bool, batch_id: &str) -> Result<Option<Batch>> {
+    changed.then(|| acts::describe(conn, batch_id)).transpose()
 }
 
 /// What a move of files did, and the batch that undoes it when anything went.
@@ -210,7 +216,7 @@ pub async fn move_folder(
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct ItemsMoved {
-    pub batch_id: Option<String>,
+    pub batch: Option<Batch>,
     pub report: MoveReport,
 }
 
@@ -225,9 +231,24 @@ pub async fn move_items(
         let batch_id = journal::new_batch();
         let report = fs_items::move_items(conn, &item_ids, folder_id, &batch_id)?;
         Ok(ItemsMoved {
-            batch_id: (report.moved > 0).then_some(batch_id),
+            batch: described(conn, report.moved > 0, &batch_id)?,
             report,
         })
+    })
+    .await
+}
+
+/// A file renamed where it is; the batch that undoes it, or nothing when the name did not change.
+#[tauri::command]
+pub async fn rename_item(
+    state: State<'_, AppState>,
+    item_id: i64,
+    name: String,
+) -> Result<Option<Batch>> {
+    run(&state, move |conn| {
+        let batch_id = journal::new_batch();
+        let changed = fs_items::rename(conn, item_id, &name, &batch_id)?;
+        described(conn, changed, &batch_id)
     })
     .await
 }
@@ -237,7 +258,7 @@ pub async fn move_items(
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct ItemsTrashed {
-    pub batch_id: Option<String>,
+    pub batch: Option<Batch>,
     pub report: TrashReport,
 }
 
@@ -248,7 +269,7 @@ pub async fn trash_items(state: State<'_, AppState>, item_ids: Vec<i64>) -> Resu
         let batch_id = journal::new_batch();
         let report = trash::trash_items(conn, &item_ids, &batch_id)?;
         Ok(ItemsTrashed {
-            batch_id: (report.trashed > 0).then_some(batch_id),
+            batch: described(conn, report.trashed > 0, &batch_id)?,
             report,
         })
     })
@@ -269,7 +290,7 @@ pub async fn folder_file_count(state: State<'_, AppState>, folder_id: i64) -> Re
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct FolderDeleted {
-    pub batch_id: Option<String>,
+    pub batch: Option<Batch>,
     pub report: DeleteReport,
 }
 
@@ -285,7 +306,7 @@ pub async fn delete_folder(
         let report = fs_folders::delete(conn, folder_id, contents, &batch_id)?;
         let journalled = !journal::batch(conn, &batch_id)?.is_empty();
         Ok(FolderDeleted {
-            batch_id: journalled.then_some(batch_id),
+            batch: described(conn, journalled, &batch_id)?,
             report,
         })
     })
@@ -327,6 +348,12 @@ pub async fn folder_children(
     folder_id: i64,
 ) -> Result<Vec<FolderNode>> {
     run(&state, move |conn| folders::children(conn, folder_id)).await
+}
+
+/// Every live folder in the library, for a picker that shows the whole tree and filters it.
+#[tauri::command]
+pub async fn list_folders(state: State<'_, AppState>) -> Result<Vec<FolderEntry>> {
+    run(&state, folders::every_live).await
 }
 
 #[tauri::command]

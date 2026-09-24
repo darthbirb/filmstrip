@@ -32,7 +32,7 @@ export type MenuGroups = readonly (readonly MenuAction[])[];
 export type HeadedMenu = { heading?: string; groups: MenuGroups };
 
 // The list's own shape, whichever way it was opened. DESIGN.md "Components".
-const SURFACE =
+export const SURFACE =
   "inset-auto m-0 w-menu flex-col gap-px rounded-control border-0 bg-panel p-1 text-fg shadow-overlay inset-ring inset-ring-line-control open:flex";
 
 const ROW =
@@ -256,7 +256,8 @@ export function ContextMenu({ label, heading, groups, anchor, onClose }: Context
   );
 }
 
-function placement(anchor: MenuAnchor, size: DOMRect) {
+/** Where a menu of this size goes against its anchor, kept inside the window. */
+export function placement(anchor: MenuAnchor, size: DOMRect) {
   const view = { width: window.innerWidth, height: window.innerHeight };
   let left: number;
   let top: number;

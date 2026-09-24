@@ -3,9 +3,10 @@ import { useEffect, useState } from "react";
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { folderItems, sortingItems } from "../../ipc/commands";
+import { whenLibraryChanges } from "../library";
 import { type Place, placeFolder } from "../place";
 
-/** The items the grid shows for a place, fetched again whenever background work moves on. */
+/** The items the grid shows for a place, fetched again whenever the library changes. */
 export function useGridItems(place: Place | null) {
   const [items, setItems] = useState<ItemRow[] | null>(null);
   const kind = place?.kind;
@@ -33,8 +34,10 @@ export function useGridItems(place: Place | null) {
     };
     load();
     const unlisten = listen("job-progress", load).catch(() => undefined);
+    const stop = whenLibraryChanges(load);
     return () => {
       live = false;
+      stop();
       void unlisten.then((stop) => stop?.());
     };
   }, [kind, folderId]);
