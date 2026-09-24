@@ -14,6 +14,13 @@ export function showInPane(itemId: number | null, from: Place | null = null) {
   if (itemId !== null) for (const request of requests) request();
 }
 
+/** The place the item was chosen in, moved or renamed: nothing new is put in the pane. */
+export function movePaneOrigin(from: Place) {
+  if (!shown) return;
+  shown = { ...shown, from };
+  for (const listener of listeners) listener();
+}
+
 /** Calls back each time something is put in the pane, the same item again included. */
 export function whenShownInPane(listener: () => void) {
   requests.add(listener);

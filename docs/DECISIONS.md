@@ -66,6 +66,13 @@ one inside a source, one holding a source, and the app's own — and each says s
 foot of the panel the add began from. Nothing is added and no row is selected in its place, because
 selecting the row it overlaps would answer a question nobody asked.
 
+**A place follows its folder**, as Artboards › Undo draws it. Each time the index is read again,
+after an act of the app's own or a walk, where you stand is found again by the folder's id among
+every live folder: moved, it takes you with it, with the tree opened down to its new place;
+renamed, the breadcrumb says the new name; gone, you are in the nearest folder above it still
+there. The pane's file went with a folder that went, so the pane empties rather than showing a
+file as gone that the person has just deleted.
+
 ## Renames made while the app was closed
 
 A directory renamed or moved while the app is closed reads, on the next walk, as one folder

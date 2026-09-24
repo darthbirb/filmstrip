@@ -8,6 +8,7 @@ import { type Place, setPlace, usePlace } from "../place";
 import { openSettings } from "../settings/settings-store";
 import { addFolder } from "./add-source";
 import { ensureChildren, loadIndex, useIndex } from "./index-store";
+import { setOpenFolders, useOpenFolders } from "./open-folders";
 import {
   addFolderRows,
   libraries,
@@ -26,7 +27,7 @@ import {
 export function Navigation() {
   const { sources, children } = useIndex();
   const place = usePlace();
-  const [expanded, setExpanded] = useState<ReadonlySet<number>>(new Set());
+  const expanded = useOpenFolders();
   const [renaming, setRenaming] = useState<string | null>(null);
 
   useEffect(() => {
@@ -62,7 +63,7 @@ export function Navigation() {
     const next = new Set(expanded);
     if (open) next.add(folder);
     else next.delete(folder);
-    setExpanded(next);
+    setOpenFolders(next);
   };
 
   const sourceOf = (id: string) => {
