@@ -66,11 +66,12 @@ pub struct FolderDeleted {
     pub retired_at: i64,
 }
 
-/// One row, as undo reads it back. The inverse stays JSON until its op says what it is.
+/// One row, as undo reads it back. Both halves stay JSON until its op says what they are.
 #[derive(Debug, Clone)]
 pub struct Entry {
     pub id: i64,
     pub op: String,
+    pub forward: Value,
     pub inverse: Value,
 }
 
@@ -194,15 +195,17 @@ pub fn record_folder_delete(
 /// Every row in a batch, newest first: the order an undo applies them in, since a later row can
 /// depend on an earlier one.
 pub fn batch(conn: &Connection, batch_id: &str) -> Result<Vec<Entry>> {
-    let mut stmt =
-        conn.prepare("SELECT id, op, inverse FROM journal WHERE batch_id = ?1 ORDER BY id DESC")?;
+    let mut stmt = conn.prepare(
+        "SELECT id, op, forward, inverse FROM journal WHERE batch_id = ?1 ORDER BY id DESC",
+    )?;
+    let json = |raw: String| serde_json::from_str(&raw).unwrap_or(Value::Null);
     let rows = stmt
         .query_map(params![batch_id], |r| {
-            let raw: String = r.get(2)?;
             Ok(Entry {
                 id: r.get(0)?,
                 op: r.get(1)?,
-                inverse: serde_json::from_str(&raw).unwrap_or(Value::Null),
+                forward: json(r.get(2)?),
+                inverse: json(r.get(3)?),
             })
         })?
         .collect::<rusqlite::Result<_>>()?;

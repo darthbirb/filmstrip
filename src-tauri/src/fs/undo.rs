@@ -11,15 +11,19 @@ use crate::db::journal::{
     self, Entry, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, ItemMoved, ItemTrashed,
 };
 use crate::error::{AppError, Result};
+use crate::fs::acts::{self, Batch};
 use crate::fs::stayed::{self, Stayed};
 use crate::fs::{folders, items, trash};
 
-/// What an undo put back, and what it could not, each with where it still is and why.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
+/// The act an undo took back, how much of it came back, and what could not, each with where it
+/// still is and why.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct UndoReport {
-    pub reversed: u32,
+    pub batch: Batch,
+    pub files_back: u32,
+    pub folders_back: u32,
     pub stayed: Vec<Stayed>,
 }
 
@@ -43,18 +47,23 @@ fn reverse_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
     if entries.is_empty() {
         return Err(AppError::invalid("there is nothing left to undo here"));
     }
-    let mut report = UndoReport::default();
+    // Described before anything comes back, while every name is still where the act left it.
+    let batch = acts::describe(conn, batch_id)?;
+    let mut stayed = Vec::new();
     for entry in &entries {
         // What failed stays in the journal, or it could never be tried again.
         match reverse(conn, entry) {
-            Ok(()) => {
-                journal::drop_entry(conn, entry.id)?;
-                report.reversed += 1;
-            }
-            Err(err) => report.stayed.push(stayed_of(conn, entry, &err)?),
+            Ok(()) => journal::drop_entry(conn, entry.id)?,
+            Err(err) => stayed.push(stayed_of(conn, entry, &err)?),
         }
     }
-    Ok(report)
+    let (files_left, folders_left) = acts::count(conn, &journal::batch(conn, batch_id)?)?;
+    Ok(UndoReport {
+        files_back: batch.files.saturating_sub(files_left),
+        folders_back: batch.folders.saturating_sub(folders_left),
+        batch,
+        stayed,
+    })
 }
 
 /// The file or folder a row that failed to come back is about.
@@ -118,6 +127,7 @@ mod tests {
     use super::*;
     use crate::db::sources::SourceKind;
     use crate::db::{self, folders as rows, sources};
+    use crate::fs::acts::Act;
     use crate::fs::{folders, items, walk};
     use std::path::{Path, PathBuf};
     use std::sync::mpsc;
@@ -159,12 +169,13 @@ mod tests {
 
         let first = undo_last(&conn).unwrap().unwrap();
         assert_eq!(
-            first,
-            UndoReport {
-                reversed: 1,
-                stayed: vec![]
+            first.batch.act,
+            Act::RenameFolder {
+                from: "Cairo".into(),
+                to: "Giza".into()
             }
         );
+        assert_eq!((first.folders_back, first.stayed.len()), (1, 0));
         assert!(dir.join("library/Trips/Cairo/pyramid.jpg").is_file());
         assert_eq!(rows::title(&conn, cairo).unwrap().as_deref(), Some("Cairo"));
         assert!(
@@ -172,7 +183,14 @@ mod tests {
             "one undo, one batch"
         );
 
-        undo_last(&conn).unwrap().unwrap();
+        let second = undo_last(&conn).unwrap().unwrap();
+        assert_eq!(
+            second.batch.act,
+            Act::CreateFolder {
+                name: "Lisbon".into(),
+                parent: "Trips".into()
+            }
+        );
         assert!(!dir.join("library/Trips/Lisbon").exists());
         assert_eq!(rows::title(&conn, made).unwrap(), None);
         assert_eq!(undo_last(&conn).unwrap(), None, "nothing is left to undo");
@@ -204,8 +222,7 @@ mod tests {
         std::fs::write(dir.join("library/Trips/Lisbon/tram.jpg"), "t").unwrap();
 
         let report = undo_batch(&conn, &batch).unwrap();
-        assert_eq!(report.reversed, 0);
-        assert_eq!(report.stayed.len(), 1);
+        assert_eq!((report.folders_back, report.stayed.len()), (0, 1));
         assert!(dir.join("library/Trips/Lisbon/tram.jpg").is_file());
         assert_eq!(journal::latest_batch(&conn).unwrap(), Some(batch));
     }
@@ -262,16 +279,26 @@ mod tests {
         items::move_items(&conn, &ids, people, &journal::new_batch()).unwrap();
         folders::move_into(&conn, cairo, people, &journal::new_batch()).unwrap();
 
-        undo_last(&conn).unwrap().unwrap();
+        let folder = undo_last(&conn).unwrap().unwrap();
+        assert_eq!(
+            folder.batch.act,
+            Act::MoveFolder {
+                name: "Cairo".into(),
+                from: "Trips".into(),
+                to: "People".into()
+            }
+        );
         assert!(dir.join("library/Trips/Cairo").is_dir());
         let report = undo_last(&conn).unwrap().unwrap();
         assert_eq!(
-            report,
-            UndoReport {
-                reversed: 2,
-                stayed: vec![]
+            report.batch.act,
+            Act::Move {
+                from: Some("Cairo".into()),
+                to: "People".into(),
+                one: None
             }
         );
+        assert_eq!((report.files_back, report.stayed.len()), (2, 0));
         assert!(dir.join("library/Trips/Cairo/pyramid.jpg").is_file());
         assert!(dir.join("library/Trips/Cairo/sphinx.jpg").is_file());
         let home = |id: &i64| db::items::folder_of(&conn, *id).unwrap() == Some(cairo);
@@ -293,7 +320,15 @@ mod tests {
         std::fs::write(dir.join("library/Trips/Cairo/pyramid.jpg"), "a new one").unwrap();
 
         let report = undo_batch(&conn, &batch).unwrap();
-        assert_eq!(report.reversed, 0);
+        assert_eq!(
+            report.batch.act,
+            Act::Move {
+                from: Some("Cairo".into()),
+                to: "People".into(),
+                one: Some("pyramid.jpg".into())
+            }
+        );
+        assert_eq!(report.files_back, 0);
         assert_eq!(report.stayed[0].id, pyramid);
         assert_eq!(
             report.stayed[0].reason,
@@ -323,17 +358,20 @@ mod tests {
         std::fs::write(dir.join("library/Trips/Cairo/sphinx.jpg"), "in the way").unwrap();
 
         let first = undo_batch(&conn, &batch).unwrap();
-        assert_eq!((first.reversed, first.stayed.len()), (1, 1));
+        assert_eq!(
+            first.batch.act,
+            Act::Delete {
+                from: Some("Cairo".into()),
+                one: None
+            }
+        );
+        assert_eq!((first.batch.files, first.files_back), (2, 1));
+        assert_eq!(first.stayed.len(), 1);
 
         std::fs::remove_file(dir.join("library/Trips/Cairo/sphinx.jpg")).unwrap();
         let retry = undo_batch(&conn, &batch).unwrap();
-        assert_eq!(
-            retry,
-            UndoReport {
-                reversed: 1,
-                stayed: vec![]
-            }
-        );
+        assert_eq!((retry.batch.files, retry.files_back), (1, 1));
+        assert!(retry.stayed.is_empty(), "{:?}", retry.stayed);
         assert!(dir.join("library/Trips/Cairo/pyramid.jpg").is_file());
         assert!(dir.join("library/Trips/Cairo/sphinx.jpg").is_file());
         assert_eq!(journal::latest_batch(&conn).unwrap(), None);

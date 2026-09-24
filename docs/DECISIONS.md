@@ -452,6 +452,10 @@ that interface will drive.
   ("IMG_0031 (2).jpg"); Filmstrip refuses that one file and says where the name is taken, and the
   rest of the selection still moves. The picker drawn on the Pane sheet reports a clash and never
   resolves it for you.
+- **An act is described from its own journal rows**: what kind of act, the names and places it
+  touched, and how many files and folders it carried. A verb returns that description with its
+  batch, and an undo reads it before anything comes back, so the line after yesterday's act,
+  undone today, names it as well as the line after an act just made.
 - **What stayed says where it is and why.** A verb or an undo that could not move something
   reports it as a row: the file or folder, the place it is still in, and a typed reason (the
   name is taken there, its folder is gone, another app has it open). The interface words each

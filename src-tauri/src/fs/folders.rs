@@ -607,6 +607,16 @@ mod tests {
         let batch = journal::new_batch();
         let report = delete(&conn, cairo, Some(Contents::Trash), &batch).unwrap();
         assert!(report.deleted, "{:?}", report.refused);
+        let described = crate::fs::acts::describe(&conn, &batch).unwrap();
+        assert_eq!(
+            described.act,
+            crate::fs::acts::Act::DeleteFolder {
+                name: "Cairo".into(),
+                parent: "Trips".into(),
+                into: None
+            }
+        );
+        assert_eq!(described.files, 2);
         assert!(!root.join("Trips/Cairo").exists());
         assert!(held.iter().all(|id| items::is_trashed(&conn, *id).unwrap()));
         assert!(!folders::is_live(&conn, night).unwrap());
@@ -632,6 +642,16 @@ mod tests {
         let contents = Some(Contents::MoveTo { source_id: inbox });
         let report = delete(&conn, cairo, contents, &batch).unwrap();
         assert!(report.deleted, "{:?}", report.refused);
+        let described = crate::fs::acts::describe(&conn, &batch).unwrap();
+        assert_eq!(
+            described.act,
+            crate::fs::acts::Act::DeleteFolder {
+                name: "Cairo".into(),
+                parent: "Trips".into(),
+                into: Some("Inbox".into())
+            }
+        );
+        assert_eq!(described.files, 2, "the file in Night counts too");
         assert!(inbox_root.join("pyramid.jpg").is_file());
         assert!(inbox_root.join("Night/stars.jpg").is_file());
         assert!(!root.join("Trips/Cairo").exists());

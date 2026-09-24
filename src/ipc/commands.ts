@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AddOutcome } from "./bindings/AddOutcome";
+import type { Batch } from "./bindings/Batch";
 import type { Contents } from "./bindings/Contents";
 import type { EffectiveTag } from "./bindings/EffectiveTag";
 import type { Failure } from "./bindings/Failure";
@@ -50,10 +51,10 @@ export const createFolder = (parentId: number, title: string) =>
   invoke<FolderMade>("create_folder", { parentId, title });
 
 export const renameFolder = (folderId: number, title: string) =>
-  invoke<string | null>("rename_folder", { folderId, title });
+  invoke<Batch | null>("rename_folder", { folderId, title });
 
 export const moveFolder = (folderId: number, parentId: number) =>
-  invoke<string | null>("move_folder", { folderId, parentId });
+  invoke<Batch | null>("move_folder", { folderId, parentId });
 
 export const moveItems = (itemIds: number[], folderId: number) =>
   invoke<ItemsMoved>("move_items", { itemIds, folderId });

@@ -1,3 +1,4 @@
+pub mod acts;
 pub mod clipboard;
 pub mod folders;
 pub mod items;

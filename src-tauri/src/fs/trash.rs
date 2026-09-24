@@ -204,7 +204,7 @@ mod tests {
         std::fs::write(root.join("Trips/Cairo/pyramid.jpg"), "another").unwrap();
 
         let report = undo::undo_batch(&conn, &batch).unwrap();
-        assert_eq!(report.reversed, 0);
+        assert_eq!(report.files_back, 0);
         assert_eq!(
             report.stayed[0].reason,
             Reason::NameTaken {
