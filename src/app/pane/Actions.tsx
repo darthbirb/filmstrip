@@ -2,16 +2,20 @@ import { type RefObject, useLayoutEffect, useRef, useState } from "react";
 
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import { copyItemFile, openItem, revealItem } from "../../ipc/commands";
+import { Button } from "../../ui/Button";
 import { GlyphButton } from "../../ui/GlyphButton";
 import type { GlyphName } from "../../ui/glyphs";
 import { Menu } from "../../ui/Menu";
 import { setFavourite, useFavourite } from "../favourites";
+import { openMovePicker } from "./move-picker";
 
 type Action = { id: string; label: string; glyph: GlyphName; run: () => void };
 
 /** What the app can do to the file the pane is showing. DECISIONS.md "The pane". */
 export function Actions({ item }: { item: ItemDetail }) {
   const bar = useRef<HTMLDivElement>(null);
+  const kept = useRef<HTMLDivElement>(null);
+  const moveTo = useRef<HTMLButtonElement>(null);
   const favorite = useFavourite(item.id, item.favorite);
 
   // Written in the order the drawing writes them, which is also the order they leave the bar.
@@ -36,7 +40,7 @@ export function Actions({ item }: { item: ItemDetail }) {
     },
   ];
 
-  const fits = useFitting(bar, actions.length);
+  const fits = useFitting(bar, kept, actions.length);
   const shown = actions.slice(0, fits);
   const folded = actions.slice(fits);
 
@@ -47,14 +51,28 @@ export function Actions({ item }: { item: ItemDetail }) {
       aria-label="Actions"
       className="flex h-toolbar shrink-0 items-center gap-1.5 border-line border-t px-1.5"
     >
-      {/* Favourite never leaves the bar: it is the one that changes the library. */}
-      <GlyphButton
-        glyph="star"
-        filled={favorite}
-        pressed={favorite}
-        label={favorite ? "Remove Favourite" : "Favourite"}
-        onClick={() => setFavourite(item.id, !favorite)}
-      />
+      {/* Favourite and Move to… never leave the bar: they are the two that change the library. */}
+      <div ref={kept} className="flex shrink-0 items-center gap-1.5">
+        <GlyphButton
+          glyph="star"
+          filled={favorite}
+          pressed={favorite}
+          label={favorite ? "Remove Favourite" : "Favourite"}
+          onClick={() => setFavourite(item.id, !favorite)}
+        />
+        <Button
+          ref={moveTo}
+          glyph="moveTo"
+          onClick={() => {
+            const element = moveTo.current;
+            if (element) {
+              openMovePicker({ itemIds: [item.id], folderId: item.folderId, anchor: { element } });
+            }
+          }}
+        >
+          Move to…
+        </Button>
+      </div>
       <div className="ml-auto flex items-center gap-1.5">
         {shown.map((action) => (
           <GlyphButton
@@ -64,7 +82,6 @@ export function Actions({ item }: { item: ItemDetail }) {
             onClick={action.run}
           />
         ))}
-        {/* The drawing keeps the menu always, for a Rename that has nothing behind it yet. */}
         {folded.length > 0 && (
           <Menu
             label="More"
@@ -84,8 +101,15 @@ export function Actions({ item }: { item: ItemDetail }) {
   );
 }
 
-/** How many glyph buttons the bar has room for. Measured, never a width written down. */
-function useFitting(bar: RefObject<HTMLElement | null>, count: number) {
+/**
+ * How many of the glyph buttons the bar has room for beside what it always keeps, the ⋯ taking
+ * a square once any have left. Measured, never a width written down.
+ */
+function useFitting(
+  bar: RefObject<HTMLElement | null>,
+  kept: RefObject<HTMLElement | null>,
+  count: number,
+) {
   const [fits, setFits] = useState(count);
 
   useLayoutEffect(() => {
@@ -96,23 +120,20 @@ function useFitting(bar: RefObject<HTMLElement | null>, count: number) {
       const gap = Number.parseFloat(style.columnGap) || 0;
       const padding =
         (Number.parseFloat(style.paddingLeft) || 0) + (Number.parseFloat(style.paddingRight) || 0);
-      // Every button in the bar is the same square, so one of them measures them all.
+      // Every glyph button is the same square, so one of them measures them all.
       const unit = element.querySelector("button")?.getBoundingClientRect().width ?? 0;
-      const room = element.clientWidth - padding;
+      const room = element.clientWidth - padding - (kept.current?.offsetWidth ?? 0) - gap;
       if (unit <= 0 || room <= 0) return;
-      const whole = (1 + count) * unit + count * gap;
-      if (whole <= room) {
-        setFits(count);
-        return;
-      }
-      const beside = Math.floor((room - 2 * unit - gap) / (unit + gap));
-      setFits(Math.max(0, Math.min(count, beside)));
+      const width = (n: number) => n * (unit + gap) - gap + (n < count ? unit + gap : 0);
+      let n = count;
+      while (n > 0 && width(n) > room) n--;
+      setFits(n);
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();
-  }, [bar, count]);
+  }, [bar, kept, count]);
 
   return fits;
 }

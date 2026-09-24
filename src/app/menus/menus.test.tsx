@@ -125,6 +125,7 @@ test("a tile's menu is the bar's verbs in the bar's order, and opening it leaves
   expect(labels(menu)).toEqual([
     "Full Screen",
     "Favourite",
+    "Move to…",
     "Show in Explorer",
     "Copy",
     "Open with Default App",
@@ -179,6 +180,7 @@ test("a filmstrip frame is a tile, and gets the tile's menu", async () => {
   expect(labels(menu)).toEqual([
     "Full Screen",
     "Favourite",
+    "Move to…",
     "Show in Explorer",
     "Copy",
     "Open with Default App",

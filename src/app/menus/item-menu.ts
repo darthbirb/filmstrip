@@ -2,8 +2,9 @@ import { copyItemFile, openItem, revealItem } from "../../ipc/commands";
 import type { MenuGroups } from "../../ui/Menu";
 import { isFavourite, setFavourite } from "../favourites";
 import { getFullScreen, setFullScreen } from "../pane/full-screen";
+import { openMovePicker } from "../pane/move-picker";
 
-type Item = { id: number; favorite: boolean };
+type Item = { id: number; folderId: number; favorite: boolean };
 
 /**
  * A file's right-click menu: the pane's bar in its own order, with only the verbs that exist.
@@ -36,6 +37,17 @@ export function itemMenu(item: Item, show: () => void): MenuGroups {
         glyph: "star",
         filled: favourite,
         onSelect: () => setFavourite(item.id, !favourite),
+      },
+      {
+        id: "move",
+        label: "Move to…",
+        glyph: "moveTo",
+        // The menu has handed the focus back by now, so the picker opens against the file.
+        onSelect: () => {
+          const element = document.activeElement;
+          const anchor = element instanceof HTMLElement ? { element } : { x: 0, y: 0 };
+          openMovePicker({ itemIds: [item.id], folderId: item.folderId, anchor });
+        },
       },
     ],
     [

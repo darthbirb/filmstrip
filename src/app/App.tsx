@@ -13,6 +13,7 @@ import { Foot } from "./navigation/Foot";
 import { Navigation } from "./navigation/Navigation";
 import { Rail } from "./navigation/Rail";
 import { useEscapeLeavesFullScreen, useFullScreen } from "./pane/full-screen";
+import { MovePickerHost } from "./pane/move-picker";
 import { Pane, PaneHeader } from "./pane/Pane";
 import { PaneDetailProvider } from "./pane/pane-detail";
 import { whenShownInPane } from "./pane/pane-store";
@@ -73,6 +74,7 @@ export function App() {
           full={full}
         />
       </PaneDetailProvider>
+      <MovePickerHost />
       <Settings
         open={settings !== null}
         onClose={closeSettings}

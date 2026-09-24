@@ -63,7 +63,7 @@ test("favourite reports itself, and says so without a hue", async () => {
 });
 
 test("what does not fit moves into the menu, and stays out of the bar", async () => {
-  const screen = await renderBar(120);
+  const screen = await renderBar(240);
   await expect.element(screen.getByRole("button", { name: "Show in Explorer" })).toBeVisible();
   expect(screen.getByRole("button", { name: "Copy" }).elements()).toHaveLength(0);
 

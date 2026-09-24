@@ -14,7 +14,12 @@ export type Preferences = {
   layout?: LayoutMode;
   /** Whether the pane's details are open, for every item it shows. */
   details?: boolean;
+  /** The folders files were last moved to, newest first: the move picker's Recent. */
+  recent?: number[];
 };
+
+/** How many folders the move picker's Recent keeps. */
+export const RECENT = 3;
 
 /** The interface sizes Settings offers and Ctrl+= and Ctrl+- step through; 1 is Windows' root size. */
 export const SCALES = [0.8, 1, 1.25, 1.5, 2];
@@ -79,7 +84,7 @@ function applyScale() {
 
 function validated(value: unknown): Partial<Preferences> {
   if (typeof value !== "object" || value === null) return {};
-  const { scale, widths, hidden, tile, layout, details } = value as Record<string, unknown>;
+  const { scale, widths, hidden, tile, layout, details, recent } = value as Record<string, unknown>;
   const valid: Partial<Preferences> = {};
   if (typeof scale === "number" && Number.isFinite(scale)) valid.scale = nearestScale(scale);
   const savedWidths = pair<number>(widths, "number");
@@ -89,6 +94,7 @@ function validated(value: unknown): Partial<Preferences> {
   if (typeof tile === "number" && Number.isFinite(tile) && tile > 0) valid.tile = tile;
   if (layout === "justified" || layout === "uniform") valid.layout = layout;
   if (typeof details === "boolean") valid.details = details;
+  if (Array.isArray(recent)) valid.recent = recent.filter(Number.isInteger).slice(0, RECENT);
   return valid;
 }
 

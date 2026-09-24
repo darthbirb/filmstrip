@@ -576,12 +576,18 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   `glyph`-sized in `fg-dim`, and `raised-hi` under the pointer. A rule in `line` stands between two
   groups only when both hold rows. A menu about a thing that is not the row itself, as a
   source's is, opens under a heading: `eyebrow` capitals in `fg-dim`, `chip` tall. The one row
-  that cannot be taken back is `danger`, over
-  `danger-tint` under the pointer. It opens from a glyph button, anchored to it, or from a
+  that cannot be taken back is `danger`, over `danger-tint` under the pointer. It opens from a glyph button, anchored to it, or from a
   right-click: at the pointer, or, from the menu key or Shift+F10, one `tile-gap` clear of the
   focused element's ring, left edges met, flipping above when there is no room below and sliding
   along the window's edge rather than shrinking. A dropdown offers a choice and marks the one taken;
   a menu marks nothing, because every row in it is a thing to do rather than a thing to be.
+- **Picker.** A place to send something: the menu's surface and width, opened against what asked
+  for it, with a filter field on `ground` at its head, Recent under an `eyebrow` heading, a rule,
+  then the tree. Rows are `control` tall, indented a `chevron` a level with the chevron's square
+  kept on every row, a filled glyph in `fg-dim`, the name, and quieter words at the end in
+  `eyebrow` size: a folder's parent, or "current" on the one the file is in, drawn in `fg-faint`
+  and never picked. The field keeps the focus; the arrows move a `raised-hi` row, Enter picks it,
+  Right and Left open and shut it.
 - **Full screen.** The pane takes the frame below the bar, keeping its header, picture and
   filmstrip and losing only the columns beside it. Its control is a glyph button at the header's
   left end, an arrow pointing along the edge that moves: left going in, right coming out, where it
