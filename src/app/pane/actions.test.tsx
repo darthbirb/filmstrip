@@ -43,9 +43,15 @@ test("each button does its own thing to the file the pane is showing", async () 
 
   expect(sent.map((call) => call.cmd)).toEqual(["reveal_item", "copy_item_file", "open_item"]);
   expect(sent[0]?.payload).toEqual({ itemId: sample.id });
-  // Nothing is drawn with nothing behind it, so the unbuilt actions are absent rather than dead.
-  expect(screen.getByRole("button", { name: "Delete" }).elements()).toHaveLength(0);
-  expect(screen.getByRole("button", { name: "Move To…" }).elements()).toHaveLength(0);
+  await expect.element(screen.getByRole("button", { name: "Move to…" })).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "Delete" })).toBeVisible();
+});
+
+test("Delete stays beside the ⋯ when the other glyph buttons have left the bar", async () => {
+  const screen = await renderBar(200);
+  await expect.element(screen.getByRole("button", { name: "Delete" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Show in Explorer" }).elements()).toHaveLength(0);
+  await expect.element(screen.getByRole("button", { name: "More" })).toBeVisible();
 });
 
 test("favourite reports itself, and says so without a hue", async () => {
@@ -63,7 +69,7 @@ test("favourite reports itself, and says so without a hue", async () => {
 });
 
 test("what does not fit moves into the menu, and stays out of the bar", async () => {
-  const screen = await renderBar(240);
+  const screen = await renderBar(280);
   await expect.element(screen.getByRole("button", { name: "Show in Explorer" })).toBeVisible();
   expect(screen.getByRole("button", { name: "Copy" }).elements()).toHaveLength(0);
 

@@ -129,8 +129,9 @@ test("a tile's menu is the bar's verbs in the bar's order, and opening it leaves
     "Show in Explorer",
     "Copy",
     "Open with Default App",
+    "Delete",
   ]);
-  expect(menu.element().querySelectorAll("hr")).toHaveLength(1);
+  expect(menu.element().querySelectorAll("hr")).toHaveLength(2);
   expect(getPaneItem()).toBeNull();
 });
 
@@ -184,6 +185,7 @@ test("a filmstrip frame is a tile, and gets the tile's menu", async () => {
     "Show in Explorer",
     "Copy",
     "Open with Default App",
+    "Delete",
   ]);
 });
 

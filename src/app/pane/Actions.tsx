@@ -7,6 +7,7 @@ import { GlyphButton } from "../../ui/GlyphButton";
 import type { GlyphName } from "../../ui/glyphs";
 import { Menu } from "../../ui/Menu";
 import { setFavourite, useFavourite } from "../favourites";
+import { deleteFiles } from "./delete";
 import { openMovePicker } from "./move-picker";
 
 type Action = { id: string; label: string; glyph: GlyphName; run: () => void };
@@ -82,6 +83,13 @@ export function Actions({ item }: { item: ItemDetail }) {
             onClick={action.run}
           />
         ))}
+        {/* Delete keeps its place beside the ⋯ at every width. DECISIONS.md "The pane". */}
+        <GlyphButton
+          glyph="trash"
+          label="Delete"
+          danger
+          onClick={() => void deleteFiles([item.id])}
+        />
         {folded.length > 0 && (
           <Menu
             label="More"
@@ -102,8 +110,8 @@ export function Actions({ item }: { item: ItemDetail }) {
 }
 
 /**
- * How many of the glyph buttons the bar has room for beside what it always keeps, the ⋯ taking
- * a square once any have left. Measured, never a width written down.
+ * How many of the glyph buttons the bar has room for beside what it always keeps: Favourite and
+ * Move to…, Delete, and the ⋯ once any have left. Measured, never a width written down.
  */
 function useFitting(
   bar: RefObject<HTMLElement | null>,
@@ -124,7 +132,11 @@ function useFitting(
       const unit = element.querySelector("button")?.getBoundingClientRect().width ?? 0;
       const room = element.clientWidth - padding - (kept.current?.offsetWidth ?? 0) - gap;
       if (unit <= 0 || room <= 0) return;
-      const width = (n: number) => n * (unit + gap) - gap + (n < count ? unit + gap : 0);
+      // The squares that fit, then Delete, then the ⋯ once any have left.
+      const width = (n: number) => {
+        const squares = n + 1 + (n < count ? 1 : 0);
+        return squares * (unit + gap) - gap;
+      };
       let n = count;
       while (n > 0 && width(n) > room) n--;
       setFits(n);

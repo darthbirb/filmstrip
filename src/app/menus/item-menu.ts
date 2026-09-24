@@ -1,6 +1,7 @@
 import { copyItemFile, openItem, revealItem } from "../../ipc/commands";
 import type { MenuGroups } from "../../ui/Menu";
 import { isFavourite, setFavourite } from "../favourites";
+import { deleteFiles } from "../pane/delete";
 import { getFullScreen, setFullScreen } from "../pane/full-screen";
 import { openMovePicker } from "../pane/move-picker";
 
@@ -63,6 +64,15 @@ export function itemMenu(item: Item, show: () => void): MenuGroups {
         label: "Open with Default App",
         glyph: "openExternal",
         onSelect: () => quietly(openItem(item.id)),
+      },
+    ],
+    [
+      {
+        id: "delete",
+        label: "Delete",
+        glyph: "trash",
+        tone: "danger",
+        onSelect: () => void deleteFiles([item.id]),
       },
     ],
   ];
