@@ -194,7 +194,7 @@ export function Picker({
                 <span className="min-w-0 flex-1 truncate">{row.label}</span>
                 {row.detail && (
                   <span
-                    className={`shrink-0 whitespace-nowrap text-eyebrow ${row.disabled ? "" : "text-fg-dim"}`}
+                    className={`shrink-0 whitespace-nowrap text-small ${row.disabled ? "" : "text-fg-dim"}`}
                   >
                     {row.detail}
                   </span>

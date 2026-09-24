@@ -585,12 +585,12 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   `nested` corner with a `line-control` ring, the text in `fg-hi` and the selection on `plate`.
   At rest the row is the name, and the `rename` glyph in `fg-dim` shows beside it under the
   pointer. A name that is taken turns the ring `line-danger` and says where under the field, in
-  `eyebrow` size in `danger`.
+  `small` `danger`.
 - **Picker.** A place to send something: the menu's surface and width, opened against what asked
   for it, with a filter field on `ground` at its head, Recent under an `eyebrow` heading, a rule,
   then the tree. Rows are `control` tall, indented a `chevron` a level with the chevron's square
   kept on every row, a filled glyph in `fg-dim`, the name, and quieter words at the end in
-  `eyebrow` size: a folder's parent, or "current" on the one the file is in, drawn in `fg-faint`
+  `small`: a folder's parent, or "current" on the one the file is in, drawn in `fg-faint`
   and never picked. The field keeps the focus; the arrows move a `raised-hi` row, Enter picks it,
   Right and Left open and shut it.
 - **Full screen.** The pane takes the frame below the bar, keeping its header, picture and

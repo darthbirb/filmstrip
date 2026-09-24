@@ -51,8 +51,8 @@ function MovePicker({ request }: { request: MoveRequest }) {
       (every) => {
         if (!live) return;
         setFolders(every);
-        // Open down to the folder the files are in, so the tree starts where they are.
-        setOpen(new Set(ancestors(every, request.folderId)));
+        // Open down to the folder the files are in, and it too, so the tree starts where they are.
+        setOpen(new Set([...ancestors(every, request.folderId), request.folderId]));
       },
       () => live && setFolders([]),
     );

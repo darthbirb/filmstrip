@@ -80,7 +80,7 @@ export function NameField({ label, name, taken, onEdit, onCommit, onCancel }: Pr
         className="focus-ring h-bar-field w-full min-w-0 rounded-nested bg-ground px-2 text-fg-hi text-ui tabular-nums inset-ring inset-ring-line-control selection:bg-plate selection:text-on-plate aria-invalid:inset-ring-line-danger"
       />
       {taken && (
-        <span id={said} className="text-danger text-eyebrow">
+        <span id={said} className="text-danger text-small">
           {taken}
         </span>
       )}
