@@ -12,6 +12,7 @@ import {
 import type { HeadedMenu, MenuAction, MenuGroups } from "../../ui/Menu";
 import { Tree, type TreeRow } from "../../ui/Tree";
 import { libraryChanged } from "../library";
+import { openMovePicker } from "../pane/move-picker";
 import { type Place, setPlace, usePlace } from "../place";
 import { openSettings } from "../settings/settings-store";
 import { refusedName } from "../undo/lines";
@@ -114,8 +115,24 @@ export function Navigation() {
     }
     // Nothing on it can act on a folder whose drive is away, and an empty menu opens nothing.
     if (!source.reachable) return { groups: [] };
+    const path = placeFolderPath(places.get(id));
+    const moveTo: MenuAction = {
+      id: "move",
+      label: "Move to…",
+      glyph: "moveTo",
+      // The menu has handed the focus back by now, so the picker opens against the row.
+      onSelect: () => {
+        const [name, parent] = [path.at(-1)?.title ?? "", path.at(-2)?.id ?? folder];
+        const element = document.activeElement;
+        const anchor = element instanceof HTMLElement ? { element } : { x: 0, y: 0 };
+        openMovePicker({ folder: { id: folder, name }, folderId: parent, anchor });
+      },
+    };
     return {
-      groups: [[newFolder], [revealFolderRow(folder), renameRow(rename), readAgainRow(folder)]],
+      groups: [
+        [newFolder, moveTo],
+        [revealFolderRow(folder), renameRow(rename), readAgainRow(folder)],
+      ],
     };
   };
 
@@ -224,6 +241,8 @@ function sourceMenu(source: SourceSummary, rename: () => void, newFolder: MenuAc
     ],
   ];
 }
+
+const placeFolderPath = (place: Place | undefined) => (place?.kind === "folder" ? place.path : []);
 
 function revealFolderRow(folder: number): MenuAction {
   return {

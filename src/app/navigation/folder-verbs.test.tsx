@@ -2,14 +2,16 @@ import { beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
-import { folderChildren, undoLast } from "../../ipc/commands";
-import { type Place, setPlace } from "../place";
+import { createFolder, folderChildren, undoLast } from "../../ipc/commands";
+import { MovePickerHost } from "../pane/move-picker";
+import { getPlace, type Place, setPlace } from "../place";
 import { ReportBanner } from "../undo/ReportBanner";
 import { showReport } from "../undo/report-store";
 import { Foot } from "./Foot";
 import { setNews } from "./foot-slot";
 import { loadIndex, resetIndex } from "./index-store";
 import { Navigation } from "./Navigation";
+import { openFolders } from "./open-folders";
 
 // Against the dev mock: Pictures holds People, empty, and Trips, which holds Cairo's three files
 // and two of its own; Incoming is the sorting source.
@@ -28,6 +30,7 @@ function Harness() {
       <main style={{ flex: 1 }}>
         <ReportBanner />
       </main>
+      <MovePickerHost />
     </div>
   );
 }
@@ -112,4 +115,64 @@ test("New Folder opens a shut folder, and on a source's row makes one at its top
   await userEvent.keyboard("{Enter}");
   await expect.element(screen.getByText("Created New folder in Pictures.")).toBeVisible();
   expect(await titles(1)).toEqual(["New folder", "People", "Trips"]);
+});
+
+const where = () => {
+  const place = getPlace();
+  return place?.kind === "folder" ? place.path.map((crumb) => crumb.title).join("/") : null;
+};
+
+test("Move to… on a folder cannot pick its own branch, and moves it with what it holds", async () => {
+  const screen = await render(<Harness />);
+  await openPictures(screen);
+  await choose(screen, "Trips 2", "Trips", "Move to…");
+  const picker = screen.getByRole("dialog", { name: "Move to" });
+  await expect.element(picker).toBeVisible();
+  const option = (name: string) => picker.getByRole("option", { name, exact: true });
+  await expect.element(option("Pictures current")).toHaveAttribute("aria-disabled", "true");
+  await expect.element(option("Trips")).toHaveAttribute("aria-disabled", "true");
+  await picker.getByRole("combobox").fill("cai");
+  await expect.element(option("Cairo Trips")).toHaveAttribute("aria-disabled", "true");
+
+  await picker.getByRole("combobox").fill("peo");
+  await userEvent.keyboard("{Enter}");
+  await expect.element(screen.getByText("Moved Trips to People.")).toBeVisible();
+  expect(await titles(5)).toEqual(["Trips"]);
+});
+
+test("a folder moved while you stand in it takes you with it, the tree opened down to it", async () => {
+  setPlace({
+    kind: "folder",
+    sourceId: 1,
+    path: [
+      { id: 1, title: "Pictures" },
+      { id: 4, title: "Trips" },
+      { id: 6, title: "Cairo" },
+    ],
+  });
+  openFolders([1, 4]);
+  const screen = await render(<Harness />);
+  await choose(screen, "Trips 2", "Trips", "Move to…");
+  await screen.getByRole("dialog", { name: "Move to" }).getByRole("combobox").fill("peo");
+  await userEvent.keyboard("{Enter}");
+
+  await expect.poll(where).toBe("Pictures/People/Trips/Cairo");
+  const cairo = screen.getByRole("treeitem", { name: "Cairo 3" });
+  await expect.element(cairo).toHaveAttribute("aria-selected", "true");
+});
+
+test("a folder whose name is taken where it was going stays, and says so in the banner", async () => {
+  await createFolder(1, "Cairo");
+  resetIndex();
+  await loadIndex();
+  openFolders([1, 4]);
+  const screen = await render(<Harness />);
+  await choose(screen, "Cairo 3", "Cairo", "Move to…");
+  await screen.getByRole("dialog", { name: "Move to" }).getByRole("combobox").fill("pict");
+  await userEvent.keyboard("{Enter}");
+
+  await expect.element(screen.getByText("Cairo could not go to Pictures")).toBeVisible();
+  await expect.element(screen.getByText("Not Moved")).toBeVisible();
+  await expect.element(screen.getByText("Name taken in Pictures")).toBeVisible();
+  expect(await titles(4)).toEqual(["Cairo"]);
 });

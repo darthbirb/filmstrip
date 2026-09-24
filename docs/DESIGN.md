@@ -594,7 +594,7 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   then the tree. Rows are `control` tall, indented a `chevron` a level with the chevron's square
   kept on every row, a filled glyph in `fg-dim`, the name, and quieter words at the end in
   `small`: a folder's parent, or "current" on the one the file is in, drawn in `fg-faint`
-  and never picked. The field keeps the focus; the arrows move a `raised-hi` row, Enter picks it,
+  and never picked. Moving a folder, its own branch is drawn the same way. The field keeps the focus; the arrows move a `raised-hi` row, Enter picks it,
   Right and Left open and shut it.
 - **Full screen.** The pane takes the frame below the bar, keeping its header, picture and
   filmstrip and losing only the columns beside it. Its control is a glyph button at the header's
