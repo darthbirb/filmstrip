@@ -11,8 +11,8 @@ import { showReport } from "./report-store";
 // What follows an act, and the way back from it. DECISIONS.md "Undo".
 
 /** After an act: its line at the foot with Undo, the newest news there. */
-export function afterAct(batch: Batch, stayed = 0) {
-  setNews({ kind: "done", line: actLine(batch, stayed), batchId: batch.batchId });
+export function afterAct(batch: Batch, stayed = 0, line = actLine(batch, stayed)) {
+  setNews({ kind: "done", line, batchId: batch.batchId });
 }
 
 let undoing = false;

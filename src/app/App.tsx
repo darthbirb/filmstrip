@@ -9,6 +9,7 @@ import { Notices } from "./grid/Notices";
 import { TileSize } from "./grid/TileSize";
 import { addFolder } from "./navigation/add-source";
 import { Breadcrumb } from "./navigation/Breadcrumb";
+import { DeleteQuestion } from "./navigation/delete-folder";
 import { Foot } from "./navigation/Foot";
 import { Navigation } from "./navigation/Navigation";
 import { Rail } from "./navigation/Rail";
@@ -63,6 +64,7 @@ export function App() {
           }
           notices={
             <>
+              <DeleteQuestion />
               <ReportBanner />
               <Notices />
             </>

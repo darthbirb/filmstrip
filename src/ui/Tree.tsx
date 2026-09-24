@@ -1,9 +1,10 @@
-import { Fragment, type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { Fragment, type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { formatCount } from "../lib/format";
 import { Glyph } from "./Glyph";
 import type { GlyphName } from "./glyphs";
 import { type HeadedMenu, useContextMenu } from "./Menu";
+import { PushDown } from "./PushDown";
 
 export type TreeRow = {
   id: string;
@@ -37,7 +38,16 @@ type Props = {
   renaming?: Renaming | null;
 };
 
-export type Renaming = { id: string; onCommit: (name: string) => void; onCancel: () => void };
+export type Renaming = {
+  id: string;
+  onCommit: (name: string) => void;
+  onCancel: () => void;
+  /** Why the name typed cannot be used, said under the row until the name is edited. */
+  taken?: string | null;
+  onEdit?: () => void;
+  /** A row not made yet, whose name as it stands is one to make rather than one to keep. */
+  fresh?: boolean;
+};
 
 /** An ARIA tree: one tab stop, arrows to move, Right and Left to open and close, Enter to go. */
 export function Tree({
@@ -178,9 +188,15 @@ export function Tree({
               {row.glyph && <Glyph name={row.glyph} filled className={`text-icon ${ink}`} />}
               {renaming?.id === row.id ? (
                 <NameField
+                  id={row.id}
                   name={row.label}
                   renaming={renaming}
-                  onDone={() => elements.current.get(row.id)?.focus()}
+                  // A draft row that was never made has no row left; its parent has.
+                  onDone={() => {
+                    const to =
+                      elements.current.get(row.id) ?? elements.current.get(parentOf(index) ?? "");
+                    to?.focus();
+                  }}
                 />
               ) : (
                 <span className="min-w-0 flex-1 truncate">{row.label}</span>
@@ -220,6 +236,26 @@ export function Tree({
                 </button>
               )}
             </div>
+            {renaming?.id === row.id && (
+              // Tight under its row: the tree's own gap would open before the reason does.
+              <PushDown open={Boolean(renaming.taken)} className="mx-row-inset -mt-row-gap">
+                {/* Under the name, so the reason reads as the field's own. */}
+                <p className="m-0 flex gap-2 pr-2 pb-1 pl-1 text-fg-dim text-small">
+                  <span
+                    aria-hidden="true"
+                    className="shrink-0"
+                    style={{ width: `calc(var(--spacing-indent) * ${row.level - 1})` }}
+                  />
+                  <span aria-hidden="true" className="size-chevron shrink-0" />
+                  {row.glyph && (
+                    <Glyph name={row.glyph} filled className="invisible shrink-0 text-icon" />
+                  )}
+                  <span id={`${row.id}-taken`} className="min-w-0 flex-1 px-1.5">
+                    {renaming.taken}
+                  </span>
+                </p>
+              </PushDown>
+            )}
           </Fragment>
         );
       })}
@@ -230,48 +266,83 @@ export function Tree({
 
 /**
  * The row's name as a field, where it stands: the whole name selected, Enter or leaving it keeps
- * what was typed, Escape keeps the old name. DECISIONS.md "Right-click menus".
+ * what was typed, Escape keeps the old name. A name taken holds Enter until it is edited, and
+ * leaving then keeps the old one. DECISIONS.md "Right-click menus".
  */
 function NameField({
+  id,
   name,
   renaming,
   onDone,
 }: {
+  id: string;
   name: string;
   renaming: Renaming;
   onDone: () => void;
 }) {
   const field = useRef<HTMLInputElement>(null);
   const settled = useRef(false);
+  const taken = renaming.taken ?? null;
   useEffect(() => {
     field.current?.select();
   }, []);
+  // The answer to Enter came back taken: the keyboard is where the name gets mended.
+  useEffect(() => {
+    if (taken) field.current?.focus();
+  }, [taken]);
+  // Closing a field that had the focus hands it back to the row, not to the page.
+  const done = useRef(onDone);
+  done.current = onDone;
+  // A layout effect, so it runs before the field leaves the page and still sees the focus.
+  useLayoutEffect(() => {
+    const element = field.current;
+    return () => {
+      if (!element || document.activeElement !== element) return;
+      queueMicrotask(() => {
+        if (!element.isConnected) done.current();
+      });
+    };
+  }, []);
 
-  const settle = (keep: boolean) => {
-    if (settled.current) return;
+  // Once committed, the field waits for the answer; a new edit lets it be committed again.
+  const commit = () => {
+    if (settled.current || taken) return;
     settled.current = true;
     const typed = field.current?.value.trim() ?? "";
-    if (keep && typed && typed !== name) renaming.onCommit(typed);
+    if (typed && (renaming.fresh || typed !== name)) renaming.onCommit(typed);
     else renaming.onCancel();
+  };
+  const cancel = () => {
+    settled.current = true;
+    renaming.onCancel();
   };
 
   return (
     <input
       ref={field}
-      aria-label={`Rename ${name}`}
+      aria-label={renaming.fresh ? "Folder Name" : `Rename ${name}`}
+      aria-invalid={taken !== null}
+      aria-describedby={taken ? `${id}-taken` : undefined}
       defaultValue={name}
-      onBlur={() => settle(true)}
+      onChange={() => {
+        settled.current = false;
+        renaming.onEdit?.();
+      }}
+      onBlur={() => (taken ? cancel() : commit())}
       // The row's own keys and clicks are the tree's; in here they are the field's.
       onClick={(event) => event.stopPropagation()}
       onDoubleClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
         event.stopPropagation();
-        if (event.key !== "Enter" && event.key !== "Escape") return;
-        event.preventDefault();
-        settle(event.key === "Enter");
-        onDone();
+        if (event.key === "Enter") {
+          event.preventDefault();
+          commit();
+        } else if (event.key === "Escape") {
+          event.preventDefault();
+          cancel();
+        }
       }}
-      className="focus-ring h-chip min-w-0 flex-1 rounded-nested bg-well px-1.5 text-fg inset-ring inset-ring-line-strong selection:bg-plate selection:text-on-plate"
+      className="focus-ring h-chip min-w-0 flex-1 rounded-nested bg-well px-1.5 text-fg inset-ring inset-ring-line-strong selection:bg-plate selection:text-on-plate aria-invalid:inset-ring-line-danger"
     />
   );
 }

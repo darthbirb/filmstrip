@@ -1,11 +1,13 @@
 import { listen } from "@tauri-apps/api/event";
 import { useSyncExternalStore } from "react";
+import type { FolderEntry } from "../../ipc/bindings/FolderEntry";
 import type { FolderNode } from "../../ipc/bindings/FolderNode";
 import type { Progress } from "../../ipc/bindings/Progress";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
-import { folderChildren, listSources } from "../../ipc/commands";
-import { getPaneOrigin, showInPane } from "../pane/pane-store";
-import { getPlace, type Place, setPlace } from "../place";
+import { folderChildren, listFolders, listSources } from "../../ipc/commands";
+import { getPaneOrigin, movePaneOrigin, showInPane } from "../pane/pane-store";
+import { type Crumb, getPlace, type Place, setPlace } from "../place";
+import { openFolders, setOpenFolders } from "./open-folders";
 
 /** The index as navigation reads it: the sources, and each folder's children once asked for. */
 type Snapshot = {
@@ -22,18 +24,34 @@ export async function loadIndex() {
   const sources = await listSources();
   publish({ sources, children: new Map() });
   ensureChildren(sources.map((source) => source.rootFolderId));
-  settle(sources);
+  await settle(sources);
 }
 
 /**
- * A source that is gone is left rather than stood in, so nothing waits on a folder that no
- * longer exists; then an empty window settles on the first library. DECISIONS.md "Places, not queries".
+ * A place follows its folder: moved, it goes with it, opened down to; gone, it is the nearest
+ * folder above it still there; and with its source gone it is left, so nothing waits on a folder
+ * that no longer exists. Then an empty window settles on the first library. DECISIONS.md "Places, not queries".
  */
-function settle(sources: SourceSummary[]) {
+async function settle(sources: SourceSummary[]) {
+  const folders = await listFolders().catch(() => null);
   const held = (place: Place | null) =>
     place?.kind !== "folder" || sources.some((source) => source.id === place.sourceId);
-  if (!held(getPlace())) setPlace(null);
-  if (!held(getPaneOrigin())) showInPane(null);
+  const now = (place: Place | null) =>
+    folders ? follow(place, folders) : held(place) ? place : null;
+
+  const place = getPlace();
+  const here = now(place);
+  if (here !== place) {
+    setPlace(here);
+    const moved = here?.kind === "folder" && place?.kind === "folder" && !samePlace(place, here);
+    if (moved) openFolders(here.path.slice(0, -1).map((crumb) => crumb.id));
+  }
+  // The pane's file went with a folder that went, so the pane has nothing left to show.
+  const origin = getPaneOrigin();
+  const from = now(origin);
+  if (origin !== null && (from === null || leaf(from) !== leaf(origin))) showInPane(null);
+  else if (from && from !== origin) movePaneOrigin(from);
+
   const library = sources.find((source) => source.kind === "library");
   if (getPlace() === null && library) {
     setPlace({
@@ -72,7 +90,39 @@ export async function refreshIndex() {
     if (list) children.set(id, list);
   });
   publish({ sources, children });
-  settle(sources);
+  await settle(sources);
+}
+
+/** Where a place is now, read off every live folder; the same object when nothing changed. */
+function follow(place: Place | null, folders: readonly FolderEntry[]): Place | null {
+  if (place?.kind !== "folder") return place;
+  const byId = new Map(folders.map((folder) => [folder.id, folder]));
+  for (const crumb of [...place.path].reverse()) {
+    const found = byId.get(crumb.id);
+    if (!found) continue;
+    const path: Crumb[] = [];
+    for (let at: FolderEntry | undefined = found; at; ) {
+      path.unshift({ id: at.id, title: at.title });
+      at = at.parentId === null ? undefined : byId.get(at.parentId);
+    }
+    const next: Place = { kind: "folder", sourceId: found.sourceId, path };
+    return sameCrumbs(place.path, path) ? place : next;
+  }
+  return null;
+}
+
+const leaf = (place: Place) => (place.kind === "folder" ? place.path.at(-1)?.id : place.kind);
+
+/** The same folders, whatever they are called now. */
+function samePlace(a: Place & { kind: "folder" }, b: Place & { kind: "folder" }) {
+  return a.path.map((crumb) => crumb.id).join() === b.path.map((crumb) => crumb.id).join();
+}
+
+function sameCrumbs(a: readonly Crumb[], b: readonly Crumb[]) {
+  return (
+    a.length === b.length &&
+    a.every((crumb, at) => crumb.id === b[at]?.id && crumb.title === b[at]?.title)
+  );
 }
 
 /** Asks for any of these folders' children not yet known. */
@@ -94,6 +144,7 @@ export function ensureChildren(folderIds: number[]) {
 /** Forgets everything, for tests. */
 export function resetIndex() {
   pending.clear();
+  setOpenFolders(new Set());
   publish({ sources: null, children: new Map() });
 }
 

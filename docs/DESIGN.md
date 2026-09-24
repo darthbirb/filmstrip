@@ -534,7 +534,10 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   `wash`; selected, a `plate` with `on-plate` ink. An offline source is `fg-dim` with an
   `fg-faint` glyph. The app's own places sit above a `line` rule. Renamed in place, the name
   becomes a `chip`-tall field on `well` at the `nested` corner with a `line-strong` hairline, the
-  whole name selected in `plate` with `on-plate` ink; the row keeps everything else.
+  whole name selected in `plate` with `on-plate` ink; the row keeps everything else. A folder's
+  name that is taken turns the hairline `line-danger`, and where it is taken comes down under the
+  row as a push-down, in `small` `fg-dim`, lined up with the name. New Folder's row is the same
+  field, arriving in its place among the folders it joins.
 - **Count pill.** A row's own item count, `badge` tall at the `badge` corner, on `raised` with a
   `line-control` ring; on a selected row it sinks to `on-plate-wash` with `on-plate` ink. A place
   with no items of its own carries no pill, and an offline source shows its word instead.
@@ -551,6 +554,14 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   opens in place beneath it rather than in a dialog: `eyebrow` headings over rows `control` tall,
   each row the name, why, and at its end a quiet way to go and look. What an act or an undo could
   not finish is grouped under a heading per place it is still in, "Reason" said over the first.
+- **Question.** The notice's shape, asking: the `danger` glyph, the question and × to answer none
+  on one line; under the question its answers as buttons, the one that destroys last in `danger`;
+  under them, where an answer can be kept, a checkbox. The answers hold the line or all fold into
+  one raised button with a caret, whose menu names them a `tile-gap` under it; folded answers that
+  still do not fit take a line each, left-aligned. Only the answers ever change shape.
+- **Checkbox.** A `badge` square at the `badge` corner on `raised` in a `line-control` ring,
+  filled with `plate` and a check in `on-plate` when ticked; its sentence beside it in `fg-mid`,
+  `fg` under the pointer or ticked. The ring the keyboard sees is on the square.
 - **Breadcrumb.** Folders above as quiet `row` steps back, the place itself as the `title`.
 - **Dropdown.** One named choice: a `control`-tall button on `raised` naming what it is on, a
   caret after it, opening a menu of every choice beneath it on `raised` with the overlay shadow.
@@ -591,7 +602,7 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   then the tree. Rows are `control` tall, indented a `chevron` a level with the chevron's square
   kept on every row, a filled glyph in `fg-dim`, the name, and quieter words at the end in
   `small`: a folder's parent, or "current" on the one the file is in, drawn in `fg-faint`
-  and never picked. The field keeps the focus; the arrows move a `raised-hi` row, Enter picks it,
+  and never picked. Moving a folder, its own branch is drawn the same way. The field keeps the focus; the arrows move a `raised-hi` row, Enter picks it,
   Right and Left open and shut it.
 - **Full screen.** The pane takes the frame below the bar, keeping its header, picture and
   filmstrip and losing only the columns beside it. Its control is a glyph button at the header's
@@ -627,7 +638,8 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Settings.** A dialog over the `scrim`: a header with its `title` and a close button; a rail of
   sections grouped under `eyebrow` captions, with a filter field on `ground` above them, the one
   shown on `raised-hi`; and the section's settings as rows in an `inset` group, each a label and
-  its control.
+  its control. A section whose body is its own, as Sources is, can close with a caption of its
+  own over such rows.
 - **Band.** What could not be done, at the foot of the panel it was asked from: a sentence, the
   folder's path under it in `--font-mono`, and a dismiss, on a `danger-wash` ground. There is only
   ever one, and a second refusal replaces it rather than stacking.

@@ -236,6 +236,14 @@
   }
 }
 
+/* The ring on a box drawn for a real control hidden before it, as the checkbox's is. */
+@utility focus-ring-peer {
+  :where(.peer):focus-visible ~ & {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: var(--focus-gap);
+  }
+}
+
 @utility focus-ring-inset {
   &:focus-visible {
     outline: var(--focus-width) solid var(--color-focus);

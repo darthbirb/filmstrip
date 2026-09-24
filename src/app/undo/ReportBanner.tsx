@@ -1,7 +1,7 @@
 import { Fragment, useState } from "react";
 
 import type { Stayed } from "../../ipc/bindings/Stayed";
-import { revealFolder, revealItem } from "../../ipc/commands";
+import { revealFolder, revealHeld, revealItem } from "../../ipc/commands";
 import { Banner, LIST_HEADING, LIST_ROW, listRow } from "../../ui/Banner";
 import { Glyph } from "../../ui/Glyph";
 import { reasonText, stayedGroups } from "./lines";
@@ -46,6 +46,12 @@ function Shown({ report }: { report: Report }) {
   );
 }
 
+/** A file, or a folder in its parent; a folder a file kept, open, with that file selected. */
+function reveal(row: Stayed) {
+  if (row.kind === "file") return revealItem(row.id);
+  return row.reason.kind === "holds" ? revealHeld(row.id) : revealFolder(row.id);
+}
+
 function Row({ row }: { row: Stayed }) {
   // Explorer has nothing to show for a file gone from disk, or one under the trash's own name.
   const showable = row.at.kind === "folder" && row.reason.kind !== "notOnDisk";
@@ -63,10 +69,7 @@ function Row({ row }: { row: Stayed }) {
           type="button"
           aria-label={`Show ${row.name} in Explorer`}
           title="Show in Explorer"
-          onClick={() => {
-            const shown = row.kind === "file" ? revealItem(row.id) : revealFolder(row.id);
-            void shown.catch(() => undefined);
-          }}
+          onClick={() => void reveal(row).catch(() => undefined)}
           className="focus-ring grid size-control place-items-center justify-self-end rounded-control text-fg-dim text-glyph transition-colors duration-(--motion-quick) hover:bg-wash hover:text-fg motion-reduce:transition-none"
         >
           <Glyph name="folderOpen" />

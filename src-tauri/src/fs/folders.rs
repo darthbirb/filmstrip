@@ -232,7 +232,7 @@ pub fn delete(
     let unseen = unseen_files(&dir)?;
     if let Some(first) = unseen.first() {
         let holds = AppError::refused(Reason::Holds {
-            name: first.clone(),
+            name: file_name(first),
             more: unseen.len() as u32 - 1,
         });
         report
@@ -301,30 +301,37 @@ fn sorting_root(conn: &Connection, source_id: i64) -> Result<i64> {
     folders::source_root_folder(conn, source_id)
 }
 
+/// The first file that keeps a folder from going, for Explorer to show selected.
+pub fn first_unseen(dir: &Path) -> Result<Option<PathBuf>> {
+    Ok(unseen_files(dir)?.into_iter().next())
+}
+
 /// Every file under `dir` the index does not show, but for Windows' own litter.
-fn unseen_files(dir: &Path) -> Result<Vec<String>> {
+fn unseen_files(dir: &Path) -> Result<Vec<PathBuf>> {
     let mut found = Vec::new();
     if !dir.is_dir() {
         return Ok(found);
     }
-    for entry in walkdir::WalkDir::new(dir).min_depth(1) {
+    for entry in walkdir::WalkDir::new(dir).min_depth(1).sort_by_file_name() {
         let entry = entry.map_err(|err| AppError::invalid(err.to_string()))?;
         if entry.file_type().is_dir() {
             continue;
         }
         if !is_litter(entry.path()) {
-            found.push(entry.file_name().to_string_lossy().into_owned());
+            found.push(entry.into_path());
         }
     }
     Ok(found)
 }
 
+fn file_name(path: &Path) -> String {
+    path.file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
 fn is_litter(path: &Path) -> bool {
-    let name = path
-        .file_name()
-        .map(|name| name.to_string_lossy().to_lowercase())
-        .unwrap_or_default();
-    walk::IGNORED_FILES.contains(&name.as_str())
+    walk::IGNORED_FILES.contains(&file_name(path).to_lowercase().as_str())
 }
 
 /// Removes the litter and then each directory, deepest first and each only once it is empty, so a
@@ -708,6 +715,8 @@ mod tests {
         );
         assert!(root.join("Trips/Lisbon/.notes").is_file());
         assert!(folders::is_live(&conn, made).unwrap());
+        let shown = first_unseen(&root.join("Trips/Lisbon")).unwrap();
+        assert_eq!(shown, Some(root.join("Trips/Lisbon/.notes")));
     }
 
     #[test]

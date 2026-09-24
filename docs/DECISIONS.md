@@ -66,6 +66,13 @@ one inside a source, one holding a source, and the app's own — and each says s
 foot of the panel the add began from. Nothing is added and no row is selected in its place, because
 selecting the row it overlaps would answer a question nobody asked.
 
+**A place follows its folder**, as Artboards › Undo draws it. Each time the index is read again,
+after an act of the app's own or a walk, where you stand is found again by the folder's id among
+every live folder: moved, it takes you with it, with the tree opened down to its new place;
+renamed, the breadcrumb says the new name; gone, you are in the nearest folder above it still
+there. The pane's file went with a folder that went, so the pane empties rather than showing a
+file as gone that the person has just deleted.
+
 ## Renames made while the app was closed
 
 A directory renamed or moved while the app is closed reads, on the next walk, as one folder
@@ -414,10 +421,9 @@ menu was already off everywhere but in a field, so until these a right-click, th
 Shift+F10 did nothing at all.
 
 - **A verb that does not exist yet is absent, never greyed.** A greyed row describes a feature at
-  the moment it refuses it. Move to…, Rename and Delete for a file, and New Folder, Move to…,
-  Rename and Delete for a folder, wait on the undo journal; the menu for a selection waits on
-  selecting. A rule only stands between two groups that both hold rows, so an absent verb leaves
-  no stray line, and a menu with nothing in it opens nothing.
+  the moment it refuses it. The menu for a selection waits on selecting. A rule only stands
+  between two groups that both hold rows, so an absent verb leaves no stray line, and a menu with
+  nothing in it opens nothing.
 - **What a drive that is away cannot do is absent too.** An offline source keeps Rename, Manage
   Sources and Remove Source, which touch only the index; its folders have nothing left.
 - **Favourite on a place waits.** The drawing puts it on a folder's and a source's menu, but nothing
@@ -436,6 +442,32 @@ Shift+F10 did nothing at all.
 - **A source is renamed on its own row**, with the same keys as its name field in Settings:
   sending someone to Settings to rename the row they are on would be the menu pointing at a place
   instead of doing the act. It edits the app's label for the source, never the folder.
+- **A folder is renamed on its row too, and that one is on disk.** A name already there is said
+  under the row, and Enter waits until it is edited; leaving the field then keeps the name it
+  had, since what was typed cannot be used. The rename is an act like any other, with its line.
+- **New Folder is a row before it is a folder.** It lands inside the folder, opened if it was
+  shut, in its place in the order and already in the rename field, under the first of Windows' own
+  names free there. Nothing is on disk until the name is given, by Enter or by leaving the field as
+  a rename is; Escape or an empty name leaves nothing. A source's row has it too, since that row is
+  the only one that stands for a source's top level.
+- **Move to… for a folder is the files' picker**, with the same tree and the same Recent. A folder
+  cannot go inside itself, so its own branch cannot be picked rather than being refused after the
+  pick. A name already where it was going is the move's banner, the folder its one row.
+- **Delete asks only when there is something to decide.** An empty folder goes at once. One with
+  files asks where they go, in the banner's shape above the grid rather than in a dialog, with no
+  answer pressed for you: each sorting source is its own answer, so the pick and the act are one
+  press, then Delete Files Too, and × answers none. With no sorting source the Trash is the only
+  answer, and nothing stands in for the missing ones.
+- **The answers hold one line or all fold into one.** Two of six on the line and four behind a
+  button would say the set is smaller than it is, so every sorting source is named, or none is and
+  Move Files to… names them in its menu; a fold that still does not fit stacks. The test is the
+  band's own line, never the window's width, so interface size and grid width fold it alike.
+- **A box keeps the answer as the default**, "Always Move to the One I Choose", written into
+  Settings › Sources, where it is changed or given up; with a default, the question is not asked.
+  It is the only setting written by answering a question elsewhere, which is why the box says so.
+- **A folder that stayed is the move's banner.** What went before the refusal stays gone and is
+  one batch, undone from the foot's line; the banner holds what kept the folder, grouped by where
+  each is, and Retry tries the rest again.
 - **Refresh walks one folder's subtree**, as the launch walk walks a source, judging nothing
   outside it. **Only one walk runs at a time:** each retires what it did not see, so a folder walk
   beside the whole walk would have the whole walk retire what the folder walk had just found.
@@ -507,7 +539,10 @@ and Escape or a click outside leaves nothing behind. It is the only thing over t
 the only use of the scrim.
 
 **A preference belongs there only when there is nowhere on screen to set it.** Today that is the
-interface size and the grid's layout. The panel widths, which panels are folded, the tile size
+interface size, the grid's layout, and where a deleted folder's files go without asking. That
+last one sits in Sources under the sorting sources it names, not under Appearance, so removing a
+sorting source takes its default with it and the row falls back to asking; with no sorting source
+there is nothing for it to name and the row is not there. The panel widths, which panels are folded, the tile size
 and whether the pane's details are open all keep their controls where they are: a second control
 for the same thing is a second thing to keep in sync.
 

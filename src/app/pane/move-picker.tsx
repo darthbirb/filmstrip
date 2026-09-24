@@ -1,7 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import type { FolderEntry } from "../../ipc/bindings/FolderEntry";
-import { listFolders, moveItems } from "../../ipc/commands";
+import { type AppError, listFolders, moveFolder, moveItems } from "../../ipc/commands";
 import type { MenuAnchor } from "../../ui/Menu";
 import { Picker, type PickerRow, type PickerSection } from "../../ui/Picker";
 import { libraryChanged } from "../library";
@@ -11,8 +11,14 @@ import { movedBannerLine } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
 
-/** Files to move, the folder they are in now, and what asked for the picker. */
-export type MoveRequest = { itemIds: number[]; folderId: number; anchor: MenuAnchor };
+/** A folder to move, with everything in it. */
+export type MovingFolder = { id: number; name: string };
+
+/** Files or a folder to move, the folder they are in now, and what asked for the picker. */
+export type MoveRequest = ({ itemIds: number[] } | { folder: MovingFolder }) & {
+  folderId: number;
+  anchor: MenuAnchor;
+};
 
 // One picker at a time, opened from the bar or a menu and drawn once at the app's root.
 let request: MoveRequest | null = null;
@@ -37,7 +43,10 @@ export function MovePickerHost() {
   return shown ? <MovePicker key={opened} request={shown} /> : null;
 }
 
-/** Move to…: Recent, then the whole tree, filtered as you type. Pane sheet "Move to…". */
+/**
+ * Move to…: Recent, then the whole tree, filtered as you type. A folder cannot go inside itself,
+ * so its own branch cannot be picked. Pane sheet "Move to…".
+ */
 function MovePicker({ request }: { request: MoveRequest }) {
   const [folders, setFolders] = useState<FolderEntry[] | null>(null);
   const [filter, setFilter] = useState("");
@@ -65,10 +74,14 @@ function MovePicker({ request }: { request: MoveRequest }) {
   const byId = new Map(folders.map((folder) => [folder.id, folder]));
   const reachable = new Set((sources ?? []).filter((one) => one.reachable).map((one) => one.id));
   const usable = folders.filter((folder) => reachable.has(folder.sourceId));
+  const barred = new Set([
+    request.folderId,
+    ...("folder" in request ? branch(folders, request.folder.id) : []),
+  ]);
   const parentName = (folder: FolderEntry) =>
     folder.parentId === null ? undefined : byId.get(folder.parentId)?.title;
   const flat = (folder: FolderEntry): PickerRow => ({
-    ...row(folder, 0, request.folderId),
+    ...row(folder, 0, barred),
     detail: folder.id === request.folderId ? "current" : parentName(folder),
   });
 
@@ -84,7 +97,7 @@ function MovePicker({ request }: { request: MoveRequest }) {
       return folder && reachable.has(folder.sourceId) ? [flat(folder)] : [];
     });
     if (known.length > 0) sections.push({ heading: "Recent", rows: known });
-    sections.push({ rows: tree(usable, open, request.folderId) });
+    sections.push({ rows: tree(usable, open, request.folderId, barred) });
   }
 
   return (
@@ -103,25 +116,58 @@ function MovePicker({ request }: { request: MoveRequest }) {
       }}
       onPick={(id) => {
         const to = byId.get(id);
-        if (to) void moveFiles(request.itemIds, to);
+        if (!to) return;
+        if (!("folder" in request)) return void moveFiles(request.itemIds, to);
+        const from = { folderId: request.folderId, path: pathOf(byId, request.folderId) };
+        void moveFolderTo(request.folder, to, from);
       }}
       onClose={() => openMovePicker(null)}
     />
   );
 }
 
-function row(folder: FolderEntry, depth: number, current: number): PickerRow {
+function row(folder: FolderEntry, depth: number, barred: ReadonlySet<number>): PickerRow {
   return {
     id: folder.id,
     label: folder.title,
     glyph: folder.parentId === null ? "source" : "folder",
     depth,
-    disabled: folder.id === current,
+    disabled: barred.has(folder.id),
   };
 }
 
+/** A folder and every folder under it. */
+function branch(folders: FolderEntry[], id: number) {
+  const found = new Set([id]);
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const folder of folders) {
+      if (folder.parentId !== null && found.has(folder.parentId) && !found.has(folder.id)) {
+        found.add(folder.id);
+        grew = true;
+      }
+    }
+  }
+  return found;
+}
+
+/** A folder's names from its source's own folder down, as a stayed row's place is named. */
+function pathOf(byId: ReadonlyMap<number, FolderEntry>, id: number) {
+  const path: string[] = [];
+  for (let at = byId.get(id); at; at = at.parentId === null ? undefined : byId.get(at.parentId)) {
+    path.unshift(at.title);
+  }
+  return path;
+}
+
 /** The tree as rows, down through whichever folders are open. */
-function tree(folders: FolderEntry[], open: ReadonlySet<number>, current: number): PickerRow[] {
+function tree(
+  folders: FolderEntry[],
+  open: ReadonlySet<number>,
+  current: number,
+  barred: ReadonlySet<number>,
+): PickerRow[] {
   const children = new Map<number | null, FolderEntry[]>();
   for (const folder of folders) {
     children.set(folder.parentId, [...(children.get(folder.parentId) ?? []), folder]);
@@ -131,7 +177,7 @@ function tree(folders: FolderEntry[], open: ReadonlySet<number>, current: number
     for (const folder of children.get(parent) ?? []) {
       const inside = (children.get(folder.id) ?? []).length > 0;
       rows.push({
-        ...row(folder, depth, current),
+        ...row(folder, depth, barred),
         detail: folder.id === current ? "current" : undefined,
         expanded: inside ? open.has(folder.id) : undefined,
       });
@@ -158,8 +204,7 @@ function ancestors(folders: FolderEntry[], id: number) {
 export async function moveFiles(itemIds: number[], to: FolderEntry) {
   const moved = await moveItems(itemIds, to.id).catch(() => null);
   if (!moved) return;
-  const recent = getPreferences().recent ?? [];
-  updatePreferences({ recent: [to.id, ...recent.filter((id) => id !== to.id)].slice(0, RECENT) });
+  remember(to);
   const { batch, report } = moved;
   if (batch) afterAct(batch, report.refused.length);
   const whole = report.moved + report.refused.length;
@@ -184,4 +229,38 @@ export async function moveFiles(itemIds: number[], to: FolderEntry) {
       : null,
   );
   await libraryChanged();
+}
+
+/**
+ * Moves a folder with everything in it. One that cannot go is the move's banner, with the folder
+ * as its one row; one that went takes you with it if you were in it. DECISIONS.md "Undo".
+ */
+export async function moveFolderTo(
+  folder: MovingFolder,
+  to: FolderEntry,
+  from: { folderId: number; path: string[] },
+) {
+  try {
+    const batch = await moveFolder(folder.id, to.id);
+    remember(to);
+    if (batch) afterAct(batch);
+    showReport(null);
+  } catch (error) {
+    const { reason } = (error ?? {}) as AppError;
+    if (!reason) return;
+    const at = { kind: "folder" as const, ...from };
+    showReport({
+      sentence: movedBannerLine(0, 1, to.title, folder.name),
+      rows: [{ kind: "folder", id: folder.id, name: folder.name, at, reason }],
+      heading: "Not Moved",
+      retry: () => void moveFolderTo(folder, to, from),
+    });
+  }
+  await libraryChanged();
+}
+
+/** The picker's Recent: the newest place first, files and folders alike. */
+function remember(to: FolderEntry) {
+  const recent = getPreferences().recent ?? [];
+  updatePreferences({ recent: [to.id, ...recent.filter((id) => id !== to.id)].slice(0, RECENT) });
 }

@@ -87,6 +87,7 @@ pub fn run() {
             commands::set_source_kind,
             commands::reveal_source,
             commands::reveal_folder,
+            commands::reveal_held,
             commands::read_folder_again,
             commands::create_folder,
             commands::rename_folder,

@@ -13,6 +13,7 @@ import type { ItemRow } from "./bindings/ItemRow";
 import type { ItemsMoved } from "./bindings/ItemsMoved";
 import type { ItemsTrashed } from "./bindings/ItemsTrashed";
 import type { Progress } from "./bindings/Progress";
+import type { Reason } from "./bindings/Reason";
 import type { SourceKind } from "./bindings/SourceKind";
 import type { SourceSummary } from "./bindings/SourceSummary";
 import type { UndoReport } from "./bindings/UndoReport";
@@ -24,6 +25,8 @@ import type { UndoReport } from "./bindings/UndoReport";
 export type AppError = {
   kind: "io" | "db" | "json" | "invalid" | "media" | "refused";
   message: string;
+  /** Why, for a refusal, in terms the interface words itself. */
+  reason?: Reason;
 };
 
 export const listSources = () => invoke<SourceSummary[]>("list_sources");
@@ -44,6 +47,8 @@ export const revealSource = (id: number) => invoke<void>("reveal_source", { id }
 export const removeSource = (id: number) => invoke<void>("remove_source", { id });
 
 export const revealFolder = (folderId: number) => invoke<void>("reveal_folder", { folderId });
+
+export const revealHeld = (folderId: number) => invoke<void>("reveal_held", { folderId });
 
 export const readFolderAgain = (folderId: number) =>
   invoke<void>("read_folder_again", { folderId });

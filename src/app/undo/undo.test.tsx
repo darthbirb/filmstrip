@@ -2,6 +2,7 @@ import { beforeEach, expect, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
+import { recording } from "../../dev/recording";
 import { folderItems, moveItems, undoLast } from "../../ipc/commands";
 import { Foot } from "../navigation/Foot";
 import { setNews } from "../navigation/foot-slot";
@@ -123,4 +124,25 @@ test("an undo that came back in part opens the banner, grouped by where each fil
   await expect.element(screen.getByText("Open in another app")).toBeVisible();
   await expect.element(screen.getByRole("button", { name: "Retry" })).toBeVisible();
   await expect.element(screen.getByRole("button", { name: "Hide Files" })).toBeVisible();
+});
+
+test("a folder a file kept is shown open in Explorer, with that file selected", async () => {
+  const screen = await render(<Harness />);
+  showReport({
+    sentence: "Lisbon could not go",
+    rows: [
+      {
+        kind: "folder",
+        id: 6,
+        name: "Lisbon",
+        at: { kind: "folder", folderId: 4, path: ["Pictures", "Trips"] },
+        reason: { kind: "holds", name: "notes.txt", more: 0 },
+      },
+    ],
+  });
+  await expect.element(screen.getByText("Holds notes.txt")).toBeVisible();
+  await recording(async (calls) => {
+    await screen.getByRole("button", { name: "Show Lisbon in Explorer" }).click();
+    expect(calls).toContainEqual(["reveal_held", { folderId: 6 }]);
+  });
 });
