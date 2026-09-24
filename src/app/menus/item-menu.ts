@@ -4,6 +4,7 @@ import { isFavourite, setFavourite } from "../favourites";
 import { deleteFiles } from "../pane/delete";
 import { getFullScreen, setFullScreen } from "../pane/full-screen";
 import { openMovePicker } from "../pane/move-picker";
+import { startRename } from "../pane/rename";
 
 type Item = { id: number; folderId: number; favorite: boolean };
 
@@ -64,6 +65,16 @@ export function itemMenu(item: Item, show: () => void): MenuGroups {
         label: "Open with Default App",
         glyph: "openExternal",
         onSelect: () => quietly(openItem(item.id)),
+      },
+      {
+        id: "rename",
+        label: "Rename",
+        glyph: "rename",
+        // The pane's Name row is where a name is changed, so the file goes there first.
+        onSelect: () => {
+          show();
+          startRename(item.id);
+        },
       },
     ],
     [

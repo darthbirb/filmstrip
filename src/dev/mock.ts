@@ -275,7 +275,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       const place = folderName(item.folderId);
       return Promise.reject<AppError>({
         kind: "refused",
-        message: `${place} already has ${wanted}`,
+        message: `${place} already has a file named ${wanted}`,
       });
     }
     const from = item.diskName;

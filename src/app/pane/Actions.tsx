@@ -9,6 +9,7 @@ import { Menu } from "../../ui/Menu";
 import { setFavourite, useFavourite } from "../favourites";
 import { deleteFiles } from "./delete";
 import { openMovePicker } from "./move-picker";
+import { startRename } from "./rename";
 
 type Action = { id: string; label: string; glyph: GlyphName; run: () => void };
 
@@ -90,20 +91,27 @@ export function Actions({ item }: { item: ItemDetail }) {
           danger
           onClick={() => void deleteFiles([item.id])}
         />
-        {folded.length > 0 && (
-          <Menu
-            label="More"
-            glyph="more"
-            groups={[
-              folded.map((action) => ({
+        {/* Always there: Rename lives in it, whatever else has left the bar. */}
+        <Menu
+          label="More"
+          glyph="more"
+          groups={[
+            [
+              ...folded.map((action) => ({
                 id: action.id,
                 label: action.label,
                 glyph: action.glyph,
                 onSelect: action.run,
               })),
-            ]}
-          />
-        )}
+              {
+                id: "rename",
+                label: "Rename",
+                glyph: "rename",
+                onSelect: () => startRename(item.id),
+              },
+            ],
+          ]}
+        />
       </div>
     </div>
   );
@@ -111,7 +119,7 @@ export function Actions({ item }: { item: ItemDetail }) {
 
 /**
  * How many of the glyph buttons the bar has room for beside what it always keeps: Favourite and
- * Move to…, Delete, and the ⋯ once any have left. Measured, never a width written down.
+ * Move to…, Delete, and the ⋯. Measured, never a width written down.
  */
 function useFitting(
   bar: RefObject<HTMLElement | null>,
@@ -132,11 +140,8 @@ function useFitting(
       const unit = element.querySelector("button")?.getBoundingClientRect().width ?? 0;
       const room = element.clientWidth - padding - (kept.current?.offsetWidth ?? 0) - gap;
       if (unit <= 0 || room <= 0) return;
-      // The squares that fit, then Delete, then the ⋯ once any have left.
-      const width = (n: number) => {
-        const squares = n + 1 + (n < count ? 1 : 0);
-        return squares * (unit + gap) - gap;
-      };
+      // The squares that fit, then Delete, then the ⋯.
+      const width = (n: number) => (n + 2) * (unit + gap) - gap;
       let n = count;
       while (n > 0 && width(n) > room) n--;
       setFits(n);

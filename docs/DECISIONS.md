@@ -356,9 +356,7 @@ turned down live on 13 September 2026, and re-derived from ggallery's drawing.
 September 2026: favourite at the left, and reveal, copy and open filling in from the right.
 **What fits is measured, never written down** — each button that does not fit moves into a menu
 under a ⋯ glyph, so the list of what the app can do to a file never depends on the width of the
-window. The drawing keeps that menu on screen always, because Rename lives in it; until Rename has
-a command behind it the menu appears only when it holds something, since a control that cannot act
-is worse than an absence. **Favourite is not yellow:** the predecessor's amber star is an accent
+window. That menu is on screen always, because Rename lives in it. **Favourite is not yellow:** the predecessor's amber star is an accent
 this app does not have, so the state is carried by the filled glyph and the raised plate, as every
 other toggle carries it.
 
@@ -370,6 +368,12 @@ bar. Delete asks nothing, because Undo is the answer to a delete. **When the pan
 file, it moves on** to the file that takes its tile's place, or the one before when it was the
 last, and to its empty state when none is left; "This File Has Gone" is for a file that went
 outside the app, never for the person's own act.
+
+**Rename is the Name row, where the name already is.** From the ⋯ or a file's menu it opens the
+details if they are shut and turns that row into a field, the stem selected and the extension in
+the field but outside the selection, so it can be changed on purpose and not by typing. A name
+already taken is said under the field, which keeps it and holds Enter until it is edited; nothing
+is renamed behind the person's back and no suffix is invented.
 
 **Full screen is a state of the pane, not a place you go**, drawn on 15 September 2026 and built
 the day after. The pane takes the frame below the bar and keeps every part it has; the bar stays,

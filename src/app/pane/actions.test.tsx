@@ -80,8 +80,15 @@ test("what does not fit moves into the menu, and stays out of the bar", async ()
   expect(sent.map((call) => call.cmd)).toEqual(["open_item"]);
 });
 
-test("with room for all of them the menu is not drawn at all", async () => {
+test("with room for all of them the menu holds Rename alone", async () => {
   const screen = await renderBar(400);
   await expect.element(screen.getByRole("button", { name: "Open with Default App" })).toBeVisible();
-  expect(screen.getByRole("button", { name: "More" }).elements()).toHaveLength(0);
+  await screen.getByRole("button", { name: "More" }).click();
+  const menu = screen.getByRole("menu", { name: "More" });
+  expect(
+    menu
+      .getByRole("menuitem")
+      .elements()
+      .map((row) => row.textContent),
+  ).toEqual([expect.stringContaining("Rename")]);
 });

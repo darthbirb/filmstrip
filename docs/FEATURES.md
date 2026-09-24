@@ -65,7 +65,7 @@ drawn. **Not started** — neither.
 | Sort by key and direction, random order held steady | Not started | |
 | Move items between folders | Built | `move_items`, Move to… on the pane's bar and a file's menu; a name already taken is reported, never changed |
 | Delete items to the trash | Built | `trash_items`, Delete on the pane's bar and a file's menu; undo takes an item back |
-| Rename a file, on disk | Built in Rust, journalled; not on screen yet | `rename_item`; not in ggallery, drawn on the Pane sheet; a name already taken is refused |
+| Rename a file, on disk | Built | `rename_item`, the pane's Name row; not in ggallery; a name already taken is refused |
 | Paste files in, and take an OS drop | Not started | |
 | Copy an item's path | Not started | |
 | Counts: unsorted, trashed, totals, arrival duplicates | Partly | the foot counts items and sources |

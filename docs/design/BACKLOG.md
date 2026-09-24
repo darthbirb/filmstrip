@@ -19,8 +19,8 @@ already lives on, never in a file of its own.
 ## The app's own right-click menus: the verbs that change the disk · DRAWN
 
 Drawn on the Components sheet; what exists is built, DECISIONS.md "Right-click menus". What waits,
-on the undo journal (FEATURES.md "Export and undo"): a file's Rename, and a folder's New Folder,
-Move to…, Rename and Delete. New Folder lands a row already in its name field,
+on the undo journal (FEATURES.md "Export and undo"): a folder's New Folder, Move to…, Rename and
+Delete. New Folder lands a row already in its name field,
 and on a source's row makes a folder at its top level. Move to… is the file picker, with a folder's
 own descendants refused in it. A folder's Rename is the in-place field with its Taken state. Delete
 asks only when the folder holds something, naming each sorting source as its own answer, with a box

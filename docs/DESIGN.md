@@ -581,6 +581,11 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   focused element's ring, left edges met, flipping above when there is no room below and sliding
   along the window's edge rather than shrinking. A dropdown offers a choice and marks the one taken;
   a menu marks nothing, because every row in it is a thing to do rather than a thing to be.
+- **Name field.** A file's name as a field where it stands: `bar-field` tall on `ground` at the
+  `nested` corner with a `line-control` ring, the text in `fg-hi` and the selection on `plate`.
+  At rest the row is the name, and the `rename` glyph in `fg-dim` shows beside it under the
+  pointer. A name that is taken turns the ring `line-danger` and says where under the field, in
+  `eyebrow` size in `danger`.
 - **Picker.** A place to send something: the menu's surface and width, opened against what asked
   for it, with a filter field on `ground` at its head, Recent under an `eyebrow` heading, a rule,
   then the tree. Rows are `control` tall, indented a `chevron` a level with the chevron's square
