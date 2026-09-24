@@ -1,6 +1,7 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import type { Act } from "../ipc/bindings/Act";
 import type { Batch } from "../ipc/bindings/Batch";
+import type { Contents } from "../ipc/bindings/Contents";
 import type { Crumb } from "../ipc/bindings/Crumb";
 import type { FolderEntry } from "../ipc/bindings/FolderEntry";
 import type { FolderNode } from "../ipc/bindings/FolderNode";
@@ -96,12 +97,20 @@ const ITEMS: Record<number, ItemRow[]> = {
   6: items(6, ["felucca.mp4", "pyramid.jpg", "sphinx.jpg"]),
 };
 
-/** Each folder's parent and title, read off the tree above. */
-const PARENTS = new Map(
-  Object.entries(FOLDERS).flatMap(([parent, children]) =>
-    children.map((child) => [child.id, { parent: Number(parent), title: child.title }] as const),
-  ),
-);
+let nextFolderId = 100;
+
+/** Each live folder's parent and title, read off the tree from each source's own folder down. */
+function parents() {
+  const found = new Map<number, { parent: number; title: string }>();
+  const walk = (parent: number) => {
+    for (const child of FOLDERS[parent] ?? []) {
+      found.set(child.id, { parent, title: child.title });
+      walk(child.id);
+    }
+  };
+  for (const one of SOURCES) walk(one.rootFolderId);
+  return found;
+}
 
 /** Where the mock keeps what was sent to the trash: a folder no place shows. */
 const TRASH = -1;
@@ -109,8 +118,17 @@ const TRASH = -1;
 const everyItem = () =>
   Object.entries(ITEMS).flatMap(([folder, rows]) => (Number(folder) === TRASH ? [] : rows));
 
+/** Every file in a folder and the folders under it. */
+function under(folderId: number): ItemRow[] {
+  return [
+    ...(ITEMS[folderId] ?? []),
+    ...(FOLDERS[folderId] ?? []).flatMap((child) => under(child.id)),
+  ];
+}
+
 /** From the source's own folder down to this one, and the source it is in. */
 function crumbs(folderId: number) {
+  const PARENTS = parents();
   const folders: Crumb[] = [];
   let at: number | undefined = folderId;
   let home: SourceSummary | undefined;
@@ -163,23 +181,46 @@ function drawn(path: string) {
 type Step =
   | { op: "move"; item: ItemRow; from: number }
   | { op: "trash"; item: ItemRow; from: number }
-  | { op: "rename"; item: ItemRow; from: string; to: string };
+  | { op: "rename"; item: ItemRow; from: string; to: string }
+  | { op: "createFolder"; node: FolderNode; parent: number }
+  | { op: "renameFolder"; node: FolderNode; from: string; to: string }
+  | { op: "moveFolder"; node: FolderNode; from: number; to: number }
+  | { op: "deleteFolder"; node: FolderNode; parent: number };
 const journal: { batchId: string; steps: Step[] }[] = [];
 let nextBatch = 1;
 
 const folderName = (id: number) => crumbs(id).folders.at(-1)?.title ?? "";
 
-/** Puts an item in another folder, keeping every count in the tree true. */
+/** Every count in the tree, made true again after a change. */
+function recount() {
+  for (const node of Object.values(FOLDERS).flat()) {
+    node.childCount = FOLDERS[node.id]?.length ?? 0;
+    node.itemCount = ITEMS[node.id]?.length ?? 0;
+  }
+}
+
+/** Puts an item in another folder. */
 function relocate(item: ItemRow, to: number) {
   const from = item.folderId;
   ITEMS[from] = (ITEMS[from] ?? []).filter((other) => other !== item);
   item.folderId = to;
   ITEMS[to] = [...(ITEMS[to] ?? []), item];
-  for (const id of [from, to]) {
-    for (const node of Object.values(FOLDERS).flat()) {
-      if (node.id === id) node.itemCount = ITEMS[id]?.length ?? 0;
-    }
+  recount();
+}
+
+/** Puts a folder, with everything under it, inside another, in name order. */
+function attach(node: FolderNode, parent: number) {
+  FOLDERS[parent] = [...(FOLDERS[parent] ?? []), node].sort((a, b) =>
+    a.title.localeCompare(b.title, undefined, { sensitivity: "base" }),
+  );
+  recount();
+}
+
+function detach(node: FolderNode) {
+  for (const [parent, children] of Object.entries(FOLDERS)) {
+    FOLDERS[Number(parent)] = children.filter((child) => child !== node);
   }
+  recount();
 }
 
 function taken(folderId: number, name: string, item: ItemRow) {
@@ -187,24 +228,77 @@ function taken(folderId: number, name: string, item: ItemRow) {
   return (ITEMS[folderId] ?? []).some((o) => o !== item && o.diskName.toLowerCase() === lower);
 }
 
+function folderTaken(parent: number, title: string, node?: FolderNode) {
+  const lower = title.toLowerCase();
+  return (FOLDERS[parent] ?? []).some((o) => o !== node && o.title.toLowerCase() === lower);
+}
+
+/** A name already there, refused as the Rust side refuses it, reason and all. */
+function refusedName(parent: number, name: string, folder: boolean) {
+  const place = folderName(parent);
+  return Promise.reject<AppError>({
+    kind: "refused",
+    message: `${place} already has a ${folder ? "folder" : "file"} named ${name}`,
+    reason: { kind: "nameTaken", place, name, folder },
+  });
+}
+
+const pathOf = (folderId: number) => crumbs(folderId).folders.map((crumb) => crumb.title);
+
 function stayedIn(item: ItemRow, reason: Reason): Stayed {
-  const path = crumbs(item.folderId).folders.map((crumb) => crumb.title);
-  const at = { kind: "folder" as const, folderId: item.folderId, path };
+  const at = { kind: "folder" as const, folderId: item.folderId, path: pathOf(item.folderId) };
   return { kind: "file", id: item.id, name: item.diskName, at, reason };
 }
 
+function stayedFolder(node: FolderNode, parent: number, reason: Reason): Stayed {
+  const at = { kind: "folder" as const, folderId: parent, path: pathOf(parent) };
+  return { kind: "folder", id: node.id, name: node.title, at, reason };
+}
+
 function describe(batchId: string, steps: Step[]): Batch {
+  const files = steps.reduce(
+    (sum, step) =>
+      sum + ("item" in step ? 1 : step.op === "moveFolder" ? under(step.node.id).length : 0),
+    0,
+  );
+  const folders = steps.filter((step) => !("item" in step)).length;
+  return { batchId, act: act(steps), files, folders };
+}
+
+function act(steps: Step[]): Act {
+  const gone = steps.find((step) => step.op === "deleteFolder");
+  if (gone) {
+    const moved = steps.find((step) => step.op === "move" || step.op === "moveFolder");
+    const into =
+      moved?.op === "move"
+        ? folderName(moved.item.folderId)
+        : moved?.op === "moveFolder"
+          ? folderName(moved.to)
+          : null;
+    return { kind: "deleteFolder", name: gone.node.title, parent: folderName(gone.parent), into };
+  }
   const [first] = steps;
-  const from = new Set(steps.map((step) => ("from" in step ? step.from : 0)));
-  const only = from.size === 1 && first?.op !== "rename" ? folderName(first?.from ?? 0) : null;
-  const one = steps.length === 1 && first ? first.item.diskName : null;
-  const act: Act =
-    first?.op === "rename"
-      ? { kind: "renameFile", from: first.from, to: first.to }
-      : first?.op === "trash"
-        ? { kind: "delete", from: only, one }
-        : { kind: "move", from: only, to: folderName(first?.item.folderId ?? 0), one };
-  return { batchId, act, files: steps.length, folders: 0 };
+  if (first?.op === "createFolder")
+    return { kind: "createFolder", name: first.node.title, parent: folderName(first.parent) };
+  if (first?.op === "renameFolder") return { kind: "renameFolder", from: first.from, to: first.to };
+  if (first?.op === "rename") return { kind: "renameFile", from: first.from, to: first.to };
+  if (first?.op === "moveFolder" && steps.length === 1) {
+    const { node, from, to } = first;
+    return { kind: "moveFolder", name: node.title, from: folderName(from), to: folderName(to) };
+  }
+  const from = new Set(
+    steps.map((step) =>
+      step.op === "move" || step.op === "trash" || step.op === "moveFolder" ? step.from : 0,
+    ),
+  );
+  const only = from.size === 1 ? folderName([...from][0] ?? 0) : null;
+  const files = steps.flatMap((step) => ("item" in step ? [step.item] : []));
+  const one = steps.length === 1 ? (files[0]?.diskName ?? null) : null;
+  if (first?.op === "trash") return { kind: "delete", from: only, one };
+  const to = steps.map((step) =>
+    step.op === "move" ? step.item.folderId : step.op === "moveFolder" ? step.to : 0,
+  )[0];
+  return { kind: "move", from: only, to: folderName(to ?? 0), one };
 }
 
 function record(steps: Step[]) {
@@ -219,11 +313,40 @@ function takeBack(at: number): UndoReport {
   // Described before anything comes back, as the Rust journal is.
   const batch = describe(batchId, steps);
   for (const step of [...steps].reverse()) {
-    if (step.op === "move" || step.op === "trash") relocate(step.item, step.from);
-    else step.item.diskName = step.from;
+    switch (step.op) {
+      case "move":
+      case "trash":
+        relocate(step.item, step.from);
+        break;
+      case "rename":
+        step.item.diskName = step.from;
+        break;
+      case "createFolder":
+        detach(step.node);
+        break;
+      case "renameFolder":
+        step.node.title = step.from;
+        break;
+      case "moveFolder":
+        detach(step.node);
+        attach(step.node, step.from);
+        break;
+      case "deleteFolder":
+        attach(step.node, step.parent);
+        break;
+    }
   }
-  return { batch, filesBack: steps.length, foldersBack: 0, stayed: [] };
+  return { batch, filesBack: batch.files, foldersBack: batch.folders, stayed: [] };
 }
+
+/** The live folder with this id, and the folder it is in. */
+function live(folderId: number) {
+  const at = parents().get(folderId);
+  const node = at && FOLDERS[at.parent]?.find((child) => child.id === folderId);
+  return at && node ? { node, parent: at.parent } : null;
+}
+
+const invalid = (message: string) => Promise.reject<AppError>({ kind: "invalid", message });
 
 type Args = Record<string, unknown>;
 
@@ -248,10 +371,40 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   reveal_folder: () => null,
   reveal_held: () => null,
   read_folder_again: () => null,
-  create_folder: () =>
-    Promise.reject<AppError>({ kind: "invalid", message: "Making a folder needs the real app." }),
-  rename_folder: () => null,
-  move_folder: () => null,
+  create_folder: ({ parentId, title }) => {
+    const parent = parentId as number;
+    const name = (title as string).trim();
+    if (folderTaken(parent, name)) return refusedName(parent, name, true);
+    const node = folder(nextFolderId++, name, 0, 0);
+    attach(node, parent);
+    return { folderId: node.id, batch: record([{ op: "createFolder", node, parent }]) };
+  },
+  rename_folder: ({ folderId, title }) => {
+    const found = live(folderId as number);
+    if (!found) return invalid("a source's own folder is renamed as a source");
+    const { node, parent } = found;
+    const name = (title as string).trim();
+    if (name === node.title) return null;
+    if (folderTaken(parent, name, node)) return refusedName(parent, name, true);
+    const from = node.title;
+    node.title = name;
+    detach(node);
+    attach(node, parent);
+    return record([{ op: "renameFolder", node, from, to: name }]);
+  },
+  move_folder: ({ folderId, parentId }) => {
+    const found = live(folderId as number);
+    const to = parentId as number;
+    if (!found) return invalid("a source's own folder sits inside nothing");
+    const { node, parent } = found;
+    if (parent === to) return null;
+    if (crumbs(to).folders.some((crumb) => crumb.id === node.id))
+      return invalid("a folder cannot go inside itself");
+    if (folderTaken(to, node.title)) return refusedName(to, node.title, true);
+    detach(node);
+    attach(node, to);
+    return record([{ op: "moveFolder", node, from: parent, to }]);
+  },
   move_items: ({ itemIds, folderId }): ItemsMoved => {
     const to = folderId as number;
     const steps: Step[] = [];
@@ -272,13 +425,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     const item = everyItem().find((one) => one.id === itemId);
     const wanted = (name as string).trim();
     if (!item || wanted === item.diskName) return null;
-    if (taken(item.folderId, wanted, item)) {
-      const place = folderName(item.folderId);
-      return Promise.reject<AppError>({
-        kind: "refused",
-        message: `${place} already has a file named ${wanted}`,
-      });
-    }
+    if (taken(item.folderId, wanted, item)) return refusedName(item.folderId, wanted, false);
     const from = item.diskName;
     item.diskName = wanted;
     return record([{ op: "rename", item, from, to: wanted }]);
@@ -292,8 +439,52 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     }
     return { batch: record(steps), report: { trashed: steps.length, refused: [] } };
   },
-  folder_file_count: () => 0,
-  delete_folder: () => ({ batch: null, report: { deleted: false, refused: [] } }),
+  folder_file_count: ({ folderId }) => under(folderId as number).length,
+  // Everything under the folder goes where `contents` says, then the folder, as the Rust side does.
+  delete_folder: ({ folderId, contents }) => {
+    const found = live(folderId as number);
+    if (!found) return invalid("a source's own folder is removed as a source, never deleted");
+    const { node, parent } = found;
+    const held = under(node.id);
+    const how = contents as Contents | null;
+    if (held.length > 0 && !how)
+      return invalid(`${node.title} holds ${held.length} files, so where they go has to be chosen`);
+    const steps: Step[] = [];
+    const refused: Stayed[] = [];
+    if (held.length > 0 && how?.kind === "trash") {
+      for (const item of held) {
+        steps.push({ op: "trash", item, from: item.folderId });
+        relocate(item, TRASH);
+      }
+    }
+    if (held.length > 0 && how?.kind === "moveTo") {
+      const to = SOURCES.find((one) => one.id === how.sourceId)?.rootFolderId ?? 0;
+      for (const child of [...(FOLDERS[node.id] ?? [])]) {
+        if (folderTaken(to, child.title)) {
+          const reason = { kind: "nameTaken" as const, place: folderName(to), folder: true };
+          refused.push(stayedFolder(child, node.id, { ...reason, name: child.title }));
+          continue;
+        }
+        steps.push({ op: "moveFolder", node: child, from: node.id, to });
+        detach(child);
+        attach(child, to);
+      }
+      for (const item of [...(ITEMS[node.id] ?? [])]) {
+        if (taken(to, item.diskName, item)) {
+          const reason = { kind: "nameTaken" as const, place: folderName(to), folder: false };
+          refused.push(stayedIn(item, { ...reason, name: item.diskName }));
+          continue;
+        }
+        steps.push({ op: "move", item, from: item.folderId });
+        relocate(item, to);
+      }
+    }
+    if (refused.length === 0) {
+      detach(node);
+      steps.push({ op: "deleteFolder", node, parent });
+    }
+    return { batch: record(steps), report: { deleted: refused.length === 0, refused } };
+  },
   undo_last: () => (journal.length > 0 ? takeBack(journal.length - 1) : null),
   undo_batch: ({ batchId }) => {
     const at = journal.findIndex((batch) => batch.batchId === batchId);
@@ -308,7 +499,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       sourceId: one.id,
       title: one.title,
     })),
-    ...[...PARENTS].map(([id, { parent, title }]) => ({
+    ...[...parents()].map(([id, { parent, title }]) => ({
       id,
       parentId: parent,
       sourceId: crumbs(id).home?.id ?? 0,
