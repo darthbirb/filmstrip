@@ -9,7 +9,11 @@ export type ItemDetail = { codec: string | null, bitrate: number | null,
 /**
  * Seconds since 1970; from EXIF, the camera's clock read as UTC. DECISIONS.md "Capture dates".
  */
-capturedAt: number | null, capturedSrc: "exif" | "container" | null, addedAt: number, sourceId: number, sourceKind: SourceKind, 
+capturedAt: number | null, capturedSrc: "exif" | "container" | null, addedAt: number, 
+/**
+ * When it went to the trash, for one that is there; its folders are then the ones it left.
+ */
+trashedAt: number | null, sourceId: number, sourceKind: SourceKind, 
 /**
  * From the source's own folder down to the item's.
  */

@@ -35,6 +35,26 @@ export function formatDimensions(width: number, height: number) {
   return `${width} × ${height}`;
 }
 
+/** The day a moment fell on, as a heading: Today, Yesterday, then the date, its year only when it is not this one. */
+export function formatDay(seconds: number, now = new Date()) {
+  const day = new Date(seconds * 1000);
+  const midnight = (at: Date) => new Date(at.getFullYear(), at.getMonth(), at.getDate()).getTime();
+  // Rounded, so a day an hour short or long at a change of clocks still counts as one.
+  const ago = Math.round((midnight(now) - midnight(day)) / 86_400_000);
+  if (ago === 0) return "Today";
+  if (ago === 1) return "Yesterday";
+  const year = day.getFullYear() === now.getFullYear() ? undefined : "numeric";
+  return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "long", year }).format(day);
+}
+
+/** A moment as its day and its time: Today, 14:02. */
+export function formatWhen(seconds: number, now = new Date()) {
+  const time = new Intl.DateTimeFormat(undefined, { timeStyle: "short" }).format(
+    new Date(seconds * 1000),
+  );
+  return `${formatDay(seconds, now)}, ${time}`;
+}
+
 /** A moment, in seconds since 1970. A floating one is a camera's clock, shown as it was written. DECISIONS.md "Capture dates". */
 export function formatDate(seconds: number, floating = false) {
   return new Intl.DateTimeFormat(undefined, {

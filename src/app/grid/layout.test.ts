@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 
-import { justified, type LayoutRequest, rowAt, uniform } from "./layout";
+import { justified, type LayoutRequest, layout, rowAt, uniform } from "./layout";
 
 const request = (aspects: number[], overrides: Partial<LayoutRequest> = {}): LayoutRequest => ({
   id: 1,
@@ -79,4 +79,29 @@ test("rowAt finds the row that holds a scroll position", () => {
   expect(rowAt(tops, 3, 100)).toBe(1);
   expect(rowAt(tops, 3, 399)).toBe(2);
   expect(rowAt(tops, 3, 5000)).toBe(2);
+});
+
+test("each group starts a row of its own under room for its heading, with room under every row", () => {
+  const aspects = Float32Array.from([1, 1, 1, 1, 1, 1, 1]);
+  const grouped = layout({
+    ...request([...aspects]),
+    groups: Uint32Array.from([0, 3]),
+    lead: 30,
+    below: 20,
+  });
+  const plain = justified(request([...aspects.subarray(0, 3)]));
+
+  // Its heading's room, its one row with the room under it, then the gap before the next group.
+  expect([...grouped.groupTops]).toEqual([0, 30 + plain.totalHeight + 20 + 4]);
+  // The first group's row sits under its heading, where the lone layout of the same three would.
+  expect(grouped.rowTops[0]).toBe(30);
+  expect(grouped.rowStart[1]).toBe(3);
+  expect(grouped.rowTops[1]).toBe((grouped.groupTops[1] ?? 0) + 30);
+  expect(grouped.itemLeft[3]).toBe(0);
+  expect(grouped.totalHeight).toBe(grouped.rowTops[grouped.rows]);
+});
+
+test("without groups, a layout is the one it always was", () => {
+  const aspects = [1.5, 0.75, 1, 1.33, 1.5, 2];
+  expect(layout(request(aspects))).toEqual(justified(request(aspects)));
 });

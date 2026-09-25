@@ -14,6 +14,8 @@ import type { Reason } from "../ipc/bindings/Reason";
 import type { SourceKind } from "../ipc/bindings/SourceKind";
 import type { SourceSummary } from "../ipc/bindings/SourceSummary";
 import type { Stayed } from "../ipc/bindings/Stayed";
+import type { Trashed } from "../ipc/bindings/Trashed";
+import type { TrashSummary } from "../ipc/bindings/TrashSummary";
 import type { UndoReport } from "../ipc/bindings/UndoReport";
 import type { AppError } from "../ipc/commands";
 
@@ -118,6 +120,15 @@ const TRASH = -1;
 const everyItem = () =>
   Object.entries(ITEMS).flatMap(([folder, rows]) => (Number(folder) === TRASH ? [] : rows));
 
+/** Everything, the trash's too. */
+const allItems = () => Object.values(ITEMS).flat();
+
+/** What the trash holds: when each went, and the folder it left, named as it was then. */
+type Trashing = { at: number; folders: Crumb[]; home: SourceSummary };
+const trashed = new Map<number, Trashing>();
+/** Now, in seconds, and one later than the last file sent, so the newest is always first. */
+let lastTrashed = 0;
+
 /** Every file in a folder and the folders under it. */
 function under(folderId: number): ItemRow[] {
   return [
@@ -144,9 +155,10 @@ function crumbs(folderId: number) {
 
 /** An item in full, as `item_detail` answers: PNGs carry no capture date, as screenshots don't. */
 function detail(itemId: number): ItemDetail | null {
-  const row = everyItem().find((item) => item.id === itemId);
+  const row = allItems().find((item) => item.id === itemId);
   if (!row) return null;
-  const { folders, home } = crumbs(row.folderId);
+  const gone = trashed.get(row.id);
+  const { folders, home } = gone ?? crumbs(row.folderId);
   if (!home) return null;
   const video = row.kind === "video";
   const dated = row.ext !== "png";
@@ -157,16 +169,19 @@ function detail(itemId: number): ItemDetail | null {
     capturedAt: dated ? 1_718_188_401 : null,
     capturedSrc: dated ? (video ? "container" : "exif") : null,
     addedAt: 1_750_000_000,
+    trashedAt: gone?.at ?? null,
     sourceId: home.id,
     sourceKind: home.kind,
     folders,
-    path: [home.root, ...folders.slice(1).map((crumb) => crumb.title), row.diskName].join("\\"),
+    path: gone
+      ? `D:\\Filmstrip\\data\\trash\\${row.uuid}\\${row.diskName}`
+      : [home.root, ...folders.slice(1).map((crumb) => crumb.title), row.diskName].join("\\"),
   };
 }
 
 /** The mock has no files, so every path it hands out is drawn: a wash in the item's own shape. */
 function drawn(path: string) {
-  const item = everyItem().find((row) => row.thumb === path || path.endsWith(`\\${row.diskName}`));
+  const item = allItems().find((row) => row.thumb === path || path.endsWith(`\\${row.diskName}`));
   const [full, tall] = [item?.width ?? 4, item?.height ?? 3];
   // A thumbnail is drawn at its real size, 320px on the longest edge, as the app makes them.
   const shrink = item && path === item.thumb ? Math.min(1, 320 / Math.max(full, tall)) : 1;
@@ -185,7 +200,8 @@ type Step =
   | { op: "createFolder"; node: FolderNode; parent: number }
   | { op: "renameFolder"; node: FolderNode; from: string; to: string }
   | { op: "moveFolder"; node: FolderNode; from: number; to: number }
-  | { op: "deleteFolder"; node: FolderNode; parent: number };
+  | { op: "deleteFolder"; node: FolderNode; parent: number }
+  | { op: "restore"; item: ItemRow; left: number; to: number; went: Trashing };
 const journal: { batchId: string; steps: Step[] }[] = [];
 let nextBatch = 1;
 
@@ -203,6 +219,31 @@ function recount() {
 function relocate(item: ItemRow, to: number) {
   const from = item.folderId;
   ITEMS[from] = (ITEMS[from] ?? []).filter((other) => other !== item);
+  item.folderId = to;
+  ITEMS[to] = [...(ITEMS[to] ?? []), item];
+  recount();
+}
+
+/** Sends an item to the trash. It keeps its folder, as the Rust side's row does. */
+function toTrash(item: ItemRow) {
+  const { folders, home } = crumbs(item.folderId);
+  if (home) {
+    lastTrashed = Math.max(lastTrashed + 1, Math.floor(Date.now() / 1000));
+    trashed.set(item.id, { at: lastTrashed, folders, home });
+  }
+  ITEMS[item.folderId] = (ITEMS[item.folderId] ?? []).filter((other) => other !== item);
+  ITEMS[TRASH] = [...(ITEMS[TRASH] ?? []), item];
+  recount();
+}
+
+/** A folder that is there: a source's own, or one under it. */
+const liveFolder = (id: number) =>
+  SOURCES.some((one) => one.rootFolderId === id) || parents().has(id);
+
+/** Takes an item out of the trash into a folder. */
+function fromTrash(item: ItemRow, to: number) {
+  ITEMS[TRASH] = (ITEMS[TRASH] ?? []).filter((other) => other !== item);
+  trashed.delete(item.id);
   item.folderId = to;
   ITEMS[to] = [...(ITEMS[to] ?? []), item];
   recount();
@@ -278,6 +319,13 @@ function act(steps: Step[]): Act {
     return { kind: "deleteFolder", name: gone.node.title, parent: folderName(gone.parent), into };
   }
   const [first] = steps;
+  const restores = steps.filter((step) => step.op === "restore");
+  if (restores.length > 0) {
+    const homes = new Set(restores.map((step) => step.to));
+    const [home] = homes;
+    const one = steps.length === 1 && first?.op === "restore" ? first.item.diskName : null;
+    return { kind: "restore", to: homes.size === 1 ? folderName(home ?? 0) : null, one };
+  }
   if (first?.op === "createFolder")
     return { kind: "createFolder", name: first.node.title, parent: folderName(first.parent) };
   if (first?.op === "renameFolder") return { kind: "renameFolder", from: first.from, to: first.to };
@@ -315,8 +363,10 @@ function takeBack(at: number): UndoReport {
   for (const step of [...steps].reverse()) {
     switch (step.op) {
       case "move":
-      case "trash":
         relocate(step.item, step.from);
+        break;
+      case "trash":
+        fromTrash(step.item, step.from);
         break;
       case "rename":
         step.item.diskName = step.from;
@@ -333,6 +383,11 @@ function takeBack(at: number): UndoReport {
         break;
       case "deleteFolder":
         attach(step.node, step.parent);
+        break;
+      case "restore":
+        toTrash(step.item);
+        step.item.folderId = step.left;
+        trashed.set(step.item.id, step.went);
         break;
     }
   }
@@ -435,9 +490,31 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     const steps: Step[] = [];
     for (const item of everyItem().filter((one) => (itemIds as number[]).includes(one.id))) {
       steps.push({ op: "trash", item, from: item.folderId });
-      relocate(item, TRASH);
+      toTrash(item);
     }
     return { batch: record(steps), report: { trashed: steps.length, refused: [] } };
+  },
+  restore_items: ({ itemIds, folderId }) => {
+    const steps: Step[] = [];
+    const refused: Stayed[] = [];
+    const wanted = itemIds as number[];
+    for (const item of (ITEMS[TRASH] ?? []).filter((one) => wanted.includes(one.id))) {
+      const went = trashed.get(item.id);
+      const to = (folderId as number | null) ?? item.folderId;
+      const at = { kind: "trash" as const };
+      const stayed = (reason: Reason) =>
+        refused.push({ kind: "file", id: item.id, name: item.diskName, at, reason });
+      if (!went || !liveFolder(to)) {
+        stayed({ kind: "folderGone", name: went?.folders.at(-1)?.title ?? "" });
+      } else if (taken(to, item.diskName, item)) {
+        const place = folderName(to);
+        stayed({ kind: "nameTaken", place, name: item.diskName, folder: false });
+      } else {
+        steps.push({ op: "restore", item, left: item.folderId, to, went });
+        fromTrash(item, to);
+      }
+    }
+    return { batch: record(steps), report: { restored: steps.length, refused } };
   },
   folder_file_count: ({ folderId }) => under(folderId as number).length,
   // Everything under the folder goes where `contents` says, then the folder, as the Rust side does.
@@ -454,7 +531,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     if (held.length > 0 && how?.kind === "trash") {
       for (const item of held) {
         steps.push({ op: "trash", item, from: item.folderId });
-        relocate(item, TRASH);
+        toTrash(item);
       }
     }
     if (held.length > 0 && how?.kind === "moveTo") {
@@ -507,6 +584,22 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     })),
   ],
   folder_items: ({ folderId }) => ITEMS[folderId as number] ?? [],
+  trash_listing: (): Trashed[] =>
+    (ITEMS[TRASH] ?? [])
+      .map((item) => {
+        const gone = trashed.get(item.id);
+        const from = {
+          folderId: item.folderId,
+          path: (gone?.folders ?? []).map((crumb) => crumb.title),
+          gone: !liveFolder(item.folderId),
+        };
+        return { ...item, trashedAt: gone?.at ?? 0, from };
+      })
+      .sort((a, b) => b.trashedAt - a.trashedAt || b.id - a.id),
+  trash_summary: (): TrashSummary => {
+    const held = ITEMS[TRASH] ?? [];
+    return { count: held.length, bytes: held.reduce((sum, item) => sum + item.sizeBytes, 0) };
+  },
   item_tags: () => [],
   item_detail: ({ itemId }) => detail(itemId as number),
   item_path: ({ itemId }) => detail(itemId as number)?.path ?? null,

@@ -331,6 +331,15 @@ already known; a button that only restates the situation is worse than no button
 folders are not known yet says nothing at all rather than guessing at "empty", and an unreachable
 source says what it last held — see "A walk only judges what it read".
 
+**The Trash is a place like any folder, with two differences**, drawn by Claude Design and built
+on 25 September 2026. It runs newest first under a heading for each day something went, Today and
+Yesterday and then the date, and a day starts a row of its own; the minute is in the pane's
+Deleted row. **Each tile says where it came from**, in one line under the tile rather than on it,
+because in the Trash that is what a person needs before putting it back: the folder's name only,
+its whole path in the tooltip and the pane, and "gone" when that folder no longer stands, so a
+refused Restore is not the first they hear of it. The line ellipsises and the tile never grows to
+fit it. The Trash counts itself on its row, its rail square and its header, with its size there.
+
 ## The pane
 
 **The picture, a row that opens onto what is known, and a filmstrip**: the predecessor's
@@ -381,6 +390,15 @@ details if they are shut and turns that row into a field, the stem selected and 
 the field but outside the selection, so it can be changed on purpose and not by typing. A name
 already taken is said under the field, which keeps it and holds Enter until it is edited; nothing
 is renamed behind the person's back and no suffix is invented.
+
+**A file in the Trash has the way back and nothing else**, drawn by Claude Design and built on 25
+September 2026. Its bar holds Restore and Restore to…, worded and from the left, and no ⋯, since
+nothing is left to fold; its menu holds the same two under Full Screen. Favourite, Move to… and
+Rename would change a file that is not in the library, and Show in Explorer, Copy and Open with
+Default App would hand Windows the name the Trash keeps it under, never the one it was given; all
+of them are absent rather than greyed. Nothing purges: emptying the Trash is under Later. Its
+details say where it came from and when it went, in place of where it is, and the Name row is
+only its name. Restored from the Trash, the pane moves on as it does after a delete.
 
 **Full screen is a state of the pane, not a place you go**, drawn on 15 September 2026 and built
 the day after. The pane takes the frame below the bar and keeps every part it has; the bar stays,
@@ -487,6 +505,9 @@ it.
   the dialog holds the keyboard, and an undo behind it would change what the person cannot see.
 - **An undo that came back in part answers with the banner, not the line.** What stayed is
   something only the person can settle, so it sits over the grid, open, with Retry.
+- **A row still in the Trash is never shown in Explorer**, which would show the name the Trash
+  keeps it under. After an undo its button is Show in Trash, which goes there with the file in
+  the pane; after a refused Restore it is Restore to…, since the answer is a place to choose.
 
 - **The disk changes first, then the index and the journal together.** A disk that refuses leaves
   nothing claiming it succeeded, and a transaction that fails puts the disk back.
@@ -514,6 +535,11 @@ it.
   name is taken there, its folder is gone, another app has it open). The interface words each
   reason itself; the sentence Rust gives it is for logs.
 - **A name held only by a file a walk found gone is freed** for the file arriving at it.
+- **Restore is an act of its own, not an undo.** It takes a file out of the trash into the folder
+  it left, or into one the person picks, under its own name; a name taken there is refused, never
+  changed. A folder that has gone is found again by its place, title by title from its source, so
+  making it again under the same name is how a refused restore resolves in place. Undoing a
+  restore sends the file back as it was: from the folder it had left, at the moment it first went.
 - **A trashed item gives up its name; a retired one keeps it.** `trashed_at` tells them apart. A
   file vanishing and coming back is the same file, so it keeps its tags. A file sent to the trash
   and then replaced under the same name is a different file: the newcomer is a new item, and the

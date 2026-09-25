@@ -10,11 +10,46 @@ import { setFavourite, useFavourite } from "../favourites";
 import { deleteFiles } from "./delete";
 import { openMovePicker } from "./move-picker";
 import { startRename } from "./rename";
+import { restoreFiles } from "./restore";
 
 type Action = { id: string; label: string; glyph: GlyphName; run: () => void };
 
 /** What the app can do to the file the pane is showing. DECISIONS.md "The pane". */
 export function Actions({ item }: { item: ItemDetail }) {
+  return item.trashedAt === null ? <InLibrary item={item} /> : <InTrash item={item} />;
+}
+
+/**
+ * A file in the Trash has the way back and nothing else, worded and from the left, with no ⋯
+ * because there is nothing left for it to hold. Pane sheet "A file in the Trash".
+ */
+function InTrash({ item }: { item: ItemDetail }) {
+  const restoreTo = useRef<HTMLButtonElement>(null);
+  return (
+    <div
+      role="toolbar"
+      aria-label="Actions"
+      className="flex h-toolbar shrink-0 items-center gap-1.5 border-line border-t px-1.5"
+    >
+      <Button glyph="putBack" onClick={() => void restoreFiles([item.id])}>
+        Restore
+      </Button>
+      <Button
+        ref={restoreTo}
+        glyph="moveTo"
+        onClick={() => {
+          const element = restoreTo.current;
+          if (!element) return;
+          openMovePicker({ restoring: [item.id], folderId: item.folderId, anchor: { element } });
+        }}
+      >
+        Restore to…
+      </Button>
+    </div>
+  );
+}
+
+function InLibrary({ item }: { item: ItemDetail }) {
   const bar = useRef<HTMLDivElement>(null);
   const kept = useRef<HTMLDivElement>(null);
   const moveTo = useRef<HTMLButtonElement>(null);

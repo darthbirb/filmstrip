@@ -254,6 +254,27 @@ pub fn send_to_trash(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
+/// When an item went to the trash, for one that is there.
+pub fn trashed_at(conn: &Connection, id: i64) -> Result<Option<i64>> {
+    Ok(conn
+        .query_row(
+            "SELECT trashed_at FROM item WHERE id = ?1",
+            params![id],
+            |r| r.get(0),
+        )
+        .optional()?
+        .flatten())
+}
+
+/// Puts back the moment an item went to the trash, as undoing its restore does.
+pub fn set_trashed_at(conn: &Connection, id: i64, at: i64) -> Result<()> {
+    conn.execute(
+        "UPDATE item SET deleted_at = ?1, trashed_at = ?1 WHERE id = ?2 AND trashed_at IS NOT NULL",
+        params![at, id],
+    )?;
+    Ok(())
+}
+
 /// Records an item as back from the trash, in the folder it left.
 pub fn take_from_trash(conn: &Connection, id: i64) -> Result<()> {
     conn.execute(
@@ -360,6 +381,28 @@ pub fn in_sorting(conn: &Connection) -> Result<Vec<ItemRow>> {
     Ok(rows)
 }
 
+/// Every item in the trash with the moment it went, the most recent first.
+pub fn in_trash(conn: &Connection) -> Result<Vec<(ItemRow, i64)>> {
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {ROW}, i.trashed_at FROM item i
+          WHERE i.trashed_at IS NOT NULL
+          ORDER BY i.trashed_at DESC, i.id DESC"
+    ))?;
+    let rows = stmt
+        .query_map([], |r| Ok((row(r)?, r.get(12)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(rows)
+}
+
+/// How many items the trash holds, and their bytes together.
+pub fn trash_totals(conn: &Connection) -> Result<(u32, i64)> {
+    Ok(conn.query_row(
+        "SELECT COUNT(*), COALESCE(SUM(size_bytes), 0) FROM item WHERE trashed_at IS NOT NULL",
+        [],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?)
+}
+
 /// One item in full, as the pane shows it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -374,6 +417,8 @@ pub struct ItemDetail {
     #[ts(type = "\"exif\" | \"container\" | null")]
     pub captured_src: Option<String>,
     pub added_at: i64,
+    /// When it went to the trash, for one that is there; its folders are then the ones it left.
+    pub trashed_at: Option<i64>,
     pub source_id: i64,
     pub source_kind: SourceKind,
     /// From the source's own folder down to the item's.
@@ -382,15 +427,15 @@ pub struct ItemDetail {
     pub path: String,
 }
 
-/// The live item with this id, in full, or `None` once it is gone.
+/// The item with this id in full, live or in the trash, or `None` once it is gone.
 pub fn detail(conn: &Connection, id: i64) -> Result<Option<ItemDetail>> {
     let found = conn
         .query_row(
             &format!(
                 "SELECT {ROW}, i.codec, i.bitrate, i.captured_at, i.captured_src, i.added_at,
-                        s.id, s.kind
+                        i.trashed_at, s.id, s.kind
                    FROM item i JOIN source s ON s.id = i.source_id
-                  WHERE i.id = ?1 AND i.deleted_at IS NULL"
+                  WHERE i.id = ?1 AND (i.deleted_at IS NULL OR i.trashed_at IS NOT NULL)"
             ),
             params![id],
             |r| {
@@ -401,8 +446,9 @@ pub fn detail(conn: &Connection, id: i64) -> Result<Option<ItemDetail>> {
                     captured_at: r.get(14)?,
                     captured_src: r.get(15)?,
                     added_at: r.get(16)?,
-                    source_id: r.get(17)?,
-                    source_kind: SourceKind::parse(&r.get::<_, String>(18)?),
+                    trashed_at: r.get(17)?,
+                    source_id: r.get(18)?,
+                    source_kind: SourceKind::parse(&r.get::<_, String>(19)?),
                     folders: Vec::new(),
                     path: String::new(),
                 })

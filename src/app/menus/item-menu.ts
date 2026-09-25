@@ -1,12 +1,14 @@
 import { copyItemFile, openItem, revealItem } from "../../ipc/commands";
-import type { MenuGroups } from "../../ui/Menu";
+import type { MenuAction, MenuGroups } from "../../ui/Menu";
 import { isFavourite, setFavourite } from "../favourites";
 import { deleteFiles } from "../pane/delete";
 import { getFullScreen, setFullScreen } from "../pane/full-screen";
 import { openMovePicker } from "../pane/move-picker";
 import { startRename } from "../pane/rename";
+import { restoreFiles } from "../pane/restore";
 
-type Item = { id: number; folderId: number; favorite: boolean };
+/** A file, with when it went to the Trash when it is there. */
+type Item = { id: number; folderId: number; favorite: boolean; trashedAt?: number | null };
 
 /**
  * A file's right-click menu: the pane's bar in its own order, with only the verbs that exist.
@@ -15,24 +17,51 @@ type Item = { id: number; folderId: number; favorite: boolean };
 export function itemMenu(item: Item, show: () => void): MenuGroups {
   const favourite = isFavourite(item.id, item.favorite);
   const quietly = (work: Promise<void>) => void work.catch(() => undefined);
+  // The menu has handed the focus back by now, so the picker opens against the file.
+  const anchor = () => {
+    const element = document.activeElement;
+    return element instanceof HTMLElement ? { element } : { x: 0, y: 0 };
+  };
+  const full: MenuAction = getFullScreen()
+    ? {
+        id: "leave",
+        label: "Exit Full Screen",
+        glyph: "leaveFullScreen",
+        onSelect: () => setFullScreen(false),
+      }
+    : {
+        id: "full",
+        label: "Full Screen",
+        glyph: "fullScreen",
+        onSelect: () => {
+          show();
+          setFullScreen(true);
+        },
+      };
+  // In the Trash the way back is all there is: anything else would act on a file not in the library.
+  if (item.trashedAt != null) {
+    return [
+      [full],
+      [
+        {
+          id: "restore",
+          label: "Restore",
+          glyph: "putBack",
+          onSelect: () => void restoreFiles([item.id]),
+        },
+        {
+          id: "restore-to",
+          label: "Restore to…",
+          glyph: "moveTo",
+          onSelect: () =>
+            openMovePicker({ restoring: [item.id], folderId: item.folderId, anchor: anchor() }),
+        },
+      ],
+    ];
+  }
   return [
     [
-      getFullScreen()
-        ? {
-            id: "leave",
-            label: "Exit Full Screen",
-            glyph: "leaveFullScreen",
-            onSelect: () => setFullScreen(false),
-          }
-        : {
-            id: "full",
-            label: "Full Screen",
-            glyph: "fullScreen",
-            onSelect: () => {
-              show();
-              setFullScreen(true);
-            },
-          },
+      full,
       {
         id: "favourite",
         label: favourite ? "Remove Favourite" : "Favourite",
@@ -44,12 +73,8 @@ export function itemMenu(item: Item, show: () => void): MenuGroups {
         id: "move",
         label: "Move to…",
         glyph: "moveTo",
-        // The menu has handed the focus back by now, so the picker opens against the file.
-        onSelect: () => {
-          const element = document.activeElement;
-          const anchor = element instanceof HTMLElement ? { element } : { x: 0, y: 0 };
-          openMovePicker({ itemIds: [item.id], folderId: item.folderId, anchor });
-        },
+        onSelect: () =>
+          openMovePicker({ itemIds: [item.id], folderId: item.folderId, anchor: anchor() }),
       },
     ],
     [

@@ -108,6 +108,25 @@ pub fn child_id(conn: &Connection, parent_id: i64, title: &str) -> Result<Option
         .optional()?)
 }
 
+/// The folder itself while it is live; once it has gone, a live folder at the same place, found
+/// title by title from its source's own folder, as one made again under the same name is.
+pub fn live_at(conn: &Connection, folder_id: i64) -> Result<Option<i64>> {
+    if is_live(conn, folder_id)? {
+        return Ok(Some(folder_id));
+    }
+    let at = location(conn, folder_id)?;
+    let Ok(mut here) = source_root_folder(conn, at.source_id) else {
+        return Ok(None);
+    };
+    for title in &at.titles {
+        match child_id(conn, here, title)? {
+            Some(child) => here = child,
+            None => return Ok(None),
+        }
+    }
+    Ok(Some(here))
+}
+
 /// A folder as the navigation lists it. Counts are of live, direct contents.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]

@@ -5,12 +5,12 @@ import { selectedRowId, sortingRow, trashRow } from "./shared";
 
 /** Folded, navigation keeps the app's own two places. Folders do not come: a slice of a tree is a worse tree. */
 export function Rail() {
-  const { sources } = useIndex();
+  const { sources, trash } = useIndex();
   const place = usePlace();
   const at = selectedRowId(place);
   const places: [ReturnType<typeof trashRow>, Place][] = [
     [sortingRow(sources ?? []), { kind: "sorting" }],
-    [trashRow(), { kind: "trash" }],
+    [trashRow(trash), { kind: "trash" }],
   ];
 
   return (

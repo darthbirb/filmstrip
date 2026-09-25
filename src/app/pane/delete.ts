@@ -1,5 +1,5 @@
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
-import { folderItems, sortingItems, trashItems } from "../../ipc/commands";
+import { folderItems, sortingItems, trashItems, trashListing } from "../../ipc/commands";
 import { libraryChanged } from "../library";
 import type { Place } from "../place";
 import { deletedBannerLine } from "../undo/lines";
@@ -39,9 +39,10 @@ export async function deleteFiles(itemIds: number[]) {
 }
 
 /** The file after this one in its place, or the one before when it was the last, or none. */
-async function neighbour(place: Place | null, id: number, going: number[]) {
+export async function neighbour(place: Place | null, id: number, going: number[]) {
   let rows: ItemRow[] = [];
   if (place?.kind === "sorting") rows = await sortingItems().catch(() => []);
+  if (place?.kind === "trash") rows = await trashListing().catch(() => []);
   const folder = place?.kind === "folder" ? place.path.at(-1) : undefined;
   if (folder) rows = await folderItems(folder.id).catch(() => []);
   const left = rows.filter((row) => row.id === id || !going.includes(row.id));

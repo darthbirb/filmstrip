@@ -30,9 +30,11 @@ pub fn run() {
             db::jobs::requeue_running(&conn)?;
             jobs::enqueue_index(&conn)?;
 
-            // The window may load files from the sources and the thumbnail cache, and nothing else.
+            // The window may load files from the sources, the thumbnail cache and the trash, where
+            // a file waits to be restored; and nothing else.
             let scope = app.asset_protocol_scope();
             scope.allow_directory(&thumbs, true)?;
+            scope.allow_directory(fs::paths::trash_dir()?, true)?;
             for source in db::sources::list(&conn)? {
                 scope.allow_directory(&source.root, true)?;
             }
@@ -104,6 +106,9 @@ pub fn run() {
             commands::list_folders,
             commands::folder_items,
             commands::sorting_items,
+            commands::trash_listing,
+            commands::trash_summary,
+            commands::restore_items,
             commands::item_tags,
             commands::item_detail,
             commands::item_path,

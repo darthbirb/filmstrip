@@ -15,6 +15,7 @@ pub const ITEM_MOVE: &str = "item_move";
 pub const ITEM_TRASH: &str = "item_trash";
 pub const ITEM_RENAME: &str = "item_rename";
 pub const FOLDER_DELETE: &str = "folder_delete";
+pub const ITEM_RESTORE: &str = "item_restore";
 
 /// A folder the app made. Its inverse is itself: undoing it removes that folder again.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -65,6 +66,17 @@ pub struct ItemRenamed {
 #[serde(rename_all = "camelCase")]
 pub struct ItemTrashed {
     pub item_id: i64,
+}
+
+/// An item taken out of the trash into a folder, the one it left or another. Its inverse is itself:
+/// undoing it sends the item back as it was, from the folder it left and at the moment it went.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemRestored {
+    pub item_id: i64,
+    pub left_folder_id: i64,
+    pub to_folder_id: i64,
+    pub trashed_at: i64,
 }
 
 /// A folder deleted, and every folder under it retired with the same stamp, which is how undo
@@ -207,6 +219,14 @@ pub fn record_item_rename(
 pub fn record_item_trash(conn: &Connection, batch_id: &str, item_id: i64) -> Result<()> {
     let trashed = ItemTrashed { item_id };
     record(conn, batch_id, ITEM_TRASH, &trashed, &trashed)
+}
+
+pub fn record_item_restore(
+    conn: &Connection,
+    batch_id: &str,
+    restored: &ItemRestored,
+) -> Result<()> {
+    record(conn, batch_id, ITEM_RESTORE, restored, restored)
 }
 
 pub fn record_folder_delete(

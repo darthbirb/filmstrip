@@ -15,6 +15,9 @@ function worker() {
   return shared;
 }
 
+/** Runs of tiles under headings, and the room each heading and each row's words take. */
+export type Sections = { groups: Uint32Array; lead: number; below: number };
+
 /** The latest layout for these items; one that arrives after a newer request is dropped. */
 export function useLayout(
   items: ItemRow[],
@@ -22,6 +25,7 @@ export function useLayout(
   target: number,
   gap: number,
   mode: LayoutMode,
+  sections?: Sections | null,
 ) {
   const latest = useRef(0);
   const [result, setResult] = useState<LayoutResult | null>(null);
@@ -45,9 +49,9 @@ export function useLayout(
     if (width <= 0) return;
     requests += 1;
     latest.current = requests;
-    const request: LayoutRequest = { id: requests, mode, aspects, width, target, gap };
+    const request: LayoutRequest = { id: requests, mode, aspects, width, target, gap, ...sections };
     worker().postMessage(request);
-  }, [aspects, width, target, gap, mode]);
+  }, [aspects, width, target, gap, mode, sections]);
 
   return result;
 }
