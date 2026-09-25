@@ -16,8 +16,7 @@ import { getPaneItem, getPaneOrigin, showInPane } from "./pane-store";
 export async function restoreFiles(itemIds: number[], to: FolderEntry | null = null) {
   const shown = getPaneItem();
   const origin = getPaneOrigin();
-  const next =
-    shown !== null && itemIds.includes(shown) ? await neighbour(origin, shown, itemIds) : shown;
+  const next = shown !== null && itemIds.includes(shown) ? await neighbour(origin, itemIds) : shown;
   const done = await restoreItems(itemIds, to?.id ?? null).catch(() => null);
   if (!done) return;
   const { batch, report } = done;

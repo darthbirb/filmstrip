@@ -118,7 +118,7 @@ export const revealItem = (itemId: number) => invoke<void>("reveal_item", { item
 
 export const openItem = (itemId: number) => invoke<void>("open_item", { itemId });
 
-export const copyItemFile = (itemId: number) => invoke<void>("copy_item_file", { itemId });
+export const copyItems = (itemIds: number[]) => invoke<void>("copy_items", { itemIds });
 
 export const startIndex = () => invoke<void>("start_index");
 

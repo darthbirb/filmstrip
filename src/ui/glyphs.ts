@@ -44,6 +44,7 @@ export const GLYPHS = {
   moveTo: { icon: "folder-simple-plus", code: 0xe25e },
   newFolder: { icon: "folder-plus", code: 0xe258 },
   putBack: { icon: "arrow-u-up-left", code: 0xe08a },
+  checkAll: { icon: "checks", code: 0xe53a },
 } as const;
 
 export type GlyphName = keyof typeof GLYPHS;

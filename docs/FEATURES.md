@@ -107,8 +107,8 @@ drawn. **Not started** — neither.
 
 | Capability | Filmstrip | Where |
 | --- | --- | --- |
-| Select in a grid, and act on the selection | Not started | |
-| Move a selection somewhere | Not started | |
+| Select in a grid, and act on the selection | Built | a box on each tile, Ctrl and Shift with a click, the keyboard; a bar at the grid's foot with Favourite, Move to…, Copy and Delete, or Restore in the Trash |
+| Move a selection somewhere | Built | the bar's Move to…, one batch undone as one |
 | Destination hotkeys | Not started | no migration yet |
 | The trash as a place, with its own limits | Partly | `trash_listing`, `trash_summary`: newest first under a heading per day, each tile saying where it came from, counted on its row and header; there are no limits yet |
 | Restore from the trash, or restore to another folder | Built | `restore_items`, journalled; Restore and Restore to… on a trashed file's bar and menu, refused into the banner |
@@ -129,6 +129,6 @@ drawn. **Not started** — neither.
 | Three panels, splitters, folding, the rail | Built | |
 | The app's own window chrome | Built | |
 | Settings | Built, with Sources in it | |
-| The app's own right-click menus | Built in part | on a tile, a frame, the pane's picture, a folder and a source, every verb included; a selection's menu waits on selecting |
+| The app's own right-click menus | Built | on a tile, a set of checked tiles, a frame, the pane's picture, a folder and a source, every verb included |
 | A scrubber for very large folders | Backlogged | |
 | Compression review, duplicate detection, a storage screen, a tags screen | Not started | PRODUCT.md "Later" |

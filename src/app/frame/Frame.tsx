@@ -16,6 +16,8 @@ export type Regions = {
   /** Above the grid, where something needing a decision waits until it is dealt with. */
   notices?: ReactNode;
   grid?: ReactNode;
+  /** Under the grid, in its own column: what acts on the files checked in it. */
+  gridFoot?: ReactNode;
   pane?: ReactNode;
   /** Beside the pane's fold button, in its header row. */
   paneHeader?: ReactNode;
@@ -35,6 +37,7 @@ export function Frame({
   location,
   notices,
   grid,
+  gridFoot,
   pane,
   paneHeader,
   revealPane,
@@ -71,6 +74,7 @@ export function Frame({
         </div>
         {notices}
         <div className="min-h-0 flex-1 overflow-auto">{grid}</div>
+        {gridFoot}
       </main>
       <SidePanel layout={layout} side="pane" header={paneHeader} full={full}>
         {pane}

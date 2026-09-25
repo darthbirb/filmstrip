@@ -341,6 +341,36 @@ already known; a button that only restates the situation is worse than no button
 folders are not known yet says nothing at all rather than guessing at "empty", and an unreachable
 source says what it last held — see "A walk only judges what it read".
 
+**Checking files is a gesture of its own**, drawn by Claude Design and built on 25 September
+2026. A click shows a picture and never checks it; the box on the tile checks it, and so do Ctrl
+and Shift with a click, as in Explorer, but a modified click never changes what the pane shows,
+so Ctrl+clicking through twenty pictures does not flash twenty through the pane. Shift takes the
+range from the last box checked in the grid's order and replaces the set, Ctrl+Shift adds it, and
+with nothing checked the range starts at the file in the pane. **A selection belongs to the place
+it was made in**: going elsewhere clears it, a folder renamed or moved under you keeps it, and a
+file that leaves the grid leaves the set, while one that arrives, by a walk or an undo, is never
+checked.
+
+**What a set can do is a bar along the grid's foot**, a row of the grid's own column rather than
+a tray over the pictures, since nothing in this app stands on a photograph but a tile's two marks.
+It holds the count and its size, Select All, and the set's verbs in its menu's order, Favourite,
+Move to…, Copy and Delete with the count again, so the bar and the menu never hold different sets;
+in the Trash, Restore and Restore to…, as its pane's bar has them. Favourite reads Remove Favourite
+only when every checked file is one already, so a mixed set is never half-toggled. As the grid
+narrows the size goes first, then Select All, Copy, Favourite and Delete behind More; the count,
+Move to… and the clear stay. The pane's bar acts on the pane's file alone, checked or not. **What
+a move or a delete could not carry stays checked**, so the bar counts what the banner lists and
+the next act takes exactly them, and after a delete the pane shows the tile after the last one
+gone.
+
+**The grid is one tab stop, and the keyboard reaches all of it.** Tab lands on the tile in the
+pane, or the first; the arrows move the ring and nothing else, up and down keeping the column as
+near as the rows allow, and Home, End and the page keys go further. Space is the box, Shift with a
+move checks from the last one checked, and Enter shows the ringed tile in the pane; full screen is
+the tile's menu or a double-click. Ctrl+A checks the whole place, the tiles scrolled away too, and
+Escape clears it, after whatever else is open has closed. The ringed tile is drawn wherever the
+scroll is, so the focus is never dropped with it.
+
 **The Trash is a place like any folder, with two differences**, drawn by Claude Design and built
 on 25 September 2026. It runs newest first under a heading for each day something went, Today and
 Yesterday and then the date, and a day starts a row of its own; the minute is in the pane's
@@ -449,7 +479,7 @@ menu was already off everywhere but in a field, so until these a right-click, th
 Shift+F10 did nothing at all.
 
 - **A verb that does not exist yet is absent, never greyed.** A greyed row describes a feature at
-  the moment it refuses it. The menu for a selection waits on selecting. A rule only stands
+  the moment it refuses it. A rule only stands
   between two groups that both hold rows, so an absent verb leaves no stray line, and a menu with
   nothing in it opens nothing.
 - **What a drive that is away cannot do is absent too.** An offline source keeps Rename, Manage
@@ -460,6 +490,12 @@ Shift+F10 did nothing at all.
 - **Remove Source goes through the question Settings already asks.** It opens Sources with that
   source's row asking, Cancel focused. Forgetting a source drops the tags and notes on its files;
   a menu row must not do that in one press when the section that owns it asks first.
+- **A checked tile opens the set's menu, and right-clicking never changes the set.** It is counted
+  at its head, since it is the one menu that acts on more than one file, and holds the verbs that
+  mean something for a set: Favourite, Move to…, Copy, and Delete with the count again; in the
+  Trash, Restore and Restore to…. A tile with no check opens its own menu and the set stays
+  checked, as a drag from it would, and that menu acts on that tile alone, so its Delete never
+  reaches a tile out of sight.
 - **Opening a menu changes nothing.** The pane keeps what it shows until a verb in the menu says
   otherwise, and Full Screen on a tile is that verb. While the pane is in full screen every file's
   menu, a filmstrip frame's included, leads with the way out.

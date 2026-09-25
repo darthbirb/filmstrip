@@ -33,6 +33,9 @@ colors:
   wash: "rgb(255 255 255 / 0.09)"
   veil: "rgb(10 10 10 / 0.82)"
   scrim: "rgb(10 10 10 / 0.55)"
+  box: "rgb(10 10 10 / 0.5)"
+  box-line: "rgb(242 242 242 / 0.9)"
+  box-line-quiet: "rgb(242 242 242 / 0.55)"
   danger: "#c25a4a"
   danger-press: "#a94f41"
   on-danger: "#f2f2f2"
@@ -436,6 +439,7 @@ thing and is never decoration:** where the keyboard is, and close.
 | `wash` | White at 9%, laid over something already filled when the pointer is on it. |
 | `veil` | Dark glass over a picture, for what must read on any photograph: a video's length, the strip's steps. |
 | `scrim` | Behind the Settings dialog; the window stays legible under it. |
+| `box`, `box-line`, `box-line-quiet` | A tile's selection box before it is checked: its glass, its ring under the pointer, and its quieter ring on the other tiles once one is checked. |
 | `danger`, `danger-press`, `on-danger` | The close button under the pointer; a destroying button under the pointer and pressed. |
 | `danger-tint` | A destroying button at rest: its ground, under a `line-danger` ring and `danger` ink. |
 
@@ -566,6 +570,14 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   under them, where an answer can be kept, a checkbox. The answers hold the line or all fold into
   one raised button with a caret, whose menu names them a `tile-gap` under it; folded answers that
   still do not fit take a line each, left-aligned. Only the answers ever change shape.
+- **Selection bar.** The grid's own foot row while anything is checked: `toolbar` tall on `panel`
+  with a `line` hairline above, arriving and leaving as a box pushing down does, the grid giving up
+  its height. From the left: the count in `ui` semibold `fg` with its size after it in `small`
+  `fg-dim`, Select All, then the set's verbs as raised buttons, a `line-control` rule, Delete with
+  the count in `danger`, and the quiet ×. What has no room leaves for a More menu in a fixed order;
+  the count, Move to… and × never leave.
+- **Dismiss.** A quiet `control` square holding ×, `fg-dim` with no ring at rest, the `wash` under
+  the pointer: the way to put something away.
 - **Checkbox.** A `badge` square at the `badge` corner on `raised` in a `line-control` ring,
   filled with `plate` and a check in `on-plate` when ticked; its sentence beside it in `fg-mid`,
   `fg` under the pointer or ticked. The ring the keyboard sees is on the square.
@@ -582,6 +594,11 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   in the opposite corner. Keyboard focus is the `focus` ring outside, so both can show at once.
   In the Trash a line goes under the tile, in the `tile-caption` room below it: the folder it came
   from in `small` `fg-mid`, and "· gone" after it in `fg-dim`. It ellipsises at the tile's width.
+- **Selection box.** A `badge` square at the `badge` corner, a `tile-inset` from the tile's
+  top-right. Unchecked it is `box` glass under a `--box-ring` ring, `box-line` under the pointer and
+  `box-line-quiet` on the other tiles once one is checked; it shows only under the pointer until
+  then. Checked it fills with `in-pane` and holds a filled tick in `on-mark`, and a checked tile
+  carries nothing else: the in-pane ring and plate are not borrowed.
 - **Day heading.** Over each run of tiles in the Trash, `eyebrow` capitals in `fg-dim`, standing
   on the `heading` room above the run, a `tile-gap` over its first row.
 - **The pane's picture.** Sized by its own shape and centred in what the pane has left, at the

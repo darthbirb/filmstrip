@@ -16,10 +16,52 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## The selection's right-click menu · DRAWN
+## The drag's 0.6s hold is not in the token sheet · DRAWN
 
-Components › Right-click: the selection's menu, with its count at the head and "Delete 5 Files".
-Everything else on a folder's and a source's menu is built; this waits on selecting.
+Tokens › Motion: hold, 600ms, a wait rather than a motion, kept to drop targets that open;
+Artboards › Dragging onto a folder names it.
+
+Artboards › Dragging onto a folder opens a closed row after the ghost is held over it for 0.6s.
+The token sheet names 120, 180 and 220ms and nothing else, so the build would invent a number.
+
+Add the hold to the token sheet as a named duration, and say where else it may be used.
+
+## Two presses of a destination key are not drawn · DRAWN
+
+Artboards › Destination keys: Already in Lisbon, a set partly in Inbox, and a free key.
+
+Artboards › Destination keys draws a bound key and a broken one. It does not draw a key that is
+free, nor a key whose folder is the one the files are already in, which is the folder you stand
+in or, in the Sorting Box, a part of the set.
+
+A free key does nothing and says nothing, as a key with no meaning does elsewhere. A key for the
+files' own folder moves what is elsewhere and passes over the rest, and when nothing would move,
+says so in the refusal band, "Already in Lisbon", as the drag's refusing row does.
+
+## Dragging onto a folder · DRAWN
+
+Artboards › Dragging onto a folder: the ghost, the accepting row, four refusals, the line after.
+
+The tree is always on screen, and moving a set means opening the picker and finding the folder
+again. Whether a tile or a set can be dragged onto a tree row or a favourite is not drawn.
+
+Let it: a ghost that counts what it carries, a row that accepts, a row that refuses (the files'
+own folder, the Trash, a source that is away), and the move's own undo line after the drop.
+
+## Destination hotkeys · DRAWN
+
+Artboards › Destination keys: the key on a row, Settings › Library, Assign Key…, and what a press
+says; Components › Right-click: Assign Key… on a folder's and a source's menu.
+
+PRODUCT.md keeps destination keys for the folders used most, and nothing draws them. ggallery
+bound a key to a folder, not a path, so the key survives the folder's rename and move, and kept a
+binding whose folder had gone, marked broken, since a delete can be undone. Its culler is cut.
+
+A press moves the selection, or the pane's file when nothing is checked, and says so in the
+move's own undo line. Bind keys in Settings › Library, a list of key, folder and its count, and
+from Assign Key… on a folder's menu. Show a bound folder's key on its row in navigation, and a
+broken binding in the red. Say which keys can be bound, and what a key already bound does when
+it is bound again.
 
 ## A folder's details · DRAWN
 

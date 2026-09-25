@@ -25,6 +25,11 @@ export function usePlace() {
   return useSyncExternalStore(subscribe, getPlace);
 }
 
+/** Calls back after every change of place, the same place set again included. */
+export function whenPlaceChanges(listener: () => void) {
+  return subscribe(listener);
+}
+
 /** The folder being shown, when the place is a folder. */
 export function placeFolder(place: Place | null) {
   return place?.kind === "folder" ? place.path.at(-1) : undefined;

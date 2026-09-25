@@ -1,7 +1,7 @@
 //! Putting a file on the Windows clipboard as a real file (`CF_HDROP`), so pasting into Explorer
 //! produces the file itself rather than its path as text. PRODUCT.md "Folders and sources".
 
-use std::path::Path;
+use std::path::PathBuf;
 
 use clipboard_win::{Clipboard, raw};
 
@@ -13,9 +13,13 @@ fn open() -> Result<Clipboard> {
         .map_err(|err| AppError::invalid(format!("the clipboard would not open: {err}")))
 }
 
-/// Copies the file under the name it already has: nothing here is renamed on the way out.
-pub fn copy_file(path: &Path) -> Result<()> {
+/// Copies the files under the names they already have: nothing here is renamed on the way out.
+pub fn copy_files(paths: &[PathBuf]) -> Result<()> {
+    let list: Vec<String> = paths
+        .iter()
+        .map(|path| path.to_string_lossy().into_owned())
+        .collect();
     let _clipboard = open()?;
-    raw::set_file_list(&[path.to_string_lossy().to_string()])
-        .map_err(|err| AppError::invalid(format!("the file would not copy: {err}")))
+    raw::set_file_list(&list)
+        .map_err(|err| AppError::invalid(format!("the files would not copy: {err}")))
 }

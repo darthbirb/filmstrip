@@ -32,6 +32,8 @@
   --strip-rest: 0.5;
   --focus-width: 2px;
   --focus-gap: 2px;
+  /* The selection box's ring, finer than a focus ring so the two are never read as one mark. */
+  --box-ring: 1.5px;
   /* How far a box pushing down starts above where it settles. */
   --push-lift: 0.25rem;
   --z-overlay: 20;
@@ -115,6 +117,10 @@
   /* Dark glass over a picture, for what has to read on any photograph. */
   --color-veil: rgb(10 10 10 / 0.82);
   --color-scrim: rgb(10 10 10 / 0.55);
+  /* The selection box before it is checked, over whatever the picture is, and its ring. */
+  --color-box: rgb(10 10 10 / 0.5);
+  --color-box-line: rgb(242 242 242 / 0.9);
+  --color-box-line-quiet: rgb(242 242 242 / 0.55);
 
   --color-danger: #c25a4a;
   --color-danger-press: #a94f41;

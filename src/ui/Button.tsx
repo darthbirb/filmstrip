@@ -1,4 +1,4 @@
-import type { ReactNode, Ref } from "react";
+import type { MouseEvent, ReactNode, Ref } from "react";
 
 import { Glyph } from "./Glyph";
 import type { GlyphName } from "./glyphs";
@@ -15,7 +15,8 @@ type Props = {
   expanded?: boolean;
   /** A tooltip, for a button whose key is worth knowing. */
   title?: string;
-  onClick: () => void;
+  /** The click, whose button a picker opened from it anchors to. */
+  onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   ref?: Ref<HTMLButtonElement>;
 };
 

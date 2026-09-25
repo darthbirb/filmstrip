@@ -650,7 +650,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   },
   reveal_item: () => null,
   open_item: () => null,
-  copy_item_file: () => null,
+  copy_items: () => null,
   start_index: () => null,
   index_progress: (): Progress => ({
     phase: "idle",
