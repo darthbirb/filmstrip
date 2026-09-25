@@ -19,6 +19,7 @@ function source(id: number, title: string): SourceSummary {
     reachable: true,
     itemCount: 2,
     totalBytes: 2,
+    favorite: false,
   };
 }
 

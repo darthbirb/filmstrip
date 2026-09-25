@@ -109,6 +109,8 @@ pub fn run() {
             commands::trash_listing,
             commands::trash_summary,
             commands::restore_items,
+            commands::set_folder_favorite,
+            commands::favourite_places,
             commands::item_tags,
             commands::item_detail,
             commands::item_path,

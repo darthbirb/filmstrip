@@ -21,12 +21,6 @@ already lives on, never in a file of its own.
 Components › Right-click: the selection's menu, with its count at the head and "Delete 5 Files".
 Everything else on a folder's and a source's menu is built; this waits on selecting.
 
-## Favourite places · DRAWN
-
-Components › Places, "Favourite places": a group of their own between the app's two places and the
-sources, each row a star, the name and its parent; choosing one plates both its rows. Not in the
-folded rail. Favourite joins a folder's and a source's menu, reading Remove Favourite when on.
-
 ## A folder's details · DRAWN
 
 The grid's header says only where you are. A folder has more to know, and nowhere to show it:

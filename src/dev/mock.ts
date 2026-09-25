@@ -3,6 +3,7 @@ import type { Act } from "../ipc/bindings/Act";
 import type { Batch } from "../ipc/bindings/Batch";
 import type { Contents } from "../ipc/bindings/Contents";
 import type { Crumb } from "../ipc/bindings/Crumb";
+import type { FavouritePlace } from "../ipc/bindings/FavouritePlace";
 import type { FolderEntry } from "../ipc/bindings/FolderEntry";
 import type { FolderNode } from "../ipc/bindings/FolderNode";
 import type { ItemDetail } from "../ipc/bindings/ItemDetail";
@@ -50,11 +51,12 @@ function source(
     reachable: true,
     itemCount,
     totalBytes,
+    favorite: false,
   };
 }
 
 function folder(id: number, title: string, childCount: number, itemCount: number): FolderNode {
-  return { id, title, childCount, itemCount };
+  return { id, title, childCount, itemCount, favorite: false };
 }
 
 function items(folderId: number, names: string[]): ItemRow[] {
@@ -569,6 +571,40 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     return Promise.reject<AppError>({ kind: "invalid", message: "nothing left to undo here" });
   },
   folder_children: ({ folderId }) => FOLDERS[folderId as number] ?? [],
+  // A source's favourite is its own folder's, as the Rust side keeps it.
+  set_folder_favorite: ({ folderId, favorite }) => {
+    const id = folderId as number;
+    const node = live(id)?.node;
+    if (node) node.favorite = favorite as boolean;
+    for (const one of SOURCES) if (one.rootFolderId === id) one.favorite = favorite as boolean;
+    return null;
+  },
+  favourite_places: (): FavouritePlace[] =>
+    [
+      ...SOURCES.filter((one) => one.kind === "library" && one.favorite).map((one) => ({
+        folderId: one.rootFolderId,
+        itemCount: ITEMS[one.rootFolderId]?.length ?? 0,
+      })),
+      ...[...parents().keys()].flatMap((id) => {
+        const node = live(id)?.node;
+        return node?.favorite ? [{ folderId: id, itemCount: node.itemCount }] : [];
+      }),
+    ]
+      .map(({ folderId, itemCount }) => {
+        const { folders, home } = crumbs(folderId);
+        return {
+          folderId,
+          sourceId: home?.id ?? 0,
+          path: folders,
+          itemCount,
+          reachable: home?.reachable ?? false,
+        };
+      })
+      .sort((a, b) =>
+        (a.path.at(-1)?.title ?? "").localeCompare(b.path.at(-1)?.title ?? "", undefined, {
+          sensitivity: "base",
+        }),
+      ),
   list_folders: (): FolderEntry[] => [
     ...SOURCES.map((one) => ({
       id: one.rootFolderId,

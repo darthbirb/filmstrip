@@ -136,13 +136,15 @@ pub struct FolderNode {
     pub title: String,
     pub child_count: i64,
     pub item_count: i64,
+    pub favorite: bool,
 }
 
 pub fn children(conn: &Connection, parent_id: i64) -> Result<Vec<FolderNode>> {
     let mut stmt = conn.prepare(
         "SELECT f.id, f.title,
                 (SELECT COUNT(*) FROM folder c WHERE c.parent_id = f.id AND c.deleted_at IS NULL),
-                (SELECT COUNT(*) FROM item i WHERE i.folder_id = f.id AND i.deleted_at IS NULL)
+                (SELECT COUNT(*) FROM item i WHERE i.folder_id = f.id AND i.deleted_at IS NULL),
+                f.favorite
            FROM folder f
           WHERE f.parent_id = ?1 AND f.deleted_at IS NULL
           ORDER BY f.title COLLATE NOCASE",
@@ -154,8 +156,45 @@ pub fn children(conn: &Connection, parent_id: i64) -> Result<Vec<FolderNode>> {
                 title: r.get(1)?,
                 child_count: r.get(2)?,
                 item_count: r.get(3)?,
+                favorite: r.get(4)?,
             })
         })?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(rows)
+}
+
+/// Marks a folder a favourite, or not. Nothing on disk changes, so it is not journalled, as a
+/// file's favourite is not.
+pub fn set_favorite(conn: &Connection, folder_id: i64, favorite: bool) -> Result<()> {
+    conn.execute(
+        "UPDATE folder SET favorite = ?1 WHERE id = ?2",
+        params![favorite, folder_id],
+    )?;
+    Ok(())
+}
+
+pub fn is_favorite(conn: &Connection, folder_id: i64) -> Result<bool> {
+    Ok(conn
+        .query_row(
+            "SELECT favorite FROM folder WHERE id = ?1",
+            params![folder_id],
+            |r| r.get(0),
+        )
+        .optional()?
+        .unwrap_or(false))
+}
+
+/// Every live favourite folder, with the files directly in it. A retired folder keeps its flag,
+/// so undoing its delete brings it back as a favourite.
+pub fn favourites(conn: &Connection) -> Result<Vec<(i64, i64)>> {
+    let mut stmt = conn.prepare(
+        "SELECT f.id,
+                (SELECT COUNT(*) FROM item i WHERE i.folder_id = f.id AND i.deleted_at IS NULL)
+           FROM folder f
+          WHERE f.favorite = 1 AND f.deleted_at IS NULL",
+    )?;
+    let rows = stmt
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<rusqlite::Result<_>>()?;
     Ok(rows)
 }

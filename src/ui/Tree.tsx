@@ -16,11 +16,15 @@ export type TreeRow = {
   glyph?: GlyphName;
   /** How many items the row's own place holds; none at all shows no pill. */
   count?: number;
+  /** Quieter words right after the name, as a favourite says which folder it is in. */
+  note?: string;
   /** Muted words at the row's end, where a count would be: why the row is muted. */
   detail?: string;
   muted?: boolean;
   /** Set apart from the rows above it by a rule. */
   separated?: boolean;
+  /** Where you are too, as a favourite's row is beside its own: plated, as the selected row is. */
+  here?: boolean;
   /** One thing the row can do, resting at its end: its own tab stop after the row. */
   action?: { glyph: GlyphName; label: string; onClick: () => void };
 };
@@ -120,7 +124,7 @@ export function Tree({
   return (
     <div role="tree" aria-label={label} className="flex flex-col gap-row-gap py-2">
       {rows.map((row, index) => {
-        const selected = row.id === selectedId;
+        const selected = row.id === selectedId || Boolean(row.here);
         // A selected row is a filled plate; its hover washes over the plate rather than replacing it.
         const tone = selected
           ? "bg-plate text-on-plate hover-wash"
@@ -146,9 +150,11 @@ export function Tree({
               ]
                 .filter(Boolean)
                 .join(" ")}
+              aria-description={row.note}
               aria-level={row.level}
               aria-expanded={row.expandable ? Boolean(row.expanded) : undefined}
-              aria-selected={selected}
+              aria-selected={row.id === selectedId}
+              aria-current={row.here ? "location" : undefined}
               tabIndex={row.id === tabStop ? 0 : -1}
               onClick={(event) => {
                 setFocusId(row.id);
@@ -198,6 +204,11 @@ export function Tree({
                     to?.focus();
                   }}
                 />
+              ) : row.note ? (
+                <span className="flex min-w-0 flex-1 items-baseline gap-1.5 overflow-hidden whitespace-nowrap">
+                  <span className="truncate">{row.label}</span>
+                  <span className={`shrink-0 text-small ${quiet}`}>{row.note}</span>
+                </span>
               ) : (
                 <span className="min-w-0 flex-1 truncate">{row.label}</span>
               )}

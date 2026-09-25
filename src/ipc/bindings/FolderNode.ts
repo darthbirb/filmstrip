@@ -3,4 +3,4 @@
 /**
  * A folder as the navigation lists it. Counts are of live, direct contents.
  */
-export type FolderNode = { id: number, title: string, childCount: number, itemCount: number, };
+export type FolderNode = { id: number, title: string, childCount: number, itemCount: number, favorite: boolean, };

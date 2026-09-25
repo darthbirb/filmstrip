@@ -281,13 +281,23 @@ source that cannot be read is muted and marked offline but keeps its folders, si
 empties it — see "A walk only judges what it read". Which folders are open is not yet kept
 between sessions.
 
+**Favourite places are a group of their own**, between the app's two places and the sources, a
+rule either side, drawn by Claude Design and built on 25 September 2026, so a favourite is one
+press away however deep it sits. Each row is a filled star, the place's name and the folder it is
+in, since the tree around it is not there to say which Cairo; a source has no parent and no pill,
+and one that is away is muted and says so. They are in name order. **Choosing one plates both of
+its rows**: both are where you are standing, and the second says where the favourite lives, but
+the tree does not open to show it. A favourite moved keeps its star; one deleted leaves the group,
+and undoing the delete brings it back, since a retired folder keeps its flag. With none, there is
+no group and no rule.
+
 **Folded, navigation keeps the app's own two places**, drawn on 15 September 2026 and built the
 day after. A rail holding nothing but its unfold button makes folding a trap for anyone who folded
 to see more pictures, so the Sorting Box and the Trash stay as squares of glyph, each wearing its
 count on the glyph's corner where a row would wear a pill. **Folders do not come with them**: an
 arbitrary slice of a tree in a rail as wide as a header is tall would be a worse tree, not a
 shorter one. A third square lays the whole tree over the grid instead, closing on a pick or on
-Escape; the header's button is still the one that docks the panel for good.
+Escape; the header's button is still the one that docks the panel for good. Favourite places stay in the tree's panel too: the rail holds only the two.
 
 **Where you are shows as a breadcrumb** in the grid's header, and every step above the last goes
 back to that folder.
@@ -444,8 +454,9 @@ Shift+F10 did nothing at all.
   nothing in it opens nothing.
 - **What a drive that is away cannot do is absent too.** An offline source keeps Rename, Manage
   Sources and Remove Source, which touch only the index; its folders have nothing left.
-- **Favourite on a place waits.** The drawing puts it on a folder's and a source's menu, but nothing
-  shows which places are favourites, so the verb would be one whose result nobody could see.
+- **Favourite is on a folder's and a source's menu**, reading Remove Favourite when on, from
+  either of the place's rows. It changes nothing on disk, so it is not journalled and a source
+  that is away keeps it.
 - **Remove Source goes through the question Settings already asks.** It opens Sources with that
   source's row asking, Cancel focused. Forgetting a source drops the tags and notes on its files;
   a menu row must not do that in one press when the section that owns it asks first.
