@@ -26,20 +26,20 @@
     "react-dom": "19.3.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.5.13",
+    "@biomejs/biome": "2.5.14",
     "@playwright/test": "1.63.0",
     "@tailwindcss/vite": "4.3.3",
-    "@tauri-apps/cli": "2.11.4",
-    "@types/node": "26.5.1",
+    "@tauri-apps/cli": "2.11.5",
+    "@types/node": "26.6.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.1",
-    "@vitest/browser-playwright": "5.0.0",
+    "@vitest/browser-playwright": "5.0.1",
     "playwright": "1.63.0",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
     "vite": "8.3.0",
-    "vitest": "5.0.0",
+    "vitest": "5.0.1",
     "vitest-browser-react": "2.3.0"
   },
   "packageManager": "pnpm@12.4.1+sha512.2e81e399d73fe8390dab25e06aa788ab7a5908248d2f5a370f82b481147a6a7a367bf8048f9a6fdb6460f21a66f0542dedb8b94ca2c8723596741920b1656d4c"
