@@ -13,6 +13,7 @@ import {
 
 import { Glyph } from "./Glyph";
 import type { GlyphName } from "./glyphs";
+import { KeyChip } from "./KeyChip";
 
 export type MenuAction = {
   id: string;
@@ -22,6 +23,14 @@ export type MenuAction = {
   filled?: boolean;
   /** The one row that cannot be taken back, drawn apart in the danger hue. */
   tone?: "danger";
+  /** A destination key drawn where the glyph would be, as a list of keys has them. */
+  chip?: string;
+  /** Quiet words at the row's end, in the mono face: the key its subject holds now. */
+  trail?: string;
+  /** The choice already made, on the selection plate. */
+  chosen?: boolean;
+  /** Words that say nothing is there yet, or what was there has gone, in `fg-dim`. */
+  quiet?: boolean;
   onSelect: () => void;
 };
 
@@ -67,8 +76,9 @@ function MenuList({
           tabIndex={-1}
           onClick={() => onChoose(action)}
           onKeyDown={(event) => moveWithin(menu, event)}
-          className={`${ROW} ${TONE[action.tone ?? "quiet"]}`}
+          className={`${ROW} ${action.chosen ? "hover-wash bg-plate text-on-plate" : TONE[action.tone ?? "quiet"]}`}
         >
+          {action.chip !== undefined && <KeyChip digit={action.chip} plated={action.chosen} />}
           {action.glyph && (
             <Glyph
               name={action.glyph}
@@ -76,7 +86,14 @@ function MenuList({
               className={`text-glyph ${action.tone === "danger" ? "" : "text-fg-dim"}`}
             />
           )}
-          <span className="min-w-0 truncate">{action.label}</span>
+          <span
+            className={`min-w-0 flex-1 truncate ${action.quiet && !action.chosen ? "text-fg-dim" : ""}`}
+          >
+            {action.label}
+          </span>
+          {action.trail !== undefined && (
+            <span className="shrink-0 font-mono text-fg-dim text-small">{action.trail}</span>
+          )}
         </button>
       ))}
     </Fragment>

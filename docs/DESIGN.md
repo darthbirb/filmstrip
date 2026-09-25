@@ -69,6 +69,10 @@ typography:
     fontSize: 0.625rem
     lineHeight: "1"
     fontWeight: 600
+  key:
+    fontFamily: IBM Plex Mono
+    fontSize: 0.6875rem
+    lineHeight: "1"
   wordmark:
     fontFamily: Archivo
     fontSize: 0.875rem
@@ -579,6 +583,12 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   the count, Move to… and × never leave.
 - **Dismiss.** A quiet `control` square holding ×, `fg-dim` with no ring at rest, the `wash` under
   the pointer: the way to put something away.
+- **Key chip.** A destination key drawn as a key: its digit in `--font-mono` at `key` in `fg-mid`,
+  a `badge` square at the `badge` corner on `inset` in a `line-control` ring. It sits beside a
+  tree row's count and sinks into a plated row as the count does, on `on-plate-wash` in
+  `on-plate-dim`; a key whose folder has gone is `danger` in a `line-danger` ring. A menu row can
+  lead with one in place of its glyph, as the list of keys does, or end with its digit alone in
+  `small` mono `fg-dim`, as Assign Key… says the key its folder holds.
 - **Drag ghost.** One `control`-tall line following the pointer, `--ghost-x` and `--ghost-y` from
   its tip: `veil` glass at the `control` corner in a `line-control-hi` ring, with the overlay
   shadow. It holds the top file's picture as a `ghost-thumb` square at the `badge` corner, the

@@ -1,5 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { useSyncExternalStore } from "react";
+import type { DestinationKey } from "../../ipc/bindings/DestinationKey";
 import type { FavouritePlace } from "../../ipc/bindings/FavouritePlace";
 import type { FolderEntry } from "../../ipc/bindings/FolderEntry";
 import type { FolderNode } from "../../ipc/bindings/FolderNode";
@@ -7,6 +8,7 @@ import type { Progress } from "../../ipc/bindings/Progress";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import type { TrashSummary } from "../../ipc/bindings/TrashSummary";
 import {
+  destinationKeys,
   favouritePlaces,
   folderChildren,
   listFolders,
@@ -19,27 +21,36 @@ import { openFolders, setOpenFolders } from "./open-folders";
 
 /**
  * The index as navigation reads it: the sources, each folder's children once asked for, how much
- * the Trash holds, and the favourite places.
+ * the Trash holds, the favourite places, and the destination keys.
  */
 type Snapshot = {
   sources: SourceSummary[] | null;
   children: ReadonlyMap<number, FolderNode[]>;
   trash: TrashSummary | null;
   favourites: FavouritePlace[];
+  keys: DestinationKey[];
 };
 
-let snapshot: Snapshot = { sources: null, children: new Map(), trash: null, favourites: [] };
+const EMPTY: Snapshot = {
+  sources: null,
+  children: new Map(),
+  trash: null,
+  favourites: [],
+  keys: [],
+};
+let snapshot: Snapshot = EMPTY;
 const pending = new Set<number>();
 const listeners = new Set<() => void>();
 
 /** Reads the sources and their top-level folders, then settles where the window is looking. */
 export async function loadIndex() {
-  const [sources, trash, favourites] = await Promise.all([
+  const [sources, trash, favourites, keys] = await Promise.all([
     listSources(),
     trashSummary().catch(() => null),
     favouritePlaces().catch(() => []),
+    destinationKeys().catch(() => []),
   ]);
-  publish({ sources, children: new Map(), trash, favourites });
+  publish({ sources, children: new Map(), trash, favourites, keys });
   ensureChildren(sources.map((source) => source.rootFolderId));
   await settle(sources);
 }
@@ -97,18 +108,19 @@ export function useIndex() {
  */
 export async function refreshIndex() {
   const known = [...snapshot.children.keys()];
-  const [sources, lists, trash, favourites] = await Promise.all([
+  const [sources, lists, trash, favourites, keys] = await Promise.all([
     listSources(),
     Promise.all(known.map((id) => folderChildren(id).catch(() => null))),
     trashSummary().catch(() => null),
     favouritePlaces().catch(() => []),
+    destinationKeys().catch(() => []),
   ]);
   const children = new Map<number, FolderNode[]>();
   known.forEach((id, at) => {
     const list = lists[at];
     if (list) children.set(id, list);
   });
-  publish({ sources, children, trash, favourites });
+  publish({ sources, children, trash, favourites, keys });
   await settle(sources);
 }
 
@@ -164,7 +176,7 @@ export function ensureChildren(folderIds: number[]) {
 export function resetIndex() {
   pending.clear();
   setOpenFolders(new Set());
-  publish({ sources: null, children: new Map(), trash: null, favourites: [] });
+  publish(EMPTY);
 }
 
 function publish(next: Snapshot) {

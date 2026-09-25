@@ -501,6 +501,10 @@ Shift+F10 did nothing at all.
 - **Favourite is on a folder's and a source's menu**, reading Remove Favourite when on, from
   either of the place's rows. It changes nothing on disk, so it is not journalled and a source
   that is away keeps it.
+- **Assign Key… sits under Favourite**, since both mark a place to come back to, and ends with
+  the key the folder holds. It opens the ten keys against the row, each with the folder it is on,
+  "Free" or "gone" in the quiet ink, the folder's own on the plate, then No Key. Picking a key
+  another folder holds moves it without a question: the row already said whose it was.
 - **Remove Source goes through the question Settings already asks.** It opens Sources with that
   source's row asking, Cancel focused. Forgetting a source drops the tags and notes on its files;
   a menu row must not do that in one press when the section that owns it asks first.
