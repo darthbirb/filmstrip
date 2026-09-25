@@ -341,6 +341,16 @@ already known; a button that only restates the situation is worse than no button
 folders are not known yet says nothing at all rather than guessing at "empty", and an unreachable
 source says what it last held — see "A walk only judges what it read".
 
+**Checking files is a gesture of its own**, drawn by Claude Design and built on 25 September
+2026. A click shows a picture and never checks it; the box on the tile checks it, and so do Ctrl
+and Shift with a click, as in Explorer, but a modified click never changes what the pane shows,
+so Ctrl+clicking through twenty pictures does not flash twenty through the pane. Shift takes the
+range from the last box checked in the grid's order and replaces the set, Ctrl+Shift adds it, and
+with nothing checked the range starts at the file in the pane. **A selection belongs to the place
+it was made in**: going elsewhere clears it, a folder renamed or moved under you keeps it, and a
+file that leaves the grid leaves the set, while one that arrives, by a walk or an undo, is never
+checked.
+
 **The Trash is a place like any folder, with two differences**, drawn by Claude Design and built
 on 25 September 2026. It runs newest first under a heading for each day something went, Today and
 Yesterday and then the date, and a day starts a row of its own; the minute is in the pane's

@@ -1,7 +1,9 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import {
+  type MouseEvent,
   type ReactElement,
   type RefObject,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -13,6 +15,7 @@ import type { Origin } from "../../ipc/bindings/Origin";
 import type { Trashed } from "../../ipc/bindings/Trashed";
 import { formatDay, formatDuration } from "../../lib/format";
 import { useContextMenu } from "../../ui/Menu";
+import { SelectBox } from "../../ui/SelectBox";
 import { SkeletonTile } from "../../ui/Skeleton";
 import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
 import { itemMenu } from "../menus/item-menu";
@@ -22,6 +25,7 @@ import { type Place, usePlace } from "../place";
 import { usePreferences } from "../preferences";
 import { EmptyPlace } from "./EmptyPlace";
 import { type LayoutMode, rowAt } from "./layout";
+import { checkRange, keepChecked, toggleChecked, useSelection } from "./selection";
 import { tileSize } from "./TileSize";
 import { useGridItems } from "./useGridItems";
 import { useLayout } from "./useLayout";
@@ -49,6 +53,20 @@ export function Grid({ mode }: { mode: LayoutMode }) {
   );
   const result = useLayout(items ?? [], view.width - gap * 2, rowHeight, gap, mode, sections);
   const reading = place !== null && items === null;
+  const selection = useSelection();
+  const checked = new Set(selection.ids);
+  const order = useMemo(() => (items ?? []).map((item) => item.id), [items]);
+
+  // A file that leaves the grid leaves the set. Artboards › Selecting.
+  useEffect(() => {
+    if (items) keepChecked(order);
+  }, [items, order]);
+
+  // A modified click changes only the set, and the pane stays where it is.
+  const check = (event: MouseEvent, id: number) => {
+    if (event.shiftKey) checkRange(order, id, event.ctrlKey);
+    else toggleChecked(id);
+  };
 
   const tiles: ReactElement[] = [];
   if (items && result) {
@@ -67,6 +85,9 @@ export function Grid({ mode }: { mode: LayoutMode }) {
             item={item}
             from={place}
             shown={item.id === inPane}
+            checked={checked.has(item.id)}
+            boxes={checked.size > 0}
+            onCheck={check}
             left={(result.itemLeft[index] ?? 0) + gap}
             top={(result.rowTops[row] ?? 0) + gap}
             width={result.itemWidth[index] ?? 0}
@@ -187,6 +208,10 @@ type TileProps = {
   from: Place | null;
   /** Whether the pane is showing it. */
   shown: boolean;
+  checked: boolean;
+  /** Something is checked, so every tile shows its box. */
+  boxes: boolean;
+  onCheck: (event: MouseEvent, id: number) => void;
   left: number;
   top: number;
   width: number;
@@ -197,13 +222,15 @@ type TileProps = {
   below: number;
 };
 
-function Tile({ item, from, shown, left, top, width, height, origin, below }: TileProps) {
+function Tile(props: TileProps) {
+  const { item, from, shown, checked, boxes, onCheck } = props;
+  const { left, top, width, height, origin, below } = props;
   // Opening it moves nothing: the pane keeps what it shows until a verb says otherwise.
   const context = useContextMenu();
   return (
     <figure
       title={item.diskName}
-      className="absolute m-0"
+      className="group/tile absolute m-0"
       style={{ left, top, width, height: height + below }}
     >
       {context.menu}
@@ -218,9 +245,13 @@ function Tile({ item, from, shown, left, top, width, height, origin, below }: Ti
           )
         }
         aria-current={shown || undefined}
-        onClick={() => showInPane(item.id, from)}
+        onClick={(event) => {
+          if (event.ctrlKey || event.shiftKey) onCheck(event, item.id);
+          else showInPane(item.id, from);
+        }}
         // Folded or hidden, the pane has no header to hold the control, so the tile is the way in.
-        onDoubleClick={() => {
+        onDoubleClick={(event) => {
+          if (event.ctrlKey || event.shiftKey) return;
           showInPane(item.id, from);
           setFullScreen(true);
         }}
@@ -244,6 +275,13 @@ function Tile({ item, from, shown, left, top, width, height, origin, below }: Ti
           }
         />
       </button>
+      {/* Clicking the picture shows it; the box is the other target. Components › Selection checkbox. */}
+      <SelectBox
+        label={`Check ${item.diskName}`}
+        checked={checked}
+        shown={boxes}
+        onClick={(event) => onCheck(event, item.id)}
+      />
       {origin && (
         // The folder's name only; its whole path is the tooltip, and the pane's From row.
         <figcaption

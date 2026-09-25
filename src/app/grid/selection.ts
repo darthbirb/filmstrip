@@ -1,0 +1,106 @@
+import { useSyncExternalStore } from "react";
+
+import { getPaneItem } from "../pane/pane-store";
+import { getPlace, type Place, whenPlaceChanges } from "../place";
+
+/** The files checked, in the order they were checked, and the one a range runs from. */
+export type Selection = { ids: readonly number[]; anchor: number | null };
+
+export const NOTHING: Selection = { ids: [], anchor: null };
+
+/** One box, checked or unchecked; checking it makes it where the next range starts. */
+export function toggled(selection: Selection, id: number): Selection {
+  if (selection.ids.includes(id)) {
+    return { ...selection, ids: selection.ids.filter((one) => one !== id) };
+  }
+  return { ids: [...selection.ids, id], anchor: id };
+}
+
+/**
+ * The tiles from the last one checked to this one, in the place's order. It replaces what was
+ * checked, or `adds` to it; with nothing checked it runs from `from`. Artboards › Selecting.
+ */
+export function ranged(
+  selection: Selection,
+  order: readonly number[],
+  id: number,
+  adds: boolean,
+  from: number | null,
+): Selection {
+  const start = selection.anchor ?? from ?? id;
+  const a = order.indexOf(start);
+  const b = order.indexOf(id);
+  if (b < 0) return selection;
+  const range = a < 0 ? [id] : order.slice(Math.min(a, b), Math.max(a, b) + 1);
+  const ids = adds
+    ? [...selection.ids, ...range.filter((one) => !selection.ids.includes(one))]
+    : range;
+  return { ids, anchor: a < 0 ? id : start };
+}
+
+/** Only what is still in the grid: a file that leaves it leaves the set. */
+export function pruned(selection: Selection, present: ReadonlySet<number>): Selection {
+  const ids = selection.ids.filter((id) => present.has(id));
+  if (ids.length === selection.ids.length) return selection;
+  const anchor =
+    selection.anchor !== null && present.has(selection.anchor) ? selection.anchor : null;
+  return ids.length === 0 ? NOTHING : { ids, anchor };
+}
+
+// A selection belongs to the place it was made in and clears when you leave it. A folder renamed
+// or moved under you is the same place. Artboards › Selecting.
+const placeKey = (place: Place | null) =>
+  place?.kind === "folder" ? `folder ${place.path.at(-1)?.id}` : (place?.kind ?? "");
+
+let held = { key: placeKey(getPlace()), selection: NOTHING };
+const listeners = new Set<() => void>();
+
+function set(selection: Selection) {
+  if (selection === held.selection) return;
+  held = { ...held, selection };
+  for (const listener of listeners) listener();
+}
+
+whenPlaceChanges(() => {
+  const key = placeKey(getPlace());
+  if (key === held.key) return;
+  held = { key, selection: held.selection };
+  set(NOTHING);
+});
+
+export function getSelection() {
+  return held.selection;
+}
+
+export function useSelection() {
+  return useSyncExternalStore(subscribe, getSelection);
+}
+
+export function toggleChecked(id: number) {
+  set(toggled(held.selection, id));
+}
+
+/** Shift+click, and Ctrl+Shift+click to add; with nothing checked it runs from the pane's file. */
+export function checkRange(order: readonly number[], id: number, adds: boolean) {
+  set(ranged(held.selection, order, id, adds, getPaneItem()));
+}
+
+export function checkAll(order: readonly number[]) {
+  set({ ids: [...order], anchor: held.selection.anchor });
+}
+
+export function clearChecked() {
+  set(NOTHING);
+}
+
+/** Drops whatever is no longer in the grid. */
+export function keepChecked(present: readonly number[]) {
+  set(pruned(held.selection, new Set(present)));
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
