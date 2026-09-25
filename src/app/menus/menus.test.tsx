@@ -198,6 +198,7 @@ test("a folder's row holds every verb a place has; a source's adds the Sources s
   const sourceMenu = await menuOn(screen, source, "Pictures");
   expect(labels(sourceMenu)).toEqual([
     "New Folder",
+    "Favourite",
     "Show in Explorer",
     "Rename",
     "Refresh",
@@ -216,6 +217,7 @@ test("a folder's row holds every verb a place has; a source's adds the Sources s
   const folderMenu = await menuOn(screen, trips, "Trips");
   expect(labels(folderMenu)).toEqual([
     "New Folder",
+    "Favourite",
     "Move to…",
     "Show in Explorer",
     "Rename",
@@ -257,7 +259,7 @@ test("an offline source keeps what needs no drive, and an offline folder opens n
       const screen = await render(<Harness />);
       const archive = screen.getByRole("treeitem", { name: "Archive offline" });
       const menu = await menuOn(screen, archive, "Archive");
-      expect(labels(menu)).toEqual(["Rename", "Manage Sources", "Remove Source"]);
+      expect(labels(menu)).toEqual(["Favourite", "Rename", "Manage Sources", "Remove Source"]);
       await userEvent.keyboard("{Escape}");
 
       await archive.click();

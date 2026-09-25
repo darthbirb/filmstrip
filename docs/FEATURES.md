@@ -49,7 +49,7 @@ drawn. **Not started** — neither.
 | Delete a folder, choosing what happens to what is inside | Built | `delete_folder`, `folder_file_count`; asks in a banner, and Settings › Sources keeps the answer |
 | Rename a folder, on disk | Built | `rename_folder`, in its tree row, a name already there said under it |
 | A folder's cover | Not started | `folder.cover_item_id` exists |
-| A folder's status, notes, favourite | Not started | |
+| A folder's status, notes, favourite | Partly | favourite: `set_folder_favorite`, `favourite_places`, a group of its own in navigation; status and notes not started |
 | A folder's labels and tags, inherited by everything under it | Not started | items inherit labels, and never own one |
 | Every item id under a folder | Not started | |
 
@@ -129,6 +129,6 @@ drawn. **Not started** — neither.
 | Three panels, splitters, folding, the rail | Built | |
 | The app's own window chrome | Built | |
 | Settings | Built, with Sources in it | |
-| The app's own right-click menus | Built in part | on a tile, a frame, the pane's picture, a folder and a source, every verb included; Favourite on a place waits on favourite places, and a selection's menu on selecting |
+| The app's own right-click menus | Built in part | on a tile, a frame, the pane's picture, a folder and a source, every verb included; a selection's menu waits on selecting |
 | A scrubber for very large folders | Backlogged | |
 | Compression review, duplicate detection, a storage screen, a tags screen | Not started | PRODUCT.md "Later" |

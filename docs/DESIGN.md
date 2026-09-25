@@ -540,6 +540,11 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   name that is taken turns the hairline `line-danger`, and where it is taken comes down under the
   row as a push-down, in `small` `fg-dim`, lined up with the name. New Folder's row is the same
   field, arriving in its place among the folders it joins.
+- **Favourite place.** A tree row at the first level: a filled star where the chevron's square
+  and the glyph would be, the name, then the folder it is in right after it in `small`, quieter
+  than the name, and the count pill at the end. A source's has no parent and no pill. The group
+  stands between the app's two places and the sources, a `line` rule either side. Where you are,
+  it wears the plate, and so does the place's own row.
 - **Count pill.** A row's own item count, `badge` tall at the `badge` corner, on `raised` with a
   `line-control` ring; on a selected row it sinks to `on-plate-wash` with `on-plate` ink. A place
   with no items of its own carries no pill, and an offline source shows its word instead.

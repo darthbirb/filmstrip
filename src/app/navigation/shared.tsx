@@ -1,3 +1,4 @@
+import type { FavouritePlace } from "../../ipc/bindings/FavouritePlace";
 import type { FolderNode } from "../../ipc/bindings/FolderNode";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import type { TrashSummary } from "../../ipc/bindings/TrashSummary";
@@ -9,6 +10,7 @@ import type { Crumb, Place } from "../place";
 export const SORTING_ID = "sorting";
 export const TRASH_ID = "trash";
 export const folderRowId = (id: number) => `folder-${id}`;
+export const favouriteRowId = (id: number) => `favourite-${id}`;
 
 export function libraries(sources: SourceSummary[]) {
   return sources.filter((source) => source.kind === "library");
@@ -120,6 +122,39 @@ export function freshTitle(siblings: readonly FolderNode[]) {
   }
 }
 
+/**
+ * A favourite place's row, in a group of its own between the app's places and the sources: a
+ * filled star, its name, and the folder it is in; a source has none. DECISIONS.md "Navigation".
+ */
+export function favouriteRow(
+  place: FavouritePlace,
+  standing: Place | null,
+  first: boolean,
+): TreeRow {
+  const own = place.path.at(-1);
+  const source = place.path.length === 1;
+  const here = standing?.kind === "folder" && standing.path.at(-1)?.id === place.folderId;
+  return {
+    id: favouriteRowId(place.folderId),
+    label: own?.title ?? "",
+    level: 1,
+    expandable: false,
+    glyph: "star",
+    note: source ? undefined : place.path.at(-2)?.title,
+    // A source counts itself whole, so its row has no pill here either.
+    count: !source && place.itemCount > 0 ? place.itemCount : undefined,
+    detail: place.reachable ? undefined : "offline",
+    muted: !place.reachable,
+    separated: first,
+    here,
+  };
+}
+
+/** Where a favourite place's row goes. */
+export function favouritePlace(place: FavouritePlace): Place {
+  return { kind: "folder", sourceId: place.sourceId, path: place.path };
+}
+
 /** The row that stands for a place, in a tree that shows every folder. */
 export function selectedRowId(place: Place | null) {
   if (!place) return null;
@@ -129,9 +164,12 @@ export function selectedRowId(place: Place | null) {
   return folder ? folderRowId(folder.id) : null;
 }
 
-/** The folder a row id names, if it names one. */
+/** The folder a row id names, if it names one: its own row, or its favourite's. */
 export function rowFolder(id: string) {
-  return id.startsWith("folder-") ? Number(id.slice("folder-".length)) : undefined;
+  for (const prefix of ["folder-", "favourite-"]) {
+    if (id.startsWith(prefix)) return Number(id.slice(prefix.length));
+  }
+  return undefined;
 }
 
 /** The doorway, where the tree will be. A folder is read where it stands, never moved. */

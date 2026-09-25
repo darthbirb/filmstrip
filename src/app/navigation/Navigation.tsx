@@ -8,6 +8,7 @@ import {
   renameSource,
   revealFolder,
   revealSource,
+  setFolderFavorite,
 } from "../../ipc/commands";
 import type { HeadedMenu, MenuAction, MenuGroups } from "../../ui/Menu";
 import { Tree, type TreeRow } from "../../ui/Tree";
@@ -19,12 +20,14 @@ import { refusedName } from "../undo/lines";
 import { afterAct } from "../undo/undo";
 import { addFolder } from "./add-source";
 import { deleteFolderAsking } from "./delete-folder";
-import { ensureChildren, loadIndex, useIndex } from "./index-store";
+import { ensureChildren, loadIndex, refreshIndex, useIndex } from "./index-store";
 import { openFolders, setOpenFolders, useOpenFolders } from "./open-folders";
 import {
   addFolderRows,
   DRAFT_ID,
   type Draft,
+  favouritePlace,
+  favouriteRow,
   freshTitle,
   libraries,
   NoSources,
@@ -40,7 +43,7 @@ import {
 
 /** The Sorting Box and the Trash, then each library source with its folders opening in place. DECISIONS.md "Navigation". */
 export function Navigation() {
-  const { sources, children, trash } = useIndex();
+  const { sources, children, trash, favourites } = useIndex();
   const place = usePlace();
   const expanded = useOpenFolders();
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -59,6 +62,12 @@ export function Navigation() {
     [SORTING_ID, { kind: "sorting" }],
     [TRASH_ID, { kind: "trash" }],
   ]);
+  // Their own group, between the app's places and the sources, a rule either side of it.
+  favourites.forEach((favourite, index) => {
+    const row = favouriteRow(favourite, place, index === 0);
+    rows.push(row);
+    places.set(row.id, favouritePlace(favourite));
+  });
   libraries(sources).forEach((source, index) => {
     const root = source.rootFolderId;
     const row = sourceRow(source, {
@@ -99,7 +108,8 @@ export function Navigation() {
       setDraft(null);
       setRenaming(id);
     };
-    // The parent opens if it was shut, and the row arrives already in its field.
+    const path = placeFolderPath(places.get(id));
+    // The parent opens if it was shut, down from its source, and the row arrives in its field.
     const newFolder: MenuAction = {
       id: "new-folder",
       label: "New Folder",
@@ -108,15 +118,26 @@ export function Navigation() {
         setTaken(null);
         setDraft({ parent: folder, title: freshTitle(children.get(folder) ?? []) });
         setRenaming(DRAFT_ID);
-        openFolders([folder]);
+        openFolders(path.map((crumb) => crumb.id));
       },
     };
+    // A favourite changes nothing on disk, so it is there whether the drive is or not.
+    const favourite = favourites.some((one) => one.folderId === folder);
+    const star: MenuAction = {
+      id: "favourite",
+      label: favourite ? "Remove Favourite" : "Favourite",
+      glyph: "star",
+      filled: favourite,
+      onSelect: () =>
+        void setFolderFavorite(folder, !favourite)
+          .then(() => refreshIndex())
+          .catch(() => undefined),
+    };
     if (folder === source.rootFolderId) {
-      return { heading: "Source", groups: sourceMenu(source, rename, newFolder) };
+      return { heading: "Source", groups: sourceMenu(source, rename, newFolder, star) };
     }
     // Nothing on it can act on a folder whose drive is away, and an empty menu opens nothing.
     if (!source.reachable) return { groups: [] };
-    const path = placeFolderPath(places.get(id));
     const moveTo: MenuAction = {
       id: "move",
       label: "Move to…",
@@ -139,7 +160,7 @@ export function Navigation() {
     };
     return {
       groups: [
-        [newFolder, moveTo],
+        [newFolder, star, moveTo],
         [revealFolderRow(folder), renameRow(rename), readAgainRow(folder)],
         [remove],
       ],
@@ -221,7 +242,12 @@ export function Navigation() {
  * source has, which point at the Sources section rather than holding anything of their own.
  * DECISIONS.md "Right-click menus".
  */
-function sourceMenu(source: SourceSummary, rename: () => void, newFolder: MenuAction): MenuGroups {
+function sourceMenu(
+  source: SourceSummary,
+  rename: () => void,
+  newFolder: MenuAction,
+  star: MenuAction,
+): MenuGroups {
   const folder = source.rootFolderId;
   const reveal: MenuAction = {
     id: "reveal",
@@ -232,7 +258,7 @@ function sourceMenu(source: SourceSummary, rename: () => void, newFolder: MenuAc
   const naming = renameRow(rename);
   // New Folder is on it because a source's row is the only row that stands for its top level.
   return [
-    source.reachable ? [newFolder] : [],
+    source.reachable ? [newFolder, star] : [star],
     source.reachable ? [reveal, naming, readAgainRow(folder)] : [naming],
     [
       {
