@@ -16,7 +16,10 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## A checked tile's box is a box inside a box · DEFECT
+## A checked tile's box is a box inside a box · DRAWN
+
+Components › Selection checkbox and The checked box, at every tile size: ph-check, outlined, at glyph
+0.9375rem on the in-pane white; Artboards › every checked tile.
 
 Components › Selection checkbox draws the checked box as `ph-fill ph-check` on the in-pane white.
 Phosphor's filled check is itself a dark rounded square with the tick knocked out of it, so what
