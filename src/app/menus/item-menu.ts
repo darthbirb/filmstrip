@@ -1,4 +1,4 @@
-import { copyItemFile, openItem, revealItem } from "../../ipc/commands";
+import { copyItems, openItem, revealItem } from "../../ipc/commands";
 import type { MenuAction, MenuGroups } from "../../ui/Menu";
 import { isFavourite, setFavourite } from "../favourites";
 import { deleteFiles } from "../pane/delete";
@@ -84,7 +84,7 @@ export function itemMenu(item: Item, show: () => void): MenuGroups {
         glyph: "folderOpen",
         onSelect: () => quietly(revealItem(item.id)),
       },
-      { id: "copy", label: "Copy", glyph: "copy", onSelect: () => quietly(copyItemFile(item.id)) },
+      { id: "copy", label: "Copy", glyph: "copy", onSelect: () => quietly(copyItems([item.id])) },
       {
         id: "open",
         label: "Open with Default App",

@@ -545,12 +545,18 @@ pub async fn open_item(app: AppHandle, state: State<'_, AppState>, item_id: i64)
         .map_err(AppError::invalid)
 }
 
+/// One file or a whole selection, on the clipboard as files, so Explorer pastes the files themselves.
 #[tauri::command]
-pub async fn copy_item_file(state: State<'_, AppState>, item_id: i64) -> Result<()> {
+pub async fn copy_items(state: State<'_, AppState>, item_ids: Vec<i64>) -> Result<()> {
     run(&state, move |conn| {
-        crate::fs::clipboard::copy_file(&item_abs_path(conn, item_id)?)
+        crate::fs::clipboard::copy_files(&item_abs_paths(conn, &item_ids)?)
     })
     .await
+}
+
+/// Every file's path, in the order asked for; one no longer in the index refuses them all.
+fn item_abs_paths(conn: &Connection, item_ids: &[i64]) -> Result<Vec<PathBuf>> {
+    item_ids.iter().map(|&id| item_abs_path(conn, id)).collect()
 }
 
 /// Queues a walk of every source; asking again while one waits or runs does nothing.
@@ -1001,6 +1007,33 @@ mod tests {
             titles(&favourites(&conn).unwrap()),
             ["Cairo", "Lisbon", "Pictures"]
         );
+    }
+
+    #[test]
+    fn a_selection_copies_as_every_file_in_its_order_and_a_gone_one_stops_it() {
+        let base = scratch("copy-items");
+        let app = app_dir(&base);
+        let library = base.join("Pictures");
+        std::fs::create_dir_all(library.join("Cairo")).unwrap();
+        std::fs::write(library.join("Cairo/a.jpg"), "a").unwrap();
+        std::fs::write(library.join("Cairo/b.jpg"), "b").unwrap();
+        let conn = conn();
+        register(&conn, &library, &app).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let [summary] = source_summaries(&conn).unwrap().try_into().unwrap();
+        let cairo = folders::child_id(&conn, summary.root_folder_id, "Cairo")
+            .unwrap()
+            .unwrap();
+        let [a, b] = items::in_folder(&conn, cairo)
+            .unwrap()
+            .try_into()
+            .unwrap_or_else(|_| panic!("two files in Cairo"));
+
+        let paths = item_abs_paths(&conn, &[b.id, a.id]).unwrap();
+        let names: Vec<_> = paths.iter().map(|path| path.file_name().unwrap()).collect();
+        assert_eq!(names, ["b.jpg", "a.jpg"]);
+        assert!(paths.iter().all(|path| path.starts_with(&library)));
+        assert!(item_abs_paths(&conn, &[a.id, 999]).is_err());
     }
 
     #[test]

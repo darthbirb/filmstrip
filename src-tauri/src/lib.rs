@@ -117,7 +117,7 @@ pub fn run() {
             commands::set_item_favorite,
             commands::reveal_item,
             commands::open_item,
-            commands::copy_item_file,
+            commands::copy_items,
             commands::start_index,
             commands::index_progress,
             commands::index_failures,

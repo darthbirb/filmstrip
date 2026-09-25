@@ -1,7 +1,7 @@
 import { type RefObject, useLayoutEffect, useRef, useState } from "react";
 
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
-import { copyItemFile, openItem, revealItem } from "../../ipc/commands";
+import { copyItems, openItem, revealItem } from "../../ipc/commands";
 import { Button } from "../../ui/Button";
 import { GlyphButton } from "../../ui/GlyphButton";
 import type { GlyphName } from "../../ui/glyphs";
@@ -67,7 +67,7 @@ function InLibrary({ item }: { item: ItemDetail }) {
       id: "copy",
       label: "Copy",
       glyph: "copy",
-      run: () => void copyItemFile(item.id).catch(() => undefined),
+      run: () => void copyItems([item.id]).catch(() => undefined),
     },
     {
       id: "open",
