@@ -74,8 +74,8 @@ export function Grid({ mode }: { mode: LayoutMode }) {
 
   // A file that leaves the grid leaves the set. Artboards › Selecting.
   useEffect(() => {
-    if (items) keepChecked(order);
-  }, [items, order]);
+    if (items) keepChecked(items);
+  }, [items]);
 
   // Once the ring has moved, its tile scrolls into view and takes the focus.
   useLayoutEffect(() => {

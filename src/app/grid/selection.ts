@@ -1,5 +1,6 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 
+import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { getFullScreen } from "../pane/full-screen";
 import { getPaneItem } from "../pane/pane-store";
 import { getPlace, type Place, whenPlaceChanges } from "../place";
@@ -53,20 +54,25 @@ export function pruned(selection: Selection, present: ReadonlySet<number>): Sele
 const placeKey = (place: Place | null) =>
   place?.kind === "folder" ? `folder ${place.path.at(-1)?.id}` : (place?.kind ?? "");
 
-let held = { key: placeKey(getPlace()), selection: NOTHING };
+// The place's files as the grid last listed them, which the bar reads its count and size from.
+let held: { key: string; selection: Selection; listed: readonly ItemRow[] } = {
+  key: placeKey(getPlace()),
+  selection: NOTHING,
+  listed: [],
+};
 const listeners = new Set<() => void>();
 
-function set(selection: Selection) {
-  if (selection === held.selection) return;
-  held = { ...held, selection };
+function set(selection: Selection, listed = held.listed) {
+  if (selection === held.selection && listed === held.listed) return;
+  held = { ...held, selection, listed };
   for (const listener of listeners) listener();
 }
 
 whenPlaceChanges(() => {
   const key = placeKey(getPlace());
   if (key === held.key) return;
-  held = { key, selection: held.selection };
-  set(NOTHING);
+  held = { ...held, key };
+  set(NOTHING, []);
 });
 
 export function getSelection() {
@@ -94,17 +100,27 @@ export function checkRange(
   set(ranged(held.selection, order, id, adds, from));
 }
 
-export function checkAll(order: readonly number[]) {
+/** Every file in the place, the ones scrolled out of sight too. */
+export function checkAll(order: readonly number[] = held.listed.map((row) => row.id)) {
   set({ ids: [...order], anchor: held.selection.anchor });
+}
+
+/** The checked files as the grid lists them, in the order they were checked. */
+export function useChecked(): readonly ItemRow[] {
+  const now = useSyncExternalStore(subscribe, () => held);
+  return useMemo(() => {
+    const byId = new Map(now.listed.map((row) => [row.id, row]));
+    return now.selection.ids.flatMap((id) => byId.get(id) ?? []);
+  }, [now]);
 }
 
 export function clearChecked() {
   set(NOTHING);
 }
 
-/** Drops whatever is no longer in the grid. */
-export function keepChecked(present: readonly number[]) {
-  set(pruned(held.selection, new Set(present)));
+/** What the grid now lists; whatever is checked and no longer in it is dropped. */
+export function keepChecked(listed: readonly ItemRow[]) {
+  set(pruned(held.selection, new Set(listed.map((row) => row.id))), listed);
 }
 
 /**

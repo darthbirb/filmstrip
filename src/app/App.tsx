@@ -6,6 +6,7 @@ import { Frame } from "./frame/Frame";
 import { Grid } from "./grid/Grid";
 import { DEFAULT_LAYOUT } from "./grid/layout";
 import { Notices } from "./grid/Notices";
+import { SelectionBar } from "./grid/SelectionBar";
 import { TileSize } from "./grid/TileSize";
 import { addFolder } from "./navigation/add-source";
 import { Breadcrumb } from "./navigation/Breadcrumb";
@@ -70,6 +71,7 @@ export function App() {
             </>
           }
           grid={<Grid mode={layout} />}
+          gridFoot={<SelectionBar />}
           pane={<Pane />}
           paneHeader={<PaneHeader />}
           revealPane={whenShownInPane}

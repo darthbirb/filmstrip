@@ -17,14 +17,13 @@ export type MovingFolder = { id: number; name: string };
 
 /**
  * Files or a folder to move, or files to take out of the Trash; the folder they are in now, or
- * came from; and what asked for the picker.
+ * came from, when it is one folder; and what asked for the picker.
  */
 export type MoveRequest = (
-  | { itemIds: number[] }
-  | { folder: MovingFolder }
-  | { restoring: number[] }
+  | { itemIds: number[]; folderId: number | null }
+  | { folder: MovingFolder; folderId: number }
+  | { restoring: number[]; folderId: number | null }
 ) & {
-  folderId: number;
   anchor: MenuAnchor;
 };
 
@@ -69,7 +68,8 @@ function MovePicker({ request }: { request: MoveRequest }) {
         if (!live) return;
         setFolders(every);
         // Open down to the folder the files are in, and it too, so the tree starts where they are.
-        setOpen(new Set([...ancestors(every, request.folderId), request.folderId]));
+        const at = request.folderId;
+        setOpen(new Set(at === null ? [] : [...ancestors(every, at), at]));
       },
       () => live && setFolders([]),
     );
@@ -82,10 +82,13 @@ function MovePicker({ request }: { request: MoveRequest }) {
   const byId = new Map(folders.map((folder) => [folder.id, folder]));
   const reachable = new Set((sources ?? []).filter((one) => one.reachable).map((one) => one.id));
   const usable = folders.filter((folder) => reachable.has(folder.sourceId));
-  const barred = new Set([
-    request.folderId,
-    ...("folder" in request ? branch(folders, request.folder.id) : []),
-  ]);
+  const barred = new Set(
+    "folder" in request
+      ? [request.folderId, ...branch(folders, request.folder.id)]
+      : request.folderId === null
+        ? []
+        : [request.folderId],
+  );
   const parentName = (folder: FolderEntry) =>
     folder.parentId === null ? undefined : byId.get(folder.parentId)?.title;
   const flat = (folder: FolderEntry): PickerRow => ({
@@ -174,7 +177,7 @@ function pathOf(byId: ReadonlyMap<number, FolderEntry>, id: number) {
 function tree(
   folders: FolderEntry[],
   open: ReadonlySet<number>,
-  current: number,
+  current: number | null,
   barred: ReadonlySet<number>,
 ): PickerRow[] {
   const children = new Map<number | null, FolderEntry[]>();

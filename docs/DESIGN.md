@@ -570,6 +570,14 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   under them, where an answer can be kept, a checkbox. The answers hold the line or all fold into
   one raised button with a caret, whose menu names them a `tile-gap` under it; folded answers that
   still do not fit take a line each, left-aligned. Only the answers ever change shape.
+- **Selection bar.** The grid's own foot row while anything is checked: `toolbar` tall on `panel`
+  with a `line` hairline above, arriving and leaving as a box pushing down does, the grid giving up
+  its height. From the left: the count in `ui` semibold `fg` with its size after it in `small`
+  `fg-dim`, Select All, then the set's verbs as raised buttons, a `line-control` rule, Delete with
+  the count in `danger`, and the quiet ×. What has no room leaves for a More menu in a fixed order;
+  the count, Move to… and × never leave.
+- **Dismiss.** A quiet `control` square holding ×, `fg-dim` with no ring at rest, the `wash` under
+  the pointer: the way to put something away.
 - **Checkbox.** A `badge` square at the `badge` corner on `raised` in a `line-control` ring,
   filled with `plate` and a check in `on-plate` when ticked; its sentence beside it in `fg-mid`,
   `fg` under the pointer or ticked. The ring the keyboard sees is on the square.

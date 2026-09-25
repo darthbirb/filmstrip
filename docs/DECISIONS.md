@@ -351,6 +351,18 @@ it was made in**: going elsewhere clears it, a folder renamed or moved under you
 file that leaves the grid leaves the set, while one that arrives, by a walk or an undo, is never
 checked.
 
+**What a set can do is a bar along the grid's foot**, a row of the grid's own column rather than
+a tray over the pictures, since nothing in this app stands on a photograph but a tile's two marks.
+It holds the count and its size, Select All, and the set's verbs in its menu's order, Favourite,
+Move to…, Copy and Delete with the count again, so the bar and the menu never hold different sets;
+in the Trash, Restore and Restore to…, as its pane's bar has them. Favourite reads Remove Favourite
+only when every checked file is one already, so a mixed set is never half-toggled. As the grid
+narrows the size goes first, then Select All, Copy, Favourite and Delete behind More; the count,
+Move to… and the clear stay. The pane's bar acts on the pane's file alone, checked or not. **What
+a move or a delete could not carry stays checked**, so the bar counts what the banner lists and
+the next act takes exactly them, and after a delete the pane shows the tile after the last one
+gone.
+
 **The grid is one tab stop, and the keyboard reaches all of it.** Tab lands on the tile in the
 pane, or the first; the arrows move the ring and nothing else, up and down keeping the column as
 near as the rows allow, and Home, End and the page keys go further. Space is the box, Shift with a
