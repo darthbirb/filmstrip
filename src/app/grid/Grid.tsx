@@ -2,6 +2,7 @@ import { convertFileSrc } from "@tauri-apps/api/core";
 import {
   type KeyboardEvent,
   type MouseEvent,
+  type PointerEvent,
   type ReactElement,
   type RefObject,
   useEffect,
@@ -24,6 +25,7 @@ import { setFullScreen } from "../pane/full-screen";
 import { showInPane, usePaneItem } from "../pane/pane-store";
 import { type Place, usePlace } from "../place";
 import { usePreferences } from "../preferences";
+import { pressTile } from "./drag";
 import { EmptyPlace } from "./EmptyPlace";
 import { rowOf, step } from "./keys";
 import { type LayoutMode, rowAt } from "./layout";
@@ -67,6 +69,12 @@ export function Grid({ mode }: { mode: LayoutMode }) {
   const checkedRows = useChecked();
   // On a checked tile the set's menu; on any other, that tile's own, and the set is kept.
   const setOf = () => setMenu(checkedRows, place?.kind === "trash");
+  // A checked tile carries the set, any other itself alone; the Trash's files only go by Restore.
+  const press =
+    place?.kind === "trash"
+      ? undefined
+      : (event: PointerEvent, item: ItemRow) =>
+          pressTile(event, () => (checked.has(item.id) ? checkedRows : [item]));
   const order = useMemo(() => (items ?? []).map((item) => item.id), [items]);
   const indexOf = useMemo(() => new Map(order.map((id, index) => [id, index])), [order]);
   useSelectionKeys(order);
@@ -142,6 +150,7 @@ export function Grid({ mode }: { mode: LayoutMode }) {
           ringed={item.id === ring}
           onCheck={check}
           setOf={setOf}
+          onPress={press}
           onRing={setRinged}
           onKeyDown={onKeyDown}
           left={(result.itemLeft[index] ?? 0) + gap}
@@ -288,6 +297,8 @@ type TileProps = {
   onCheck: (event: MouseEvent, id: number) => void;
   /** The checked set's menu, which a right-click on a checked tile opens. */
   setOf: () => HeadedMenu;
+  /** A press that may become a drag onto a folder; none where files cannot be dragged. */
+  onPress?: (event: PointerEvent, item: ItemRow) => void;
   onRing: (id: number) => void;
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
   left: number;
@@ -301,7 +312,8 @@ type TileProps = {
 };
 
 function Tile(props: TileProps) {
-  const { item, from, shown, checked, boxes, ringed, onCheck, setOf, onRing, onKeyDown } = props;
+  const { item, from, shown, checked, boxes, ringed, onCheck, setOf, onPress, onRing, onKeyDown } =
+    props;
   const { left, top, width, height, origin, below } = props;
   // Opening it moves nothing: the pane keeps what it shows until a verb says otherwise.
   const context = useContextMenu();
@@ -318,6 +330,7 @@ function Tile(props: TileProps) {
         data-item={item.id}
         tabIndex={ringed ? 0 : -1}
         onFocus={() => onRing(item.id)}
+        onPointerDown={onPress && ((event) => onPress(event, item))}
         onKeyDown={onKeyDown}
         onContextMenu={(event) => {
           if (!checked) {

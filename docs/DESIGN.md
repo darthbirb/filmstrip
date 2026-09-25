@@ -122,6 +122,7 @@ spacing:
   tile-inset: 0.5rem
   heading: 1.5rem
   tile-caption: 1.3125rem
+  ghost-thumb: 1.5rem
   strip: 6rem
   strip-inset: 0.375rem
   strip-step: 1.5rem
@@ -578,6 +579,12 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   the count, Move to… and × never leave.
 - **Dismiss.** A quiet `control` square holding ×, `fg-dim` with no ring at rest, the `wash` under
   the pointer: the way to put something away.
+- **Drag ghost.** One `control`-tall line following the pointer, `--ghost-x` and `--ghost-y` from
+  its tip: `veil` glass at the `control` corner in a `line-control-hi` ring, with the overlay
+  shadow. It holds the top file's picture as a `ghost-thumb` square at the `badge` corner, the
+  rest stacked `--ghost-stack` behind it in `line-strong`, then its words in `ui` `fg`: the count,
+  the act, or after a `danger` prohibit the reason. A tree row that will take the drop lifts to
+  the `wash` inside a 2px `plate` ring, its glyph in `fg`; one that refuses does not change.
 - **Checkbox.** A `badge` square at the `badge` corner on `raised` in a `line-control` ring,
   filled with `plate` and a check in `on-plate` when ticked; its sentence beside it in `fg-mid`,
   `fg` under the pointer or ticked. The ring the keyboard sees is on the square.
@@ -697,7 +704,9 @@ box that changes size: a panel folding, a push-down, the pane growing to full sc
 `--motion-swap` (220ms) is content cross-fading *under* a size change, and only ever with one — the
 longer of the two, so the box settles before the fade finishes rather than under it.
 `--motion-quick` (120ms) is a colour, a chevron turning and a frame's opacity. All three take
-`--ease-out`, and all three go to zero under reduced motion. Nothing else moves: the pane's
+`--ease-out`, and all three go to zero under reduced motion. `--hold` (600ms) is a wait, not a
+motion: how long a dragged ghost rests on a closed row before the row opens, kept to drop targets
+that open to take a drop, and left as it is under reduced motion. Nothing else moves: the pane's
 contents are replaced without a transition, the grid never animates its layout, the strip never
 scrolls smoothly, the splitter follows the pointer exactly, and nothing animates on first paint.
 

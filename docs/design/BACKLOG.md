@@ -26,16 +26,6 @@ sheet. The drawing and what is built disagree by 2px at the one mark every check
 Draw the box a `tile-inset` in, as everything else on a tile is, on Components and on every
 Artboards tile; or, if 6px is meant, say why the box alone sits closer and name the value.
 
-## The drag's 0.6s hold is not in the token sheet · DRAWN
-
-Tokens › Motion: hold, 600ms, a wait rather than a motion, kept to drop targets that open;
-Artboards › Dragging onto a folder names it.
-
-Artboards › Dragging onto a folder opens a closed row after the ghost is held over it for 0.6s.
-The token sheet names 120, 180 and 220ms and nothing else, so the build would invent a number.
-
-Add the hold to the token sheet as a named duration, and say where else it may be used.
-
 ## Two presses of a destination key are not drawn · DRAWN
 
 Artboards › Destination keys: Already in Lisbon, a set partly in Inbox, and a free key.
@@ -47,16 +37,6 @@ in or, in the Sorting Box, a part of the set.
 A free key does nothing and says nothing, as a key with no meaning does elsewhere. A key for the
 files' own folder moves what is elsewhere and passes over the rest, and when nothing would move,
 says so in the refusal band, "Already in Lisbon", as the drag's refusing row does.
-
-## Dragging onto a folder · DRAWN
-
-Artboards › Dragging onto a folder: the ghost, the accepting row, four refusals, the line after.
-
-The tree is always on screen, and moving a set means opening the picker and finding the folder
-again. Whether a tile or a set can be dragged onto a tree row or a favourite is not drawn.
-
-Let it: a ghost that counts what it carries, a row that accepts, a row that refuses (the files'
-own folder, the Trash, a source that is away), and the move's own undo line after the drop.
 
 ## Destination hotkeys · DRAWN
 

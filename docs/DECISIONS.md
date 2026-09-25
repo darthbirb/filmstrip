@@ -371,6 +371,20 @@ the tile's menu or a double-click. Ctrl+A checks the whole place, the tiles scro
 Escape clears it, after whatever else is open has closed. The ringed tile is drawn wherever the
 scroll is, so the focus is never dropped with it.
 
+**A tile dragged onto a row in navigation is Move to… that row**, drawn by Claude Design and built
+on 26 September 2026, since the tree is always on screen: the same act, the same line after it and
+the same banner when part of it stays. A checked tile carries the whole set and any other carries
+itself alone, leaving the set as it was; a press that moves less than a tile-gap is a click. **The
+ghost says what letting go will do before you let go**: the top picture with the rest stacked
+behind it and the count, then the act over a row that takes it, lifted inside a pewter ring, or the
+reason after the red prohibit over one that will not, which stays as it was under Windows' no-drop
+pointer. Every folder, source and favourite row takes a drop, except the files' own folder, the
+Trash, a drive that is away and the Sorting Box when it is more than one folder. It is a drag the
+app draws itself, not the browser's, because only its own ghost can change its words on the way.
+Held on a closed row for `--hold` the row opens, the tree scrolls near its edges, and Escape puts
+the ghost away and moves nothing, keeping the set. The Trash's files are not dragged: Restore is
+their one way out.
+
 **The Trash is a place like any folder, with two differences**, drawn by Claude Design and built
 on 25 September 2026. It runs newest first under a heading for each day something went, Today and
 Yesterday and then the date, and a day starts a row of its own; the minute is in the pane's

@@ -40,6 +40,8 @@ type Props = {
   menuFor?: (id: string) => HeadedMenu;
   /** The row whose name is a field for now, and what becomes of what is typed there. */
   renaming?: Renaming | null;
+  /** The row a dragged ghost rests on and that will take it: lifted inside a pewter ring. */
+  accepting?: string | null;
 };
 
 export type Renaming = {
@@ -63,6 +65,7 @@ export function Tree({
   onCollapse,
   menuFor,
   renaming,
+  accepting,
 }: Props) {
   const [focusId, setFocusId] = useState<string | null>(null);
   const context = useContextMenu();
@@ -126,11 +129,16 @@ export function Tree({
       {rows.map((row, index) => {
         const selected = row.id === selectedId || Boolean(row.here);
         // A selected row is a filled plate; its hover washes over the plate rather than replacing it.
-        const tone = selected
-          ? "bg-plate text-on-plate hover-wash"
-          : `${row.muted ? "text-fg-dim" : "text-fg-mid"} hover:bg-wash hover:text-fg`;
+        // A row about to take a drop wears the selection's colour as a ring: it is about to be chosen.
+        const tone =
+          row.id === accepting
+            ? "bg-wash text-fg inset-ring-2 inset-ring-plate"
+            : selected
+              ? "bg-plate text-on-plate hover-wash"
+              : `${row.muted ? "text-fg-dim" : "text-fg-mid"} hover:bg-wash hover:text-fg`;
         const quiet = selected ? "text-on-plate" : "text-fg-dim";
-        const ink = row.muted && !selected ? "text-fg-faint" : quiet;
+        const ink =
+          row.id === accepting ? "text-fg" : row.muted && !selected ? "text-fg-faint" : quiet;
         return (
           <Fragment key={row.id}>
             {row.separated && (
@@ -142,6 +150,8 @@ export function Tree({
                 else elements.current.delete(row.id);
               }}
               role="treeitem"
+              // Where a drag finds which row it rests on.
+              data-row={row.id}
               // Named explicitly, so a trailing action's own label is not read as the row's.
               aria-label={[
                 row.label,

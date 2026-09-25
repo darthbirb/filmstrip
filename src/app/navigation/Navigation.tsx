@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import {
   createFolder,
@@ -12,6 +13,7 @@ import {
 } from "../../ipc/commands";
 import type { HeadedMenu, MenuAction, MenuGroups } from "../../ui/Menu";
 import { Tree, type TreeRow } from "../../ui/Tree";
+import { type Landing, type Resolver, setDropResolver, useDrag } from "../grid/drag";
 import { libraryChanged } from "../library";
 import { openMovePicker } from "../pane/move-picker";
 import { type Place, setPlace, usePlace } from "../place";
@@ -49,10 +51,19 @@ export function Navigation() {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [taken, setTaken] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const drag = useDrag();
 
   useEffect(() => {
     ensureChildren([...expanded]);
   }, [expanded]);
+
+  // A drop is answered by the rows of the newest render, and by none while there is no tree.
+  const landing = useRef<Resolver>(() => null);
+  landing.current = () => null;
+  useEffect(() => {
+    setDropResolver((id, carried) => landing.current(id, carried));
+    return () => setDropResolver(() => null);
+  }, []);
 
   if (!sources) return null;
   if (sources.length === 0) return <NoSources onAdd={() => void addFolder("library")} />;
@@ -98,6 +109,36 @@ export function Navigation() {
     if (at?.kind !== "folder") return undefined;
     return sources.find((source) => source.id === at.sourceId);
   };
+
+  /**
+   * What a row does with files dropped on it: a folder, a source or a favourite takes them, but
+   * not the files' own folder, not the Trash, not a drive that is away, and the Sorting Box only
+   * when it is one folder. Artboards › Dragging onto a folder.
+   */
+  const landingFor = (id: string, carried: readonly ItemRow[]): Landing | null => {
+    const refuse = (why: string): Landing => ({ kind: "refuse", why });
+    const into = (folder: number, title: string, source: SourceSummary): Landing => {
+      if (!source.reachable) return refuse(`${source.title} is offline`);
+      if (carried.every((file) => file.folderId === folder)) return refuse(`Already in ${title}`);
+      const row = rows.find((one) => one.id === id);
+      const open = row?.expandable && !row.expanded ? () => setOpen(id, true) : undefined;
+      return { kind: "accept", to: { id: folder, title }, open };
+    };
+    if (id === TRASH_ID) return refuse("Delete sends to the Trash");
+    if (id === SORTING_ID) {
+      const sorting = sources.filter((source) => source.kind === "sorting");
+      const [one] = sorting;
+      if (sorting.length > 1) return refuse("Use Move to… to pick one");
+      return one ? into(one.rootFolderId, one.title, one) : null;
+    }
+    const folder = rowFolder(id);
+    const source = sourceOf(id);
+    const title = placeFolderPath(places.get(id)).at(-1)?.title;
+    if (folder === undefined || !source || title === undefined) return null;
+    return into(folder, title, source);
+  };
+
+  landing.current = landingFor;
 
   const menuFor = (id: string): HeadedMenu => {
     const source = sourceOf(id);
@@ -221,6 +262,7 @@ export function Navigation() {
       onExpand={(id) => setOpen(id, true)}
       onCollapse={(id) => setOpen(id, false)}
       menuFor={menuFor}
+      accepting={drag?.over?.landing.kind === "accept" ? drag.over.rowId : null}
       renaming={
         renaming
           ? {
