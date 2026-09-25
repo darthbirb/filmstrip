@@ -175,6 +175,8 @@
   --spacing-heading: 1.5rem;
   /* The room under a tile for the one line said about it, the gap above that line included. */
   --spacing-tile-caption: 1.3125rem;
+  /* The column a list's counts stand in, right-aligned, so they line up from row to row. */
+  --spacing-count: 3.25rem;
   /* A dragged ghost's picture. */
   --spacing-ghost-thumb: 1.5rem;
   --spacing-strip: 6rem;

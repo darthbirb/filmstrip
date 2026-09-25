@@ -555,6 +555,18 @@ Shift+F10 did nothing at all.
   outside it. **Only one walk runs at a time:** each retires what it did not see, so a folder walk
   beside the whole walk would have the whole walk retire what the folder walk had just found.
 
+## Destination keys
+
+**The ten digits move files to the folders used most**, drawn by Claude Design and built on 26
+September 2026, as PRODUCT.md keeps them; ggallery's culler, a bar of keys over the grid, is cut,
+and the keys need no furniture of their own. Letters stay free for the type-to-find the tree and
+the picker already have, and ten is more folders than anyone keeps in their head. **A key names a
+folder, not a path**, as ggallery's did, so a rename or a move keeps it, and a folder that goes
+keeps its key, marked gone, because the delete that took it can be undone. Binding is a setting,
+not an act on disk: it is not journalled and Ctrl+Z does not unbind. A key bound again moves
+without a question, and a folder holds one key at most. A bound folder's rows carry the key
+beside the count; the rail, which holds no folders, carries none.
+
 ## Undo
 
 **Every change the app makes on disk is journalled and can be undone, across a restart**, ported
@@ -636,6 +648,13 @@ sorting source takes its default with it and the row falls back to asking; with 
 there is nothing for it to name and the row is not there. The panel widths, which panels are folded, the tile size
 and whether the pane's details are open all keep their controls where they are: a second control
 for the same thing is a second thing to keep in sync.
+
+**Destination Keys sits in the Library group, beside Sources**, not with the app's own shortcuts:
+a key is about a folder in the library. It lists all ten keys, bound or free, so which are left
+is read at a glance. A bound row is its key, its folder as a button that opens the Move to…
+picker to choose another, its count and a ×; a free row offers Choose Folder…; one whose folder
+has gone is in the red and says where it was, and keeps its key until it is freed or given to
+another folder. The picker opens inside the dialog, since the window behind it is inert.
 
 **A rail of sections, grouped and filtered**, because it will grow: tabs hold six or seven names
 and then scroll, and a rail takes twenty. A section with nothing in it yet is not in the rail.

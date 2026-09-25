@@ -2,6 +2,7 @@ import { beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { recording } from "../../dev/recording";
+import { withoutGlyphs } from "../../dev/words";
 import { folderItems, trashItems, undoLast } from "../../ipc/commands";
 import { formatBytes } from "../../lib/format";
 import { setFavourites } from "../favourites";
@@ -65,7 +66,7 @@ const bar = () => page.getByRole("toolbar", { name: "Selection" });
 const said = (text: string) => bar().getByText(text, { exact: true }).last();
 // A glyph is a character of its own, from the font's private area; the words are the rest.
 const words = (element: Element) =>
-  element.getAttribute("aria-label") ?? element.textContent?.replace(/[-]/g, "").trim();
+  element.getAttribute("aria-label") ?? withoutGlyphs(element.textContent);
 const idOf = async (name: string) =>
   (await folderItems(6)).find((row) => row.diskName === name)?.id ?? -1;
 

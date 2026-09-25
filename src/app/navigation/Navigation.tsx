@@ -23,6 +23,7 @@ import {
 } from "../../ui/Menu";
 import { Tree, type TreeRow } from "../../ui/Tree";
 import { type Landing, type Resolver, setDropResolver, useDrag } from "../grid/drag";
+import { DIGITS } from "../keys";
 import { libraryChanged } from "../library";
 import { openMovePicker } from "../pane/move-picker";
 import { type Place, setPlace, usePlace } from "../place";
@@ -323,9 +324,6 @@ export function Navigation() {
 
 /** A folder the key menu is open for, and the row it opened against. */
 type Keying = { folder: number; title: string; anchor: MenuAnchor };
-
-/** The keys in keyboard order, 1 to 9 then 0. */
-export const DIGITS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"] as const;
 
 /**
  * The ten keys, each with the folder it is on, this folder's own on the plate, then No Key.

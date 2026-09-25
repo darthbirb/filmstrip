@@ -126,6 +126,7 @@ spacing:
   tile-inset: 0.5rem
   heading: 1.5rem
   tile-caption: 1.3125rem
+  count: 3.25rem
   ghost-thumb: 1.5rem
   strip: 6rem
   strip-inset: 0.375rem
@@ -589,6 +590,12 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   `on-plate-dim`; a key whose folder has gone is `danger` in a `line-danger` ring. A menu row can
   lead with one in place of its glyph, as the list of keys does, or end with its digit alone in
   `small` mono `fg-dim`, as Assign Key… says the key its folder holds.
+- **Place button.** A folder as a button that picks another: `bar-field` tall at the `nested`
+  corner on `raised` in a `line-control` ring, the filled folder in `fg-dim`, the name in `ui` `fg`,
+  the folder it is in after it in `small` `fg-dim`, and a caret at its end. With nothing chosen it
+  has no ground and reads Choose Folder… in `fg-dim` with the Move to… glyph; for a folder that has
+  gone it is `danger` in a `line-danger` ring with the dashed folder. A destination key's row in
+  Settings is the key chip, this, the count right-aligned in a `count` column, and a dismiss.
 - **Drag ghost.** One `control`-tall line following the pointer, `--ghost-x` and `--ghost-y` from
   its tip: `veil` glass at the `control` corner in a `line-control-hi` ring, with the overlay
   shadow. It holds the top file's picture as a `ghost-thumb` square at the `badge` corner, the

@@ -1,11 +1,17 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import type { FolderEntry } from "../../ipc/bindings/FolderEntry";
-import { type AppError, listFolders, moveFolder, moveItems } from "../../ipc/commands";
+import {
+  type AppError,
+  listFolders,
+  moveFolder,
+  moveItems,
+  setDestinationKey,
+} from "../../ipc/commands";
 import type { MenuAnchor } from "../../ui/Menu";
 import { Picker, type PickerRow, type PickerSection } from "../../ui/Picker";
 import { libraryChanged } from "../library";
-import { useIndex } from "../navigation/index-store";
+import { refreshIndex, useIndex } from "../navigation/index-store";
 import { getPreferences, RECENT, updatePreferences, usePreferences } from "../preferences";
 import { movedBannerLine } from "../undo/lines";
 import { showReport } from "../undo/report-store";
@@ -23,8 +29,12 @@ export type MoveRequest = (
   | { itemIds: number[]; folderId: number | null }
   | { folder: MovingFolder; folderId: number }
   | { restoring: number[]; folderId: number | null }
+  /** A destination key to give a folder: the tree is the same, and nothing moves. */
+  | { binding: string; folderId: number | null }
 ) & {
   anchor: MenuAnchor;
+  /** Asked for from inside Settings, whose dialog holds the only part of the window not inert. */
+  inDialog?: boolean;
 };
 
 // One picker at a time, opened from the bar or a menu and drawn once at the app's root.
@@ -45,9 +55,12 @@ function subscribe(listener: () => void) {
   };
 }
 
-export function MovePickerHost() {
+/** Where the picker is drawn: the app's root, and inside Settings for what Settings asks for. */
+export function MovePickerHost({ inDialog = false }: { inDialog?: boolean }) {
   const shown = useSyncExternalStore(subscribe, () => request);
-  return shown ? <MovePicker key={opened} request={shown} /> : null;
+  return shown && Boolean(shown.inDialog) === inDialog ? (
+    <MovePicker key={opened} request={shown} />
+  ) : null;
 }
 
 /**
@@ -113,7 +126,13 @@ function MovePicker({ request }: { request: MoveRequest }) {
 
   return (
     <Picker
-      label={"restoring" in request ? "Restore to" : "Move to"}
+      label={
+        "restoring" in request
+          ? "Restore to"
+          : "binding" in request
+            ? `Folder for Key ${request.binding}`
+            : "Move to"
+      }
       placeholder="Filter folders"
       anchor={request.anchor}
       sections={sections}
@@ -129,6 +148,11 @@ function MovePicker({ request }: { request: MoveRequest }) {
         const to = byId.get(id);
         if (!to) return;
         if ("restoring" in request) return void restoreFiles(request.restoring, to);
+        if ("binding" in request) {
+          return void setDestinationKey(request.binding, to.id)
+            .then(() => refreshIndex())
+            .catch(() => undefined);
+        }
         if (!("folder" in request)) return void moveFiles(request.itemIds, to);
         const from = { folderId: request.folderId, path: pathOf(byId, request.folderId) };
         void moveFolderTo(request.folder, to, from);
