@@ -16,6 +16,16 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
+## The selection box sits 6px in, where the token sheet says 8 · DEFECT
+
+Components › Selection checkbox puts the box 6px from the tile's top-right, and the Notes sheet's
+last pass leans on that 6px. The token sheet says what sits on a tile sits `tile-inset`, 0.5rem,
+from its corner, as the In Pane plate and the length plate do, and the build follows the token
+sheet. The drawing and what is built disagree by 2px at the one mark every checked tile carries.
+
+Draw the box a `tile-inset` in, as everything else on a tile is, on Components and on every
+Artboards tile; or, if 6px is meant, say why the box alone sits closer and name the value.
+
 ## The drag's 0.6s hold is not in the token sheet · DRAWN
 
 Tokens › Motion: hold, 600ms, a wait rather than a motion, kept to drop targets that open;

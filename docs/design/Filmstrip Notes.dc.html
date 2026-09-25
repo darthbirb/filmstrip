@@ -139,6 +139,23 @@
 
   <div style="display:flex; flex-direction:column; gap:16px">
     <div style="display:flex; flex-direction:column; gap:8px; max-width:74ch">
+      <div style="font-size:19px; font-weight:600; letter-spacing:-.01em; color:#f4f3f1">One defect: the checked box was two boxes</div>
+      <div style="font-size:13px; line-height:1.7; color:#a8a5a0; text-wrap:pretty">The checked box ticked with Phosphor’s filled check, which is a dark rounded square with the tick cut out of it, so every checked tile showed a box inside a box. Only this entry was drawn; every entry marked drawn is exactly as it was.</div>
+      <div style="display:grid; grid-template-columns:max-content minmax(0,1fr); gap:5px 20px; font-size:12px; line-height:1.6">
+        <span style="font-family:'IBM Plex Mono',monospace; color:#eceae7">Components</span><span style="color:#908c86">Selection checkbox’s two checked tiles tick with <span style="color:#a8a5a0">ph ph-check</span> at 15px, and its note names the glyph and size. A new block draws the checked box at the four tile sizes, on a light picture and a dark one, alone and beside the in-pane ring.</span>
+        <span style="font-family:'IBM Plex Mono',monospace; color:#eceae7">Artboards</span><span style="color:#908c86">All sixteen checked tiles take the same mark.</span>
+        <span style="font-family:'IBM Plex Mono',monospace; color:#eceae7">Tokens · Pane</span><span style="color:#908c86">Nothing. The glyph is one of the two families already shipped and its size is already on the scale.</span>
+      </div>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px">
+      <div style="display:flex; flex-direction:column; gap:8px; padding:16px 18px; border-radius:12px; background:#1b1b1b; box-shadow:inset 0 0 0 1px #262626"><span style="font-size:13px; font-weight:600; color:#eceae7">The outlined check, which the Settings box already uses</span><span style="font-size:12px; line-height:1.65; color:#908c86; text-wrap:pretty">The plate is the box, so the glyph has to be a tick and nothing more. <span style="color:#a8a5a0">ph-check in the regular family</span> is that, and it is the glyph the Settings checkbox ticks with, so the two boxes now agree. For the build: <span style="color:#a8a5a0">Glyph name="done"</span> without <span style="color:#a8a5a0">filled</span>. Phosphor’s bold weight would give a heavier stroke, but it is a third font file for one glyph.</span></div>
+      <div style="display:flex; flex-direction:column; gap:8px; padding:16px 18px; border-radius:12px; background:#1b1b1b; box-shadow:inset 0 0 0 1px #262626"><span style="font-size:13px; font-weight:600; color:#eceae7">One step up the scale, to glyph</span><span style="font-size:12px; line-height:1.65; color:#908c86; text-wrap:pretty">At glyph-small, 0.75rem, the regular stroke is under a pixel wide and the tick is little more than half the box. At <span style="color:#a8a5a0">glyph, 0.9375rem</span>, the tick spans most of the 20px plate and reads at a glance. The box does not scale with the tile, so the same size holds from 8rem to 20rem. The Settings box stays at glyph-small: it sits beside its sentence on the dialog’s surface, not over a picture.</span></div>
+      <div style="display:flex; flex-direction:column; gap:8px; padding:16px 18px; border-radius:12px; background:#1b1b1b; box-shadow:inset 0 0 0 1px #262626"><span style="font-size:13px; font-weight:600; color:#eceae7">No edge on the plate</span><span style="font-size:12px; line-height:1.65; color:#908c86; text-wrap:pretty">On a near-white picture the plate’s outline fades, but the dark tick does not, so the box still reads. An edge would be a new value for a case the mark already answers. The in-pane ring’s 2px lies outside the box’s 6px inset, so the two whites never meet.</span></div>
+    </div>
+  </div>
+
+  <div style="display:flex; flex-direction:column; gap:16px">
+    <div style="display:flex; flex-direction:column; gap:8px; max-width:74ch">
       <div style="font-size:19px; font-weight:600; letter-spacing:-.01em; color:#f4f3f1">Three defects from the selection pass</div>
       <div style="font-size:13px; line-height:1.7; color:#a8a5a0; text-wrap:pretty">Two sheets gave a right-click outside the set two meanings, a drag waited on a number the token sheet did not have, and two presses of a destination key were never drawn. Only these three entries were drawn; every entry marked drawn is exactly as it was. Each followed its recommendation.</div>
       <div style="display:grid; grid-template-columns:max-content minmax(0,1fr); gap:5px 20px; font-size:12px; line-height:1.6">
