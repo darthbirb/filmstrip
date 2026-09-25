@@ -3,6 +3,7 @@ import type { Act } from "../ipc/bindings/Act";
 import type { Batch } from "../ipc/bindings/Batch";
 import type { Contents } from "../ipc/bindings/Contents";
 import type { Crumb } from "../ipc/bindings/Crumb";
+import type { DestinationKey } from "../ipc/bindings/DestinationKey";
 import type { FavouritePlace } from "../ipc/bindings/FavouritePlace";
 import type { FolderEntry } from "../ipc/bindings/FolderEntry";
 import type { FolderNode } from "../ipc/bindings/FolderNode";
@@ -118,6 +119,14 @@ function parents() {
 
 /** Where the mock keeps what was sent to the trash: a folder no place shows. */
 const TRASH = -1;
+
+/** Destination keys: the digit, and the folder it names with the path it last had. */
+const KEYS = new Map<
+  string,
+  { folderId: number; path: Crumb[]; sourceId: number; reachable: boolean }
+>();
+/** 1 to 9, then 0, as the keys sit on the keyboard. */
+const keyOrder = (key: string) => (key === "0" ? 10 : Number(key));
 
 const everyItem = () =>
   Object.entries(ITEMS).flatMap(([folder, rows]) => (Number(folder) === TRASH ? [] : rows));
@@ -605,6 +614,42 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
           sensitivity: "base",
         }),
       ),
+  destination_keys: (): DestinationKey[] =>
+    [...KEYS.entries()]
+      .sort(([a], [b]) => keyOrder(a) - keyOrder(b))
+      .map(([key, held]) => {
+        const node = live(held.folderId)?.node;
+        const root = SOURCES.find((one) => one.rootFolderId === held.folderId);
+        const gone = !node && !root;
+        // A folder that went keeps the path it last had, as the retired row keeps its ancestry.
+        if (!gone) {
+          const { folders, home } = crumbs(held.folderId);
+          Object.assign(held, {
+            path: folders,
+            sourceId: home?.id ?? 0,
+            reachable: !!home?.reachable,
+          });
+        }
+        const itemCount = node ? node.itemCount : (ITEMS[held.folderId]?.length ?? 0);
+        return { key, ...held, itemCount: gone ? 0 : itemCount, gone };
+      }),
+  set_destination_key: ({ key, folderId }) => {
+    const [digit, id] = [key as string, folderId as number];
+    for (const [other, held] of KEYS)
+      if (other === digit || held.folderId === id) KEYS.delete(other);
+    const { folders, home } = crumbs(id);
+    KEYS.set(digit, {
+      folderId: id,
+      path: folders,
+      sourceId: home?.id ?? 0,
+      reachable: !!home?.reachable,
+    });
+    return null;
+  },
+  remove_destination_key: ({ key }) => {
+    KEYS.delete(key as string);
+    return null;
+  },
   list_folders: (): FolderEntry[] => [
     ...SOURCES.map((one) => ({
       id: one.rootFolderId,
