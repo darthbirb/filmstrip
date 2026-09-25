@@ -16,6 +16,19 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
+## A checked tile's box is a box inside a box · DEFECT
+
+Components › Selection checkbox draws the checked box as `ph-fill ph-check` on the in-pane white.
+Phosphor's filled check is itself a dark rounded square with the tick knocked out of it, so what
+shows on the tile is a white square holding a black square holding a tick: two boxes and a
+thinner mark than either, at the one place a set has to read at a glance. Built, it looks broken.
+The Artboards sheet repeats it on every checked tile, and the Settings checkbox, which ticks with
+the outlined check, already disagrees with it.
+
+Draw the checked box as one mark: the white plate and a tick on it, at a weight that holds at the
+smallest tile, and say which glyph and size it is so the build has nothing to guess. Check it
+drawn at every tile size, on a light picture and a dark one, and with the in-pane ring beside it.
+
 ## The drag's 0.6s hold is not in the token sheet · DRAWN
 
 Tokens › Motion: hold, 600ms, a wait rather than a motion, kept to drop targets that open;
