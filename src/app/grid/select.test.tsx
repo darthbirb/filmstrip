@@ -86,6 +86,17 @@ test("the box checks a file and the pane keeps what it shows; then every tile sh
   await expect.poll(shownBoxes).toBe(1);
 });
 
+test("a checked box is one plate and one tick: the outlined check, at glyph size", async () => {
+  await renderGrid();
+  await userEvent.click(box(2));
+  const input = box(2).element();
+  const tick = input.nextElementSibling?.querySelector<HTMLElement>("[data-icon=check]");
+  // The filled check is a square of its own, which read as a box inside the box.
+  expect(tick?.classList.contains("glyph-fill")).toBe(false);
+  const root = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+  expect(Number.parseFloat(getComputedStyle(tick as HTMLElement).fontSize)).toBe(root * 0.9375);
+});
+
 test("a plain click still shows the picture and checks nothing", async () => {
   await renderGrid();
   await userEvent.click(tile(3));

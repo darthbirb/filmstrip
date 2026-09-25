@@ -16,21 +16,15 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## A checked tile's box is a box inside a box · DRAWN
+## The selection box sits 6px in, where the token sheet says 8 · DEFECT
 
-Components › Selection checkbox and The checked box, at every tile size: ph-check, outlined, at glyph
-0.9375rem on the in-pane white; Artboards › every checked tile.
+Components › Selection checkbox puts the box 6px from the tile's top-right, and the Notes sheet's
+last pass leans on that 6px. The token sheet says what sits on a tile sits `tile-inset`, 0.5rem,
+from its corner, as the In Pane plate and the length plate do, and the build follows the token
+sheet. The drawing and what is built disagree by 2px at the one mark every checked tile carries.
 
-Components › Selection checkbox draws the checked box as `ph-fill ph-check` on the in-pane white.
-Phosphor's filled check is itself a dark rounded square with the tick knocked out of it, so what
-shows on the tile is a white square holding a black square holding a tick: two boxes and a
-thinner mark than either, at the one place a set has to read at a glance. Built, it looks broken.
-The Artboards sheet repeats it on every checked tile, and the Settings checkbox, which ticks with
-the outlined check, already disagrees with it.
-
-Draw the checked box as one mark: the white plate and a tick on it, at a weight that holds at the
-smallest tile, and say which glyph and size it is so the build has nothing to guess. Check it
-drawn at every tile size, on a light picture and a dark one, and with the in-pane ring beside it.
+Draw the box a `tile-inset` in, as everything else on a tile is, on Components and on every
+Artboards tile; or, if 6px is meant, say why the box alone sits closer and name the value.
 
 ## The drag's 0.6s hold is not in the token sheet · DRAWN
 

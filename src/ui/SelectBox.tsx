@@ -39,7 +39,8 @@ export function SelectBox({ label, checked, shown, onClick }: Props) {
         aria-hidden="true"
         className={`pointer-events-none grid place-items-center rounded-badge ${drawn}`}
       >
-        {checked && <Glyph name="done" filled className="text-glyph-small" />}
+        {/* Outlined: Phosphor's filled check is a square of its own, a box inside the box. */}
+        {checked && <Glyph name="done" className="text-glyph" />}
       </span>
     </span>
   );

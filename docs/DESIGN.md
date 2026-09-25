@@ -597,7 +597,8 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Selection box.** A `badge` square at the `badge` corner, a `tile-inset` from the tile's
   top-right. Unchecked it is `box` glass under a `--box-ring` ring, `box-line` under the pointer and
   `box-line-quiet` on the other tiles once one is checked; it shows only under the pointer until
-  then. Checked it fills with `in-pane` and holds a filled tick in `on-mark`, and a checked tile
+  then. Checked it fills with `in-pane` and holds the outlined tick at `glyph` in `on-mark`, one
+  mark on one plate, the same at every tile size, and a checked tile
   carries nothing else: the in-pane ring and plate are not borrowed.
 - **Day heading.** Over each run of tiles in the Trash, `eyebrow` capitals in `fg-dim`, standing
   on the `heading` room above the run, a `tile-gap` over its first row.
