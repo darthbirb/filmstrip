@@ -46,6 +46,8 @@ export const GLYPHS = {
   putBack: { icon: "arrow-u-up-left", code: 0xe08a },
   checkAll: { icon: "checks", code: 0xe53a },
   prohibit: { icon: "prohibit", code: 0xe3de },
+  keyboard: { icon: "keyboard", code: 0xe2d8 },
+  folderGone: { icon: "folder-dashed", code: 0xe8f8 },
 } as const;
 
 export type GlyphName = keyof typeof GLYPHS;

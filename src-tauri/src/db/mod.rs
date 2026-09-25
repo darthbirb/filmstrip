@@ -5,6 +5,7 @@ pub mod folders;
 pub mod items;
 pub mod jobs;
 pub mod journal;
+pub mod keys;
 pub mod sources;
 pub mod tags;
 
@@ -22,6 +23,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (3, include_str!("migrations/003_probed.sql")),
     (4, include_str!("migrations/004_journal.sql")),
     (5, include_str!("migrations/005_trash.sql")),
+    (6, include_str!("migrations/006_keys.sql")),
 ];
 
 /// A connection with the app's pragmas. One per thread: WAL allows one writer

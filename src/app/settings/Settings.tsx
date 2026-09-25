@@ -6,6 +6,7 @@ import { GlyphButton } from "../../ui/GlyphButton";
 import type { GlyphName } from "../../ui/glyphs";
 import { DEFAULT_LAYOUT, type LayoutMode } from "../grid/layout";
 import { SCALES, updatePreferences, usePreferences } from "../preferences";
+import { Keys } from "./Keys";
 import { Caption, type Row, Rows } from "./Rows";
 import { Sources } from "./Sources";
 
@@ -73,6 +74,15 @@ function useSections(asking?: number): Section[] {
       caption: "Sources",
       rows: [],
       body: <Sources asking={asking} />,
+    },
+    {
+      id: "keys",
+      group: "Library",
+      title: "Destination Keys",
+      glyph: "keyboard",
+      caption: "Destination Keys",
+      rows: [],
+      body: <Keys />,
     },
   ];
 }

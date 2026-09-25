@@ -68,6 +68,9 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
     const { why, clash, path } = news.refused;
     return <Band sentence={refusalSentence(why, clash)} path={path} onDismiss={dismiss} />;
   }
+  if (news.kind === "keyRefused") {
+    return <Band sentence={news.line} detail={news.detail} onDismiss={dismiss} />;
+  }
   if (rail) {
     return (
       <div className="grid place-items-center border-line border-t py-1.5">

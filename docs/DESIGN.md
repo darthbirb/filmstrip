@@ -69,6 +69,10 @@ typography:
     fontSize: 0.625rem
     lineHeight: "1"
     fontWeight: 600
+  key:
+    fontFamily: IBM Plex Mono
+    fontSize: 0.6875rem
+    lineHeight: "1"
   wordmark:
     fontFamily: Archivo
     fontSize: 0.875rem
@@ -122,6 +126,7 @@ spacing:
   tile-inset: 0.5rem
   heading: 1.5rem
   tile-caption: 1.3125rem
+  count: 3.25rem
   ghost-thumb: 1.5rem
   strip: 6rem
   strip-inset: 0.375rem
@@ -579,6 +584,18 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   the count, Move to… and × never leave.
 - **Dismiss.** A quiet `control` square holding ×, `fg-dim` with no ring at rest, the `wash` under
   the pointer: the way to put something away.
+- **Key chip.** A destination key drawn as a key: its digit in `--font-mono` at `key` in `fg-mid`,
+  a `badge` square at the `badge` corner on `inset` in a `line-control` ring. It sits beside a
+  tree row's count and sinks into a plated row as the count does, on `on-plate-wash` in
+  `on-plate-dim`; a key whose folder has gone is `danger` in a `line-danger` ring. A menu row can
+  lead with one in place of its glyph, as the list of keys does, or end with its digit alone in
+  `small` mono `fg-dim`, as Assign Key… says the key its folder holds.
+- **Place button.** A folder as a button that picks another: `bar-field` tall at the `nested`
+  corner on `raised` in a `line-control` ring, the filled folder in `fg-dim`, the name in `ui` `fg`,
+  the folder it is in after it in `small` `fg-dim`, and a caret at its end. With nothing chosen it
+  has no ground and reads Choose Folder… in `fg-dim` with the Move to… glyph; for a folder that has
+  gone it is `danger` in a `line-danger` ring with the dashed folder. A destination key's row in
+  Settings is the key chip, this, the count right-aligned in a `count` column, and a dismiss.
 - **Drag ghost.** One `control`-tall line following the pointer, `--ghost-x` and `--ghost-y` from
   its tip: `veil` glass at the `control` corner in a `line-control-hi` ring, with the overlay
   shadow. It holds the top file's picture as a `ghost-thumb` square at the `badge` corner, the
@@ -679,8 +696,9 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   its control. A section whose body is its own, as Sources is, can close with a caption of its
   own over such rows.
 - **Band.** What could not be done, at the foot of the panel it was asked from: a sentence, the
-  folder's path under it in `--font-mono`, and a dismiss, on a `danger-wash` ground. There is only
-  ever one, and a second refusal replaces it rather than stacking.
+  folder's path under it in `--font-mono` or why in `small` `fg-dim`, and a dismiss, on a
+  `danger-wash` ground. There is only ever one, and a second refusal replaces it rather than
+  stacking.
 - **Line.** What an act did, in the Band's slot and shape without its alarm: a `glyph` in `fg-dim`
   (a check after an act, the undo arrow after an undo), the sentence in `ui`, the way back under it
   as a raised Undo button, and a dismiss. It shares the one slot with the Band, and the newest of

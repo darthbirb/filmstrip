@@ -20,6 +20,7 @@ migration arrives with the feature that needs it and is never edited once shippe
 | `setting` | Key-value pairs. |
 | `journal` | Every change the app made on disk, with what reverses it, grouped into batches. |
 | `job` | Background work: waiting, running, or failed with its error. |
+| `destination_key` | A digit, `0` to `9`, bound to a folder that a press moves files into. |
 
 ## Where things live on disk
 
@@ -91,7 +92,16 @@ migration arrives with the feature that needs it and is never edited once shippe
   as it comes back, so a batch that came back in part keeps exactly the rows that stayed.
 - Nothing prunes the journal yet.
 
+## Destination keys
+
+- A key names a folder, not a path, so a rename or a move keeps it.
+- One folder per key and one key per folder: binding a key takes it from the folder that held it,
+  and frees any other key the new folder held.
+- A folder retired by a delete or a walk keeps its row, so its key stays, reported gone; an undo
+  that brings the folder back makes it work again. A folder deleted outright, as removing its
+  source does, takes its key with it.
+- Binding is not journalled, as a favourite is not.
+
 ## Not here yet
 
-Search indexes and destination hotkeys each arrive as a new migration alongside the feature that
-uses them.
+Search indexes arrive as a new migration alongside the feature that uses them.

@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { AddOutcome } from "./bindings/AddOutcome";
 import type { Batch } from "./bindings/Batch";
 import type { Contents } from "./bindings/Contents";
+import type { DestinationKey } from "./bindings/DestinationKey";
 import type { EffectiveTag } from "./bindings/EffectiveTag";
 import type { Failure } from "./bindings/Failure";
 import type { FavouritePlace } from "./bindings/FavouritePlace";
@@ -96,6 +97,14 @@ export const setFolderFavorite = (folderId: number, favorite: boolean) =>
   invoke<void>("set_folder_favorite", { folderId, favorite });
 
 export const favouritePlaces = () => invoke<FavouritePlace[]>("favourite_places");
+
+export const destinationKeys = () => invoke<DestinationKey[]>("destination_keys");
+
+export const setDestinationKey = (key: string, folderId: number) =>
+  invoke<void>("set_destination_key", { key, folderId });
+
+export const removeDestinationKey = (key: string) =>
+  invoke<void>("remove_destination_key", { key });
 
 export const folderItems = (folderId: number) => invoke<ItemRow[]>("folder_items", { folderId });
 

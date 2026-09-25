@@ -3,6 +3,7 @@ import { Fragment, type KeyboardEvent, useEffect, useLayoutEffect, useRef, useSt
 import { formatCount } from "../lib/format";
 import { Glyph } from "./Glyph";
 import type { GlyphName } from "./glyphs";
+import { KeyChip } from "./KeyChip";
 import { type HeadedMenu, useContextMenu } from "./Menu";
 import { PushDown } from "./PushDown";
 
@@ -16,6 +17,8 @@ export type TreeRow = {
   glyph?: GlyphName;
   /** How many items the row's own place holds; none at all shows no pill. */
   count?: number;
+  /** The destination key bound to the row's folder, drawn beside the count. */
+  key?: string;
   /** Quieter words right after the name, as a favourite says which folder it is in. */
   note?: string;
   /** Muted words at the row's end, where a count would be: why the row is muted. */
@@ -222,6 +225,7 @@ export function Tree({
               ) : (
                 <span className="min-w-0 flex-1 truncate">{row.label}</span>
               )}
+              {row.key !== undefined && <KeyChip digit={row.key} plated={selected} />}
               {row.count !== undefined && (
                 <span
                   className={`flex h-badge shrink-0 items-center rounded-badge px-1.5 text-small tabular-nums ${selected ? "bg-on-plate-wash text-on-plate" : "bg-raised text-fg-mid inset-ring inset-ring-line-control"}`}

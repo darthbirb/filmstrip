@@ -14,6 +14,7 @@ use crate::db::folders::{self, FolderEntry, FolderNode};
 use crate::db::items::{self, ItemDetail, ItemRow};
 use crate::db::jobs::{self as job_table, Failure};
 use crate::db::journal;
+use crate::db::keys;
 use crate::db::sources::{self, Refusal, Source, SourceKind};
 use crate::db::tags::{self, EffectiveTag};
 use crate::error::{AppError, Result};
@@ -474,6 +475,65 @@ pub fn favourites(conn: &Connection) -> Result<Vec<FavouritePlace>> {
             .unwrap_or_default()
     });
     Ok(places)
+}
+
+/// A digit bound to a folder, as navigation, Settings and a press read it: the way down to the
+/// folder, the files directly in it, and whether it is gone or its source is away.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct DestinationKey {
+    /// One digit, `0` to `9`.
+    pub key: String,
+    pub folder_id: i64,
+    pub source_id: i64,
+    /// From the source's own folder, by the source's title, down to the folder, gone or not.
+    pub path: Vec<folders::Crumb>,
+    pub item_count: i64,
+    /// Retired by a delete or a walk; the key stays, since an undo can bring the folder back.
+    pub gone: bool,
+    pub reachable: bool,
+}
+
+#[tauri::command]
+pub async fn destination_keys(state: State<'_, AppState>) -> Result<Vec<DestinationKey>> {
+    run(&state, destination_key_list).await
+}
+
+/// Binds a key, taking it from any folder that held it; not journalled, as a favourite is not.
+#[tauri::command]
+pub async fn set_destination_key(
+    state: State<'_, AppState>,
+    key: String,
+    folder_id: i64,
+) -> Result<()> {
+    run(&state, move |conn| keys::set(conn, &key, folder_id)).await
+}
+
+#[tauri::command]
+pub async fn remove_destination_key(state: State<'_, AppState>, key: String) -> Result<()> {
+    run(&state, move |conn| keys::remove(conn, &key)).await
+}
+
+/// Every bound key, 1 to 9 and then 0.
+pub fn destination_key_list(conn: &Connection) -> Result<Vec<DestinationKey>> {
+    keys::list(conn)?
+        .into_iter()
+        .map(|binding| {
+            let source_id = folders::location(conn, binding.folder_id)?.source_id;
+            let reachable = sources::get(conn, source_id)?
+                .is_some_and(|source| Path::new(&source.root).is_dir());
+            Ok(DestinationKey {
+                key: binding.key,
+                folder_id: binding.folder_id,
+                source_id,
+                path: folders::ancestry(conn, binding.folder_id)?,
+                item_count: binding.item_count,
+                gone: binding.gone,
+                reachable,
+            })
+        })
+        .collect()
 }
 
 /// What the trash holds, the most recent first, each with the folder it left.
@@ -1007,6 +1067,54 @@ mod tests {
             titles(&favourites(&conn).unwrap()),
             ["Cairo", "Lisbon", "Pictures"]
         );
+    }
+
+    #[test]
+    fn a_key_follows_its_folder_through_a_move_goes_with_a_delete_and_comes_back_with_its_undo() {
+        let base = scratch("destination-keys");
+        let app = app_dir(&base);
+        let library = base.join("Pictures");
+        std::fs::create_dir_all(library.join("Trips/Lisbon")).unwrap();
+        std::fs::create_dir_all(library.join("People")).unwrap();
+        std::fs::write(library.join("Trips/Lisbon/tram.jpg"), "t").unwrap();
+        let conn = conn();
+        register(&conn, &library, &app).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let [summary] = source_summaries(&conn).unwrap().try_into().unwrap();
+        let root = summary.root_folder_id;
+        let trips = folders::child_id(&conn, root, "Trips").unwrap().unwrap();
+        let people = folders::child_id(&conn, root, "People").unwrap().unwrap();
+        let lisbon = folders::child_id(&conn, trips, "Lisbon").unwrap().unwrap();
+        keys::set(&conn, "1", lisbon).unwrap();
+
+        let titles = |conn: &Connection| -> Vec<String> {
+            let [key] = destination_key_list(conn).unwrap().try_into().unwrap();
+            key.path.iter().map(|crumb| crumb.title.clone()).collect()
+        };
+        assert_eq!(titles(&conn), ["Pictures", "Trips", "Lisbon"]);
+        let [key] = destination_key_list(&conn).unwrap().try_into().unwrap();
+        assert_eq!((key.item_count, key.gone, key.reachable), (1, false, true));
+
+        fs_folders::move_into(&conn, lisbon, people, &journal::new_batch()).unwrap();
+        assert_eq!(
+            titles(&conn),
+            ["Pictures", "People", "Lisbon"],
+            "the key names the folder"
+        );
+
+        let batch = journal::new_batch();
+        fs_folders::delete(&conn, lisbon, Some(Contents::Trash), &batch).unwrap();
+        let [gone] = destination_key_list(&conn).unwrap().try_into().unwrap();
+        assert!(gone.gone, "kept, and marked gone");
+        undo::undo_batch(&conn, &batch).unwrap();
+        let [back] = destination_key_list(&conn).unwrap().try_into().unwrap();
+        assert!(
+            !back.gone,
+            "the undo brought the folder back, and its key works again"
+        );
+
+        sources::remove(&conn, summary.source.id).unwrap();
+        assert!(destination_key_list(&conn).unwrap().is_empty());
     }
 
     #[test]

@@ -9,6 +9,7 @@ import { DEFAULT_LAYOUT } from "./grid/layout";
 import { Notices } from "./grid/Notices";
 import { SelectionBar } from "./grid/SelectionBar";
 import { TileSize } from "./grid/TileSize";
+import { useDestinationKeys } from "./keys";
 import { addFolder } from "./navigation/add-source";
 import { Breadcrumb } from "./navigation/Breadcrumb";
 import { DeleteQuestion } from "./navigation/delete-folder";
@@ -37,6 +38,7 @@ export function App() {
   const full = useFullScreen();
   useEscapeLeavesFullScreen();
   useUndoKey();
+  useDestinationKeys();
 
   return (
     <div className="flex h-dvh flex-col bg-ground text-fg">

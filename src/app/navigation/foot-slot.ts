@@ -8,6 +8,8 @@ export type Refused = { why: Refusal; clash: string | null; path: string };
 /** What just happened at the person's request, as the foot of navigation says it. */
 export type FootNews =
   | { kind: "refused"; refused: Refused }
+  /** A destination key that moved nothing, and why. */
+  | { kind: "keyRefused"; line: string; detail?: string }
   /** An act that changed the disk, and the batch its Undo takes back. */
   | { kind: "done"; line: string; batchId: string }
   | { kind: "undone"; line: string }

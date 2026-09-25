@@ -1,19 +1,29 @@
 import { useEffect, useRef, useState } from "react";
 
+import type { DestinationKey } from "../../ipc/bindings/DestinationKey";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import {
   createFolder,
   readFolderAgain,
+  removeDestinationKey,
   renameFolder,
   renameSource,
   revealFolder,
   revealSource,
+  setDestinationKey,
   setFolderFavorite,
 } from "../../ipc/commands";
-import type { HeadedMenu, MenuAction, MenuGroups } from "../../ui/Menu";
+import {
+  ContextMenu,
+  type HeadedMenu,
+  type MenuAction,
+  type MenuAnchor,
+  type MenuGroups,
+} from "../../ui/Menu";
 import { Tree, type TreeRow } from "../../ui/Tree";
 import { type Landing, type Resolver, setDropResolver, useDrag } from "../grid/drag";
+import { DIGITS } from "../keys";
 import { libraryChanged } from "../library";
 import { openMovePicker } from "../pane/move-picker";
 import { type Place, setPlace, usePlace } from "../place";
@@ -45,7 +55,8 @@ import {
 
 /** The Sorting Box and the Trash, then each library source with its folders opening in place. DECISIONS.md "Navigation". */
 export function Navigation() {
-  const { sources, children, trash, favourites } = useIndex();
+  const { sources, children, trash, favourites, keys } = useIndex();
+  const [keying, setKeying] = useState<Keying | null>(null);
   const place = usePlace();
   const expanded = useOpenFolders();
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -94,6 +105,14 @@ export function Navigation() {
       addFolderRows(walk, at.path, 2);
     }
   });
+
+  // A bound folder's rows carry its key, wherever the folder shows: its own row and its favourite.
+  const keyOf = new Map(keys.filter((one) => !one.gone).map((one) => [one.folderId, one.key]));
+  for (const row of rows) {
+    const folder = rowFolder(row.id);
+    const key = folder === undefined ? undefined : keyOf.get(folder);
+    if (key !== undefined) row.key = key;
+  }
 
   const setOpen = (id: string, open: boolean) => {
     const folder = rowFolder(id);
@@ -174,8 +193,21 @@ export function Navigation() {
           .then(() => refreshIndex())
           .catch(() => undefined),
     };
+    // Opens the ten keys against the row, which the menu has handed the focus back to.
+    const title = path.at(-1)?.title ?? source.title;
+    const assign: MenuAction = {
+      id: "assign-key",
+      label: "Assign Key…",
+      glyph: "keyboard",
+      trail: keyOf.get(folder),
+      onSelect: () => {
+        const element = document.activeElement;
+        const anchor = element instanceof HTMLElement ? { element } : { x: 0, y: 0 };
+        setKeying({ folder, title, anchor });
+      },
+    };
     if (folder === source.rootFolderId) {
-      return { heading: "Source", groups: sourceMenu(source, rename, newFolder, star) };
+      return { heading: "Source", groups: sourceMenu(source, rename, newFolder, star, assign) };
     }
     // Nothing on it can act on a folder whose drive is away, and an empty menu opens nothing.
     if (!source.reachable) return { groups: [] };
@@ -201,7 +233,7 @@ export function Navigation() {
     };
     return {
       groups: [
-        [newFolder, star, moveTo],
+        [newFolder, star, assign, moveTo],
         [revealFolderRow(folder), renameRow(rename), readAgainRow(folder)],
         [remove],
       ],
@@ -251,32 +283,76 @@ export function Navigation() {
   };
 
   return (
-    <Tree
-      label="Places"
-      rows={rows}
-      selectedId={selectedRowId(place)}
-      onSelect={(id) => {
-        const target = places.get(id);
-        if (target) setPlace(target);
-      }}
-      onExpand={(id) => setOpen(id, true)}
-      onCollapse={(id) => setOpen(id, false)}
-      menuFor={menuFor}
-      accepting={drag?.over?.landing.kind === "accept" ? drag.over.rowId : null}
-      renaming={
-        renaming
-          ? {
-              id: renaming,
-              onCommit: (name) => void (draft ? make(draft, name) : rename(renaming, name)),
-              fresh: draft !== null,
-              onCancel: stopRenaming,
-              taken,
-              onEdit: () => setTaken(null),
-            }
-          : null
-      }
-    />
+    <>
+      {keying && (
+        <ContextMenu
+          label={`Key for ${keying.title}`}
+          heading={`Key for ${keying.title}`}
+          groups={keyGroups(keys, keying.folder)}
+          anchor={keying.anchor}
+          onClose={() => setKeying(null)}
+        />
+      )}
+      <Tree
+        label="Places"
+        rows={rows}
+        selectedId={selectedRowId(place)}
+        onSelect={(id) => {
+          const target = places.get(id);
+          if (target) setPlace(target);
+        }}
+        onExpand={(id) => setOpen(id, true)}
+        onCollapse={(id) => setOpen(id, false)}
+        menuFor={menuFor}
+        accepting={drag?.over?.landing.kind === "accept" ? drag.over.rowId : null}
+        renaming={
+          renaming
+            ? {
+                id: renaming,
+                onCommit: (name) => void (draft ? make(draft, name) : rename(renaming, name)),
+                fresh: draft !== null,
+                onCancel: stopRenaming,
+                taken,
+                onEdit: () => setTaken(null),
+              }
+            : null
+        }
+      />
+    </>
   );
+}
+
+/** A folder the key menu is open for, and the row it opened against. */
+type Keying = { folder: number; title: string; anchor: MenuAnchor };
+
+/**
+ * The ten keys, each with the folder it is on, this folder's own on the plate, then No Key.
+ * Picking a key another folder holds moves it, with no question. Artboards › Destination keys.
+ */
+function keyGroups(keys: readonly DestinationKey[], folder: number): MenuGroups {
+  const own = keys.find((one) => one.folderId === folder);
+  const bind = (work: Promise<void>) => void work.then(() => refreshIndex()).catch(() => undefined);
+  const digits: MenuAction[] = DIGITS.map((digit) => {
+    const held = keys.find((one) => one.key === digit);
+    const name = held?.path.at(-1)?.title;
+    return {
+      id: `key-${digit}`,
+      label: !held ? "Free" : held.gone ? `${name} · gone` : (name ?? ""),
+      chip: digit,
+      chosen: held?.folderId === folder,
+      quiet: !held || held.gone,
+      onSelect: () => bind(setDestinationKey(digit, folder)),
+    };
+  });
+  const none: MenuAction = {
+    id: "no-key",
+    label: "No Key",
+    glyph: "close",
+    onSelect: () => {
+      if (own) bind(removeDestinationKey(own.key));
+    },
+  };
+  return [digits, [none]];
 }
 
 /**
@@ -289,6 +365,7 @@ function sourceMenu(
   rename: () => void,
   newFolder: MenuAction,
   star: MenuAction,
+  assign: MenuAction,
 ): MenuGroups {
   const folder = source.rootFolderId;
   const reveal: MenuAction = {
@@ -300,7 +377,7 @@ function sourceMenu(
   const naming = renameRow(rename);
   // New Folder is on it because a source's row is the only row that stands for its top level.
   return [
-    source.reachable ? [newFolder, star] : [star],
+    source.reachable ? [newFolder, star, assign] : [star, assign],
     source.reachable ? [reveal, naming, readAgainRow(folder)] : [naming],
     [
       {

@@ -106,6 +106,15 @@ export function checkAll(order: readonly number[] = held.listed.map((row) => row
   set({ ids: [...order], anchor: held.selection.anchor });
 }
 
+/** The checked files as the grid lists them, and the grid's whole list. */
+export function getChecked() {
+  const byId = new Map(held.listed.map((row) => [row.id, row]));
+  return {
+    checked: held.selection.ids.flatMap((id) => byId.get(id) ?? []),
+    listed: held.listed,
+  };
+}
+
 /** The checked files as the grid lists them, in the order they were checked. */
 export function useChecked(): readonly ItemRow[] {
   const now = useSyncExternalStore(subscribe, () => held);
