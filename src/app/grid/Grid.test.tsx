@@ -142,7 +142,7 @@ test("a double-clicked picture takes the window, where a single click only shows
   expect(getFullScreen()).toBe(true);
 });
 
-test("Enter on the tile the keyboard is on takes the window too", async () => {
+test("Enter on the tile the keyboard is on shows it in the pane, and the window stays", async () => {
   serve(6);
   const screen = await renderGrid("justified");
   const third = screen.getByRole("button", { name: "item-2.png" });
@@ -151,7 +151,7 @@ test("Enter on the tile the keyboard is on takes the window too", async () => {
 
   await userEvent.keyboard("{Enter}");
   expect(getPaneItem()).toBe(3);
-  expect(getFullScreen()).toBe(true);
+  expect(getFullScreen()).toBe(false);
 });
 
 test("an empty place says which kind of empty it is, in its own words", async () => {

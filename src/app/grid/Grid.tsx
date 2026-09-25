@@ -1,5 +1,6 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import {
+  type KeyboardEvent,
   type MouseEvent,
   type ReactElement,
   type RefObject,
@@ -24,8 +25,15 @@ import { showInPane, usePaneItem } from "../pane/pane-store";
 import { type Place, usePlace } from "../place";
 import { usePreferences } from "../preferences";
 import { EmptyPlace } from "./EmptyPlace";
+import { rowOf, step } from "./keys";
 import { type LayoutMode, rowAt } from "./layout";
-import { checkRange, keepChecked, toggleChecked, useSelection } from "./selection";
+import {
+  checkRange,
+  keepChecked,
+  toggleChecked,
+  useSelection,
+  useSelectionKeys,
+} from "./selection";
 import { tileSize } from "./TileSize";
 import { useGridItems } from "./useGridItems";
 import { useLayout } from "./useLayout";
@@ -56,11 +64,57 @@ export function Grid({ mode }: { mode: LayoutMode }) {
   const selection = useSelection();
   const checked = new Set(selection.ids);
   const order = useMemo(() => (items ?? []).map((item) => item.id), [items]);
+  const indexOf = useMemo(() => new Map(order.map((id, index) => [id, index])), [order]);
+  useSelectionKeys(order);
+
+  // The grid is one tab stop: the tile the ring is on, else the one in the pane, else the first.
+  const [ringed, setRinged] = useState<number | null>(null);
+  const ring = [ringed, inPane, order[0]].find((id) => id != null && indexOf.has(id)) ?? null;
+  const focusing = useRef<number | null>(null);
 
   // A file that leaves the grid leaves the set. Artboards › Selecting.
   useEffect(() => {
     if (items) keepChecked(order);
   }, [items, order]);
+
+  // Once the ring has moved, its tile scrolls into view and takes the focus.
+  useLayoutEffect(() => {
+    const id = focusing.current;
+    const element = scroller.current;
+    const index = id === null ? undefined : indexOf.get(id);
+    if (index === undefined || !element || !result) return;
+    focusing.current = null;
+    const row = rowOf(result, index);
+    const top = (result.rowTops[row] ?? 0) + gap;
+    const bottom = top + (result.rowHeights[row] ?? 0) + (sections?.below ?? 0);
+    if (top - gap < element.scrollTop) element.scrollTop = top - gap;
+    else if (bottom + gap > element.scrollTop + element.clientHeight) {
+      element.scrollTop = bottom + gap - element.clientHeight;
+    }
+    element.querySelector<HTMLElement>(`[data-item="${id}"]`)?.focus({ preventScroll: true });
+  });
+
+  // The arrows move the ring and nothing else; Space is the box and Enter shows the tile.
+  const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    const from = Number(target?.dataset.item);
+    const index = indexOf.get(from);
+    if (index === undefined || !result || event.altKey || event.metaKey || event.ctrlKey) return;
+    if (event.key === " " || event.key === "Enter") {
+      event.preventDefault();
+      if (event.shiftKey) return;
+      if (event.key === " ") toggleChecked(from);
+      else showInPane(from, place);
+      return;
+    }
+    const next = step(result, order.length, index, event.key, view.height);
+    const to = next === null ? undefined : order[next];
+    if (to === undefined) return;
+    event.preventDefault();
+    if (event.shiftKey) checkRange(order, to, false, from);
+    setRinged(to);
+    focusing.current = to;
+  };
 
   // A modified click changes only the set, and the pane stays where it is.
   const check = (event: MouseEvent, id: number) => {
@@ -70,33 +124,46 @@ export function Grid({ mode }: { mode: LayoutMode }) {
 
   const tiles: ReactElement[] = [];
   if (items && result) {
+    const draw = (index: number, row: number) => {
+      const item = items[index];
+      if (!item) return;
+      tiles.push(
+        <Tile
+          key={item.id}
+          item={item}
+          from={place}
+          shown={item.id === inPane}
+          checked={checked.has(item.id)}
+          boxes={checked.size > 0}
+          ringed={item.id === ring}
+          onCheck={check}
+          onRing={setRinged}
+          onKeyDown={onKeyDown}
+          left={(result.itemLeft[index] ?? 0) + gap}
+          top={(result.rowTops[row] ?? 0) + gap}
+          width={result.itemWidth[index] ?? 0}
+          height={result.rowHeights[row] ?? 0}
+          origin={trashed?.[index]?.from}
+          below={sections?.below ?? 0}
+        />,
+      );
+    };
     // A screen's height above and below is drawn ahead of the scroll, so a fling never shows gaps.
     const first = rowAt(result.rowTops, result.rows, view.top - view.height);
-    const last = rowAt(result.rowTops, result.rows, view.top + view.height * 2);
-    for (let row = first; row <= last && row < result.rows; row += 1) {
+    const last = Math.min(
+      rowAt(result.rowTops, result.rows, view.top + view.height * 2),
+      result.rows - 1,
+    );
+    for (let row = first; row <= last; row += 1) {
       const start = result.rowStart[row] ?? 0;
-      const end = start + (result.rowLength[row] ?? 0);
-      for (let index = start; index < end && index < items.length; index += 1) {
-        const item = items[index];
-        if (!item) continue;
-        tiles.push(
-          <Tile
-            key={item.id}
-            item={item}
-            from={place}
-            shown={item.id === inPane}
-            checked={checked.has(item.id)}
-            boxes={checked.size > 0}
-            onCheck={check}
-            left={(result.itemLeft[index] ?? 0) + gap}
-            top={(result.rowTops[row] ?? 0) + gap}
-            width={result.itemWidth[index] ?? 0}
-            height={result.rowHeights[row] ?? 0}
-            origin={trashed?.[index]?.from}
-            below={sections?.below ?? 0}
-          />,
-        );
-      }
+      const end = Math.min(start + (result.rowLength[row] ?? 0), items.length);
+      for (let index = start; index < end; index += 1) draw(index, row);
+    }
+    // The ringed tile is drawn wherever the scroll is, so the focus is never dropped with it.
+    const at = ring === null ? undefined : indexOf.get(ring);
+    if (at !== undefined) {
+      const row = rowOf(result, at);
+      if (row < first || row > last) draw(at, row);
     }
   }
 
@@ -211,7 +278,11 @@ type TileProps = {
   checked: boolean;
   /** Something is checked, so every tile shows its box. */
   boxes: boolean;
+  /** The grid's one tab stop. */
+  ringed: boolean;
   onCheck: (event: MouseEvent, id: number) => void;
+  onRing: (id: number) => void;
+  onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
   left: number;
   top: number;
   width: number;
@@ -223,7 +294,7 @@ type TileProps = {
 };
 
 function Tile(props: TileProps) {
-  const { item, from, shown, checked, boxes, onCheck } = props;
+  const { item, from, shown, checked, boxes, ringed, onCheck, onRing, onKeyDown } = props;
   const { left, top, width, height, origin, below } = props;
   // Opening it moves nothing: the pane keeps what it shows until a verb says otherwise.
   const context = useContextMenu();
@@ -237,6 +308,10 @@ function Tile(props: TileProps) {
       <button
         type="button"
         aria-label={item.diskName}
+        data-item={item.id}
+        tabIndex={ringed ? 0 : -1}
+        onFocus={() => onRing(item.id)}
+        onKeyDown={onKeyDown}
         onContextMenu={(event) =>
           context.open(
             event,
@@ -252,13 +327,6 @@ function Tile(props: TileProps) {
         // Folded or hidden, the pane has no header to hold the control, so the tile is the way in.
         onDoubleClick={(event) => {
           if (event.ctrlKey || event.shiftKey) return;
-          showInPane(item.id, from);
-          setFullScreen(true);
-        }}
-        // The keyboard's own way in, so Enter is not left docking what a double-click opens whole.
-        onKeyDown={(event) => {
-          if (event.key !== "Enter" || event.ctrlKey || event.altKey || event.metaKey) return;
-          event.preventDefault();
           showInPane(item.id, from);
           setFullScreen(true);
         }}

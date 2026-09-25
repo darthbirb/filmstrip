@@ -5,6 +5,7 @@ import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
+import { getFullScreen, setFullScreen, useEscapeLeavesFullScreen } from "../pane/full-screen";
 import { getPaneItem, showInPane } from "../pane/pane-store";
 import { setPlace } from "../place";
 import { Grid } from "./Grid";
@@ -64,11 +65,14 @@ beforeEach(() => {
   inFolder(1);
   clearChecked();
   showInPane(101, null);
+  setFullScreen(false);
 });
 
 test("the box checks a file and the pane keeps what it shows; then every tile shows its box", async () => {
   await renderGrid();
-  expect(shownBoxes()).toBe(0);
+  // Only the box under the pointer shows while nothing is checked.
+  await userEvent.hover(tile(2));
+  await expect.poll(shownBoxes).toBe(1);
 
   await userEvent.click(box(2));
   await expect.element(box(2)).toBeChecked();
@@ -130,4 +134,76 @@ test("a checked file that leaves the grid leaves the set", async () => {
   held[1] = (held[1] ?? []).filter((row) => row.id !== 102);
   await emit("job-progress");
   await expect.poll(() => getSelection().ids).toEqual([101]);
+});
+
+const focused = () => (document.activeElement as HTMLElement | null)?.getAttribute("aria-label");
+const tabStops = () =>
+  [...document.querySelectorAll<HTMLElement>("figure button")].filter((tile) => tile.tabIndex === 0)
+    .length;
+
+test("the grid is one tab stop, on the tile in the pane, and the arrows move only the ring", async () => {
+  await renderGrid();
+  expect(tabStops()).toBe(1);
+  expect((tile(0).element() as HTMLElement).tabIndex).toBe(0);
+  (tile(0).element() as HTMLElement).focus();
+
+  await userEvent.keyboard("{ArrowRight}{ArrowRight}");
+  expect(focused()).toBe("item-2.png");
+  expect(tabStops()).toBe(1);
+  expect(getPaneItem()).toBe(101);
+  expect(getSelection().ids).toEqual([]);
+  await userEvent.keyboard("{End}");
+  expect(focused()).toBe("item-5.png");
+  await userEvent.keyboard("{Home}");
+  expect(focused()).toBe("item-0.png");
+});
+
+test("Space checks the ringed tile, and Shift with an arrow checks from the last one checked", async () => {
+  await renderGrid();
+  (tile(1).element() as HTMLElement).focus();
+  await userEvent.keyboard(" ");
+  expect(getSelection().ids).toEqual([102]);
+  expect(getPaneItem()).toBe(101);
+  await userEvent.keyboard("{Shift>}{ArrowRight}{ArrowRight}{/Shift}");
+  expect(getSelection().ids).toEqual([102, 103, 104]);
+  expect(focused()).toBe("item-3.png");
+  await userEvent.keyboard(" ");
+  expect(getSelection().ids).toEqual([102, 103]);
+});
+
+test("Ctrl+A checks the whole place and Escape clears it", async () => {
+  await renderGrid();
+  (tile(0).element() as HTMLElement).focus();
+  await userEvent.keyboard("{Control>}a{/Control}");
+  expect(getSelection().ids).toEqual([101, 102, 103, 104, 105, 106]);
+  await userEvent.keyboard("{Escape}");
+  expect(getSelection().ids).toEqual([]);
+});
+
+function LeavesFullScreen() {
+  useEscapeLeavesFullScreen();
+  return null;
+}
+
+test("in full screen the first Escape leaves it, and only the next one clears", async () => {
+  render(<LeavesFullScreen />);
+  await renderGrid();
+  await userEvent.click(box(0));
+  setFullScreen(true);
+  await userEvent.keyboard("{Escape}");
+  expect(getFullScreen()).toBe(false);
+  expect(getSelection().ids).toEqual([101]);
+  await userEvent.keyboard("{Escape}");
+  expect(getSelection().ids).toEqual([]);
+});
+
+test("Ctrl+A in a field selects its text and checks nothing", async () => {
+  await renderGrid();
+  const field = document.createElement("input");
+  field.value = "Cairo";
+  document.body.append(field);
+  field.focus();
+  await userEvent.keyboard("{Control>}a{/Control}");
+  expect(getSelection().ids).toEqual([]);
+  field.remove();
 });

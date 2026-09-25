@@ -30,6 +30,8 @@ export function SelectBox({ label, checked, shown, onClick }: Props) {
         aria-label={label}
         checked={checked}
         readOnly
+        // The focus stays where the keyboard left it: a box is never where the ring goes.
+        onMouseDown={(event) => event.preventDefault()}
         onClick={onClick}
         className="absolute inset-0 m-0 size-full opacity-0"
       />

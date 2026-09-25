@@ -351,6 +351,14 @@ it was made in**: going elsewhere clears it, a folder renamed or moved under you
 file that leaves the grid leaves the set, while one that arrives, by a walk or an undo, is never
 checked.
 
+**The grid is one tab stop, and the keyboard reaches all of it.** Tab lands on the tile in the
+pane, or the first; the arrows move the ring and nothing else, up and down keeping the column as
+near as the rows allow, and Home, End and the page keys go further. Space is the box, Shift with a
+move checks from the last one checked, and Enter shows the ringed tile in the pane; full screen is
+the tile's menu or a double-click. Ctrl+A checks the whole place, the tiles scrolled away too, and
+Escape clears it, after whatever else is open has closed. The ringed tile is drawn wherever the
+scroll is, so the focus is never dropped with it.
+
 **The Trash is a place like any folder, with two differences**, drawn by Claude Design and built
 on 25 September 2026. It runs newest first under a heading for each day something went, Today and
 Yesterday and then the date, and a day starts a row of its own; the minute is in the pane's

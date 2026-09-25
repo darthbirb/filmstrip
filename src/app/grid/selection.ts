@@ -1,5 +1,6 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 
+import { getFullScreen } from "../pane/full-screen";
 import { getPaneItem } from "../pane/pane-store";
 import { getPlace, type Place, whenPlaceChanges } from "../place";
 
@@ -80,9 +81,17 @@ export function toggleChecked(id: number) {
   set(toggled(held.selection, id));
 }
 
-/** Shift+click, and Ctrl+Shift+click to add; with nothing checked it runs from the pane's file. */
-export function checkRange(order: readonly number[], id: number, adds: boolean) {
-  set(ranged(held.selection, order, id, adds, getPaneItem()));
+/**
+ * Shift+click, and Ctrl+Shift+click to add; with nothing checked it runs from the pane's file, or
+ * from `from`, the tile Shift+arrow left.
+ */
+export function checkRange(
+  order: readonly number[],
+  id: number,
+  adds: boolean,
+  from = getPaneItem(),
+) {
+  set(ranged(held.selection, order, id, adds, from));
 }
 
 export function checkAll(order: readonly number[]) {
@@ -96,6 +105,33 @@ export function clearChecked() {
 /** Drops whatever is no longer in the grid. */
 export function keepChecked(present: readonly number[]) {
   set(pruned(held.selection, new Set(present)));
+}
+
+/**
+ * Ctrl+A takes the whole place and Escape clears it, from anywhere but a field or Settings. What
+ * is open closes first: a menu, a field, full screen. Artboards › Selecting.
+ */
+export function useSelectionKeys(order: readonly number[]) {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.altKey || event.metaKey) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest("input, textarea, select, [contenteditable], [role=menu], [popover]")) {
+        return;
+      }
+      if (document.querySelector("dialog[open]")) return;
+      if (event.key === "Escape" && !event.ctrlKey && !event.shiftKey) {
+        if (getFullScreen() || held.selection.ids.length === 0) return;
+        clearChecked();
+      } else if (event.key.toLowerCase() === "a" && event.ctrlKey && !event.shiftKey) {
+        event.preventDefault();
+        if (order.length > 0) checkAll(order);
+      }
+    };
+    // Before full screen's own Escape, so the press that leaves it is not also the one that clears.
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [order]);
 }
 
 function subscribe(listener: () => void) {
