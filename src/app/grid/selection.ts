@@ -4,6 +4,7 @@ import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { getFullScreen } from "../pane/full-screen";
 import { getPaneItem } from "../pane/pane-store";
 import { getPlace, type Place, whenPlaceChanges } from "../place";
+import { dragging } from "./drag";
 
 /** The files checked, in the order they were checked, and the one a range runs from. */
 export type Selection = { ids: readonly number[]; anchor: number | null };
@@ -143,7 +144,7 @@ export function useSelectionKeys(order: readonly number[]) {
       }
       if (document.querySelector("dialog[open]")) return;
       if (event.key === "Escape" && !event.ctrlKey && !event.shiftKey) {
-        if (getFullScreen() || held.selection.ids.length === 0) return;
+        if (getFullScreen() || dragging() || held.selection.ids.length === 0) return;
         clearChecked();
       } else if (event.key.toLowerCase() === "a" && event.ctrlKey && !event.shiftKey) {
         event.preventDefault();

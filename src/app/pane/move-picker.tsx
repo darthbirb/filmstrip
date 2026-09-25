@@ -213,7 +213,7 @@ function ancestors(folders: FolderEntry[], id: number) {
  * Moves the files and says what happened: the line at the foot for what went, the banner over
  * the grid for what did not. DECISIONS.md "Undo".
  */
-export async function moveFiles(itemIds: number[], to: FolderEntry) {
+export async function moveFiles(itemIds: number[], to: Pick<FolderEntry, "id" | "title">) {
   const moved = await moveItems(itemIds, to.id).catch(() => null);
   if (!moved) return;
   remember(to);
@@ -272,7 +272,7 @@ export async function moveFolderTo(
 }
 
 /** The picker's Recent: the newest place first, files and folders alike. */
-function remember(to: FolderEntry) {
+function remember(to: Pick<FolderEntry, "id">) {
   const recent = getPreferences().recent ?? [];
   updatePreferences({ recent: [to.id, ...recent.filter((id) => id !== to.id)].slice(0, RECENT) });
 }
