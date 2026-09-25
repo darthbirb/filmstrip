@@ -118,6 +118,12 @@ export function clearChecked() {
   set(NOTHING);
 }
 
+/** The one folder a set is in, or none when it spans several, as a set in the Sorting Box can. */
+export function oneFolder(rows: readonly { folderId: number }[]) {
+  const [first, ...rest] = rows;
+  return first && rest.every((row) => row.folderId === first.folderId) ? first.folderId : null;
+}
+
 /** What the grid now lists; whatever is checked and no longer in it is dropped. */
 export function keepChecked(listed: readonly ItemRow[]) {
   set(pruned(held.selection, new Set(listed.map((row) => row.id))), listed);

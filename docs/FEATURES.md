@@ -129,6 +129,6 @@ drawn. **Not started** — neither.
 | Three panels, splitters, folding, the rail | Built | |
 | The app's own window chrome | Built | |
 | Settings | Built, with Sources in it | |
-| The app's own right-click menus | Built in part | on a tile, a frame, the pane's picture, a folder and a source, every verb included; a selection's menu waits on selecting |
+| The app's own right-click menus | Built | on a tile, a set of checked tiles, a frame, the pane's picture, a folder and a source, every verb included |
 | A scrubber for very large folders | Backlogged | |
 | Compression review, duplicate detection, a storage screen, a tags screen | Not started | PRODUCT.md "Later" |

@@ -479,7 +479,7 @@ menu was already off everywhere but in a field, so until these a right-click, th
 Shift+F10 did nothing at all.
 
 - **A verb that does not exist yet is absent, never greyed.** A greyed row describes a feature at
-  the moment it refuses it. The menu for a selection waits on selecting. A rule only stands
+  the moment it refuses it. A rule only stands
   between two groups that both hold rows, so an absent verb leaves no stray line, and a menu with
   nothing in it opens nothing.
 - **What a drive that is away cannot do is absent too.** An offline source keeps Rename, Manage
@@ -490,6 +490,12 @@ Shift+F10 did nothing at all.
 - **Remove Source goes through the question Settings already asks.** It opens Sources with that
   source's row asking, Cancel focused. Forgetting a source drops the tags and notes on its files;
   a menu row must not do that in one press when the section that owns it asks first.
+- **A checked tile opens the set's menu, and right-clicking never changes the set.** It is counted
+  at its head, since it is the one menu that acts on more than one file, and holds the verbs that
+  mean something for a set: Favourite, Move to…, Copy, and Delete with the count again; in the
+  Trash, Restore and Restore to…. A tile with no check opens its own menu and the set stays
+  checked, as a drag from it would, and that menu acts on that tile alone, so its Delete never
+  reaches a tile out of sight.
 - **Opening a menu changes nothing.** The pane keeps what it shows until a verb in the menu says
   otherwise, and Full Screen on a tile is that verb. While the pane is in full screen every file's
   menu, a filmstrip frame's included, leads with the way out.

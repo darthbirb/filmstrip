@@ -12,7 +12,7 @@ import { deleteFiles } from "../pane/delete";
 import { openMovePicker } from "../pane/move-picker";
 import { restoreFiles } from "../pane/restore";
 import { usePlace } from "../place";
-import { checkAll, clearChecked, useChecked } from "./selection";
+import { checkAll, clearChecked, oneFolder, useChecked } from "./selection";
 
 /**
  * What acts on the files checked in the grid: a row of the grid's own column, under the pictures
@@ -36,12 +36,6 @@ export function SelectionBar() {
 type Piece = { id: string; node: ReactNode; action?: MenuAction; group?: number };
 
 const files = (count: number) => `${formatCount(count)} ${count === 1 ? "File" : "Files"}`;
-
-/** The one folder the set is in, or none when it spans several. */
-function oneFolder(rows: readonly ItemRow[]) {
-  const [first, ...rest] = rows;
-  return first && rest.every((row) => row.folderId === first.folderId) ? first.folderId : null;
-}
 
 function InLibrary({ rows }: { rows: readonly ItemRow[] }) {
   const ids = rows.map((row) => row.id);

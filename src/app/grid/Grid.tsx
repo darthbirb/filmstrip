@@ -15,11 +15,11 @@ import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import type { Origin } from "../../ipc/bindings/Origin";
 import type { Trashed } from "../../ipc/bindings/Trashed";
 import { formatDay, formatDuration } from "../../lib/format";
-import { useContextMenu } from "../../ui/Menu";
+import { type HeadedMenu, useContextMenu } from "../../ui/Menu";
 import { SelectBox } from "../../ui/SelectBox";
 import { SkeletonTile } from "../../ui/Skeleton";
 import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
-import { itemMenu } from "../menus/item-menu";
+import { itemMenu, setMenu } from "../menus/item-menu";
 import { setFullScreen } from "../pane/full-screen";
 import { showInPane, usePaneItem } from "../pane/pane-store";
 import { type Place, usePlace } from "../place";
@@ -31,6 +31,7 @@ import {
   checkRange,
   keepChecked,
   toggleChecked,
+  useChecked,
   useSelection,
   useSelectionKeys,
 } from "./selection";
@@ -63,6 +64,9 @@ export function Grid({ mode }: { mode: LayoutMode }) {
   const reading = place !== null && items === null;
   const selection = useSelection();
   const checked = new Set(selection.ids);
+  const checkedRows = useChecked();
+  // On a checked tile the set's menu; on any other, that tile's own, and the set is kept.
+  const setOf = () => setMenu(checkedRows, place?.kind === "trash");
   const order = useMemo(() => (items ?? []).map((item) => item.id), [items]);
   const indexOf = useMemo(() => new Map(order.map((id, index) => [id, index])), [order]);
   useSelectionKeys(order);
@@ -137,6 +141,7 @@ export function Grid({ mode }: { mode: LayoutMode }) {
           boxes={checked.size > 0}
           ringed={item.id === ring}
           onCheck={check}
+          setOf={setOf}
           onRing={setRinged}
           onKeyDown={onKeyDown}
           left={(result.itemLeft[index] ?? 0) + gap}
@@ -281,6 +286,8 @@ type TileProps = {
   /** The grid's one tab stop. */
   ringed: boolean;
   onCheck: (event: MouseEvent, id: number) => void;
+  /** The checked set's menu, which a right-click on a checked tile opens. */
+  setOf: () => HeadedMenu;
   onRing: (id: number) => void;
   onKeyDown: (event: KeyboardEvent<HTMLButtonElement>) => void;
   left: number;
@@ -294,7 +301,7 @@ type TileProps = {
 };
 
 function Tile(props: TileProps) {
-  const { item, from, shown, checked, boxes, ringed, onCheck, onRing, onKeyDown } = props;
+  const { item, from, shown, checked, boxes, ringed, onCheck, setOf, onRing, onKeyDown } = props;
   const { left, top, width, height, origin, below } = props;
   // Opening it moves nothing: the pane keeps what it shows until a verb says otherwise.
   const context = useContextMenu();
@@ -312,13 +319,18 @@ function Tile(props: TileProps) {
         tabIndex={ringed ? 0 : -1}
         onFocus={() => onRing(item.id)}
         onKeyDown={onKeyDown}
-        onContextMenu={(event) =>
-          context.open(
-            event,
-            item.diskName,
-            itemMenu(item, () => showInPane(item.id, from)),
-          )
-        }
+        onContextMenu={(event) => {
+          if (!checked) {
+            context.open(
+              event,
+              item.diskName,
+              itemMenu(item, () => showInPane(item.id, from)),
+            );
+            return;
+          }
+          const set = setOf();
+          context.open(event, set.heading ?? item.diskName, set.groups, set.heading);
+        }}
         aria-current={shown || undefined}
         onClick={(event) => {
           if (event.ctrlKey || event.shiftKey) onCheck(event, item.id);

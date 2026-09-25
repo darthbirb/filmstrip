@@ -2,8 +2,9 @@ import { beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { recording } from "../../dev/recording";
-import { folderItems, setItemFavorite, trashItems, undoLast } from "../../ipc/commands";
+import { folderItems, trashItems, undoLast } from "../../ipc/commands";
 import { formatBytes } from "../../lib/format";
+import { setFavourites } from "../favourites";
 import { setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { MovePickerHost } from "../pane/move-picker";
@@ -35,7 +36,8 @@ beforeEach(async () => {
   setPlace(CAIRO);
   clearChecked();
   showInPane(null);
-  await setItemFavorite(
+  // Through the app's own store, which remembers what was set before the index reads it again.
+  setFavourites(
     (await folderItems(6)).map((row) => row.id),
     false,
   );
@@ -115,7 +117,10 @@ test("Move to… moves the whole set, and the files that went leave it", async (
 test("Favourite on a mixed set makes every one a favourite, then offers to take it off all", async () => {
   await renderGrid();
   const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
-  await setItemFavorite([pyramid], true);
+  setFavourites([pyramid], true);
+  await expect
+    .poll(async () => (await folderItems(6)).find((row) => row.id === pyramid)?.favorite)
+    .toBe(true);
   await userEvent.click(box("pyramid.jpg"));
   await userEvent.click(box("sphinx.jpg"));
   await recording(async (calls) => {
@@ -192,4 +197,46 @@ test("at the grid's narrowest the count, Move to… and × stay, and the rest wa
   await userEvent.click(bar().getByRole("button", { name: "More" }).last());
   const rows = page.getByRole("menuitem").elements().map(words);
   expect(rows).toEqual(["Select All", "Favourite", "Copy", "Delete 3 Files"]);
+});
+
+const tile = (name: string) => page.getByRole("button", { name, exact: true });
+const menuRows = () => page.getByRole("menuitem").elements().map(words);
+
+test("right-clicking a checked tile opens the set's menu, counted, with the verbs a set has", async () => {
+  await renderGrid();
+  const ids = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
+  await userEvent.click(box("pyramid.jpg"));
+  await userEvent.click(box("sphinx.jpg"));
+  await userEvent.click(tile("sphinx.jpg"), { button: "right" });
+
+  await expect.element(page.getByRole("menu", { name: "2 Files" })).toBeVisible();
+  expect(menuRows()).toEqual(["Favourite", "Move to…", "Copy", "Delete 2 Files"]);
+  await recording(async (calls) => {
+    await userEvent.click(page.getByRole("menuitem", { name: "Delete 2 Files" }));
+    await expect
+      .poll(() => calls.find(([cmd]) => cmd === "trash_items")?.[1])
+      .toEqual({ itemIds: ids });
+  });
+});
+
+test("right-clicking a tile with no check opens its own menu, and the set stays checked", async () => {
+  await renderGrid();
+  await userEvent.click(box("pyramid.jpg"));
+  await userEvent.click(tile("felucca.mp4"), { button: "right" });
+
+  await expect.element(page.getByRole("menu", { name: "felucca.mp4" })).toBeVisible();
+  expect(menuRows()[0]).toBe("Full Screen");
+  expect(getSelection().ids).toEqual([await idOf("pyramid.jpg")]);
+});
+
+test("in the Trash the set's menu holds the way back under its count", async () => {
+  await trashItems([await idOf("pyramid.jpg"), await idOf("sphinx.jpg")]);
+  setPlace({ kind: "trash" });
+  await renderGrid();
+  await userEvent.click(box("pyramid.jpg"));
+  await userEvent.click(box("sphinx.jpg"));
+  await userEvent.click(tile("pyramid.jpg"), { button: "right" });
+
+  await expect.element(page.getByRole("menu", { name: "2 Files" })).toBeVisible();
+  expect(menuRows()).toEqual(["Restore", "Restore to…"]);
 });
