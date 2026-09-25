@@ -8,4 +8,8 @@ export type SourceSummary = { rootFolderId: number,
 /**
  * False when its directory cannot be read — an unplugged drive, say.
  */
-reachable: boolean, itemCount: number, totalBytes: number, id: number, root: string, title: string, kind: SourceKind, addedAt: number, };
+reachable: boolean, itemCount: number, totalBytes: number, 
+/**
+ * Whether its own folder is a favourite place.
+ */
+favorite: boolean, id: number, root: string, title: string, kind: SourceKind, addedAt: number, };

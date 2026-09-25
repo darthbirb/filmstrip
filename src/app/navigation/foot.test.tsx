@@ -24,6 +24,7 @@ const SOURCES: SourceSummary[] = [
     reachable: true,
     itemCount: 41_236,
     totalBytes: 0,
+    favorite: false,
   },
   {
     id: 2,
@@ -35,6 +36,7 @@ const SOURCES: SourceSummary[] = [
     reachable: true,
     itemCount: 3,
     totalBytes: 0,
+    favorite: false,
   },
 ];
 

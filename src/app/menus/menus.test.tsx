@@ -249,7 +249,7 @@ test("the verbs reach the commands they name, for the folder they were opened on
 });
 
 test("an offline source keeps what needs no drive, and an offline folder opens nothing", async () => {
-  const old: FolderNode = { id: 99, title: "Old", childCount: 0, itemCount: 0 };
+  const old: FolderNode = { id: 99, title: "Old", childCount: 0, itemCount: 0, favorite: false };
   await recording(
     async () => {
       resetIndex();

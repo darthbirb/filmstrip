@@ -4,6 +4,7 @@ import type { Batch } from "./bindings/Batch";
 import type { Contents } from "./bindings/Contents";
 import type { EffectiveTag } from "./bindings/EffectiveTag";
 import type { Failure } from "./bindings/Failure";
+import type { FavouritePlace } from "./bindings/FavouritePlace";
 import type { FolderDeleted } from "./bindings/FolderDeleted";
 import type { FolderEntry } from "./bindings/FolderEntry";
 import type { FolderMade } from "./bindings/FolderMade";
@@ -90,6 +91,11 @@ export const folderChildren = (folderId: number) =>
   invoke<FolderNode[]>("folder_children", { folderId });
 
 export const listFolders = () => invoke<FolderEntry[]>("list_folders");
+
+export const setFolderFavorite = (folderId: number, favorite: boolean) =>
+  invoke<void>("set_folder_favorite", { folderId, favorite });
+
+export const favouritePlaces = () => invoke<FavouritePlace[]>("favourite_places");
 
 export const folderItems = (folderId: number) => invoke<ItemRow[]>("folder_items", { folderId });
 

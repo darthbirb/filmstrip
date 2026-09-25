@@ -54,6 +54,8 @@ pub struct SourceSummary {
     pub reachable: bool,
     pub item_count: i64,
     pub total_bytes: i64,
+    /// Whether its own folder is a favourite place.
+    pub favorite: bool,
 }
 
 #[tauri::command]
@@ -415,6 +417,65 @@ pub async fn sorting_items(state: State<'_, AppState>) -> Result<Vec<ItemRow>> {
     .await
 }
 
+/// A folder or a source marked a favourite place, or not.
+#[tauri::command]
+pub async fn set_folder_favorite(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    favorite: bool,
+) -> Result<()> {
+    run(&state, move |conn| {
+        folders::set_favorite(conn, folder_id, favorite)
+    })
+    .await
+}
+
+/// A favourite place as navigation's group shows it: the way down to it, the files directly in
+/// it, and whether its source can be read.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct FavouritePlace {
+    pub folder_id: i64,
+    pub source_id: i64,
+    /// From the source's own folder, by the source's title, down to the place.
+    pub path: Vec<folders::Crumb>,
+    pub item_count: i64,
+    pub reachable: bool,
+}
+
+#[tauri::command]
+pub async fn favourite_places(state: State<'_, AppState>) -> Result<Vec<FavouritePlace>> {
+    run(&state, favourites).await
+}
+
+/// Every live favourite place, in name order.
+pub fn favourites(conn: &Connection) -> Result<Vec<FavouritePlace>> {
+    let mut places = folders::favourites(conn)?
+        .into_iter()
+        .map(|(folder_id, item_count)| {
+            let source_id = folders::location(conn, folder_id)?.source_id;
+            let reachable = sources::get(conn, source_id)?
+                .is_some_and(|source| Path::new(&source.root).is_dir());
+            Ok(FavouritePlace {
+                folder_id,
+                source_id,
+                path: folders::ancestry(conn, folder_id)?,
+                item_count,
+                reachable,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    places.sort_by_cached_key(|place| {
+        place
+            .path
+            .last()
+            .map(|crumb| crumb.title.to_lowercase())
+            .unwrap_or_default()
+    });
+    Ok(places)
+}
+
 /// What the trash holds, the most recent first, each with the folder it left.
 #[tauri::command]
 pub async fn trash_listing(state: State<'_, AppState>) -> Result<Vec<Trashed>> {
@@ -597,8 +658,10 @@ pub fn source_summaries(conn: &Connection) -> Result<Vec<SourceSummary>> {
         .into_iter()
         .map(|source| {
             let (item_count, total_bytes) = sources::item_stats(conn, source.id)?;
+            let root_folder_id = folders::source_root_folder(conn, source.id)?;
             Ok(SourceSummary {
-                root_folder_id: folders::source_root_folder(conn, source.id)?,
+                favorite: folders::is_favorite(conn, root_folder_id)?,
+                root_folder_id,
                 reachable: Path::new(&source.root).is_dir(),
                 item_count,
                 total_bytes,
@@ -893,6 +956,51 @@ mod tests {
             "{was}"
         );
         assert_eq!(last_path(&conn, 9_999).unwrap(), None);
+    }
+
+    #[test]
+    fn favourite_places_list_by_name_and_a_deleted_one_leaves_until_its_undo() {
+        let base = scratch("favourites");
+        let app = app_dir(&base);
+        let library = base.join("Pictures");
+        std::fs::create_dir_all(library.join("Trips/Lisbon")).unwrap();
+        std::fs::create_dir_all(library.join("Trips/Cairo")).unwrap();
+        std::fs::write(library.join("Trips/Cairo/pyramid.jpg"), "p").unwrap();
+        let conn = conn();
+        register(&conn, &library, &app).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let [summary] = source_summaries(&conn).unwrap().try_into().unwrap();
+        let trips = folders::child_id(&conn, summary.root_folder_id, "Trips")
+            .unwrap()
+            .unwrap();
+        let cairo = folders::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        let lisbon = folders::child_id(&conn, trips, "Lisbon").unwrap().unwrap();
+        folders::set_favorite(&conn, lisbon, true).unwrap();
+        folders::set_favorite(&conn, cairo, true).unwrap();
+        folders::set_favorite(&conn, summary.root_folder_id, true).unwrap();
+
+        let titles = |places: &[FavouritePlace]| -> Vec<String> {
+            places
+                .iter()
+                .map(|place| place.path.last().unwrap().title.clone())
+                .collect()
+        };
+        let listed = favourites(&conn).unwrap();
+        assert_eq!(titles(&listed), ["Cairo", "Lisbon", "Pictures"]);
+        assert_eq!(listed[0].item_count, 1);
+        assert!(listed[0].reachable);
+        let [source] = source_summaries(&conn).unwrap().try_into().unwrap();
+        assert!(source.favorite);
+        assert!(folders::children(&conn, trips).unwrap()[0].favorite);
+
+        let batch = journal::new_batch();
+        fs_folders::delete(&conn, lisbon, None, &batch).unwrap();
+        assert_eq!(titles(&favourites(&conn).unwrap()), ["Cairo", "Pictures"]);
+        undo::undo_batch(&conn, &batch).unwrap();
+        assert_eq!(
+            titles(&favourites(&conn).unwrap()),
+            ["Cairo", "Lisbon", "Pictures"]
+        );
     }
 
     #[test]
