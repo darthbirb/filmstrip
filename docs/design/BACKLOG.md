@@ -26,33 +26,6 @@ sheet. The drawing and what is built disagree by 2px at the one mark every check
 Draw the box a `tile-inset` in, as everything else on a tile is, on Components and on every
 Artboards tile; or, if 6px is meant, say why the box alone sits closer and name the value.
 
-## Two presses of a destination key are not drawn · DRAWN
-
-Artboards › Destination keys: Already in Lisbon, a set partly in Inbox, and a free key.
-
-Artboards › Destination keys draws a bound key and a broken one. It does not draw a key that is
-free, nor a key whose folder is the one the files are already in, which is the folder you stand
-in or, in the Sorting Box, a part of the set.
-
-A free key does nothing and says nothing, as a key with no meaning does elsewhere. A key for the
-files' own folder moves what is elsewhere and passes over the rest, and when nothing would move,
-says so in the refusal band, "Already in Lisbon", as the drag's refusing row does.
-
-## Destination hotkeys · DRAWN
-
-Artboards › Destination keys: the key on a row, Settings › Library, Assign Key…, and what a press
-says; Components › Right-click: Assign Key… on a folder's and a source's menu.
-
-PRODUCT.md keeps destination keys for the folders used most, and nothing draws them. ggallery
-bound a key to a folder, not a path, so the key survives the folder's rename and move, and kept a
-binding whose folder had gone, marked broken, since a delete can be undone. Its culler is cut.
-
-A press moves the selection, or the pane's file when nothing is checked, and says so in the
-move's own undo line. Bind keys in Settings › Library, a list of key, folder and its count, and
-from Assign Key… on a folder's menu. Show a bound folder's key on its row in navigation, and a
-broken binding in the red. Say which keys can be bound, and what a key already bound does when
-it is bound again.
-
 ## A folder's details · DRAWN
 
 The grid's header says only where you are. A folder has more to know, and nowhere to show it:

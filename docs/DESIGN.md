@@ -696,8 +696,9 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   its control. A section whose body is its own, as Sources is, can close with a caption of its
   own over such rows.
 - **Band.** What could not be done, at the foot of the panel it was asked from: a sentence, the
-  folder's path under it in `--font-mono`, and a dismiss, on a `danger-wash` ground. There is only
-  ever one, and a second refusal replaces it rather than stacking.
+  folder's path under it in `--font-mono` or why in `small` `fg-dim`, and a dismiss, on a
+  `danger-wash` ground. There is only ever one, and a second refusal replaces it rather than
+  stacking.
 - **Line.** What an act did, in the Band's slot and shape without its alarm: a `glyph` in `fg-dim`
   (a check after an act, the undo arrow after an undo), the sentence in `ui`, the way back under it
   as a raised Undo button, and a dismiss. It shares the one slot with the Band, and the newest of

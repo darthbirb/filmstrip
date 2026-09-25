@@ -235,11 +235,11 @@ function ancestors(folders: FolderEntry[], id: number) {
 
 /**
  * Moves the files and says what happened: the line at the foot for what went, the banner over
- * the grid for what did not. DECISIONS.md "Undo".
+ * the grid for what did not; and hands back the report. DECISIONS.md "Undo".
  */
 export async function moveFiles(itemIds: number[], to: Pick<FolderEntry, "id" | "title">) {
   const moved = await moveItems(itemIds, to.id).catch(() => null);
-  if (!moved) return;
+  if (!moved) return null;
   remember(to);
   const { batch, report } = moved;
   if (batch) afterAct(batch, report.refused.length);
@@ -265,6 +265,7 @@ export async function moveFiles(itemIds: number[], to: Pick<FolderEntry, "id" | 
       : null,
   );
   await libraryChanged();
+  return report;
 }
 
 /**

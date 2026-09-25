@@ -98,6 +98,10 @@ export async function startIndex() {
   }).catch(() => undefined);
 }
 
+export function getIndex() {
+  return snapshot;
+}
+
 export function useIndex() {
   return useSyncExternalStore(subscribe, () => snapshot);
 }

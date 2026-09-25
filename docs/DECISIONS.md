@@ -567,6 +567,16 @@ not an act on disk: it is not journalled and Ctrl+Z does not unbind. A key bound
 without a question, and a folder holds one key at most. A bound folder's rows carry the key
 beside the count; the rail, which holds no folders, carries none.
 
+**A press is Move to… that folder**, for what is checked, or for the file in the pane when nothing
+is: the same act, the same line after it and the same banner, since the key is how it was asked
+for and not a different act. When the pane's file goes, the pane moves on to the tile that took
+its place, as after a delete, so sorting a place is a press per picture. Files already in the
+folder are passed over without a word and only what moved is counted; when nothing would move,
+the foot says "Already in Lisbon." in the refusal band. A free key is silent, like any key the app
+does not use, but a key whose folder has gone did mean something, so its press says which key and
+where the folder was. A key does nothing in a field, over a menu or Settings, or in the Trash,
+whose only way out is Restore. The top row and the number pad are the same keys.
+
 ## Undo
 
 **Every change the app makes on disk is journalled and can be undone, across a restart**, ported
