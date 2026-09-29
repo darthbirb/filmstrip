@@ -16,15 +16,46 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## The selection box sits 6px in, where the token sheet says 8 · DEFECT
+## Typing a search · DRAWN
 
-Components › Selection checkbox puts the box 6px from the tile's top-right, and the Notes sheet's
-last pass leans on that 6px. The token sheet says what sits on a tile sits `tile-inset`, 0.5rem,
-from its corner, as the In Pane plate and the length plate do, and the build follows the token
-sheet. The drawing and what is built disagree by 2px at the one mark every checked tile carries.
+Components › Search field draws the field at rest and nothing else. Search is the next slice, and
+PRODUCT.md "Search" asks that terms scope by folder and by tag through visible controls, with the
+syntax as the fallback. A query's text is the whole state of a search: anything a control offers
+writes into that text rather than setting a hidden filter.
 
-Draw the box a `tile-inset` in, as everything else on a tile is, on Components and on every
-Artboards tile; or, if 6px is meant, say why the box alone sits closer and name the value.
+Draw the field focused, from a click and from a key (name the key), and while typing: a dropdown
+of suggestions that each write a term — folders by their path, tags, and labels as `Key: Value` —
+each saying what kind of term it is, since a value is never shown without its key. Draw the
+keyboard through the list, and the raw syntax typed by hand. Draw a finished query in the field
+as its terms, each removable: the terms are the parse, so what shows is what was understood.
+Draw a query that does not parse, an unclosed `(` or `"`: what the field says, and that the
+results stay where they were.
+
+## The results place · DRAWN
+
+A search is a place, as a folder, the Sorting Box and the Trash are. Nothing draws it.
+
+Draw the grid's header for it: the terms, how many files matched, and the way back out. Draw the
+folders that matched before the files, each with its cover, its parent, its count and the term it
+matched on, said as key and value. Draw each file saying where it lives, as a Trash tile says
+where it came from. Navigation has no row lit. Draw a trashed file among results, for a query
+that asks for `is:trashed`, and results that are only folders or only files.
+
+## Scoping to where you are · DRAWN
+
+"Nothing Matched" says "No file in Cairo matches", so a search typed inside a folder searches
+that folder. How that scope shows is not drawn. Since the query's text is the whole state, the
+scope is a `path:` term like any other.
+
+Draw the scope in the field, and both ways to widen it: Search Everywhere, and removing the term.
+Say what a search typed in the Sorting Box or the Trash covers.
+
+## Folders and tags as controls · DRAWN
+
+The controls that write a term are not drawn anywhere. Draw each: a tag or a label in the pane's
+details, a folder's right-click menu (Search in Folder), and a matched folder among results, where
+going into the folder and scoping the search to it are two different things. Say whether a click
+replaces the query or adds its term, and which modifier does the other.
 
 ## A folder's details · DRAWN
 
