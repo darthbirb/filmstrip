@@ -599,6 +599,13 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   has no ground and reads Choose Folder… in `fg-dim` with the Move to… glyph; for a folder that has
   gone it is `danger` in a `line-danger` ring with the dashed folder. A destination key's row in
   Settings is the key chip, this, the count right-aligned in a `count` column, and a dismiss.
+- **Search field.** The bar's field, `bar-field` tall at the `nested` corner. At rest it is the
+  glass and the word Search centred in `fg-dim`, on `ground` in a `line-control` ring; with the
+  caret in it, or a query held, it is left-aligned, on `well` in a `line-strong` ring while
+  focused: the glass, the terms as chips, then the words in `ui` `fg`. Arriving by Ctrl+F draws the
+  focus ring; a click does not. A query that does not read turns the ring `danger`, underlines the
+  character in `danger`, and hangs one sentence below it on `panel` in a `line-danger` ring with
+  the warning glyph.
 - **Term chip.** A search term the field understood, in the shape its kind has in the pane's
   details, at `badge` height in `small`: a folder or a place a square at the `badge` corner with
   its filled glyph in `fg-dim`, a tag a pill in a `line-control-hi` ring, a label its key sunk on

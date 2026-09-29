@@ -1,0 +1,277 @@
+import {
+  type CSSProperties,
+  type KeyboardEvent,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+
+import type { QueryFault } from "../../ipc/bindings/QueryFault";
+import type { QueryTerm } from "../../ipc/bindings/QueryTerm";
+import { readQuery } from "../../ipc/commands";
+import { Glyph } from "../../ui/Glyph";
+import { TermChip } from "../../ui/TermChip";
+import { backFrom, getPlace, placeKey, usePlace } from "../place";
+import { faultSentence, marksCharacter } from "./fault";
+import { runQuery, scopeOf } from "./search";
+
+type Chip = QueryTerm & { shape: Exclude<QueryTerm["shape"], { kind: "text" }> };
+
+const isChip = (term: QueryTerm): term is Chip => term.shape.kind !== "text";
+
+// One field in the window; Ctrl+F reaches it from anywhere. DECISIONS.md "Search".
+let focusField: ((byKey: boolean) => void) | null = null;
+
+/** Puts the caret in the search field, with the focus ring when it came from a key. */
+export function focusSearch(byKey = true) {
+  focusField?.(byKey);
+}
+
+/** What a query reads as in the field: its folders, places, tags and labels as chips, the rest words. */
+async function split(query: string) {
+  const { terms } = await readQuery(query);
+  return {
+    chips: terms.filter(isChip),
+    text: terms
+      .filter((term) => !isChip(term))
+      .map((term) => term.text)
+      .join(" "),
+  };
+}
+
+/**
+ * The query, in the bar: the terms it understood as chips and the words as typed. Typing moves
+ * nothing; Enter runs it, and a query that does not read runs nothing and says why.
+ * Components › "The field holds the query".
+ */
+export function SearchField() {
+  const place = usePlace();
+  const input = useRef<HTMLInputElement>(null);
+  const mirror = useRef<HTMLDivElement>(null);
+  const [chips, setChips] = useState<Chip[]>([]);
+  const [text, setText] = useState("");
+  const [focused, setFocused] = useState(false);
+  const [ringed, setRinged] = useState(false);
+  const [plated, setPlated] = useState(false);
+  const [fault, setFault] = useState<QueryFault | null>(null);
+  const anchor = `--search-${useId().replace(/[^\w-]/g, "")}`;
+  const sentence = fault ? faultSentence(fault.why) : null;
+
+  // The field holds the query that made the results, and nothing anywhere else.
+  const key = placeKey(place);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the key is the place.
+  useEffect(() => {
+    void hold();
+  }, [key]);
+
+  async function hold() {
+    const here = getPlace();
+    setFault(null);
+    setPlated(false);
+    if (here?.kind !== "search") {
+      setChips([]);
+      setText("");
+      return;
+    }
+    const held = await split(here.query).catch(() => ({ chips: [], text: here.query }));
+    setChips(held.chips);
+    setText(held.text);
+  }
+
+  useEffect(() => {
+    focusField = (byKey) => {
+      setRinged(byKey);
+      input.current?.focus();
+    };
+    return () => {
+      focusField = null;
+    };
+  }, []);
+
+  // A dropped popover leaves the top layer, so the sentence is shown again whenever it changes.
+  const line = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (sentence && focused) line.current?.showPopover();
+  }, [sentence, focused]);
+
+  const query = () =>
+    [...chips.map((chip) => chip.text), text.trim()].filter((part) => part !== "").join(" ");
+
+  /** Where you stand becomes the first term, so the same words mean the same everywhere. */
+  async function begin() {
+    if (chips.length > 0 || text !== "") return;
+    const scope = scopeOf(backFrom(getPlace()));
+    if (!scope) return;
+    const reading = await readQuery(scope).catch(() => null);
+    setChips(reading?.terms.filter(isChip) ?? []);
+  }
+
+  /** Once a space closes a word, the terms it read as take their chips; words stay words. */
+  async function absorb(typed: string) {
+    const reading = await readQuery(typed).catch(() => null);
+    if (!reading || reading.fault) return;
+    const taken = reading.terms.filter(isChip);
+    if (taken.length === 0) return;
+    let rest = typed;
+    for (const term of [...taken].reverse()) {
+      rest = `${rest.slice(0, term.start)}${rest.slice(term.end)}`;
+    }
+    // A term the query already holds is not added twice.
+    setChips((held) => [
+      ...held,
+      ...taken.filter((term) => !held.some((chip) => chip.text === term.text)),
+    ]);
+    setText(rest.replace(/\s+/g, " ").trimStart());
+  }
+
+  async function run() {
+    const asked = query();
+    if (asked === "") return;
+    const { fault: why } = await readQuery(asked).catch(() => ({ fault: null }));
+    if (why) {
+      setFault(why);
+      return;
+    }
+    input.current?.blur();
+    runQuery(asked);
+  }
+
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      void run();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      // The first Escape takes back what did not read; the next, what was typed since the last run.
+      if (fault) setFault(null);
+      else {
+        void hold();
+        input.current?.blur();
+      }
+    } else if (event.key === "Backspace") {
+      const at = event.currentTarget;
+      if (at.selectionStart !== 0 || at.selectionEnd !== 0 || chips.length === 0) return;
+      event.preventDefault();
+      if (plated) {
+        setChips((held) => held.slice(0, -1));
+        setPlated(false);
+      } else setPlated(true);
+    } else if (plated) setPlated(false);
+  };
+
+  const prefix = chips.map((chip) => `${chip.text} `).join("").length;
+  const marked = fault && marksCharacter(fault.why) ? fault.at - prefix : -1;
+  const marking = marked >= 0 && marked < text.length;
+  const resting = !focused && chips.length === 0 && text === "";
+  const ring = fault
+    ? "inset-ring-danger"
+    : focused
+      ? "inset-ring-line-strong"
+      : "inset-ring-line-control hover:inset-ring-line-control-hi";
+
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: the input is the control; a press anywhere on its frame only hands it the caret.
+    <div
+      style={{ anchorName: anchor } as CSSProperties}
+      className={`relative flex h-full min-w-0 flex-1 cursor-text items-center gap-1.5 overflow-hidden rounded-nested pr-1 pl-2.5 inset-ring ${ring} ${focused ? "bg-well" : "bg-ground"} ${ringed && focused ? "outline-(length:--focus-width) outline-focus outline-offset-(--focus-gap) outline-solid" : ""} ${resting ? "justify-center" : ""}`}
+      onMouseDown={(event) => {
+        setRinged(false);
+        if (event.target !== input.current) {
+          event.preventDefault();
+          input.current?.focus();
+        }
+      }}
+    >
+      <Glyph
+        name="search"
+        className={`shrink-0 text-glyph ${focused ? "text-fg-mid" : "text-fg-dim"}`}
+      />
+      {resting && <span className="truncate text-fg-dim text-ui">Search</span>}
+      {chips.map((chip, index) => (
+        <TermChip
+          key={chip.text}
+          shape={chip.shape}
+          text={chip.text}
+          plated={plated && index === chips.length - 1}
+          onRemove={() => {
+            setChips((held) => held.filter((_, at) => at !== index));
+            setFault(null);
+          }}
+        />
+      ))}
+      {/* Resting, the field is the centred word; the input lies over it all, unseen, to take the click. */}
+      <div
+        className={`h-full ${resting ? "absolute inset-0 opacity-0" : "relative min-w-16 flex-1"}`}
+      >
+        {marking && (
+          <div
+            ref={mirror}
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 flex items-center whitespace-pre text-fg text-ui"
+          >
+            {text.slice(0, marked)}
+            <span className="text-danger underline decoration-danger underline-offset-3">
+              {text[marked]}
+            </span>
+            {text.slice(marked + 1)}
+          </div>
+        )}
+        <input
+          ref={input}
+          type="search"
+          aria-label="Search"
+          aria-invalid={fault ? true : undefined}
+          aria-describedby={sentence ? `${anchor}-fault` : undefined}
+          autoComplete="off"
+          spellCheck={false}
+          value={text}
+          onFocus={() => {
+            setFocused(true);
+            void begin();
+          }}
+          onBlur={() => {
+            setFocused(false);
+            setRinged(false);
+            setPlated(false);
+          }}
+          onChange={(event) => {
+            const typed = event.currentTarget.value;
+            setText(typed);
+            setFault(null);
+            setPlated(false);
+            if (/\s$/.test(typed)) void absorb(typed);
+          }}
+          onScroll={(event) => {
+            if (mirror.current) {
+              mirror.current.style.transform = `translateX(${-event.currentTarget.scrollLeft}px)`;
+            }
+          }}
+          onKeyDown={onKeyDown}
+          className={`h-full w-full min-w-0 appearance-none bg-transparent text-ui outline-none [&::-webkit-search-cancel-button]:hidden ${marking ? "text-transparent caret-fg" : "text-fg"}`}
+        />
+      </div>
+      {sentence && focused && (
+        <div
+          ref={line}
+          id={`${anchor}-fault`}
+          popover="manual"
+          role="alert"
+          style={
+            {
+              positionAnchor: anchor,
+              top: "anchor(bottom)",
+              left: "anchor(left)",
+              width: "anchor-size(width)",
+            } as CSSProperties
+          }
+          className="m-0 mt-1 flex min-h-control items-center gap-2 rounded-control border-0 bg-panel px-2.5 py-1.5 text-fg text-ui shadow-overlay inset-ring inset-ring-line-danger"
+        >
+          <Glyph name="warning" className="shrink-0 text-danger text-glyph" />
+          <span className="text-pretty">{sentence}</span>
+        </div>
+      )}
+    </div>
+  );
+}

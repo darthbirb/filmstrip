@@ -31,15 +31,6 @@ as its terms, each removable: the terms are the parse, so what shows is what was
 Draw a query that does not parse, an unclosed `(` or `"`: what the field says, and that the
 results stay where they were.
 
-## Scoping to where you are · DRAWN
-
-"Nothing Matched" says "No file in Cairo matches", so a search typed inside a folder searches
-that folder. How that scope shows is not drawn. Since the query's text is the whole state, the
-scope is a `path:` term like any other.
-
-Draw the scope in the field, and both ways to widen it: Search Everywhere, and removing the term.
-Say what a search typed in the Sorting Box or the Trash covers.
-
 ## Folders and tags as controls · DRAWN
 
 The controls that write a term are not drawn anywhere. Draw each: a tag or a label in the pane's

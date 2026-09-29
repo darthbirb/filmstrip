@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 
-import { SearchStandIn } from "../dev/FrameStandIns";
 import { GlyphButton } from "../ui/GlyphButton";
 import { Frame } from "./frame/Frame";
 import { Dragging } from "./grid/drag";
@@ -23,14 +22,12 @@ import { PaneDetailProvider } from "./pane/pane-detail";
 import { whenShownInPane } from "./pane/pane-store";
 import { usePreferences, useScaleHotkeys } from "./preferences";
 import { useSearchKeys } from "./search/keys";
+import { SearchField } from "./search/SearchField";
 import { Settings } from "./settings/Settings";
 import { closeSettings, openSettings, useSettingsRequest } from "./settings/settings-store";
 import { ReportBanner } from "./undo/ReportBanner";
 import { useUndoKey } from "./undo/undo";
 import { WindowBar } from "./window-bar/WindowBar";
-
-// Until the search slice lands, the bar holds a dev stand-in, and nothing in production.
-const SEARCH = import.meta.env.DEV ? <SearchStandIn /> : undefined;
 
 export function App() {
   useScaleHotkeys();
@@ -45,7 +42,7 @@ export function App() {
   return (
     <div className="flex h-dvh flex-col bg-ground text-fg">
       <WindowBar
-        search={SEARCH}
+        search={<SearchField />}
         onSettings={() => openSettings()}
         settingsOpen={settings !== null}
       />

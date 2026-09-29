@@ -606,6 +606,16 @@ or its files do, so a word finds a folder exactly when it finds that folder's ow
 the folder's tags. **A path only limits folders**: the folder a search is scoped to is where you
 are, not a result.
 
+**The field shows what it understood.** Folders, places, tags and labels become chips once a space
+closes them, and words stay the words typed, so the field is the parse and not a guess at it.
+**Ctrl+F** puts the caret there, as in Explorer and every browser; letters stay free for
+type-to-find and digits are destination keys. **Where you stand is the first term**: a folder
+writes `path:`, the Sorting Box `is:sorting` and the Trash `is:trashed`, so the same text means the
+same thing wherever it runs, and Search Everywhere is only that term removed. **Typing moves
+nothing; Enter runs the query**, because a grid that reflows under every letter is a grid nobody
+can look at. A query that does not read runs nothing: the field names the character and the
+results stay as they were.
+
 **A search is a place**, as Artboards › A search is a place draws it, so the grid, the pane and
 the selection work in it as anywhere. Its header names it by its terms and its back arrow, or
 Escape once nothing else is open, returns to where the search began; no row in navigation is lit,
