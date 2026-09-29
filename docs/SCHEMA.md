@@ -21,6 +21,8 @@ migration arrives with the feature that needs it and is never edited once shippe
 | `journal` | Every change the app made on disk, with what reverses it, grouped into batches. |
 | `job` | Background work: waiting, running, or failed with its error. |
 | `destination_key` | A digit, `0` to `9`, bound to a folder that a press moves files into. |
+| `item_fts` | Each item's name and every tag it carries, tokenised for a bare word. |
+| `folder_fts` | Each folder's own tags, its title's among them, tokenised the same way. |
 
 ## Where things live on disk
 
@@ -102,6 +104,36 @@ migration arrives with the feature that needs it and is never edited once shippe
   source does, takes its key with it.
 - Binding is not journalled, as a favourite is not.
 
-## Not here yet
+## Query language
 
-Search indexes arrive as a new migration alongside the feature that uses them.
+A query is text, and the text is all there is to a search. Terms are ANDed unless `OR` joins
+them; `-` negates one, and brackets group.
+
+```text
+path:Pictures/Trips    that folder and everything below it; the first title is a source's
+path:=Pictures/Trips   that folder alone
+tag:dawn  tag:da*      a tag, exactly or by its start
+location:cairo         a label by its key; location:ca* by its start, location:* any value
+:cairo  @ana           a label's value under any key
+type:video             image | video | other
+year:2024              the date it was taken, or else modified
+date:2024-06..2024-08  whole periods, both ends included; date:2024-06 one alone
+dur:>30s  size:>100mb  s | m | h, and b | kb | mb | gb in binary units
+w:>=1920  h:<1080
+is:favorite  is:untagged  is:sorting  is:trashed
+status:wip  status:complete  status:none
+"old town"             a quoted span is one term, and quoting works after any key
+say\"hi  a\\b          \" is a quote and \\ a backslash, quoted or not; path: also takes \/
+```
+
+- A key the language does not reserve names a label: `anything:value` reads, and finds nothing
+  until such a label exists.
+- **A bare word matches a tag's or a label's value, a folder's title, which every file below it
+  carries, and a word of the file's name, all at once.** `item_fts` holds the name and the tags;
+  `folder_fts` a folder's own tags and never an ancestor's.
+- A folder is found by what it carries itself. A `path:` limits the folders found and is never
+  one of them; `path:=` limits them to the folders directly inside.
+- A trashed file is found only by a query that names `is:trashed`. A retired one never is.
+- `item_fts` is rewritten from the item whenever what it carries changes (`tags::rebuild_item`)
+  and when its name does. `folder_fts` is rewritten when a folder's tags or title change. A row
+  left behind by an item deleted outright finds nothing, since every search joins `item`.

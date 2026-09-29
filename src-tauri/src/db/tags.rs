@@ -5,7 +5,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::db::{fold, now};
+use crate::db::{fold, now, search};
 use crate::error::Result;
 
 pub fn get_or_create_tag(conn: &Connection, key: Option<&str>, value: &str) -> Result<i64> {
@@ -50,7 +50,7 @@ pub fn sync_title_tag(conn: &Connection, folder_id: i64, title: &str) -> Result<
         "INSERT OR IGNORE INTO folder_tag (folder_id, tag_id, source) VALUES (?1, ?2, 'title')",
         params![folder_id, tag_id],
     )?;
-    Ok(())
+    search::index_folder(conn, folder_id)
 }
 
 pub fn set_folder_label(conn: &Connection, folder_id: i64, key: &str, value: &str) -> Result<()> {
@@ -59,6 +59,7 @@ pub fn set_folder_label(conn: &Connection, folder_id: i64, key: &str, value: &st
         "INSERT OR IGNORE INTO folder_tag (folder_id, tag_id, source) VALUES (?1, ?2, 'manual')",
         params![folder_id, tag_id],
     )?;
+    search::index_folder(conn, folder_id)?;
     rebuild_subtree(conn, folder_id)
 }
 
@@ -68,6 +69,7 @@ pub fn add_folder_tag(conn: &Connection, folder_id: i64, value: &str) -> Result<
         "INSERT OR IGNORE INTO folder_tag (folder_id, tag_id, source) VALUES (?1, ?2, 'manual')",
         params![folder_id, tag_id],
     )?;
+    search::index_folder(conn, folder_id)?;
     rebuild_subtree(conn, folder_id)
 }
 
@@ -76,6 +78,7 @@ pub fn remove_folder_tag(conn: &Connection, folder_id: i64, tag_id: i64) -> Resu
         "DELETE FROM folder_tag WHERE folder_id = ?1 AND tag_id = ?2",
         params![folder_id, tag_id],
     )?;
+    search::index_folder(conn, folder_id)?;
     rebuild_subtree(conn, folder_id)
 }
 
@@ -142,7 +145,7 @@ pub fn rebuild_item(conn: &Connection, item_id: i64) -> Result<()> {
            SELECT ?1, tag_id, NULL FROM item_tag WHERE item_id = ?1",
         params![item_id],
     )?;
-    Ok(())
+    search::index_item(conn, item_id)
 }
 
 /// Recomputes every live item at or below a folder — what a folder's tags

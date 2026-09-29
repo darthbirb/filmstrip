@@ -16,7 +16,9 @@ import type { ItemsMoved } from "./bindings/ItemsMoved";
 import type { ItemsRestored } from "./bindings/ItemsRestored";
 import type { ItemsTrashed } from "./bindings/ItemsTrashed";
 import type { Progress } from "./bindings/Progress";
+import type { Reading } from "./bindings/Reading";
 import type { Reason } from "./bindings/Reason";
+import type { SearchOutcome } from "./bindings/SearchOutcome";
 import type { SourceKind } from "./bindings/SourceKind";
 import type { SourceSummary } from "./bindings/SourceSummary";
 import type { Trashed } from "./bindings/Trashed";
@@ -119,6 +121,10 @@ export const sortingItems = () => invoke<ItemRow[]>("sorting_items");
 export const trashListing = () => invoke<Trashed[]>("trash_listing");
 
 export const trashSummary = () => invoke<TrashSummary>("trash_summary");
+
+export const readQuery = (text: string) => invoke<Reading>("read_query", { text });
+
+export const search = (query: string) => invoke<SearchOutcome>("search", { query });
 
 export const setItemFavorite = (itemIds: number[], favorite: boolean) =>
   invoke<void>("set_item_favorite", { itemIds, favorite });

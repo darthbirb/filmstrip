@@ -4,15 +4,22 @@ import type { Batch } from "../ipc/bindings/Batch";
 import type { Contents } from "../ipc/bindings/Contents";
 import type { Crumb } from "../ipc/bindings/Crumb";
 import type { DestinationKey } from "../ipc/bindings/DestinationKey";
+import type { Fault } from "../ipc/bindings/Fault";
 import type { FavouritePlace } from "../ipc/bindings/FavouritePlace";
 import type { FolderEntry } from "../ipc/bindings/FolderEntry";
+import type { FolderMatch } from "../ipc/bindings/FolderMatch";
 import type { FolderNode } from "../ipc/bindings/FolderNode";
+import type { Hit } from "../ipc/bindings/Hit";
 import type { ItemDetail } from "../ipc/bindings/ItemDetail";
 import type { ItemRow } from "../ipc/bindings/ItemRow";
 import type { ItemsMoved } from "../ipc/bindings/ItemsMoved";
 import type { ItemsTrashed } from "../ipc/bindings/ItemsTrashed";
 import type { Progress } from "../ipc/bindings/Progress";
+import type { QueryTerm } from "../ipc/bindings/QueryTerm";
+import type { Reading } from "../ipc/bindings/Reading";
 import type { Reason } from "../ipc/bindings/Reason";
+import type { SearchOutcome } from "../ipc/bindings/SearchOutcome";
+import type { Shape } from "../ipc/bindings/Shape";
 import type { SourceKind } from "../ipc/bindings/SourceKind";
 import type { SourceSummary } from "../ipc/bindings/SourceSummary";
 import type { Stayed } from "../ipc/bindings/Stayed";
@@ -414,6 +421,101 @@ function live(folderId: number) {
 
 const invalid = (message: string) => Promise.reject<AppError>({ kind: "invalid", message });
 
+/**
+ * The query language, as far as the mock library needs it: space-separated words, each a path,
+ * a place, a tag, a label or a word; an unclosed `(` or `"` is the fault. `query::read` is the
+ * real reader.
+ */
+function readQuery(text: string): Reading {
+  const terms: QueryTerm[] = [];
+  const opened = [...text].findIndex((char) => char === "(" || char === '"');
+  const readable = opened < 0 ? text : text.slice(0, opened);
+  for (const match of readable.matchAll(/\S+/g)) {
+    const word = match[0];
+    terms.push({
+      text: word,
+      shape: shapeOf(word),
+      start: match.index,
+      end: match.index + word.length,
+    });
+  }
+  if (opened < 0) {
+    return { terms, fault: terms.length > 0 ? null : { why: { kind: "empty" }, at: 0 } };
+  }
+  const why: Fault =
+    text[opened] === "("
+      ? { kind: "unclosedGroup", after: terms.at(-1)?.text ?? null }
+      : { kind: "unclosedQuote", before: text.slice(opened + 1).split(/\s+/)[0] || null };
+  return { terms, fault: { why, at: opened } };
+}
+
+function shapeOf(word: string): Shape {
+  const [key, value] = word.includes(":") ? word.split(/:(.*)/, 2) : ["", word];
+  if (key === "path") return { kind: "path", titles: (value ?? "").split("/"), exact: false };
+  if (word === "is:sorting") return { kind: "place", place: "sorting" };
+  if (word === "is:trashed") return { kind: "place", place: "trash" };
+  if (key === "tag") return { kind: "tag", value: value ?? "" };
+  if (key && key !== "is") return { kind: "label", key, value: value ?? "" };
+  return { kind: "text" };
+}
+
+/** Every file and folder each term finds: a word by name or by a folder's title. */
+function searchFor(query: string): SearchOutcome {
+  const { terms, fault } = readQuery(query);
+  if (fault) return { kind: "unparsed", fault };
+  const lower = (words: string[]) => words.map((word) => word.toLowerCase());
+  const within = (path: string[], shape: Shape & { kind: "path" }) =>
+    lower(shape.titles).every((title, at) => path[at] === title);
+  const trash = terms.some((term) => term.text === "is:trashed");
+  const files = (trash ? (ITEMS[TRASH] ?? []) : everyItem().filter((item) => item.folderId > 0))
+    .map((item): Hit => {
+      const gone = trashed.get(item.id);
+      const path = (gone?.folders ?? crumbs(item.folderId).folders).map((crumb) => crumb.title);
+      return {
+        ...item,
+        at: { folderId: item.folderId, path, gone: false },
+        trashedAt: gone?.at ?? null,
+      };
+    })
+    .filter((hit) =>
+      terms.every(({ shape, text }) => {
+        const path = lower(hit.at.path);
+        if (shape.kind === "path") return within(path, shape);
+        if (shape.kind === "place") return shape.place === "trash" || hit.folderId === 2;
+        if (shape.kind === "tag") return path.includes(shape.value.toLowerCase());
+        if (shape.kind === "label") return false;
+        const word = text.toLowerCase();
+        return hit.diskName.toLowerCase().includes(word) || path.includes(word);
+      }),
+    )
+    .sort((a, b) => a.diskName.localeCompare(b.diskName));
+  const words = terms.filter((term) => term.shape.kind === "text");
+  const found: FolderMatch[] = [...parents()]
+    .filter(([id, { title }]) => {
+      const path = lower(crumbs(id).folders.map((crumb) => crumb.title));
+      return (
+        words.length > 0 &&
+        words.every((word) => title.toLowerCase().includes(word.text.toLowerCase())) &&
+        terms.every(
+          ({ shape }) =>
+            shape.kind !== "path" || (within(path, shape) && path.length > shape.titles.length),
+        )
+      );
+    })
+    .map(([id, { title }]) => ({
+      id,
+      sourceId: crumbs(id).home?.id ?? 0,
+      title,
+      above: crumbs(id)
+        .folders.slice(0, -1)
+        .map((crumb) => crumb.title),
+      count: under(id).length,
+      cover: under(id)[0]?.thumb ?? null,
+      matched: { kind: "name", value: title },
+    }));
+  return { kind: "found", terms, folders: found, items: files };
+}
+
 type Args = Record<string, unknown>;
 
 let storedPreferences: unknown = null;
@@ -681,6 +783,8 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     const held = ITEMS[TRASH] ?? [];
     return { count: held.length, bytes: held.reduce((sum, item) => sum + item.sizeBytes, 0) };
   },
+  read_query: ({ text }) => readQuery(text as string),
+  search: ({ query }) => searchFor(query as string),
   item_tags: () => [],
   item_detail: ({ itemId }) => detail(itemId as number),
   item_path: ({ itemId }) => detail(itemId as number)?.path ?? null,
