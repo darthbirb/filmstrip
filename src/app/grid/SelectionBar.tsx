@@ -11,7 +11,7 @@ import { setFavourites, useEveryFavourite } from "../favourites";
 import { deleteFiles } from "../pane/delete";
 import { openMovePicker } from "../pane/move-picker";
 import { restoreFiles } from "../pane/restore";
-import { usePlace } from "../place";
+import { inTrash } from "./place-items";
 import { checkAll, clearChecked, oneFolder, useChecked } from "./selection";
 
 /**
@@ -20,11 +20,12 @@ import { checkAll, clearChecked, oneFolder, useChecked } from "./selection";
  */
 export function SelectionBar() {
   const rows = useChecked();
-  const trash = usePlace()?.kind === "trash";
   // The set it last showed stays in it while it folds away, so its words do not blank as it goes.
   const last = useRef(rows);
   if (rows.length > 0) last.current = rows;
   const shown = last.current;
+  // Trashed files go only by Restore, in the Trash and among a search's results alike.
+  const trash = shown.every(inTrash);
   return (
     <PushDown open={rows.length > 0}>
       {shown.length > 0 && (trash ? <InTrash rows={shown} /> : <InLibrary rows={shown} />)}

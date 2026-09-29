@@ -22,6 +22,7 @@ import { Pane, PaneHeader } from "./pane/Pane";
 import { PaneDetailProvider } from "./pane/pane-detail";
 import { whenShownInPane } from "./pane/pane-store";
 import { usePreferences, useScaleHotkeys } from "./preferences";
+import { useSearchKeys } from "./search/keys";
 import { Settings } from "./settings/Settings";
 import { closeSettings, openSettings, useSettingsRequest } from "./settings/settings-store";
 import { ReportBanner } from "./undo/ReportBanner";
@@ -39,6 +40,7 @@ export function App() {
   useEscapeLeavesFullScreen();
   useUndoKey();
   useDestinationKeys();
+  useSearchKeys();
 
   return (
     <div className="flex h-dvh flex-col bg-ground text-fg">

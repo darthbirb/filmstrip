@@ -9,6 +9,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::db::fold;
+use crate::db::folders::Crumb;
 use crate::db::items::{self, ItemRow};
 use crate::error::Result;
 use crate::media::probe::days_from_civil;
@@ -319,8 +320,8 @@ pub struct FolderMatch {
     pub id: i64,
     pub source_id: i64,
     pub title: String,
-    /// The folders above it, its source's first.
-    pub above: Vec<String>,
+    /// From its source's own folder, by the source's title, down to it, as a place is named.
+    pub path: Vec<Crumb>,
     /// Every live file at or below it.
     pub count: i64,
     /// The picture that stands for it, once its thumbnail is made. Filled by the command.
@@ -369,15 +370,13 @@ pub fn folders(conn: &Connection, expr: &Expr) -> Result<Vec<FolderMatch>> {
     };
     let mut matches = Vec::with_capacity(rows.len());
     for (id, title) in rows {
-        let mut above = crate::db::folders::ancestry(conn, id)?;
-        above.pop();
         let source_id = crate::db::folders::location(conn, id)?.source_id;
         matches.push(FolderMatch {
             id,
             source_id,
             matched: matched(conn, &conjuncts, id, &title)?,
             title,
-            above: above.into_iter().map(|crumb| crumb.title).collect(),
+            path: crate::db::folders::ancestry(conn, id)?,
             count: live_count(conn, id)?,
             cover: None,
             cover_uuid: cover_uuid(conn, id)?,
@@ -1150,9 +1149,13 @@ mod tests {
             people.count, 3,
             "Ana's two and Bob's one; the Trash's is not counted"
         );
-        assert_eq!(people.above, ["Library"]);
+        let titles = |path: &[Crumb]| -> Vec<String> {
+            path.iter().map(|crumb| crumb.title.clone()).collect()
+        };
+        assert_eq!(titles(&people.path), ["Library", "People"]);
         let ana = folders(&l.conn, &parse("ana").unwrap()).unwrap().remove(0);
-        assert_eq!(ana.above, ["Library", "People"]);
+        assert_eq!(titles(&ana.path), ["Library", "People", "Ana"]);
+        assert_eq!(ana.path.last().map(|crumb| crumb.id), Some(l.ana));
         assert_eq!(ana.cover_uuid, Some(format!("uuid-{}-ana_clip.mp4", l.ana)));
         conn_cover(&l.conn, l.ana, l.sunset);
         let ana = folders(&l.conn, &parse("ana").unwrap()).unwrap().remove(0);

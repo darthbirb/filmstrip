@@ -1066,7 +1066,8 @@ mod tests {
             panic!("one folder: {json}");
         };
         assert_eq!(folder["title"], "Cairo");
-        assert_eq!(folder["above"], serde_json::json!(["library", "Trips"]));
+        assert_eq!(folder["path"][1]["title"], "Trips");
+        assert_eq!(folder["sourceId"], 1);
         assert_eq!(folder["count"], 1);
         assert_eq!(
             folder["matched"],

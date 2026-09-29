@@ -31,16 +31,6 @@ as its terms, each removable: the terms are the parse, so what shows is what was
 Draw a query that does not parse, an unclosed `(` or `"`: what the field says, and that the
 results stay where they were.
 
-## The results place · DRAWN
-
-A search is a place, as a folder, the Sorting Box and the Trash are. Nothing draws it.
-
-Draw the grid's header for it: the terms, how many files matched, and the way back out. Draw the
-folders that matched before the files, each with its cover, its parent, its count and the term it
-matched on, said as key and value. Draw each file saying where it lives, as a Trash tile says
-where it came from. Navigation has no row lit. Draw a trashed file among results, for a query
-that asks for `is:trashed`, and results that are only folders or only files.
-
 ## Scoping to where you are · DRAWN
 
 "Nothing Matched" says "No file in Cairo matches", so a search typed inside a folder searches

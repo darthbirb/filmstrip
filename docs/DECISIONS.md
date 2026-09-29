@@ -606,6 +606,13 @@ or its files do, so a word finds a folder exactly when it finds that folder's ow
 the folder's tags. **A path only limits folders**: the folder a search is scoped to is where you
 are, not a result.
 
+**A search is a place**, as Artboards › A search is a place draws it, so the grid, the pane and
+the selection work in it as anywhere. Its header names it by its terms and its back arrow, or
+Escape once nothing else is open, returns to where the search began; no row in navigation is lit,
+because none is this place. Folders come first, each saying what it matched, and a click on one
+goes into it; each file says where it lives, and a trashed one where it came from, keeping the
+Trash's verbs.
+
 **Results come trashed first, newest first, then by name**, as the Trash and the Sorting Box each
 order their own. A trashed file is found only when the query names the Trash; the drawing's Trash
 scope writes `is:trashed`, so the two meet only when someone types both.

@@ -7,7 +7,7 @@ type Props = {
   glyph: GlyphName;
   title: string;
   /** A count or a name the title cannot hold. Most places have nothing to add, and draw no line. */
-  note?: string;
+  note?: ReactNode;
   /** Where something was or is, in the face that tells a path's segments apart. */
   path?: string;
   /** The one thing worth doing here, where there is one. Most places have none. */

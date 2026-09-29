@@ -48,6 +48,7 @@ export const GLYPHS = {
   prohibit: { icon: "prohibit", code: 0xe3de },
   keyboard: { icon: "keyboard", code: 0xe2d8 },
   folderGone: { icon: "folder-dashed", code: 0xe8f8 },
+  back: { icon: "arrow-left", code: 0xe058 },
 } as const;
 
 export type GlyphName = keyof typeof GLYPHS;

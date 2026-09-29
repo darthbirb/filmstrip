@@ -1,5 +1,6 @@
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
-import { folderItems, sortingItems, trashItems, trashListing } from "../../ipc/commands";
+import { trashItems } from "../../ipc/commands";
+import { placeItems } from "../grid/place-items";
 import { libraryChanged } from "../library";
 import type { Place } from "../place";
 import { deletedBannerLine } from "../undo/lines";
@@ -42,11 +43,7 @@ export async function deleteFiles(itemIds: number[]) {
  * none. For one file, the one after it or before it. Artboards › Selecting.
  */
 export async function neighbour(place: Place | null, going: number[]) {
-  let rows: ItemRow[] = [];
-  if (place?.kind === "sorting") rows = await sortingItems().catch(() => []);
-  if (place?.kind === "trash") rows = await trashListing().catch(() => []);
-  const folder = place?.kind === "folder" ? place.path.at(-1) : undefined;
-  if (folder) rows = await folderItems(folder.id).catch(() => []);
+  const rows: ItemRow[] = await placeItems(place).catch(() => []);
   const last = rows.findLastIndex((row) => going.includes(row.id));
   if (last < 0) return null;
   const stays = (row: ItemRow) => !going.includes(row.id);

@@ -506,9 +506,7 @@ function searchFor(query: string): SearchOutcome {
       id,
       sourceId: crumbs(id).home?.id ?? 0,
       title,
-      above: crumbs(id)
-        .folders.slice(0, -1)
-        .map((crumb) => crumb.title),
+      path: crumbs(id).folders,
       count: under(id).length,
       cover: under(id)[0]?.thumb ?? null,
       matched: { kind: "name", value: title },

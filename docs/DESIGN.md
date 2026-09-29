@@ -128,6 +128,9 @@ spacing:
   tile-caption: 1.3125rem
   count: 3.25rem
   ghost-thumb: 1.5rem
+  card: 17rem
+  card-cover: 5rem
+  card-cover-height: 3.75rem
   strip: 6rem
   strip-inset: 0.375rem
   strip-step: 1.5rem
@@ -596,6 +599,20 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   has no ground and reads Choose Folder… in `fg-dim` with the Move to… glyph; for a folder that has
   gone it is `danger` in a `line-danger` ring with the dashed folder. A destination key's row in
   Settings is the key chip, this, the count right-aligned in a `count` column, and a dismiss.
+- **Term chip.** A search term the field understood, in the shape its kind has in the pane's
+  details, at `badge` height in `small`: a folder or a place a square at the `badge` corner with
+  its filled glyph in `fg-dim`, a tag a pill in a `line-control-hi` ring, a label its key sunk on
+  `panel` beside its value on `raised`. In the field each ends with a `size-4` × at the
+  `mark-badge` corner; Backspace plates the last one in `plate` before removing it. Words are
+  never chips.
+- **Results header.** The grid's header for a search: the back glyph button, then the query's
+  terms read-only, words in `ui` `fg` and every other term its chip, the count after them in
+  `small` `fg-dim`, and Search Everywhere as a raised button while the query holds a scope.
+- **Folder card.** A folder a search found: `card` wide on `panel` at the `control` corner in a
+  `line` hairline, `line-strong` and `inset` under the pointer. Its cover is `card-cover` by
+  `card-cover-height` at the `badge` corner; beside it the name in `row` semibold with its count
+  in a `badge` pill, the folders above it in `small` `fg-dim`, and what it matched, key first.
+  Folders come under an eyebrow heading before the files, which then take one of their own.
 - **Drag ghost.** One `control`-tall line following the pointer, `--ghost-x` and `--ghost-y` from
   its tip: `veil` glass at the `control` corner in a `line-control-hi` ring, with the overlay
   shadow. It holds the top file's picture as a `ghost-thumb` square at the `badge` corner, the
