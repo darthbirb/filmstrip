@@ -331,4 +331,136 @@ mod tests {
             }
         }
     }
+
+    // Generated trees and titles, so the round trip holds beyond the cases anyone thought to list.
+
+    use crate::media::probe::days_from_civil;
+    use crate::query::parser::KEYS;
+    use proptest::prelude::*;
+
+    fn ident() -> impl Strategy<Value = String> {
+        "[a-z][a-z0-9]{0,6}"
+    }
+
+    /// Sometimes two words, which a term can only hold quoted.
+    fn phrase() -> impl Strategy<Value = String> {
+        prop_oneof![
+            ident(),
+            (ident(), ident()).prop_map(|(a, b)| format!("{a} {b}"))
+        ]
+    }
+
+    fn label_match() -> impl Strategy<Value = LabelMatch> {
+        prop_oneof![
+            phrase().prop_map(LabelMatch::Exact),
+            phrase().prop_map(LabelMatch::Prefix),
+            Just(LabelMatch::Present),
+        ]
+    }
+
+    fn cmp() -> impl Strategy<Value = Cmp> {
+        prop_oneof![
+            Just(Cmp::Lt),
+            Just(Cmp::Le),
+            Just(Cmp::Gt),
+            Just(Cmp::Ge),
+            Just(Cmp::Eq)
+        ]
+    }
+
+    /// Every term the parser can produce. A label's key is never a reserved one, and a bare word
+    /// is never `or`: the parser reads those as something else, so no tree holds them.
+    fn term() -> impl Strategy<Value = Term> {
+        let year_start = |year: i64| days_from_civil(year, 1, 1) * 86_400;
+        prop_oneof![
+            (phrase(), any::<bool>()).prop_map(|(path, exact)| Term::Path { path, exact }),
+            (phrase(), any::<bool>()).prop_map(|(value, prefix)| Term::Tag { value, prefix }),
+            (
+                ident().prop_filter("a reserved key", |key| !KEYS.contains(&key.as_str())),
+                label_match()
+            )
+                .prop_map(|(key, value)| Term::Label { key, value }),
+            label_match().prop_map(|value| Term::AnyLabel { value }),
+            phrase()
+                .prop_filter("the keyword", |text| text != "or")
+                .prop_map(|text| Term::Bare { text }),
+            ident().prop_map(Term::Type),
+            (1970i32..2100).prop_map(Term::Year),
+            (0i64..50, 0i64..50).prop_map(move |(a, b)| Term::DateRange {
+                from: year_start(2000 + a.min(b)),
+                to: year_start(2001 + a.max(b)),
+            }),
+            (cmp(), 0i64..48).prop_map(|(cmp, hours)| Term::Duration {
+                cmp,
+                ms: hours * 3_600_000
+            }),
+            (cmp(), 0i64..64).prop_map(|(cmp, gb)| Term::Size {
+                cmp,
+                bytes: gb << 30
+            }),
+            (cmp(), 0i64..8000).prop_map(|(cmp, px)| Term::Width { cmp, px }),
+            (cmp(), 0i64..8000).prop_map(|(cmp, px)| Term::Height { cmp, px }),
+            prop_oneof![
+                Just(IsFlag::Favorite),
+                Just(IsFlag::Untagged),
+                Just(IsFlag::Sorting),
+                Just(IsFlag::Trashed)
+            ]
+            .prop_map(Term::Is),
+            prop_oneof![
+                Just(StatusValue::Wip),
+                Just(StatusValue::Complete),
+                Just(StatusValue::None)
+            ]
+            .prop_map(Term::Status),
+        ]
+    }
+
+    /// A `-` only ever negates one term, and a group never holds one part: the parser makes
+    /// neither, so neither is generated.
+    fn expr() -> impl Strategy<Value = Expr> {
+        let leaf = prop_oneof![
+            term().prop_map(Expr::Term),
+            term().prop_map(|term| Expr::Not(Box::new(Expr::Term(term)))),
+        ];
+        leaf.prop_recursive(3, 32, 4, |inner| {
+            prop_oneof![
+                prop::collection::vec(inner.clone(), 2..4).prop_map(Expr::And),
+                prop::collection::vec(inner, 2..4).prop_map(Expr::Or),
+            ]
+        })
+    }
+
+    /// Titles made of the very characters the escapes give meaning to.
+    fn wild_titles() -> impl Strategy<Value = Vec<String>> {
+        let character = prop::sample::select(vec!['a', 'z', '0', '\\', '"', '/', '(', ')', ' ']);
+        let title = prop::collection::vec(character, 1..8)
+            .prop_map(|chars| chars.into_iter().collect::<String>());
+        prop::collection::vec(title, 1..5)
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig { cases: 512, ..ProptestConfig::default() })]
+
+        #[test]
+        fn any_tree_renders_to_text_that_reads_as_itself(tree in expr()) {
+            let text = render(&tree);
+            let again = parse(&text);
+            prop_assert_eq!(again.as_ref(), Ok(&tree), "rendered {:?}", text);
+        }
+
+        #[test]
+        fn any_titles_come_back_from_the_path_term_written_from_them(
+            titles in wild_titles(),
+            exact in any::<bool>(),
+        ) {
+            let text = path_term(&titles, exact);
+            let parsed = parse(&text);
+            let Ok(Expr::Term(Term::Path { path, exact: read })) = parsed else {
+                return Err(TestCaseError::fail(format!("{text:?} read as {parsed:?}")));
+            };
+            prop_assert_eq!(read, exact);
+            prop_assert_eq!(split_path_segments(&path), titles, "{:?}", text);
+        }
+    }
 }
