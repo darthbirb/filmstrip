@@ -130,7 +130,9 @@ say\"hi  a\\b          \" is a quote and \\ a backslash, quoted or not; path: al
   until such a label exists.
 - **A bare word matches a tag's or a label's value, a folder's title, which every file below it
   carries, and a word of the file's name, all at once.** `item_fts` holds the name and the tags;
-  `folder_fts` a folder's own tags and never an ancestor's.
+  `folder_fts` a folder's own tags and never an ancestor's. Against those two it matches the
+  beginning of a word, so `lis` finds Lisbon and `isbon` does not; a tag's or a label's value it
+  matches whole.
 - A folder is found by what it carries itself. A `path:` limits the folders found and is never
   one of them; `path:=` limits them to the folders directly inside.
 - A trashed file is found only by a query that names `is:trashed`. A retired one never is.
