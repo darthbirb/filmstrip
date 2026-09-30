@@ -38,7 +38,7 @@ impl Sql {
 const NOTHING: &str = "(1 = 0)";
 
 /// `%`, `_` and `\` are LIKE's own, so a value that holds one is matched as itself.
-fn escape_like(s: &str) -> String {
+pub(crate) fn escape_like(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for c in s.chars() {
         if matches!(c, '\\' | '%' | '_') {
@@ -254,7 +254,7 @@ fn tag_row(term: &Term, sql: &mut Sql) -> Option<String> {
 }
 
 /// Every live folder a path names. The first title is a source's, and two sources may share one.
-fn resolve_path(conn: &Connection, path: &str) -> Result<Vec<i64>> {
+pub(crate) fn resolve_path(conn: &Connection, path: &str) -> Result<Vec<i64>> {
     let mut titles = split_path_segments(path).into_iter();
     let Some(source) = titles.next() else {
         return Ok(Vec::new());

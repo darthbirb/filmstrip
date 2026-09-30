@@ -18,6 +18,7 @@ use crate::db::journal;
 use crate::db::keys;
 use crate::db::search::{self, FolderMatch};
 use crate::db::sources::{self, Refusal, Source, SourceKind};
+use crate::db::suggest::{self, Suggestion};
 use crate::db::tags::{self, EffectiveTag};
 use crate::error::{AppError, Result};
 use crate::fs::acts::{self, Batch};
@@ -631,6 +632,45 @@ pub fn search_with(conn: &Connection, text: &str, thumbs: &Path) -> Result<Searc
     })
 }
 
+/// The list under the field: where the word being typed starts, and the terms offered for it.
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+#[ts(export)]
+pub struct Suggestions {
+    /// In UTF-16 units. A pick replaces the text from here to its end.
+    pub from: usize,
+    pub rows: Vec<Suggestion>,
+}
+
+#[tauri::command]
+pub async fn search_suggestions(
+    state: State<'_, AppState>,
+    scope: Option<String>,
+    text: String,
+) -> Result<Suggestions> {
+    run(&state, move |conn| {
+        suggestions_with(conn, scope.as_deref(), &text)
+    })
+    .await
+}
+
+/// `scope` is the query's place term as text. Text that ends on no word offers nothing.
+pub fn suggestions_with(conn: &Connection, scope: Option<&str>, text: &str) -> Result<Suggestions> {
+    let Some(typing) = query::typing(text) else {
+        return Ok(Suggestions {
+            from: text.encode_utf16().count(),
+            rows: Vec::new(),
+        });
+    };
+    let scope = match scope.map(query::parse) {
+        Some(Ok(query::Expr::Term(term))) => Some(term),
+        _ => None,
+    };
+    Ok(Suggestions {
+        from: typing.from,
+        rows: suggest::suggest(conn, scope.as_ref(), &typing)?,
+    })
+}
+
 /// How many files the trash holds, and their size.
 #[tauri::command]
 pub async fn trash_summary(state: State<'_, AppState>) -> Result<TrashSummary> {
@@ -1097,6 +1137,42 @@ mod tests {
                 "fault": { "why": { "kind": "unclosedGroup", "after": null }, "at": 0 }
             })
         );
+    }
+
+    #[test]
+    fn the_list_says_where_the_word_starts_and_offers_nothing_after_a_space() {
+        let base = scratch("suggest");
+        let app = app_dir(&base);
+        let library = base.join("library");
+        std::fs::create_dir_all(library.join("Trips/Cairo")).unwrap();
+        let conn = conn();
+        register(&conn, &library, &app).unwrap();
+        walk::reconcile(&conn).unwrap();
+
+        let typed = suggestions_with(&conn, Some("path:library/Trips"), "é cai").unwrap();
+        assert_eq!(
+            serde_json::to_value(&typed).unwrap(),
+            serde_json::json!({
+                "from": 2,
+                "rows": [
+                    { "kind": "words", "text": "cai", "shape": { "kind": "text" }, "path": [] },
+                    {
+                        "kind": "folder",
+                        "text": "path:library/Trips/Cairo",
+                        "shape": {
+                            "kind": "path",
+                            "titles": ["library", "Trips", "Cairo"],
+                            "exact": false
+                        },
+                        "path": ["Trips", "Cairo"]
+                    }
+                ]
+            })
+        );
+        let spaced = suggestions_with(&conn, None, "cai ").unwrap();
+        assert_eq!((spaced.from, spaced.rows.len()), (4, 0));
+        let unscoped = suggestions_with(&conn, Some("(a or b)"), "cai").unwrap();
+        assert_eq!(unscoped.rows[1].path, ["library", "Trips", "Cairo"]);
     }
 
     #[test]

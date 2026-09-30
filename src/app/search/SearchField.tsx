@@ -10,16 +10,18 @@ import {
 
 import type { QueryFault } from "../../ipc/bindings/QueryFault";
 import type { QueryTerm } from "../../ipc/bindings/QueryTerm";
-import { readQuery } from "../../ipc/commands";
+import type { Suggestion } from "../../ipc/bindings/Suggestion";
+import type { Suggestions as Offered } from "../../ipc/bindings/Suggestions";
+import { readQuery, searchSuggestions } from "../../ipc/commands";
 import { Glyph } from "../../ui/Glyph";
 import { TermChip } from "../../ui/TermChip";
 import { backFrom, getPlace, placeKey, usePlace } from "../place";
 import { faultSentence, marksCharacter } from "./fault";
+import { Suggestions } from "./Suggestions";
 import { runQuery, scopeOf } from "./search";
+import { type Chip, movePlate, picked, queryOf, scoping } from "./suggest";
 
-type Chip = QueryTerm & { shape: Exclude<QueryTerm["shape"], { kind: "text" }> };
-
-const isChip = (term: QueryTerm): term is Chip => term.shape.kind !== "text";
+const isChip = (term: QueryTerm): term is QueryTerm & Chip => term.shape.kind !== "text";
 
 // One field in the window; Ctrl+F reaches it from anywhere. DECISIONS.md "Search".
 let focusField: ((byKey: boolean) => void) | null = null;
@@ -42,9 +44,9 @@ async function split(query: string) {
 }
 
 /**
- * The query, in the bar: the terms it understood as chips and the words as typed. Typing moves
- * nothing; Enter runs it, and a query that does not read runs nothing and says why.
- * Components › "The field holds the query".
+ * The query, in the bar: the terms it understood as chips and the words as typed. Typing moves only
+ * the list under it; Enter or a pick runs the query, and one that does not read runs nothing and
+ * says why. Components › "The field holds the query".
  */
 export function SearchField() {
   const place = usePlace();
@@ -56,8 +58,14 @@ export function SearchField() {
   const [ringed, setRinged] = useState(false);
   const [plated, setPlated] = useState(false);
   const [fault, setFault] = useState<QueryFault | null>(null);
+  const [offered, setOffered] = useState<Offered | null>(null);
+  const [plate, setPlate] = useState<number | null>(null);
+  // Counts the askings, so an answer for text since typed over is dropped.
+  const asked = useRef(0);
   const anchor = `--search-${useId().replace(/[^\w-]/g, "")}`;
   const sentence = fault ? faultSentence(fault.why) : null;
+  // The list and the sentence share one place, and the sentence has it first.
+  const listed = focused && !fault && offered !== null;
 
   // The field holds the query that made the results, and nothing anywhere else.
   const key = placeKey(place);
@@ -66,10 +74,28 @@ export function SearchField() {
     void hold();
   }, [key]);
 
+  function closeList() {
+    asked.current += 1;
+    setOffered(null);
+    setPlate(null);
+  }
+
+  /** Asks for the rows the word being typed begins; nothing is plated until a key moves. */
+  async function offer(typed: string) {
+    asked.current += 1;
+    const mine = asked.current;
+    const scope = chips.find(scoping)?.text ?? null;
+    const found = await searchSuggestions(scope, typed).catch(() => null);
+    if (mine !== asked.current) return;
+    setOffered(found && found.rows.length > 0 ? found : null);
+    setPlate(null);
+  }
+
   async function hold() {
     const here = getPlace();
     setFault(null);
     setPlated(false);
+    closeList();
     if (here?.kind !== "search") {
       setChips([]);
       setText("");
@@ -95,9 +121,6 @@ export function SearchField() {
   useLayoutEffect(() => {
     if (sentence && focused) line.current?.showPopover();
   }, [sentence, focused]);
-
-  const query = () =>
-    [...chips.map((chip) => chip.text), text.trim()].filter((part) => part !== "").join(" ");
 
   /** Where you stand becomes the first term, so the same words mean the same everywhere. */
   async function begin() {
@@ -126,26 +149,42 @@ export function SearchField() {
     setText(rest.replace(/\s+/g, " ").trimStart());
   }
 
-  async function run() {
-    const asked = query();
-    if (asked === "") return;
-    const { fault: why } = await readQuery(asked).catch(() => ({ fault: null }));
+  async function run(query = queryOf({ chips, text })) {
+    closeList();
+    if (query === "") return;
+    const { fault: why } = await readQuery(query).catch(() => ({ fault: null }));
     if (why) {
       setFault(why);
       return;
     }
     input.current?.blur();
-    runQuery(asked);
+    runQuery(query);
+  }
+
+  /** Writes a row's term where the word was, then runs the query it makes. */
+  function pick(row: Suggestion) {
+    const held = picked({ chips, text }, offered?.from ?? text.length, row);
+    setChips([...held.chips]);
+    setText(held.text);
+    void run(queryOf(held));
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Enter") {
+    const row = listed && plate !== null ? offered.rows[plate] : undefined;
+    if (listed && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+      event.preventDefault();
+      setPlate(movePlate(plate, event.key === "ArrowDown" ? 1 : -1, offered.rows.length));
+    } else if (row && (event.key === "Enter" || event.key === "Tab")) {
+      event.preventDefault();
+      pick(row);
+    } else if (event.key === "Enter") {
       event.preventDefault();
       void run();
     } else if (event.key === "Escape") {
       event.preventDefault();
-      // The first Escape takes back what did not read; the next, what was typed since the last run.
-      if (fault) setFault(null);
+      // Each Escape takes back one thing: the list, what did not read, then what was typed.
+      if (listed) closeList();
+      else if (fault) setFault(null);
       else {
         void hold();
         input.current?.blur();
@@ -221,7 +260,12 @@ export function SearchField() {
         <input
           ref={input}
           type="search"
+          role="combobox"
           aria-label="Search"
+          aria-autocomplete="list"
+          aria-expanded={listed}
+          aria-controls={listed ? `${anchor}-list` : undefined}
+          aria-activedescendant={listed && plate !== null ? `${anchor}-list-${plate}` : undefined}
           aria-invalid={fault ? true : undefined}
           aria-describedby={sentence ? `${anchor}-fault` : undefined}
           autoComplete="off"
@@ -235,12 +279,14 @@ export function SearchField() {
             setFocused(false);
             setRinged(false);
             setPlated(false);
+            closeList();
           }}
           onChange={(event) => {
             const typed = event.currentTarget.value;
             setText(typed);
             setFault(null);
             setPlated(false);
+            void offer(typed);
             if (/\s$/.test(typed)) void absorb(typed);
           }}
           onScroll={(event) => {
@@ -252,6 +298,16 @@ export function SearchField() {
           className={`h-full w-full min-w-0 appearance-none bg-transparent text-ui outline-none [&::-webkit-search-cancel-button]:hidden ${marking ? "text-transparent caret-fg" : "text-fg"}`}
         />
       </div>
+      {listed && (
+        <Suggestions
+          id={`${anchor}-list`}
+          anchor={anchor}
+          rows={offered.rows}
+          typed={text.trim()}
+          plate={plate}
+          onPick={pick}
+        />
+      )}
       {sentence && focused && (
         <div
           ref={line}

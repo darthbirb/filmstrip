@@ -111,6 +111,7 @@ pub fn run() {
             commands::trash_summary,
             commands::read_query,
             commands::search,
+            commands::search_suggestions,
             commands::restore_items,
             commands::set_folder_favorite,
             commands::favourite_places,

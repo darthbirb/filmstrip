@@ -616,6 +616,25 @@ nothing; Enter runs the query**, because a grid that reflows under every letter 
 can look at. A query that does not read runs nothing: the field names the character and the
 results stay as they were.
 
+**The list under the field offers terms for the word the text ends on**, by prefix: the words as
+typed, then folders, tags and labels, eight rows at most. ggallery had nothing like it, so the
+rules are Filmstrip's own:
+
+- **Each kind takes a row in turn** until the eight are gone, so forty folders called `Day 1` to
+  `Day 40` never push every tag and label off the list.
+- **Folders come nearest the scope first**, and only from below it; tags and labels ignore the
+  scope, since they cut across folders. Under `is:trashed` no folder is offered: nothing in the
+  Trash is in one.
+- **A folder's title is not offered as a tag.** Every folder carries its title as a tag, so each
+  would show twice; its row as a folder already stands for it. A tag someone added is offered once
+  something still carries it, most carried first.
+- **A typed key narrows the list**: `path:` to folders, `tag:` to tags, a label's key to that key's
+  values. `is:` and the keys that compare offer nothing, as the drawing has no row for them.
+- **A folder picked replaces the scope**, since a query holds one place; any other pick replaces
+  the word. A `-` typed before the word stays on the term.
+- **Folder titles match without case in ASCII only**, which is SQLite's `LIKE`; tags and labels are
+  stored folded, so they match in any script.
+
 **A search is a place**, as Artboards › A search is a place draws it, so the grid, the pane and
 the selection work in it as anywhere. Its header names it by its terms and its back arrow, or
 Escape once nothing else is open, returns to where the search began; no row in navigation is lit,

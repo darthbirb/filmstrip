@@ -21,6 +21,7 @@ import type { Reason } from "./bindings/Reason";
 import type { SearchOutcome } from "./bindings/SearchOutcome";
 import type { SourceKind } from "./bindings/SourceKind";
 import type { SourceSummary } from "./bindings/SourceSummary";
+import type { Suggestions } from "./bindings/Suggestions";
 import type { Trashed } from "./bindings/Trashed";
 import type { TrashSummary } from "./bindings/TrashSummary";
 import type { UndoReport } from "./bindings/UndoReport";
@@ -125,6 +126,9 @@ export const trashSummary = () => invoke<TrashSummary>("trash_summary");
 export const readQuery = (text: string) => invoke<Reading>("read_query", { text });
 
 export const search = (query: string) => invoke<SearchOutcome>("search", { query });
+
+export const searchSuggestions = (scope: string | null, text: string) =>
+  invoke<Suggestions>("search_suggestions", { scope, text });
 
 export const setItemFavorite = (itemIds: number[], favorite: boolean) =>
   invoke<void>("set_item_favorite", { itemIds, favorite });

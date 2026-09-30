@@ -16,21 +16,6 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## Typing a search · DRAWN
-
-Components › Search field draws the field at rest and nothing else. Search is the next slice, and
-PRODUCT.md "Search" asks that terms scope by folder and by tag through visible controls, with the
-syntax as the fallback. A query's text is the whole state of a search: anything a control offers
-writes into that text rather than setting a hidden filter.
-
-Draw the field focused, from a click and from a key (name the key), and while typing: a dropdown
-of suggestions that each write a term — folders by their path, tags, and labels as `Key: Value` —
-each saying what kind of term it is, since a value is never shown without its key. Draw the
-keyboard through the list, and the raw syntax typed by hand. Draw a finished query in the field
-as its terms, each removable: the terms are the parse, so what shows is what was understood.
-Draw a query that does not parse, an unclosed `(` or `"`: what the field says, and that the
-results stay where they were.
-
 ## Folders and tags as controls · DRAWN
 
 The controls that write a term are not drawn anywhere. Draw each: a tag or a label in the pane's

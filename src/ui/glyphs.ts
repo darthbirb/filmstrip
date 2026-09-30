@@ -49,6 +49,9 @@ export const GLYPHS = {
   keyboard: { icon: "keyboard", code: 0xe2d8 },
   folderGone: { icon: "folder-dashed", code: 0xe8f8 },
   back: { icon: "arrow-left", code: 0xe058 },
+  words: { icon: "text-aa", code: 0xe6ee },
+  tag: { icon: "tag", code: 0xe478 },
+  label: { icon: "tag-simple", code: 0xe47a },
 } as const;
 
 export type GlyphName = keyof typeof GLYPHS;

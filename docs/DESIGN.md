@@ -606,6 +606,13 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   focus ring; a click does not. A query that does not read turns the ring `danger`, underlines the
   character in `danger`, and hangs one sentence below it on `panel` in a `line-danger` ring with
   the warning glyph.
+- **Suggestion list.** Under the search field while a word is being typed, at the field's width:
+  the menu's surface, `panel` at the `control` corner in a `line-control` ring with the overlay
+  shadow, and rows `control` tall at the `nested` corner. A row is its kind's glyph in `fg-dim`
+  (text-aa, the filled folder, tag, tag-simple), the term as the field will show it, and the
+  kind's word at the end in `small` `fg-dim`: Words, Folder, Tag, Label. A folder is its path in
+  `fg-dim` and its title in `fg`; a tag and a label are their term chips. A `line` rule parts the
+  Words row from the rest. The row under the pointer or the arrow keys is on `raised-hi`.
 - **Term chip.** A search term the field understood, in the shape its kind has in the pane's
   details, at `badge` height in `small`: a folder or a place a square at the `badge` corner with
   its filled glyph in `fg-dim`, a tag a pill in a `line-control-hi` ring, a label its key sunk on
