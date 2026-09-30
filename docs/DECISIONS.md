@@ -577,6 +577,56 @@ does not use, but a key whose folder has gone did mean something, so its press s
 where the folder was. A key does nothing in a field, over a menu or Settings, or in the Trash,
 whose only way out is Restore. The top row and the number pad are the same keys.
 
+## Search
+
+**The query's text is the whole state of a search**, as ggallery's was and as Claude Design drew
+it on 29 September 2026. Every control that offers a term writes it into the text rather than
+setting a filter the text does not show, so a search reads the same wherever it runs and can
+always be typed by hand. The language is ggallery's, ported with its tests
+(SCHEMA.md "Query language"); what changed on the way:
+
+- **A path starts at a source.** ggallery had one library and matched a path's first title
+  against every top-level folder; here the first title is a source's, so `path:Pictures/Trips`
+  names one place even with several sources, and two sources sharing a title both answer.
+- **`is:unsorted` became `is:sorting`**, the Sorting Box's own word, and means a file in a sorting
+  source rather than a file with no folder, which cannot exist here.
+- **The index holds the name on disk.** ggallery was dropping file names from its index because it
+  renamed every file; Filmstrip keeps each file's own name, so the name you see is one you can find.
+- **Terms whose tables do not exist yet are not read**: `source:`, `uploader:`, `is:duplicate`,
+  `is:compressed` and `is:pending` arrive with downloads, duplicates and compression. Until then
+  `source:x` reads as a label, as any unreserved key does.
+- **A fault says where it is.** An unclosed `(` or `"` is reported with the character it starts at,
+  so the field can name it and keep what read before it.
+
+**A bare word is a union, not a fallback.** It matches a tag's or a label's value, a folder's title
+and a word of the name all at once. Trying them in order would make tagging one file `beach` stop
+`beach` from finding `bob_at_beach.jpg` anywhere, silently; a union is never quietly wrong, and a
+result says how it matched. **A folder matches what it carries itself**, never what its ancestors
+or its files do, so a word finds a folder exactly when it finds that folder's own files through
+the folder's tags. **A path only limits folders**: the folder a search is scoped to is where you
+are, not a result.
+
+**The field shows what it understood.** Folders, places, tags and labels become chips once a space
+closes them, and words stay the words typed, so the field is the parse and not a guess at it.
+**Ctrl+F** puts the caret there, as in Explorer and every browser; letters stay free for
+type-to-find and digits are destination keys. **Where you stand is the first term**: a folder
+writes `path:`, the Sorting Box `is:sorting` and the Trash `is:trashed`, so the same text means the
+same thing wherever it runs, and Search Everywhere is only that term removed. **Typing moves
+nothing; Enter runs the query**, because a grid that reflows under every letter is a grid nobody
+can look at. A query that does not read runs nothing: the field names the character and the
+results stay as they were.
+
+**A search is a place**, as Artboards › A search is a place draws it, so the grid, the pane and
+the selection work in it as anywhere. Its header names it by its terms and its back arrow, or
+Escape once nothing else is open, returns to where the search began; no row in navigation is lit,
+because none is this place. Folders come first, each saying what it matched, and a click on one
+goes into it; each file says where it lives, and a trashed one where it came from, keeping the
+Trash's verbs.
+
+**Results come trashed first, newest first, then by name**, as the Trash and the Sorting Box each
+order their own. A trashed file is found only when the query names the Trash; the drawing's Trash
+scope writes `is:trashed`, so the two meet only when someone types both.
+
 ## Undo
 
 **Every change the app makes on disk is journalled and can be undone, across a restart**, ported

@@ -58,21 +58,25 @@ pub fn listing(conn: &Connection) -> Result<Vec<Trashed>> {
     items::in_trash(conn)?
         .into_iter()
         .map(|(row, trashed_at)| {
-            let from = Origin {
-                folder_id: row.folder_id,
-                path: folders::ancestry(conn, row.folder_id)?
-                    .into_iter()
-                    .map(|crumb| crumb.title)
-                    .collect(),
-                gone: folders::live_at(conn, row.folder_id)?.is_none(),
-            };
             Ok(Trashed {
+                from: origin(conn, row.folder_id)?,
                 row,
                 trashed_at,
-                from,
             })
         })
         .collect()
+}
+
+/// A folder named from its source's own folder down, and whether it or one at its place is live.
+pub fn origin(conn: &Connection, folder_id: i64) -> Result<Origin> {
+    Ok(Origin {
+        folder_id,
+        path: folders::ancestry(conn, folder_id)?
+            .into_iter()
+            .map(|crumb| crumb.title)
+            .collect(),
+        gone: folders::live_at(conn, folder_id)?.is_none(),
+    })
 }
 
 pub fn summary(conn: &Connection) -> Result<TrashSummary> {

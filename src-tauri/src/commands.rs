@@ -1,6 +1,7 @@
 //! The command boundary: each command opens a connection on a blocking thread,
 //! calls a plain function, and returns. DEVELOPMENT.md "The command boundary".
 
+use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
 
 use rusqlite::Connection;
@@ -15,6 +16,7 @@ use crate::db::items::{self, ItemDetail, ItemRow};
 use crate::db::jobs::{self as job_table, Failure};
 use crate::db::journal;
 use crate::db::keys;
+use crate::db::search::{self, FolderMatch};
 use crate::db::sources::{self, Refusal, Source, SourceKind};
 use crate::db::tags::{self, EffectiveTag};
 use crate::error::{AppError, Result};
@@ -22,9 +24,10 @@ use crate::fs::acts::{self, Batch};
 use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
 use crate::fs::items::{self as fs_items, MoveReport};
 use crate::fs::paths;
-use crate::fs::trash::{self, RestoreReport, TrashReport, TrashSummary, Trashed};
+use crate::fs::trash::{self, Origin, RestoreReport, TrashReport, TrashSummary, Trashed};
 use crate::fs::undo::{self, UndoReport};
 use crate::jobs::{self, JobQueue, Progress};
+use crate::query::{self, QueryFault, QueryTerm, Reading};
 
 pub struct AppState {
     pub db: PathBuf,
@@ -550,6 +553,84 @@ pub async fn trash_listing(state: State<'_, AppState>) -> Result<Vec<Trashed>> {
     .await
 }
 
+/// What the field understood of its text, with nothing run.
+#[tauri::command]
+pub async fn read_query(text: String) -> Result<Reading> {
+    Ok(query::read(&text))
+}
+
+/// A file a search found, the folder it lives in or, in the Trash, the one it left, and when it
+/// went there.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Hit {
+    #[serde(flatten)]
+    pub row: ItemRow,
+    pub at: Origin,
+    pub trashed_at: Option<i64>,
+}
+
+/// A search's answer: its terms, the folders and then the files it found; or why it did not read.
+#[derive(Debug, Clone, PartialEq, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(export)]
+pub enum SearchOutcome {
+    Found {
+        terms: Vec<QueryTerm>,
+        folders: Vec<FolderMatch>,
+        items: Vec<Hit>,
+    },
+    Unparsed {
+        fault: QueryFault,
+    },
+}
+
+#[tauri::command]
+pub async fn search(state: State<'_, AppState>, query: String) -> Result<SearchOutcome> {
+    let thumbs = state.thumbs.clone();
+    run(&state, move |conn| search_with(conn, &query, &thumbs)).await
+}
+
+pub fn search_with(conn: &Connection, text: &str, thumbs: &Path) -> Result<SearchOutcome> {
+    let reading = query::read(text);
+    if let Some(fault) = reading.fault {
+        return Ok(SearchOutcome::Unparsed { fault });
+    }
+    let expr = query::parse(text).map_err(AppError::invalid)?;
+    // Results crowd into few folders, so each folder is named once.
+    let mut named: HashMap<i64, Origin> = HashMap::new();
+    let mut items = Vec::new();
+    for (mut row, trashed_at) in search::items(conn, &expr)? {
+        let at = match named.get(&row.folder_id) {
+            Some(at) => at.clone(),
+            None => {
+                let at = trash::origin(conn, row.folder_id)?;
+                named.insert(row.folder_id, at.clone());
+                at
+            }
+        };
+        row.thumb = thumb_of(&row.uuid, thumbs);
+        items.push(Hit {
+            row,
+            at,
+            trashed_at,
+        });
+    }
+    let mut folders = search::folders(conn, &expr)?;
+    for folder in &mut folders {
+        folder.cover = folder
+            .cover_uuid
+            .as_deref()
+            .and_then(|uuid| thumb_of(uuid, thumbs));
+    }
+    Ok(SearchOutcome::Found {
+        terms: reading.terms,
+        folders,
+        items,
+    })
+}
+
 /// How many files the trash holds, and their size.
 #[tauri::command]
 pub async fn trash_summary(state: State<'_, AppState>) -> Result<TrashSummary> {
@@ -962,6 +1043,59 @@ mod tests {
         assert_eq!(
             (ticket.disk_name.as_str(), ticket.kind.as_str()),
             ("ticket.png", "image")
+        );
+    }
+
+    #[test]
+    fn a_walked_file_is_found_by_its_name_and_its_folders_and_crosses_in_camel_case() {
+        let base = scratch("search");
+        let app = app_dir(&base);
+        let library = base.join("library");
+        std::fs::create_dir_all(library.join("Trips/Cairo")).unwrap();
+        std::fs::write(library.join("Trips/Cairo/pyramid.jpg"), "abc").unwrap();
+        std::fs::write(library.join("Trips/ticket.png"), "de").unwrap();
+        let conn = conn();
+        register(&conn, &library, &app).unwrap();
+        walk::reconcile(&conn).unwrap();
+
+        let outcome = search_with(&conn, "cairo", &base.join("thumbs")).unwrap();
+        let json = serde_json::to_value(&outcome).unwrap();
+        assert_eq!(json["kind"], "found");
+        assert_eq!(json["terms"][0]["shape"]["kind"], "text");
+        let [folder] = json["folders"].as_array().unwrap().as_slice() else {
+            panic!("one folder: {json}");
+        };
+        assert_eq!(folder["title"], "Cairo");
+        assert_eq!(folder["path"][1]["title"], "Trips");
+        assert_eq!(folder["sourceId"], 1);
+        assert_eq!(folder["count"], 1);
+        assert_eq!(
+            folder["matched"],
+            serde_json::json!({ "kind": "name", "value": "Cairo" })
+        );
+        let [hit] = json["items"].as_array().unwrap().as_slice() else {
+            panic!("one file: {json}");
+        };
+        assert_eq!(hit["diskName"], "pyramid.jpg");
+        assert_eq!(hit["trashedAt"], serde_json::Value::Null);
+        assert_eq!(
+            hit["at"]["path"],
+            serde_json::json!(["library", "Trips", "Cairo"])
+        );
+
+        let by_name = search_with(&conn, "ticket", &base.join("thumbs")).unwrap();
+        let SearchOutcome::Found { items, .. } = by_name else {
+            panic!("it reads")
+        };
+        assert_eq!(items[0].row.disk_name, "ticket.png");
+
+        let unread = serde_json::to_value(search_with(&conn, "(", &base).unwrap()).unwrap();
+        assert_eq!(
+            unread,
+            serde_json::json!({
+                "kind": "unparsed",
+                "fault": { "why": { "kind": "unclosedGroup", "after": null }, "at": 0 }
+            })
         );
     }
 

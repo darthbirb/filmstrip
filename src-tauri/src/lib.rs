@@ -7,6 +7,7 @@ pub mod error;
 pub mod fs;
 pub mod jobs;
 pub mod media;
+pub mod query;
 
 use tauri::{Emitter, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
 
@@ -108,6 +109,8 @@ pub fn run() {
             commands::sorting_items,
             commands::trash_listing,
             commands::trash_summary,
+            commands::read_query,
+            commands::search,
             commands::restore_items,
             commands::set_folder_favorite,
             commands::favourite_places,

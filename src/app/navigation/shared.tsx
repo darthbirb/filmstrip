@@ -160,6 +160,8 @@ export function selectedRowId(place: Place | null) {
   if (!place) return null;
   if (place.kind === "sorting") return SORTING_ID;
   if (place.kind === "trash") return TRASH_ID;
+  // No row is a search's place, so none is lit. Artboards › A search is a place.
+  if (place.kind === "search") return null;
   const folder = place.path.at(-1);
   return folder ? folderRowId(folder.id) : null;
 }

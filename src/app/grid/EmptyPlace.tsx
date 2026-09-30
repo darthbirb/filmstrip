@@ -5,6 +5,7 @@ import { Button } from "../../ui/Button";
 import { EmptyState } from "../../ui/EmptyState";
 import { ensureChildren, useIndex } from "../navigation/index-store";
 import { type Place, setPlace } from "../place";
+import { NothingMatched } from "../search/NothingMatched";
 
 /** What an empty place says, in its own words, and the one move worth offering. DECISIONS.md "The grid". */
 export function EmptyPlace({ place }: { place: Place }) {
@@ -22,6 +23,7 @@ export function EmptyPlace({ place }: { place: Place }) {
   if (place.kind === "trash") {
     return <EmptyState glyph="trash" title="Trash Is Empty" />;
   }
+  if (place.kind === "search") return <NothingMatched place={place} />;
   if (!folder) return null;
 
   // A source that cannot be read still knows what it held, so it says that rather than "empty".

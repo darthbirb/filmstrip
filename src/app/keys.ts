@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import { itemDetail } from "../ipc/commands";
+import { inTrash } from "./grid/place-items";
 import { getChecked } from "./grid/selection";
 import { setNews } from "./navigation/foot-slot";
 import { getIndex } from "./navigation/index-store";
@@ -68,7 +69,8 @@ export async function press(digit: string) {
         ? []
         : [listed.find((row) => row.id === shown) ?? (await itemDetail(shown).catch(() => null))];
   const going = files.flatMap((file) => (file ? [file] : []));
-  if (going.length === 0) return;
+  // A trashed file among a search's results goes only by Restore, as in the Trash.
+  if (going.length === 0 || going.every(inTrash)) return;
   if (going.every((file) => file.folderId === bound.folderId)) {
     setNews({ kind: "keyRefused", line: `Already in ${name}.` });
     return;

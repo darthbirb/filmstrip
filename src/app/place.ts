@@ -7,7 +7,9 @@ export type Crumb = { id: number; title: string };
 export type Place =
   | { kind: "folder"; sourceId: number; path: Crumb[] }
   | { kind: "sorting" }
-  | { kind: "trash" };
+  | { kind: "trash" }
+  /** A query's results, and the place the search began from, which back returns to. */
+  | { kind: "search"; query: string; back: Place | null };
 
 let current: Place | null = null;
 const listeners = new Set<() => void>();
@@ -33,6 +35,18 @@ export function whenPlaceChanges(listener: () => void) {
 /** The folder being shown, when the place is a folder. */
 export function placeFolder(place: Place | null) {
   return place?.kind === "folder" ? place.path.at(-1) : undefined;
+}
+
+/** One string per place, the same for the same place however it was reached. */
+export function placeKey(place: Place | null) {
+  if (place?.kind === "folder") return `folder ${place.path.at(-1)?.id}`;
+  if (place?.kind === "search") return `search ${place.query}`;
+  return place?.kind ?? "";
+}
+
+/** Where a search from here returns to: a search's own way back, so back never leads to results. */
+export function backFrom(place: Place | null): Place | null {
+  return place?.kind === "search" ? place.back : place;
 }
 
 function subscribe(listener: () => void) {

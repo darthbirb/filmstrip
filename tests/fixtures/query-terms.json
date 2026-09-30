@@ -1,0 +1,27 @@
+[
+  { "fn": "quoteWord", "args": ["beach"], "expected": "beach" },
+  { "fn": "quoteWord", "args": ["say\"hi"], "expected": "say\\\"hi" },
+  { "fn": "quoteWord", "args": ["say \"hi\""], "expected": "\"say \\\"hi\\\"\"" },
+  { "fn": "quoteWord", "args": ["a\\"], "expected": "a\\\\" },
+  { "fn": "quoteWord", "args": ["a b\\"], "expected": "\"a b\\\\\"" },
+  { "fn": "quoteWord", "args": ["line\u0085break"], "expected": "\"line\u0085break\"" },
+  { "fn": "quoteWord", "args": ["bom﻿char"], "expected": "bom﻿char" },
+  { "fn": "quoteWord", "args": ["a(b)c"], "expected": "\"a(b)c\"" },
+  { "fn": "quoteWord", "args": ["or"], "expected": "\"or\"" },
+  { "fn": "quoteWord", "args": ["OR"], "expected": "\"OR\"" },
+  { "fn": "quoteWord", "args": [""], "expected": "\"\"" },
+  { "fn": "pathTerm", "args": [["Library", "Ana"], false], "expected": "path:Library/Ana" },
+  { "fn": "pathTerm", "args": [["Library", "Ana"], true], "expected": "path:=Library/Ana" },
+  {
+    "fn": "pathTerm",
+    "args": [["Music", "rock/pop"], false],
+    "expected": "path:Music/rock\\\\/pop"
+  },
+  { "fn": "pathTerm", "args": [["a\\", "b"], false], "expected": "path:a\\\\\\\\/b" },
+  { "fn": "pathTerm", "args": [["a/b"], false], "expected": "path:a\\\\/b" },
+  { "fn": "pathTerm", "args": [["Trips", "Day One"], true], "expected": "path:=\"Trips/Day One\"" },
+  { "fn": "bareTerm", "args": ["Pinned Folder"], "expected": "\"Pinned Folder\"" },
+  { "fn": "bareTerm", "args": ["a\\"], "expected": "a\\\\" },
+  { "fn": "labelTerm", "args": ["location", "a\\\"b"], "expected": "location:a\\\\\\\"b" },
+  { "fn": "labelTerm", "args": ["location", "san diego"], "expected": "location:\"san diego\"" }
+]

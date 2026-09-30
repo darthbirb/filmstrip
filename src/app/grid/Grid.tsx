@@ -12,10 +12,14 @@ import {
   useState,
 } from "react";
 
+import type { FolderMatch } from "../../ipc/bindings/FolderMatch";
+import type { Hit } from "../../ipc/bindings/Hit";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import type { Origin } from "../../ipc/bindings/Origin";
 import type { Trashed } from "../../ipc/bindings/Trashed";
-import { formatDay, formatDuration } from "../../lib/format";
+import { formatCount, formatDay, formatDuration } from "../../lib/format";
+import { FolderCard } from "../../ui/FolderCard";
+import { Glyph } from "../../ui/Glyph";
 import { type HeadedMenu, useContextMenu } from "../../ui/Menu";
 import { SelectBox } from "../../ui/SelectBox";
 import { SkeletonTile } from "../../ui/Skeleton";
@@ -23,12 +27,14 @@ import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
 import { itemMenu, setMenu } from "../menus/item-menu";
 import { setFullScreen } from "../pane/full-screen";
 import { showInPane, usePaneItem } from "../pane/pane-store";
-import { type Place, usePlace } from "../place";
+import { type Place, setPlace, usePlace } from "../place";
 import { usePreferences } from "../preferences";
+import { useSearchOutcome } from "../search/results";
 import { pressTile } from "./drag";
 import { EmptyPlace } from "./EmptyPlace";
 import { rowOf, step } from "./keys";
 import { type LayoutMode, rowAt } from "./layout";
+import { inTrash } from "./place-items";
 import {
   checkRange,
   keepChecked,
@@ -58,23 +64,30 @@ export function Grid({ mode }: { mode: LayoutMode }) {
       ? (items as Trashed[])
       : null;
   const days = useMemo(() => (trashed ? byDay(trashed) : null), [trashed]);
-  const sections = useMemo(
-    () => days && { groups: days.starts, lead: view.heading + gap, below: view.caption },
-    [days, view.heading, view.caption, gap],
-  );
+  // A search's folders stand before its files, each file saying where it lives. Artboards › A
+  // search is a place.
+  const search = place?.kind === "search" ? place : null;
+  const outcome = useSearchOutcome(search?.query);
+  const found = (search && outcome?.kind === "found" && outcome.folders) || NO_FOLDERS;
+  const hits = search && items?.every((item) => "at" in item) ? (items as Hit[]) : null;
+  const [block, setBlock] = useState<HTMLDivElement | null>(null);
+  const foldersHeight = useHeight(block);
+  const filesLead = found.length > 0 ? foldersHeight + gap + view.heading + gap : 0;
+  const sections = useMemo(() => {
+    if (days) return { groups: days.starts, lead: view.heading + gap, below: view.caption };
+    if (hits) return { groups: Uint32Array.of(0), lead: filesLead, below: view.caption };
+    return null;
+  }, [days, hits, filesLead, view.heading, view.caption, gap]);
   const result = useLayout(items ?? [], view.width - gap * 2, rowHeight, gap, mode, sections);
   const reading = place !== null && items === null;
   const selection = useSelection();
   const checked = new Set(selection.ids);
   const checkedRows = useChecked();
   // On a checked tile the set's menu; on any other, that tile's own, and the set is kept.
-  const setOf = () => setMenu(checkedRows, place?.kind === "trash");
-  // A checked tile carries the set, any other itself alone; the Trash's files only go by Restore.
-  const press =
-    place?.kind === "trash"
-      ? undefined
-      : (event: PointerEvent, item: ItemRow) =>
-          pressTile(event, () => (checked.has(item.id) ? checkedRows : [item]));
+  const setOf = () => setMenu(checkedRows, checkedRows.every(inTrash));
+  // A checked tile carries the set, any other itself alone; a trashed file only goes by Restore.
+  const press = (event: PointerEvent, item: ItemRow) =>
+    pressTile(event, () => (checked.has(item.id) ? checkedRows : [item]));
   const order = useMemo(() => (items ?? []).map((item) => item.id), [items]);
   const indexOf = useMemo(() => new Map(order.map((id, index) => [id, index])), [order]);
   useSelectionKeys(order);
@@ -150,14 +163,15 @@ export function Grid({ mode }: { mode: LayoutMode }) {
           ringed={item.id === ring}
           onCheck={check}
           setOf={setOf}
-          onPress={press}
+          onPress={inTrash(item) ? undefined : press}
           onRing={setRinged}
           onKeyDown={onKeyDown}
           left={(result.itemLeft[index] ?? 0) + gap}
           top={(result.rowTops[row] ?? 0) + gap}
           width={result.itemWidth[index] ?? 0}
           height={result.rowHeights[row] ?? 0}
-          origin={trashed?.[index]?.from}
+          origin={trashed?.[index]?.from ?? hits?.[index]?.at}
+          fromTrash={hits?.[index]?.trashedAt != null}
           below={sections?.below ?? 0}
         />,
       );
@@ -191,13 +205,52 @@ export function Grid({ mode }: { mode: LayoutMode }) {
           gap={gap}
           mode={mode}
         />
-      ) : items?.length === 0 && place ? (
+      ) : items?.length === 0 && found.length === 0 && place ? (
         <EmptyPlace place={place} />
       ) : (
         <div
           className="relative"
-          style={{ height: result && items?.length ? result.totalHeight + gap * 2 : 0 }}
+          style={{
+            height: Math.max(
+              result && items?.length ? result.totalHeight + gap * 2 : 0,
+              found.length > 0 ? foldersHeight + gap * 2 : 0,
+            ),
+          }}
         >
+          {found.length > 0 && (
+            <div
+              ref={setBlock}
+              className="absolute flex flex-col gap-tile-gap"
+              style={{ top: gap, left: gap, right: gap }}
+            >
+              <h3 className="m-0 flex h-heading items-end px-0.5 text-eyebrow text-fg-dim uppercase">
+                Folders · {formatCount(found.length)}
+              </h3>
+              <div className="flex flex-wrap gap-tile-gap">
+                {found.map((folder) => (
+                  <FolderCard
+                    key={folder.id}
+                    title={folder.title}
+                    count={folder.count}
+                    above={folder.path.slice(0, -1).map((crumb) => crumb.title)}
+                    matched={folder.matched}
+                    cover={folder.cover ? convertFileSrc(folder.cover) : undefined}
+                    onOpen={() =>
+                      setPlace({ kind: "folder", sourceId: folder.sourceId, path: folder.path })
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+          {found.length > 0 && hits && hits.length > 0 && (
+            <h3
+              className="absolute m-0 flex h-heading items-end px-0.5 text-eyebrow text-fg-dim uppercase"
+              style={{ top: foldersHeight + gap * 2, left: gap, right: gap }}
+            >
+              Files · {formatCount(hits.length)}
+            </h3>
+          )}
           {/* Drawn once the layout that made room for them has come back. */}
           {result?.groupTops.length === days?.headings.length &&
             days?.headings.map((day, group) => (
@@ -214,6 +267,22 @@ export function Grid({ mode }: { mode: LayoutMode }) {
       )}
     </div>
   );
+}
+
+const NO_FOLDERS: FolderMatch[] = [];
+
+/** An element's height as it lays out, followed through every resize; nothing for no element. */
+function useHeight(element: HTMLElement | null) {
+  const [height, setHeight] = useState(0);
+  useLayoutEffect(() => {
+    if (!element) return setHeight(0);
+    const measure = () => setHeight(element.getBoundingClientRect().height);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [element]);
+  return height;
 }
 
 /** Where each day's run begins, newest first, and the heading it goes under. */
@@ -305,8 +374,10 @@ type TileProps = {
   top: number;
   width: number;
   height: number;
-  /** For a file in the Trash: the folder it came from, said under the tile. */
+  /** The folder it lives in, or for a file in the Trash the one it came from, said under the tile. */
   origin?: Origin;
+  /** Among results, a trashed file says it came from its folder, after the Trash's glyph. */
+  fromTrash?: boolean;
   /** The room under the tile for that line. */
   below: number;
 };
@@ -314,7 +385,7 @@ type TileProps = {
 function Tile(props: TileProps) {
   const { item, from, shown, checked, boxes, ringed, onCheck, setOf, onPress, onRing, onKeyDown } =
     props;
-  const { left, top, width, height, origin, below } = props;
+  const { left, top, width, height, origin, fromTrash, below } = props;
   // Opening it moves nothing: the pane keeps what it shows until a verb says otherwise.
   const context = useContextMenu();
   return (
@@ -379,9 +450,13 @@ function Tile(props: TileProps) {
         // The folder's name only; its whole path is the tooltip, and the pane's From row.
         <figcaption
           title={origin.path.join(" › ")}
-          className="flex h-tile-caption items-end px-0.5 text-small"
+          className="flex h-tile-caption items-end gap-1 px-0.5 text-small"
         >
+          {fromTrash && (
+            <Glyph name="trash" className="shrink-0 pb-0.5 text-fg-dim text-glyph-small" />
+          )}
           <span className="truncate text-fg-mid">
+            {fromTrash && "from "}
             {origin.path.at(-1)}
             {origin.gone && <span className="text-fg-dim"> · gone</span>}
           </span>

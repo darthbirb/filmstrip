@@ -1,6 +1,7 @@
 import { formatBytes, formatCount } from "../../lib/format";
 import { Glyph } from "../../ui/Glyph";
 import { setPlace, usePlace } from "../place";
+import { SearchHeader } from "../search/SearchHeader";
 import { useIndex } from "./index-store";
 
 const TITLES = { sorting: "Sorting Box", trash: "Trash" } as const;
@@ -10,6 +11,7 @@ export function Breadcrumb() {
   const place = usePlace();
   const { trash } = useIndex();
   if (!place) return null;
+  if (place.kind === "search") return <SearchHeader place={place} />;
 
   const steps =
     place.kind === "folder"

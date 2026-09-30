@@ -152,10 +152,14 @@ pub struct ItemRow {
 }
 
 /// The columns [`row`] reads, in its order, from `item` named `i`.
-const ROW: &str = "i.id, i.uuid, i.folder_id, i.disk_name, i.ext, i.kind, i.size_bytes, i.mtime,
+pub(crate) const ROW: &str =
+    "i.id, i.uuid, i.folder_id, i.disk_name, i.ext, i.kind, i.size_bytes, i.mtime,
                    i.width, i.height, i.duration_ms, i.favorite";
 
-fn row(r: &rusqlite::Row) -> rusqlite::Result<ItemRow> {
+/// How many columns [`ROW`] is, so a query can read what it selects after them.
+pub(crate) const ROW_WIDTH: usize = 12;
+
+pub(crate) fn row(r: &rusqlite::Row) -> rusqlite::Result<ItemRow> {
     Ok(ItemRow {
         id: r.get(0)?,
         uuid: r.get(1)?,
@@ -222,7 +226,7 @@ pub fn set_name(conn: &Connection, id: i64, disk_name: &str) -> Result<()> {
         "UPDATE item SET disk_name = ?1, ext = ?2 WHERE id = ?3",
         params![disk_name, crate::fs::paths::extension_of(disk_name), id],
     )?;
-    Ok(())
+    crate::db::search::index_item(conn, id)
 }
 
 /// Removes a retired row outright: one whose file a walk found gone, holding a name another file
