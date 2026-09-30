@@ -207,9 +207,10 @@ fn dated(from: i64, to: i64, sql: &mut Sql) -> String {
     "(COALESCE(i.captured_at, i.mtime) >= ? AND COALESCE(i.captured_at, i.mtime) < ?)".into()
 }
 
-/// A word as one FTS5 phrase, so what the person typed is never read as FTS5's own syntax.
+/// A word as one FTS5 phrase, so what the person typed is never read as FTS5's own syntax. The
+/// `*` lets its last word be the beginning of one. DECISIONS.md "Search".
 fn phrase(text: &str) -> Option<String> {
-    (!text.trim().is_empty()).then(|| format!("\"{}\"", text.replace('"', "\"\"")))
+    (!text.trim().is_empty()).then(|| format!("\"{}\"*", text.replace('"', "\"\"")))
 }
 
 /// A term as a condition over one `tag t` row, for the four kinds a tag row can answer.
@@ -847,6 +848,22 @@ mod tests {
             found(&l.conn, "\"\"").is_empty(),
             "an empty word finds nothing"
         );
+    }
+
+    #[test]
+    fn a_word_finds_what_begins_with_it_and_not_what_only_holds_it() {
+        let l = library();
+        assert_eq!(found(&l.conn, "sun"), ["sunset_at_beach.jpg"]);
+        assert_eq!(found_folders(&l.conn, "lis"), ["Lisbon"]);
+        assert_eq!(found_folders(&l.conn, "pin"), ["Pinned Folder"]);
+        assert_eq!(
+            found_folders(&l.conn, "\"pinned fol\""),
+            ["Pinned Folder"],
+            "only the last word of a phrase is a beginning"
+        );
+        assert!(found(&l.conn, "each").is_empty(), "not the middle of beach");
+        assert!(found_folders(&l.conn, "isbon").is_empty());
+        assert!(found_folders(&l.conn, "\"pin folder\"").is_empty());
     }
 
     #[test]

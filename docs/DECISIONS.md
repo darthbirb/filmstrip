@@ -601,7 +601,10 @@ always be typed by hand. The language is ggallery's, ported with its tests
 **A bare word is a union, not a fallback.** It matches a tag's or a label's value, a folder's title
 and a word of the name all at once. Trying them in order would make tagging one file `beach` stop
 `beach` from finding `bob_at_beach.jpg` anywhere, silently; a union is never quietly wrong, and a
-result says how it matched. **A folder matches what it carries itself**, never what its ancestors
+result says how it matched. **A word finds what begins with it**: ggallery matched whole words, so
+`root` found neither the folder `root1` nor a file `root_canal.jpg`, and a search that finds
+nothing for the first half of a name reads as broken. The middle of a word still finds nothing,
+which keeps short words from matching everything. **A folder matches what it carries itself**, never what its ancestors
 or its files do, so a word finds a folder exactly when it finds that folder's own files through
 the folder's tags. **A path only limits folders**: the folder a search is scoped to is where you
 are, not a result.
