@@ -16,7 +16,20 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## A search starts scoped to where you stand · DEFECT
+## The last pass left three things undecided · DEFECT
+
+The pass that drew search starting everywhere and the two-figure count listed these as open on
+its Notes sheet. The first blocks building the offer; settle all three.
+
+- **The offer's dashed edge is `#4a4845`**, a grey the token sheet does not name. Draw it with a
+  named colour, or name it on the token sheet and say where else it may be used.
+- **The folder band says `3 here · 0 below`**, where below leaves out the folder's own files,
+  while the pill's second figure counts them. Decide whether the band reads in the pill's terms,
+  and draw it that way.
+- **Move to… shows no counts.** This backlog asked for the count wherever one is shown, the
+  picker included, and the pass drew none there. Say whether a picker row carries the pill.
+
+## A search starts scoped to where you stand · DRAWN
 
 Components › "The field holds the query, and shows it as terms" has focus write where you stand
 as the query's first term, so a search typed in Cairo searches Cairo. Tried against a real
@@ -33,7 +46,7 @@ results header and Nothing Matched, whose Search Everywhere assumed a scope to r
 suggestion list's folders, drawn as under the scope; and "One scope per query". The scope stays a
 term in the text, read, removed and typed like any other.
 
-## A source's row shows no count
+## A source's row shows no count · DRAWN
 
 In navigation every folder's row ends in a count and a source's row has none, so the files lying
 directly in a source's own folder cannot be seen from the tree. A library of nine files read as
@@ -41,7 +54,7 @@ five: three lay in the source itself and one in a folder folded shut.
 
 Give a source's row its count, by the rule the entry below settles for folders.
 
-## A folder's count hides what is below it
+## A folder's count hides what is below it · DRAWN
 
 A folder's row counts only the files directly in it. A folder of folders reads as empty, and
 nothing says how much a branch holds.
@@ -59,9 +72,9 @@ details, a folder's right-click menu (Search in Folder), and a matched folder am
 going into the folder and scoping the search to it are two different things. Say whether a click
 replaces the query or adds its term, and which modifier does the other.
 
-Not built yet, and reopened by the defect above: the drawn rule, a click replaces the query and
-drops the scope and Ctrl+Click adds the term and keeps it, was made for a search that starts
-scoped. Say what each does once it does not.
+Redrawn for a search that starts everywhere: a click replaces the whole query and the field
+offers the scope again; Ctrl+Click adds the term, keeps whatever the query holds, and never writes
+a scope of its own.
 
 ## A folder's details · DRAWN
 
