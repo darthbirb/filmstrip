@@ -27,9 +27,11 @@ way a choice is offered.
 
 ## Rules
 
-- **Work on a branch and open a pull request.** Never commit to `main`. Never push — the user
-  pushes. `git status -sb` before committing: the user merges and pulls between turns, so the
-  branch you were on may now be `main`. The `.githooks/pre-commit` hook refuses that commit
+- **Work on a branch and open a pull request.** Never commit to `main` and never push to it;
+  `main` is protected on GitHub. Push your own branch and open its pull request once the gates
+  pass; the user reviews and merges. Never force-push, never merge a pull request, never delete a
+  remote branch. `git status -sb` before committing: the user merges and pulls between turns, so
+  the branch you were on may now be `main`. The `.githooks/pre-commit` hook refuses that commit
   when the clone has run `git config core.hooksPath .githooks`.
 - **Every branch starts from an up-to-date `main`, and only from `main`.** Before a new task:
   `git fetch --prune`, see that no earlier branch is still waiting to be merged, and branch from
