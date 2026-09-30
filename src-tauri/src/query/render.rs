@@ -101,6 +101,10 @@ pub fn bare_term(value: &str) -> String {
     quote_word(value)
 }
 
+pub fn tag_term(value: &str) -> String {
+    format!("tag:{}", quote_word(value))
+}
+
 pub fn label_term(key: &str, value: &str) -> String {
     format!("{key}:{}", quote_word(value))
 }

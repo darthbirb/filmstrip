@@ -8,6 +8,7 @@ pub mod journal;
 pub mod keys;
 pub mod search;
 pub mod sources;
+pub mod suggest;
 pub mod tags;
 
 use std::path::Path;

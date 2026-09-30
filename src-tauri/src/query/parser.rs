@@ -190,6 +190,23 @@ fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
     Ok(tokens)
 }
 
+/// The word the text ends on, unescaped, and the byte it starts at: none after a space, a
+/// bracket or `OR`. A quote still open is read as closed, since it is still being typed.
+pub fn last_word(input: &str) -> Option<(usize, String)> {
+    let (tokens, end) = match tokenize(input) {
+        Ok(tokens) => (tokens, input.len()),
+        Err(_) => (tokenize(&format!("{input}\"")).ok()?, input.len() + 1),
+    };
+    match tokens.last()? {
+        Token {
+            kind: Kind::Word(word),
+            start,
+            end: at,
+        } if *at == end => Some((*start, word.clone())),
+        _ => None,
+    }
+}
+
 struct Parser<'a> {
     tokens: &'a [Token],
     pos: usize,

@@ -23,6 +23,8 @@ import type { Shape } from "../ipc/bindings/Shape";
 import type { SourceKind } from "../ipc/bindings/SourceKind";
 import type { SourceSummary } from "../ipc/bindings/SourceSummary";
 import type { Stayed } from "../ipc/bindings/Stayed";
+import type { Suggestion } from "../ipc/bindings/Suggestion";
+import type { Suggestions } from "../ipc/bindings/Suggestions";
 import type { Trashed } from "../ipc/bindings/Trashed";
 import type { TrashSummary } from "../ipc/bindings/TrashSummary";
 import type { UndoReport } from "../ipc/bindings/UndoReport";
@@ -514,6 +516,62 @@ function searchFor(query: string): SearchOutcome {
   return { kind: "found", terms, folders: found, items: files };
 }
 
+// The mock library carries no tags of its own, so the list has these to offer.
+const TAGS = ["dawn", "dusk"];
+const LABELS = [
+  { key: "time", value: "dawn" },
+  { key: "location", value: "cairo" },
+];
+
+/**
+ * The list under the field, as far as the mock library needs it: the last word, by prefix, against
+ * folder titles below a `path:` scope and the tags and labels above. `db::suggest` is the real one.
+ */
+function suggestionsFor(scope: string | null, text: string): Suggestions {
+  const raw = /\S+$/.exec(text)?.[0] ?? "";
+  const from = text.length - raw.length;
+  const sign = raw.startsWith("-") ? "-" : "";
+  const typed = raw.slice(sign.length);
+  const [key, word = ""] = typed.includes(":") ? typed.split(/:(.*)/, 2) : [null, typed];
+  if (typed === "" || key === "is") return { from, rows: [] };
+  const begins = (value: string) => value.toLowerCase().startsWith(word.toLowerCase());
+  const below = scope?.startsWith("path:") ? scope.slice(5).toLowerCase().split("/") : null;
+  const rows: Suggestion[] = [];
+  if (key === null) rows.push({ kind: "words", text: raw, shape: { kind: "text" }, path: [] });
+  if ((key === null || key === "path") && scope !== "is:trashed") {
+    for (const [id, { title }] of parents()) {
+      const titles = crumbs(id).folders.map((crumb) => crumb.title);
+      const inside =
+        !below ||
+        (titles.length > below.length && below.every((t, at) => titles[at]?.toLowerCase() === t));
+      if (!begins(title) || !inside) continue;
+      rows.push({
+        kind: "folder",
+        text: `${sign}path:${titles.join("/")}`,
+        shape: { kind: "path", titles, exact: false },
+        path: titles.slice(below ? below.length - 1 : 0),
+      });
+    }
+  }
+  if (key === null || key === "tag") {
+    for (const value of TAGS.filter(begins)) {
+      rows.push({
+        kind: "tag",
+        text: `${sign}tag:${value}`,
+        shape: { kind: "tag", value },
+        path: [],
+      });
+    }
+  }
+  if (key !== "path" && key !== "tag") {
+    for (const label of LABELS.filter((one) => (!key || one.key === key) && begins(one.value))) {
+      const term = `${sign}${label.key}:${label.value}`;
+      rows.push({ kind: "label", text: term, shape: { kind: "label", ...label }, path: [] });
+    }
+  }
+  return { from, rows: rows.slice(0, 8) };
+}
+
 type Args = Record<string, unknown>;
 
 let storedPreferences: unknown = null;
@@ -783,6 +841,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   },
   read_query: ({ text }) => readQuery(text as string),
   search: ({ query }) => searchFor(query as string),
+  search_suggestions: ({ scope, text }) => suggestionsFor(scope as string | null, text as string),
   item_tags: () => [],
   item_detail: ({ itemId }) => detail(itemId as number),
   item_path: ({ itemId }) => detail(itemId as number)?.path ?? null,

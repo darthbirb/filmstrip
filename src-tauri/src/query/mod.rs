@@ -9,8 +9,8 @@ use serde::Serialize;
 use ts_rs::TS;
 
 pub use ast::{Cmp, Expr, IsFlag, LabelMatch, StatusValue, Term};
-pub use parser::{Fault, ParseError, parse, parse_conjuncts, split_path_segments};
-pub use render::{bare_term, conjunct, label_term, path_term, render};
+pub use parser::{Fault, KEYS, ParseError, last_word, parse, parse_conjuncts, split_path_segments};
+pub use render::{bare_term, conjunct, label_term, path_term, render, tag_term};
 
 /// What the field understood of its text: the terms read, and why the rest did not read.
 #[derive(Debug, Clone, PartialEq, Serialize, TS)]
@@ -137,6 +137,69 @@ fn shape_of(part: &Expr) -> Shape {
     }
 }
 
+/// The word being typed at the end of the field's text, as the list under the field needs it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Typing {
+    /// Where the word starts, in UTF-16 units: what a pick replaces runs from here to the end.
+    pub from: usize,
+    /// The word exactly as typed, its `-`, key and quotes included.
+    pub raw: String,
+    pub negated: bool,
+    pub narrow: Narrow,
+    /// What is matched by prefix: the word, or a key's value so far.
+    pub word: String,
+}
+
+/// The one kind of term a typed key asks for. A label's key is `None` for `:value`, any key.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Narrow {
+    Any,
+    Folders,
+    Tags,
+    Labels(Option<String>),
+}
+
+/// Reads the word the text ends on. A key whose values are not folders, tags or labels has
+/// nothing to offer, and neither has a bare `-`. DECISIONS.md "Search".
+pub fn typing(input: &str) -> Option<Typing> {
+    let (start, word) = last_word(input)?;
+    let (negated, rest) = match word.strip_prefix('-') {
+        Some(rest) => (true, rest),
+        None => (false, word.as_str()),
+    };
+    let (narrow, value) = if let Some(value) = rest.strip_prefix(':') {
+        (Narrow::Labels(None), value.to_owned())
+    } else if let Some((key, value)) = rest.split_once(':') {
+        match key.to_ascii_lowercase().as_str() {
+            "path" => (Narrow::Folders, last_title(value)),
+            "tag" => (Narrow::Tags, value.to_owned()),
+            reserved if KEYS.contains(&reserved) => return None,
+            _ => (Narrow::Labels(Some(key.to_owned())), value.to_owned()),
+        }
+    } else if rest.is_empty() {
+        return None;
+    } else {
+        (Narrow::Any, rest.to_owned())
+    };
+    Some(Typing {
+        from: units(input, start),
+        raw: input[start..].to_owned(),
+        negated,
+        narrow,
+        word: value.strip_suffix('*').unwrap_or(&value).to_owned(),
+    })
+}
+
+/// The title a typed path ends on, which is the one still being typed; none after a `/`.
+fn last_title(path: &str) -> String {
+    let path = path.strip_prefix('=').unwrap_or(path);
+    let open = path.ends_with('/') && !path.ends_with("\\/");
+    match split_path_segments(path).pop() {
+        Some(title) if !open => title,
+        _ => String::new(),
+    }
+}
+
 /// A byte offset as the number of UTF-16 units before it.
 fn units(input: &str, at: usize) -> usize {
     input[..at].encode_utf16().count()
@@ -222,6 +285,61 @@ mod tests {
             })
         );
         assert_eq!(read("  ").fault.map(|fault| fault.why), Some(Fault::Empty));
+    }
+
+    fn typed(input: &str) -> Option<(usize, bool, Narrow, String)> {
+        typing(input).map(|t| (t.from, t.negated, t.narrow, t.word))
+    }
+
+    #[test]
+    fn the_word_being_typed_is_the_one_the_text_ends_on() {
+        assert_eq!(
+            typed("giza daw"),
+            Some((5, false, Narrow::Any, "daw".into()))
+        );
+        assert_eq!(typed("é -daw"), Some((2, true, Narrow::Any, "daw".into())));
+        assert_eq!(
+            typed("\"old to"),
+            Some((0, false, Narrow::Any, "old to".into())),
+            "a quote still open is a word still being typed"
+        );
+        assert_eq!(typing("a \"old to").map(|t| t.raw), Some("\"old to".into()));
+        for nothing in ["", "giza ", "(a or b)", "a or", "-", "\"old town\" "] {
+            assert_eq!(typed(nothing), None, "{nothing:?}");
+        }
+    }
+
+    #[test]
+    fn a_typed_key_narrows_what_is_offered() {
+        assert_eq!(typed("tag:da"), Some((0, false, Narrow::Tags, "da".into())));
+        assert_eq!(
+            typed("tag:da*"),
+            Some((0, false, Narrow::Tags, "da".into()))
+        );
+        assert_eq!(typed("tag:"), Some((0, false, Narrow::Tags, String::new())));
+        assert_eq!(
+            typed("x -Time:da"),
+            Some((2, true, Narrow::Labels(Some("Time".into())), "da".into()))
+        );
+        assert_eq!(
+            typed(":da"),
+            Some((0, false, Narrow::Labels(None), "da".into()))
+        );
+        assert_eq!(
+            typed("path:Library/Tri"),
+            Some((0, false, Narrow::Folders, "Tri".into()))
+        );
+        assert_eq!(
+            typed("path:=Library/"),
+            Some((0, false, Narrow::Folders, String::new()))
+        );
+        assert_eq!(
+            typed("path:rock\\/po"),
+            Some((0, false, Narrow::Folders, "rock/po".into()))
+        );
+        for reserved in ["is:so", "type:vi", "year:20", "size:>1", "status:w"] {
+            assert_eq!(typed(reserved), None, "{reserved:?}");
+        }
     }
 
     #[test]
