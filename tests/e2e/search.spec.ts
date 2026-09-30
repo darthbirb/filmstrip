@@ -15,7 +15,7 @@ test("a search typed in a folder stands in its results, opens one, widens, acts 
 
   // Ctrl+F writes where you stand, and Enter runs what was typed after it.
   await page.keyboard.press("Control+f");
-  const field = page.getByRole("searchbox", { name: "Search" });
+  const field = page.getByRole("combobox", { name: "Search" });
   await expect(field).toBeFocused();
   await field.pressSequentially("cairo");
   await page.keyboard.press("Enter");

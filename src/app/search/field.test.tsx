@@ -34,7 +34,7 @@ beforeEach(() => {
   setPlace(TRIPS);
 });
 
-const field = () => page.getByRole("searchbox", { name: "Search" });
+const field = () => page.getByRole("combobox", { name: "Search" });
 const chips = () =>
   [...document.querySelectorAll("[title]")]
     .filter((one) => one.closest("div")?.contains(field().element()))

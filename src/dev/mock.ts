@@ -517,7 +517,7 @@ function searchFor(query: string): SearchOutcome {
 }
 
 // The mock library carries no tags of its own, so the list has these to offer.
-const TAGS = ["dawn", "dusk"];
+const TAGS = ["camel", "dawn", "dusk"];
 const LABELS = [
   { key: "time", value: "dawn" },
   { key: "location", value: "cairo" },
