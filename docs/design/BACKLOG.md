@@ -16,7 +16,7 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## The last pass left three things undecided · DEFECT
+## The last pass left three things undecided · DRAWN
 
 The pass that drew search starting everywhere and the two-figure count listed these as open on
 its Notes sheet. The first blocks building the offer; settle all three.
