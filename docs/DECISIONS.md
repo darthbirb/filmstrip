@@ -400,6 +400,20 @@ its whole path in the tooltip and the pane, and "gone" when that folder no longe
 refused Restore is not the first they hear of it. The line ellipsises and the tile never grows to
 fit it. The Trash counts itself on its row, its rail square and its header, with its size there.
 
+## A folder's details
+
+**A folder's band is the pane's details one level up**, opened from the grid's header, as
+Artboards › 04 draws it. Same caption column, same row, same chips: a folder and a file both have
+a path, labels and tags, and should not need two vocabularies. The Sorting Box and the Trash keep a
+plain header, having none of these.
+
+- **Its tags start with its own, its name first, then what it inherits**, each folder above in
+  path order from the source down, that folder's name before its tags. A tag carried at two levels
+  shows once, where it is nearest, as a file inherits it.
+- **A folder that holds anything always has a picture.** Its chosen cover while that file is live
+  at or below it, else its first picture or video, nearest first. A search's folder card shows the
+  same one, so the band and the card never disagree; ggallery never left a folder coverless either.
+
 ## The pane
 
 **The picture, a row that opens onto what is known, and a filmstrip**: the predecessor's

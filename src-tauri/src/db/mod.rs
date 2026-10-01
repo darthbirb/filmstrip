@@ -1,6 +1,7 @@
 //! Connections and migrations. **All SQL lives under this module** — callers
 //! use functions, never queries.
 
+pub mod details;
 pub mod folders;
 pub mod items;
 pub mod jobs;

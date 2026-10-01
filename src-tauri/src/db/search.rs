@@ -382,7 +382,7 @@ pub fn folders(conn: &Connection, expr: &Expr) -> Result<Vec<FolderMatch>> {
             count: live_count(conn, id)?,
             own_count: crate::db::folders::own_count(conn, id)?,
             cover: None,
-            cover_uuid: cover_uuid(conn, id)?,
+            cover_uuid: crate::db::details::cover(conn, id)?.map(|(_, uuid)| uuid),
         });
     }
     Ok(matches)
@@ -516,27 +516,6 @@ fn live_count(conn: &Connection, folder_id: i64) -> Result<i64> {
         params_from_iter(ids),
         |r| r.get(0),
     )?)
-}
-
-/// The folder's own cover while it is live, else its first picture or video, nearest first.
-fn cover_uuid(conn: &Connection, folder_id: i64) -> Result<Option<String>> {
-    Ok(conn
-        .query_row(
-            "WITH RECURSIVE subtree(id, depth) AS (
-                 SELECT ?1, 0
-               UNION ALL
-                 SELECT f.id, s.depth + 1 FROM folder f JOIN subtree s ON f.parent_id = s.id
-                  WHERE f.deleted_at IS NULL
-             )
-             SELECT i.uuid FROM item i JOIN subtree s ON s.id = i.folder_id
-              WHERE i.deleted_at IS NULL AND i.kind IN ('image', 'video')
-              ORDER BY i.id = (SELECT cover_item_id FROM folder WHERE id = ?1) DESC,
-                       s.depth, i.disk_name COLLATE NOCASE
-              LIMIT 1",
-            params![folder_id],
-            |r| r.get(0),
-        )
-        .optional()?)
 }
 
 // The text index.

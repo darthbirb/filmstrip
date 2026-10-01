@@ -114,6 +114,7 @@ pub fn run() {
             commands::search_suggestions,
             commands::restore_items,
             commands::set_folder_favorite,
+            commands::folder_detail,
             commands::favourite_places,
             commands::destination_keys,
             commands::set_destination_key,

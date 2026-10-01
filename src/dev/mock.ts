@@ -6,9 +6,12 @@ import type { Crumb } from "../ipc/bindings/Crumb";
 import type { DestinationKey } from "../ipc/bindings/DestinationKey";
 import type { Fault } from "../ipc/bindings/Fault";
 import type { FavouritePlace } from "../ipc/bindings/FavouritePlace";
+import type { FolderDetail } from "../ipc/bindings/FolderDetail";
 import type { FolderEntry } from "../ipc/bindings/FolderEntry";
 import type { FolderMatch } from "../ipc/bindings/FolderMatch";
 import type { FolderNode } from "../ipc/bindings/FolderNode";
+import type { FolderStatus } from "../ipc/bindings/FolderStatus";
+import type { FolderTag } from "../ipc/bindings/FolderTag";
 import type { Hit } from "../ipc/bindings/Hit";
 import type { ItemDetail } from "../ipc/bindings/ItemDetail";
 import type { ItemRow } from "../ipc/bindings/ItemRow";
@@ -577,6 +580,104 @@ function suggestionsFor(scope: string | null, text: string): Suggestions {
   return { from, rows: rows.slice(0, 8) };
 }
 
+/** What a folder knows about itself beyond its place, as the band reads it. */
+type Own = {
+  status: FolderStatus | null;
+  statusSetAt: number | null;
+  note: string | null;
+  cover: number | null;
+  /** Its hand-made tags and labels, in the order they were added; its name is not among them. */
+  tags: { key: string | null; value: string }[];
+};
+
+const OWN = new Map<number, Own>([
+  [
+    4,
+    {
+      ...blank(),
+      tags: [
+        { key: null, value: "travel" },
+        { key: "trip", value: "egypt 2024" },
+      ],
+    },
+  ],
+  [
+    6,
+    {
+      ...blank(),
+      status: "wip",
+      statusSetAt: 1_749_859_200,
+      note: "Four mornings at Giza. The dawn set is the keepers.",
+      tags: [
+        { key: null, value: "egypt" },
+        { key: "location", value: "cairo" },
+      ],
+    },
+  ],
+]);
+
+function blank(): Own {
+  return { status: null, statusSetAt: null, note: null, cover: null, tags: [] };
+}
+
+function ownOf(folderId: number): Own {
+  const found = OWN.get(folderId) ?? blank();
+  OWN.set(folderId, found);
+  return found;
+}
+
+/** One id per distinct term, as the `tag` table keeps them. */
+const TAG_IDS = new Map<string, number>();
+const tagId = (key: string | null, value: string) => {
+  const term = `${key ?? ""}:${value}`;
+  if (!TAG_IDS.has(term)) TAG_IDS.set(term, TAG_IDS.size + 1);
+  return TAG_IDS.get(term) ?? 0;
+};
+
+/** A folder's band, as `folder_detail` answers: its own tags, then each folder's above it. */
+function folderDetail(folderId: number): FolderDetail | null {
+  const isRoot = SOURCES.some((one) => one.rootFolderId === folderId);
+  if (!isRoot && !parents().has(folderId)) return null;
+  const { folders, home } = crumbs(folderId);
+  if (!home) return null;
+  const levels = folders.map((crumb) => {
+    const from = crumb.id === folderId ? null : crumb;
+    const name = { key: null, value: crumb.title.toLowerCase() };
+    return [name, ...ownOf(crumb.id).tags].map(
+      (tag, at): FolderTag => ({ tagId: tagId(tag.key, tag.value), ...tag, from, name: at === 0 }),
+    );
+  });
+  // A tag carried at two levels shows once, where it is nearest.
+  const seen = new Set<number>();
+  const [self = [], ...above] = levels.reverse().map((level) =>
+    level.filter((tag) => {
+      if (seen.has(tag.tagId)) return false;
+      seen.add(tag.tagId);
+      return true;
+    }),
+  );
+  const own = ownOf(folderId);
+  const pictures = under(folderId).filter((item) => item.kind !== "other");
+  const depth = (item: ItemRow) => crumbs(item.folderId).folders.length;
+  const standing =
+    pictures.find((item) => item.id === own.cover) ??
+    [...pictures].sort((a, b) => depth(a) - depth(b))[0];
+  return {
+    id: folderId,
+    sourceId: home.id,
+    path: folders,
+    status: own.status,
+    statusSetAt: own.statusSetAt,
+    favorite: isRoot ? home.favorite : (live(folderId)?.node.favorite ?? false),
+    note: own.note,
+    coverItemId: standing && standing.id === own.cover ? standing.id : null,
+    cover: standing?.thumb ?? null,
+    ownCount: ITEMS[folderId]?.length ?? 0,
+    allCount: under(folderId).length,
+    tags: [...self, ...above.reverse().flat()],
+  };
+}
+
 type Args = Record<string, unknown>;
 
 let storedPreferences: unknown = null;
@@ -751,6 +852,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     for (const one of SOURCES) if (one.rootFolderId === id) one.favorite = favorite as boolean;
     return null;
   },
+  folder_detail: ({ folderId }) => folderDetail(folderId as number),
   favourite_places: (): FavouritePlace[] =>
     [
       ...SOURCES.filter((one) => one.kind === "library" && one.favorite).map((one) => ({

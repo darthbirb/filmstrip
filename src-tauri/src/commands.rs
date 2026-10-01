@@ -11,6 +11,7 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 use ts_rs::TS;
 
+use crate::db::details::{self, FolderDetail};
 use crate::db::folders::{self, FolderEntry, FolderNode};
 use crate::db::items::{self, ItemDetail, ItemRow};
 use crate::db::jobs::{self as job_table, Failure};
@@ -435,6 +436,34 @@ pub async fn set_folder_favorite(
         folders::set_favorite(conn, folder_id, favorite)
     })
     .await
+}
+
+/// Everything a folder's band shows, or nothing once the folder has gone.
+#[tauri::command]
+pub async fn folder_detail(
+    state: State<'_, AppState>,
+    folder_id: i64,
+) -> Result<Option<FolderDetail>> {
+    let thumbs = state.thumbs.clone();
+    run(&state, move |conn| {
+        folder_detail_with(conn, folder_id, &thumbs)
+    })
+    .await
+}
+
+pub fn folder_detail_with(
+    conn: &Connection,
+    folder_id: i64,
+    thumbs: &Path,
+) -> Result<Option<FolderDetail>> {
+    let mut detail = details::detail(conn, folder_id)?;
+    if let Some(detail) = &mut detail {
+        detail.cover = detail
+            .cover_uuid
+            .as_deref()
+            .and_then(|uuid| thumb_of(uuid, thumbs));
+    }
+    Ok(detail)
 }
 
 /// A favourite place as navigation's group shows it: the way down to it, the files directly in

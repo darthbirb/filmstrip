@@ -7,6 +7,7 @@ import type { EffectiveTag } from "./bindings/EffectiveTag";
 import type { Failure } from "./bindings/Failure";
 import type { FavouritePlace } from "./bindings/FavouritePlace";
 import type { FolderDeleted } from "./bindings/FolderDeleted";
+import type { FolderDetail } from "./bindings/FolderDetail";
 import type { FolderEntry } from "./bindings/FolderEntry";
 import type { FolderMade } from "./bindings/FolderMade";
 import type { FolderNode } from "./bindings/FolderNode";
@@ -98,6 +99,9 @@ export const listFolders = () => invoke<FolderEntry[]>("list_folders");
 
 export const setFolderFavorite = (folderId: number, favorite: boolean) =>
   invoke<void>("set_folder_favorite", { folderId, favorite });
+
+export const folderDetail = (folderId: number) =>
+  invoke<FolderDetail | null>("folder_detail", { folderId });
 
 export const favouritePlaces = () => invoke<FavouritePlace[]>("favourite_places");
 
