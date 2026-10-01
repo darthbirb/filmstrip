@@ -270,14 +270,16 @@ structure the chrome has, and the chevrons already say which rows have children.
 
 **A row's count is a pill**, drawn on 15 September 2026 and built the day after. A bare number at
 the end of a row runs into the title beside it, where a plate ends the row and groups itself.
-**It reads a place's own files, then everything at or below it**, as `3/9`, and one figure where
-the two are equal; redrawn on 30 September 2026 after a library of nine files read as five, three
-of them loose in the source and one in a folder folded shut. The own figure comes first because it
-is what a click shows; the second is what folding hides, so a row reads the same folded or open,
-and a folder of folders reads `0/9`, where the nought is the news. A source's row has a pill now
-too, by the same rule. A place with nothing at or below it carries none: a nought in a plate is a
-number to read and dismiss on every empty folder, and an absence says the same in no ink. The
-Sorting Box and the Trash keep one figure, what their grids show.
+**It reads a place's own files, then everything at or below it, always both**, as `3/9`, `3/3`
+and `0/0`; redrawn on 30 September 2026 after a library of nine files read as five, three of them
+loose in the source and one in a folder folded shut, and again on 1 October when one figure where
+the two agreed read as ambiguous, since a lone `3` could be either number. The own figure comes
+first because it is what a click shows; the second is what folding hides, so a row reads the same
+folded or open, and a folder of folders reads `0/9`. Every row has its pill, a source's and an
+empty folder's included, so the column has no gaps to explain; the Sorting Box and the Trash read
+`3/3` the same way. Two exceptions: an offline source shows only its word, since the app cannot
+stand behind a count while the drive is away, and the folded rail's badges keep one figure,
+because two do not fit a glyph's corner and neither place has subfolders.
 
 **Choosing a row goes there; only its chevron, Right or a double-click opens it.** The tree is
 one tab stop and follows the ARIA tree pattern: the arrow keys move and open, Enter goes. A
@@ -509,6 +511,10 @@ Shift+F10 did nothing at all.
   the key the folder holds. It opens the ten keys against the row, each with the folder it is on,
   "Free" or "gone" in the quiet ink, the folder's own on the plate, then No Key. Picking a key
   another folder holds moves it without a question: the row already said whose it was.
+- **Search in Folder and Search in Source open the second group.** Each is Ctrl+F with the offer
+  taken, for a place you are not standing in: it writes the place as the field's scope, replacing
+  any scope it held and keeping its other terms, and leaves the caret in the field without running
+  anything. A source that is away has none, as it has no Show in Explorer.
 - **Remove Source goes through the question Settings already asks.** It opens Sources with that
   source's row asking, Cancel focused. Forgetting a source drops the tags and notes on its files;
   a menu row must not do that in one press when the section that owns it asks first.
@@ -646,12 +652,21 @@ rules are Filmstrip's own:
 - **Folder titles match without case in ASCII only**, which is SQLite's `LIKE`; tags and labels are
   stored folded, so they match in any script.
 
+**A tag or a label in the pane's details is a search**, so the visible control PRODUCT.md asks for
+sits where the term already is, and the syntax stays the fallback. **A click replaces the whole
+query**: it is a new question about the whole library, and a new search starts everywhere, so a
+taken scope goes with the rest and the field offers it again. **Ctrl+Click adds the term** and
+keeps everything the query holds, scope included, as Ctrl+Click adds a tile to a set; it never
+writes a scope, and a term the query already holds is not added twice.
+
 **A search is a place**, as Artboards › A search is a place draws it, so the grid, the pane and
 the selection work in it as anywhere. Its header names it by its terms and its back arrow, or
 Escape once nothing else is open, returns to where the search began; no row in navigation is lit,
-because none is this place. Folders come first, each saying what it matched, and a click on one
-goes into it; each file says where it lives, and a trashed one where it came from, keeping the
-Trash's verbs.
+because none is this place. Folders come first, each saying what it matched. **A matched folder
+has two targets**: the card is the folder, so a click goes into it and leaves the search, as a
+row in navigation does; its glass is the search, so a click asks the same question inside that
+folder, which takes the scope's place while the other terms stay. Each file says where it lives,
+and a trashed one where it came from, keeping the Trash's verbs.
 
 **Results come trashed first, newest first, then by name**, as the Trash and the Sorting Box each
 order their own. A trashed file is found only when the query names the Trash; the drawing's Trash

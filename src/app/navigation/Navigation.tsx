@@ -14,6 +14,7 @@ import {
   setDestinationKey,
   setFolderFavorite,
 } from "../../ipc/commands";
+import { pathTerm } from "../../lib/queryTerm";
 import {
   ContextMenu,
   type HeadedMenu,
@@ -27,6 +28,7 @@ import { DIGITS } from "../keys";
 import { libraryChanged } from "../library";
 import { openMovePicker } from "../pane/move-picker";
 import { type Place, setPlace, usePlace } from "../place";
+import { searchIn } from "../search/SearchField";
 import { openSettings } from "../settings/settings-store";
 import { refusedName } from "../undo/lines";
 import { afterAct } from "../undo/undo";
@@ -206,8 +208,20 @@ export function Navigation() {
         setKeying({ folder, title, anchor });
       },
     };
+    // Ctrl+F with the offer taken, for a place you are not in: the scope is written, nothing runs.
+    const titles = path.length > 0 ? path.map((crumb) => crumb.title) : [source.title];
+    const searchHere = (label: string): MenuAction => ({
+      id: "search",
+      label,
+      glyph: "search",
+      onSelect: () => searchIn(pathTerm(titles)),
+    });
     if (folder === source.rootFolderId) {
-      return { heading: "Source", groups: sourceMenu(source, rename, newFolder, star, assign) };
+      const search = searchHere("Search in Source");
+      return {
+        heading: "Source",
+        groups: sourceMenu(source, rename, newFolder, star, assign, search),
+      };
     }
     // Nothing on it can act on a folder whose drive is away, and an empty menu opens nothing.
     if (!source.reachable) return { groups: [] };
@@ -234,7 +248,12 @@ export function Navigation() {
     return {
       groups: [
         [newFolder, star, assign, moveTo],
-        [revealFolderRow(folder), renameRow(rename), readAgainRow(folder)],
+        [
+          searchHere("Search in Folder"),
+          revealFolderRow(folder),
+          renameRow(rename),
+          readAgainRow(folder),
+        ],
         [remove],
       ],
     };
@@ -366,6 +385,7 @@ function sourceMenu(
   newFolder: MenuAction,
   star: MenuAction,
   assign: MenuAction,
+  search: MenuAction,
 ): MenuGroups {
   const folder = source.rootFolderId;
   const reveal: MenuAction = {
@@ -378,7 +398,7 @@ function sourceMenu(
   // New Folder is on it because a source's row is the only row that stands for its top level.
   return [
     source.reachable ? [newFolder, star, assign] : [star, assign],
-    source.reachable ? [reveal, naming, readAgainRow(folder)] : [naming],
+    source.reachable ? [search, reveal, naming, readAgainRow(folder)] : [naming],
     [
       {
         id: "manage",

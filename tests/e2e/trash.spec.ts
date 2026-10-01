@@ -25,7 +25,7 @@ test("a file deleted waits in the Trash under today, and Restore puts it back wh
   await bar.getByRole("button", { name: "Restore", exact: true }).click();
   await expect(page.getByText("Restored cover.jpg to Pictures.")).toBeVisible();
   await expect(grid.getByRole("button", { name: "cover.jpg" })).toHaveCount(0);
-  await expect(tree.getByRole("treeitem", { name: "Trash", exact: true })).toBeVisible();
+  await expect(tree.getByRole("treeitem", { name: "Trash 0 of 0", exact: true })).toBeVisible();
 
   await tree.getByRole("treeitem", { name: "Pictures 1 of 6" }).click();
   await expect(grid.getByRole("button", { name: "cover.jpg" })).toBeVisible();

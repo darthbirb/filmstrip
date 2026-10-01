@@ -20,7 +20,8 @@ export function Rail() {
           key={row.id}
           glyph={row.glyph ?? "folder"}
           label={row.label}
-          count={row.count}
+          // One figure, and none at nought: two do not fit a glyph's corner. DECISIONS.md "Navigation".
+          count={row.count || undefined}
           filled
           selected={row.id === at}
           onClick={() => setPlace(target)}

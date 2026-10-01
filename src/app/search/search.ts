@@ -1,4 +1,5 @@
 import type { QueryTerm } from "../../ipc/bindings/QueryTerm";
+import { readQuery } from "../../ipc/commands";
 import { pathTerm } from "../../lib/queryTerm";
 import { backFrom, getPlace, type Place, setPlace } from "../place";
 
@@ -44,6 +45,29 @@ export function withoutScope(terms: readonly QueryTerm[]): string | undefined {
 /** Stands the window in a query's results, keeping the way back to where the search began. */
 export function runQuery(query: string) {
   setPlace({ kind: "search", query, back: backFrom(getPlace()) });
+}
+
+/** A new search for one term: a new search starts everywhere, so nothing else is kept. */
+export function searchFor(term: string) {
+  runQuery(term);
+}
+
+/** Adds a term to the query standing in the results, scope and all, unless it holds it already. */
+export async function addToSearch(term: string) {
+  const place = getPlace();
+  if (place?.kind !== "search") return runQuery(term);
+  const { terms } = await readQuery(place.query);
+  if (terms.some((held) => held.text === term)) return;
+  runQuery(`${place.query} ${term}`);
+}
+
+/** Asks the standing query again inside one folder: it takes the scope's place, the rest stays. */
+export async function scopeTo(titles: readonly string[]) {
+  const place = getPlace();
+  const { terms } = place?.kind === "search" ? await readQuery(place.query) : { terms: [] };
+  runQuery(
+    [pathTerm(titles), ...terms.filter((term) => !scoping(term)).map((t) => t.text)].join(" "),
+  );
 }
 
 /** From results to where the search began. */

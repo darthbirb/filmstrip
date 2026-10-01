@@ -559,13 +559,14 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   than the name, and the count pill at the end. A source's has no parent. The group
   stands between the app's two places and the sources, a `line` rule either side. Where you are,
   it wears the plate, and so does the place's own row.
-- **Count pill.** A folder's or a source's files: its own, then everything at or below it, as
-  `3/9`, and one figure where the two are equal. `badge` tall at the `badge` corner, on `raised`
-  with a `line-control` ring, figures `fg-mid` and the slash `fg-faint`; on a selected row it sinks
-  to `on-plate-wash`, figures `on-plate-dim` and the slash `on-plate-faint`. A folded row and the
-  same row opened show the same pill. The Sorting Box and the Trash keep one figure. A place with
-  nothing at or below it carries no pill, and an offline source shows its word instead. Move to…'s
-  tree rows carry it too; Settings' key rows and No Pictures Here print the same figures as text.
+- **Count pill.** A place's files, always both figures: its own, then everything at or below it,
+  as `3/9`, `3/3` or `0/0`. `badge` tall at the `badge` corner, on `raised` with a `line-control`
+  ring, figures `fg-mid` and the slash `fg-faint`; on a selected row it sinks to `on-plate-wash`,
+  figures `on-plate-dim` and the slash `on-plate-faint`. A folded row and the same row opened
+  show the same pill. Every row carries one, the Sorting Box and the Trash included; an offline
+  source shows its word instead. Move to…'s tree rows and a matched folder's card carry it too;
+  Settings' key rows and No Pictures Here print the same figures as text. The folded rail's
+  badges keep one figure.
 - **Rail button.** A folded panel's place: a `control` square holding a filled glyph, `plate` with
   `on-plate` ink when it is where you are, a `wash` under the pointer otherwise. Its count rides the
   glyph's top-right corner as a `mark-badge` plate in `micro` figures, ringed in the panel's own
@@ -633,8 +634,10 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Folder card.** A folder a search found: `card` wide on `panel` at the `control` corner in a
   `line` hairline, `line-strong` and `inset` under the pointer. Its cover is `card-cover` by
   `card-cover-height` at the `badge` corner; beside it the name in `row` semibold with its count
-  in a `badge` pill, the folders above it in `small` `fg-dim`, and what it matched, key first.
-  Folders come under an eyebrow heading before the files, which then take one of their own.
+  pill, the folders above it in `small` `fg-dim`, and what it matched, key first. In its top-right
+  corner, a tile-inset in, the glass: a `size-6` square at the `nested` corner, the search glyph
+  in `fg-dim`, `raised-hi` with `fg` under the pointer. Folders come under an eyebrow heading
+  before the files, which then take one of their own.
 - **Drag ghost.** One `control`-tall line following the pointer, `--ghost-x` and `--ghost-y` from
   its tip: `veil` glass at the `control` corner in a `line-control-hi` ring, with the overlay
   shadow. It holds the top file's picture as a `ghost-thumb` square at the `badge` corner, the
@@ -728,7 +731,9 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Facts.** Terms in `eyebrow` capitals, in a column as wide as the longest of them, values in
   `fg-mid`, each row the height of a chip.
 - **Chip.** A tag is a pill, raised with a ring; inherited, it sinks to `inset`. A label splits into
-  a sunk key and its value, and is never shown without the key.
+  a sunk key and its value, and is never shown without the key. In the pane's details each is a
+  control that searches for itself: under the pointer it is one step lighter, `raised-hi` with
+  `fg` ink, in a `line-strong` ring, and its tooltip says what a click writes.
 - **Settings.** A dialog over the `scrim`: a header with its `title` and a close button; a rail of
   sections grouped under `eyebrow` captions, with a filter field on `ground` above them, the one
   shown on `raised-hi`; and the section's settings as rows in an `inset` group, each a label and

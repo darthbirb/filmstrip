@@ -79,15 +79,14 @@ test("the tree's rows carry navigation's pill, and a recent row names its parent
   const pills = () =>
     [...picker.element().querySelectorAll('[role="option"]')].map((row) => [
       row.querySelector(".truncate")?.textContent,
-      row.querySelector(".rounded-badge")?.firstElementChild?.textContent ??
-        row.querySelector(".rounded-badge")?.textContent,
+      row.querySelector(".rounded-badge [aria-hidden]")?.textContent,
     ]);
   expect(pills()).toEqual([
     ["Pictures", "1/6"],
-    ["People", undefined],
+    ["People", "0/0"],
     ["Trips", "2/5"],
-    ["Cairo", "3"],
-    ["Incoming", "3"],
+    ["Cairo", "3/3"],
+    ["Incoming", "3/3"],
   ]);
 
   await picker.getByRole("option", { name: /People/ }).click();

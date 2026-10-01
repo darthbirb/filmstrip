@@ -55,10 +55,9 @@ function KeyRow({ digit, held }: { digit: string; held?: DestinationKey }) {
           onClick={(event) => choose(event.currentTarget)}
         />
       )}
-      <span className="w-count shrink-0 text-right text-fg-dim text-small tabular-nums">
-        {held && !held.gone && held.allCount > 0
-          ? countText({ own: held.itemCount, all: held.allCount })
-          : ""}
+      {/* At least the column's width, and as wide as two figures need. */}
+      <span className="min-w-count shrink-0 text-right text-fg-dim text-small tabular-nums">
+        {held && !held.gone ? countText({ own: held.itemCount, all: held.allCount }) : ""}
       </span>
       {held ? (
         <DismissButton

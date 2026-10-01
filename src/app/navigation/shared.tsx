@@ -35,7 +35,7 @@ export function sortingRow(sources: SourceSummary[], onNominate?: () => void): T
     level: 1,
     expandable: false,
     glyph: "sortingBox",
-    count: waiting > 0 ? waiting : undefined,
+    ...pill(waiting, waiting),
     // Which + was pressed is what decides a source's kind, so this one is never hidden.
     action: onNominate
       ? { glyph: "plus", label: "Add Sorting Source…", onClick: onNominate }
@@ -45,16 +45,20 @@ export function sortingRow(sources: SourceSummary[], onNominate?: () => void): T
 
 /** The Trash, with the number of files waiting in it. */
 export function trashRow(trash: TrashSummary | null = null): TreeRow {
-  const count = trash && trash.count > 0 ? trash.count : undefined;
-  return { id: TRASH_ID, label: "Trash", level: 1, expandable: false, glyph: "trash", count };
+  const held = trash?.count ?? 0;
+  return {
+    id: TRASH_ID,
+    label: "Trash",
+    level: 1,
+    expandable: false,
+    glyph: "trash",
+    ...pill(held, held),
+  };
 }
 
-/**
- * A folder's own files, then everything at or below it, for its row's pill; a place with nothing
- * at or below it has none. DECISIONS.md "Navigation".
- */
+/** A place's own files, then everything at or below it, for its row's pill; `0/0` when it holds nothing. DECISIONS.md "Navigation". */
 export function pill(own: number, all: number): Pick<TreeRow, "count" | "total"> {
-  return all > 0 ? { count: own, total: all } : {};
+  return { count: own, total: all };
 }
 
 /** A source's own row. One that cannot be read is muted and says so, but keeps its folders. */

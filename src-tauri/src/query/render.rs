@@ -308,6 +308,7 @@ mod tests {
                 }
                 "bareTerm" => bare_term(&string(&args[0])),
                 "labelTerm" => label_term(&string(&args[0]), &string(&args[1])),
+                "tagTerm" => tag_term(&string(&args[0])),
                 other => panic!("no writer named {other}"),
             };
             assert_eq!(written, case["expected"].as_str().unwrap(), "{case}");

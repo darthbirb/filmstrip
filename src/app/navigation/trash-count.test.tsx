@@ -26,13 +26,15 @@ test("an empty Trash carries no count, and one holding files counts them on its 
       <Rail />
     </div>,
   );
-  await expect.element(screen.getByRole("treeitem", { name: "Trash", exact: true })).toBeVisible();
+  await expect
+    .element(screen.getByRole("treeitem", { name: "Trash 0 of 0", exact: true }))
+    .toBeVisible();
   expect(screen.getByText(/ · /).elements()).toHaveLength(0);
 
   const ids = (await folderItems(6)).map((row) => row.id);
   await trashItems(ids.slice(0, 2));
   await refreshIndex();
-  await expect.element(screen.getByRole("treeitem", { name: "Trash 2" })).toBeVisible();
+  await expect.element(screen.getByRole("treeitem", { name: "Trash 2 of 2" })).toBeVisible();
   await expect
     .element(screen.getByRole("button", { name: "Trash", exact: true }))
     .toHaveAttribute("title", "Trash · 2");

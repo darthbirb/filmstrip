@@ -47,11 +47,11 @@ test("Favourite on a folder's menu gives it a row of its own, between the app's 
   await expect
     .poll(() => rows(screen))
     .toEqual([
-      "Sorting Box 3",
-      "Trash",
+      "Sorting Box 3 of 3",
+      "Trash 0 of 0",
       "Trips 2 of 5",
       "Pictures 1 of 6",
-      "People",
+      "People 0 of 0",
       "Trips 2 of 5",
       "Archive offline",
     ]);
@@ -73,7 +73,7 @@ test("choosing a favourite goes there, and both of its rows wear the plate witho
   resetIndex();
   await loadIndex();
   const screen = await render(<Navigation />);
-  const favourite = screen.getByRole("treeitem", { name: "Cairo 3" });
+  const favourite = screen.getByRole("treeitem", { name: "Cairo 3 of 3" });
   await favourite.click();
 
   const place = getPlace();
@@ -83,15 +83,15 @@ test("choosing a favourite goes there, and both of its rows wear the plate witho
     "Cairo",
   ]);
   await expect.element(favourite).toHaveAttribute("aria-current", "location");
-  expect(rows(screen)).not.toContain("People");
+  expect(rows(screen)).not.toContain("People 0 of 0");
 
   await screen.getByRole("treeitem", { name: "Pictures 1 of 6" }).click();
   await userEvent.keyboard("{ArrowRight}");
   await screen.getByRole("treeitem", { name: "Trips 2 of 5", exact: true }).click();
   await userEvent.keyboard("{ArrowRight}");
-  await screen.getByRole("treeitem", { name: "Cairo 3" }).nth(1).click();
+  await screen.getByRole("treeitem", { name: "Cairo 3 of 3" }).nth(1).click();
   await expect
-    .element(screen.getByRole("treeitem", { name: "Cairo 3" }).nth(0))
+    .element(screen.getByRole("treeitem", { name: "Cairo 3 of 3" }).nth(0))
     .toHaveAttribute("aria-current", "location");
 });
 
@@ -116,14 +116,16 @@ test("a favourite deleted leaves the group, and undoing the delete brings it bac
       <DeleteQuestion />
     </>,
   );
-  await expect.element(screen.getByRole("treeitem", { name: "People", exact: true })).toBeVisible();
-  await choose(screen, "People", "People", "Delete");
-  await expect.poll(() => rows(screen)).not.toContain("People");
+  await expect
+    .element(screen.getByRole("treeitem", { name: "People 0 of 0", exact: true }))
+    .toBeVisible();
+  await choose(screen, "People 0 of 0", "People", "Delete");
+  await expect.poll(() => rows(screen)).not.toContain("People 0 of 0");
 
   await undoLast();
   resetIndex();
   await loadIndex();
-  await expect.poll(() => rows(screen)).toContain("People");
+  await expect.poll(() => rows(screen)).toContain("People 0 of 0");
 });
 
 test("folded, navigation keeps the app's own places and no favourites", async () => {

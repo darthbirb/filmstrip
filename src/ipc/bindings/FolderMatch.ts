@@ -11,9 +11,9 @@ export type FolderMatch = { id: number, sourceId: number, title: string,
  */
 path: Array<Crumb>, 
 /**
- * Every live file at or below it.
+ * Every live file at or below it, and those directly in it.
  */
-count: number, 
+count: number, ownCount: number, 
 /**
  * The picture that stands for it, once its thumbnail is made. Filled by the command.
  */

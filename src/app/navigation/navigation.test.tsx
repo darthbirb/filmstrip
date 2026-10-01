@@ -25,15 +25,15 @@ beforeEach(async () => {
 
 test("shows the Sorting Box with its count, every library source, and the Trash", async () => {
   const screen = await render(<Navigation />);
-  await expect.element(screen.getByRole("treeitem", { name: "Sorting Box 3" })).toBeVisible();
+  await expect.element(screen.getByRole("treeitem", { name: "Sorting Box 3 of 3" })).toBeVisible();
   await expect.element(screen.getByRole("treeitem", { name: "Pictures 1 of 6" })).toBeVisible();
   await expect.element(screen.getByRole("treeitem", { name: "Archive offline" })).toBeVisible();
-  await expect.element(screen.getByRole("treeitem", { name: "Trash" })).toBeVisible();
+  await expect.element(screen.getByRole("treeitem", { name: "Trash 0 of 0" })).toBeVisible();
 });
 
 test("the app's own two places sit together at the top, above a rule, then the sources", async () => {
   const screen = await render(<Navigation />);
-  const trash = screen.getByRole("treeitem", { name: "Trash" });
+  const trash = screen.getByRole("treeitem", { name: "Trash 0 of 0" });
   await expect.element(trash).toBeVisible();
   const order = screen
     .getByRole("treeitem")
@@ -59,34 +59,34 @@ test("a source opens in place, and choosing a folder goes there", async () => {
   await row("Trips 2 of 5").click();
   expect(titles()).toEqual(["Pictures", "Trips"]);
   await userEvent.keyboard("{ArrowRight}");
-  await row("Cairo 3").click();
+  await row("Cairo 3 of 3").click();
   expect(titles()).toEqual(["Pictures", "Trips", "Cairo"]);
-  await expect.element(row("Cairo 3")).toHaveAttribute("aria-selected", "true");
+  await expect.element(row("Cairo 3 of 3")).toHaveAttribute("aria-selected", "true");
 
-  await row("Sorting Box 3").click();
+  await row("Sorting Box 3 of 3").click();
   expect(titles()).toBe("sorting");
 });
 
-test("a place with items ends in a count pill, and one without carries none", async () => {
+test("every place ends in a count pill of two figures, and only an offline source has none", async () => {
   const screen = await render(<Navigation />);
   const row = (name: string) => screen.getByRole("treeitem", { name });
   const pill = (name: string) => row(name).element().querySelector(".rounded-badge");
-  await expect.element(row("Sorting Box 3")).toBeVisible();
+  const shown = (name: string) => pill(name)?.querySelector("[aria-hidden]")?.textContent;
+  await expect.element(row("Sorting Box 3 of 3")).toBeVisible();
 
-  const sorting = pill("Sorting Box 3") as HTMLElement;
-  expect(sorting.textContent).toBe("3");
-  expect(sorting.getBoundingClientRect().height).toBe(20);
+  expect(shown("Sorting Box 3 of 3")).toBe("3/3");
+  expect(pill("Sorting Box 3 of 3")?.getBoundingClientRect().height).toBe(20);
+  expect(shown("Trash 0 of 0")).toBe("0/0");
   // An offline source keeps its word where the pill would be, and shows no count it cannot stand behind.
   expect(pill("Archive offline")).toBeNull();
-  expect(pill("Trash")).toBeNull();
 
   await row("Pictures 1 of 6").click();
   await userEvent.keyboard("{ArrowRight}");
   await expect.element(row("Trips 2 of 5")).toBeVisible();
-  expect(pill("People")).toBeNull();
+  expect(shown("People 0 of 0")).toBe("0/0");
 });
 
-test("a pill reads its own files, then everything at or below it, and one figure where they agree", async () => {
+test("a pill reads its own files, then everything at or below it, even where they agree", async () => {
   const screen = await render(<Navigation />);
   const row = (name: string) => screen.getByRole("treeitem", { name });
   const shown = (name: string) =>
@@ -95,15 +95,16 @@ test("a pill reads its own files, then everything at or below it, and one figure
   await userEvent.keyboard("{ArrowRight}");
   await row("Trips 2 of 5").click();
   await userEvent.keyboard("{ArrowRight}");
-  await expect.element(row("Cairo 3")).toBeVisible();
+  await expect.element(row("Cairo 3 of 3")).toBeVisible();
 
   expect(shown("Pictures 1 of 6")).toBe("1/6");
+  expect(shown("Cairo 3 of 3")).toBe("3/3");
   // Folded shut or opened, a row's pill is the folder's, not what the tree shows of it.
   await row("Trips 2 of 5").click();
   await userEvent.keyboard("{ArrowLeft}");
-  await expect.element(row("Cairo 3")).not.toBeInTheDocument();
+  await expect.element(row("Cairo 3 of 3")).not.toBeInTheDocument();
   expect(shown("Trips 2 of 5")).toBe("2/5");
-  expect(row("Cairo 3").elements()).toHaveLength(0);
+  expect(row("Cairo 3 of 3").elements()).toHaveLength(0);
 
   // The slash is the separator ink at rest, and the plate's on the row you stand in.
   const slash = (name: string) =>
@@ -133,7 +134,7 @@ test("the breadcrumb goes back up to any folder on the path", async () => {
 
 test("the Sorting Box keeps its own way in, reachable after the row it sits on", async () => {
   const screen = await render(<Navigation />);
-  const row = screen.getByRole("treeitem", { name: "Sorting Box 3" });
+  const row = screen.getByRole("treeitem", { name: "Sorting Box 3 of 3" });
   await expect.element(row).toBeVisible();
 
   // Drawn at rest, not on hover: it is the only way to nominate a sorting folder.

@@ -200,6 +200,7 @@ test("a folder's row holds every verb a place has; a source's adds the Sources s
     "New Folder",
     "Favourite",
     "Assign Key…",
+    "Search in Source",
     "Show in Explorer",
     "Rename",
     "Refresh",
@@ -221,6 +222,7 @@ test("a folder's row holds every verb a place has; a source's adds the Sources s
     "Favourite",
     "Assign Key…",
     "Move to…",
+    "Search in Folder",
     "Show in Explorer",
     "Rename",
     "Refresh",
@@ -279,7 +281,8 @@ test("an offline source keeps what needs no drive, and an offline folder opens n
 
       await archive.click();
       await userEvent.keyboard("{ArrowRight}");
-      const folder = screen.getByRole("treeitem", { name: "Old" });
+      // A folder of an offline source keeps its row, and its count with it.
+      const folder = screen.getByRole("treeitem", { name: "Old 0 of 0" });
       await folder.click({ button: "right" });
       await new Promise((settle) => setTimeout(settle, 100));
       expect(screen.getByRole("menu").elements()).toHaveLength(0);

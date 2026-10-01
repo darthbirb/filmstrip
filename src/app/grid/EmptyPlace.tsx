@@ -56,11 +56,7 @@ export function EmptyPlace({ place }: { place: Place }) {
           key={child.id}
           glyph="folder"
           filled
-          detail={
-            child.allCount > 0
-              ? countText({ own: child.itemCount, all: child.allCount })
-              : undefined
-          }
+          detail={countText({ own: child.itemCount, all: child.allCount })}
           onClick={() =>
             setPlace({
               kind: "folder",

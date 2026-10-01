@@ -39,6 +39,16 @@ export function focusSearch(byKey = true) {
   focusField?.(byKey);
 }
 
+let scopeField: ((term: string) => void) | null = null;
+
+/**
+ * Ctrl+F with the offer taken, for a folder you are not in: the folder becomes the field's scope,
+ * its other terms stay, and nothing runs. Components › Search in Folder.
+ */
+export function searchIn(scope: string) {
+  scopeField?.(scope);
+}
+
 /** What a query reads as in the field: its folders, places, tags and labels as chips, the rest words. */
 async function split(query: string) {
   const { terms } = await readQuery(query);
@@ -119,8 +129,18 @@ export function SearchField() {
       setRinged(byKey);
       input.current?.focus();
     };
+    scopeField = async (term) => {
+      const reading = await readQuery(term).catch(() => null);
+      const chip = reading?.terms.find(isChip);
+      if (!chip) return;
+      setChips((held) => [chip, ...held.filter((one) => !scoping(one))]);
+      setFault(null);
+      setRinged(true);
+      input.current?.focus();
+    };
     return () => {
       focusField = null;
+      scopeField = null;
     };
   }, []);
 
