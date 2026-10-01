@@ -16,15 +16,19 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## A source's own band was never drawn · DEFECT
+## The offline band refuses what an offline source's menu still does · DEFECT
 
-Clicking a source's row shows its root folder, and the header there is a disclosure like any
-folder's. Artboards › 04 draws the band only on folders below a root. A root differs: its path is
-the source's folder alone, its name tag is the source's name and changes when the source is
-renamed in Settings or on its row, nothing above it passes anything down, and an offline source's
-root has nothing on disk to show.
+Artboards › 04 "A source's own band" draws Pictures offline as read-only, Favourite included,
+reading "Not a favourite". But the build keeps every act on an offline source that touches only
+the index: its menu still has Favourite, Assign Key… and Rename, and loses only what needs the
+drive (DECISIONS.md "Right-click menus"). A folder's status, labels, tags and note are in the index
+too. So the band refuses an act the row beside it offers.
 
-Draw the band on Pictures, reachable and offline.
+The folders below an offline root still show in navigation and can be gone into, and their band
+is not drawn either.
+
+Draw the offline band in line with what an offline source can still do, on Pictures and on a
+folder below it.
 
 ## The folder band's edit controls open nothing · DRAWN
 
