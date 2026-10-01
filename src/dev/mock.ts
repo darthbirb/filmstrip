@@ -60,13 +60,14 @@ function source(
     rootFolderId: id,
     reachable: true,
     itemCount,
+    rootCount: 0,
     totalBytes,
     favorite: false,
   };
 }
 
 function folder(id: number, title: string, childCount: number, itemCount: number): FolderNode {
-  return { id, title, childCount, itemCount, favorite: false };
+  return { id, title, childCount, itemCount, allCount: itemCount, favorite: false };
 }
 
 function items(folderId: number, names: string[]): ItemRow[] {
@@ -110,6 +111,7 @@ const ITEMS: Record<number, ItemRow[]> = {
   4: items(4, ["boarding-pass.png", "hotel.jpg"]),
   6: items(6, ["felucca.mp4", "pyramid.jpg", "sphinx.jpg"]),
 };
+recount();
 
 let nextFolderId = 100;
 
@@ -232,6 +234,12 @@ function recount() {
   for (const node of Object.values(FOLDERS).flat()) {
     node.childCount = FOLDERS[node.id]?.length ?? 0;
     node.itemCount = ITEMS[node.id]?.length ?? 0;
+    node.allCount = under(node.id).length;
+  }
+  // An offline source keeps the count it was last indexed with.
+  for (const one of SOURCES.filter((source) => source.reachable)) {
+    one.rootCount = ITEMS[one.rootFolderId]?.length ?? 0;
+    one.itemCount = under(one.rootFolderId).length;
   }
 }
 
@@ -764,6 +772,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
           sourceId: home?.id ?? 0,
           path: folders,
           itemCount,
+          allCount: under(folderId).length,
           reachable: home?.reachable ?? false,
         };
       })
@@ -789,7 +798,8 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
           });
         }
         const itemCount = node ? node.itemCount : (ITEMS[held.folderId]?.length ?? 0);
-        return { key, ...held, itemCount: gone ? 0 : itemCount, gone };
+        const allCount = gone ? 0 : under(held.folderId).length;
+        return { key, ...held, itemCount: gone ? 0 : itemCount, allCount, gone };
       }),
   set_destination_key: ({ key, folderId }) => {
     const [digit, id] = [key as string, folderId as number];
@@ -814,12 +824,16 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       parentId: null,
       sourceId: one.id,
       title: one.title,
+      itemCount: ITEMS[one.rootFolderId]?.length ?? 0,
+      allCount: under(one.rootFolderId).length,
     })),
     ...[...parents()].map(([id, { parent, title }]) => ({
       id,
       parentId: parent,
       sourceId: crumbs(id).home?.id ?? 0,
       title,
+      itemCount: ITEMS[id]?.length ?? 0,
+      allCount: under(id).length,
     })),
   ],
   folder_items: ({ folderId }) => ITEMS[folderId as number] ?? [],

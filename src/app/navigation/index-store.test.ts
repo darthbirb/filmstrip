@@ -18,6 +18,7 @@ function source(id: number, title: string): SourceSummary {
     rootFolderId: id,
     reachable: true,
     itemCount: 2,
+    rootCount: 0,
     totalBytes: 2,
     favorite: false,
   };
@@ -32,6 +33,8 @@ const entry = (id: number, parentId: number | null, title: string): FolderEntry 
   parentId,
   sourceId: 1,
   title,
+  itemCount: 0,
+  allCount: 0,
 });
 // Pictures › Trips › Cairo, and People beside Trips.
 const TREE = [

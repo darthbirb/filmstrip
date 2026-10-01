@@ -15,6 +15,10 @@ key: string, folderId: number, sourceId: number,
  */
 path: Array<Crumb>, itemCount: number, 
 /**
+ * Every live file at or below it.
+ */
+allCount: number, 
+/**
  * Retired by a delete or a walk; the key stays, since an undo can bring the folder back.
  */
 gone: boolean, reachable: boolean, };

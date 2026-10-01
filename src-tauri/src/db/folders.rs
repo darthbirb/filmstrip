@@ -1,6 +1,8 @@
 //! Folders. A folder's path is never stored — it is derived from ancestry, so
 //! renaming a directory costs one row. DECISIONS.md "Places, not queries".
 
+use std::collections::HashMap;
+
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 use ts_rs::TS;
@@ -127,7 +129,8 @@ pub fn live_at(conn: &Connection, folder_id: i64) -> Result<Option<i64>> {
     Ok(Some(here))
 }
 
-/// A folder as the navigation lists it. Counts are of live, direct contents.
+/// A folder as the navigation lists it. Counts are of live contents: its own, then everything at
+/// or below it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -136,10 +139,12 @@ pub struct FolderNode {
     pub title: String,
     pub child_count: i64,
     pub item_count: i64,
+    pub all_count: i64,
     pub favorite: bool,
 }
 
 pub fn children(conn: &Connection, parent_id: i64) -> Result<Vec<FolderNode>> {
+    let all = branch_counts(conn, parent_id)?;
     let mut stmt = conn.prepare(
         "SELECT f.id, f.title,
                 (SELECT COUNT(*) FROM folder c WHERE c.parent_id = f.id AND c.deleted_at IS NULL),
@@ -151,16 +156,62 @@ pub fn children(conn: &Connection, parent_id: i64) -> Result<Vec<FolderNode>> {
     )?;
     let rows = stmt
         .query_map(params![parent_id], |r| {
+            let id = r.get(0)?;
             Ok(FolderNode {
-                id: r.get(0)?,
+                id,
                 title: r.get(1)?,
                 child_count: r.get(2)?,
                 item_count: r.get(3)?,
+                all_count: all.get(&id).copied().unwrap_or(0),
                 favorite: r.get(4)?,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
     Ok(rows)
+}
+
+/// Each live child of a folder, and the live files at or below it, in one walk.
+fn branch_counts(conn: &Connection, parent_id: i64) -> Result<HashMap<i64, i64>> {
+    let mut stmt = conn.prepare(
+        "WITH RECURSIVE below(top, id) AS (
+             SELECT id, id FROM folder WHERE parent_id = ?1 AND deleted_at IS NULL
+           UNION ALL
+             SELECT b.top, f.id FROM folder f JOIN below b ON f.parent_id = b.id
+              WHERE f.deleted_at IS NULL
+         )
+         SELECT b.top, COUNT(i.id) FROM below b
+           LEFT JOIN item i ON i.folder_id = b.id AND i.deleted_at IS NULL
+          GROUP BY b.top",
+    )?;
+    let counts = stmt
+        .query_map(params![parent_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(counts)
+}
+
+/// The live files directly in one folder.
+pub fn own_count(conn: &Connection, folder_id: i64) -> Result<i64> {
+    Ok(conn.query_row(
+        "SELECT COUNT(*) FROM item WHERE folder_id = ?1 AND deleted_at IS NULL",
+        params![folder_id],
+        |r| r.get(0),
+    )?)
+}
+
+/// The live files at or below one folder.
+pub fn subtree_count(conn: &Connection, folder_id: i64) -> Result<i64> {
+    Ok(conn.query_row(
+        "WITH RECURSIVE below(id) AS (
+             SELECT ?1
+           UNION ALL
+             SELECT f.id FROM folder f JOIN below b ON f.parent_id = b.id
+              WHERE f.deleted_at IS NULL
+         )
+         SELECT COUNT(*) FROM item i JOIN below b ON i.folder_id = b.id
+          WHERE i.deleted_at IS NULL",
+        params![folder_id],
+        |r| r.get(0),
+    )?)
 }
 
 /// Marks a folder a favourite, or not. Nothing on disk changes, so it is not journalled, as a
@@ -210,10 +261,19 @@ pub struct FolderEntry {
     pub source_id: i64,
     /// A source's own folder goes by the source's title, as navigation shows it.
     pub title: String,
+    /// Live files directly in it, then at or below it.
+    pub item_count: i64,
+    pub all_count: i64,
 }
 
 /// Every live folder in every source, parents before their children.
 pub fn every_live(conn: &Connection) -> Result<Vec<FolderEntry>> {
+    let mut own = conn.prepare(
+        "SELECT folder_id, COUNT(*) FROM item WHERE deleted_at IS NULL GROUP BY folder_id",
+    )?;
+    let own: HashMap<i64, i64> = own
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
     let mut stmt = conn.prepare(
         "WITH RECURSIVE tree(id, parent_id, source_id, title, depth) AS (
              SELECT f.id, f.parent_id, f.source_id, s.title, 0
@@ -226,16 +286,27 @@ pub fn every_live(conn: &Connection) -> Result<Vec<FolderEntry>> {
          )
          SELECT id, parent_id, source_id, title FROM tree ORDER BY depth, title COLLATE NOCASE",
     )?;
-    let rows = stmt
+    let mut rows: Vec<FolderEntry> = stmt
         .query_map([], |r| {
+            let id = r.get(0)?;
+            let item_count = own.get(&id).copied().unwrap_or(0);
             Ok(FolderEntry {
-                id: r.get(0)?,
+                id,
                 parent_id: r.get(1)?,
                 source_id: r.get(2)?,
                 title: r.get(3)?,
+                item_count,
+                all_count: item_count,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
+    // Children come after their parents, so walking back up adds each branch into its parent once.
+    let at: HashMap<i64, usize> = rows.iter().enumerate().map(|(i, f)| (f.id, i)).collect();
+    for i in (0..rows.len()).rev() {
+        if let Some(&parent) = rows[i].parent_id.as_ref().and_then(|p| at.get(p)) {
+            rows[parent].all_count += rows[i].all_count;
+        }
+    }
     Ok(rows)
 }
 
@@ -524,6 +595,84 @@ mod tests {
         let titles: Vec<_> = listed.iter().map(|f| f.title.as_str()).collect();
         assert_eq!(titles, ["Archive", "trips"]);
         assert_eq!(listed[1].child_count, 1, "the trashed child is not counted");
+    }
+
+    fn file(conn: &Connection, folder_id: i64, name: &str) -> i64 {
+        crate::db::items::upsert(
+            conn,
+            &crate::db::items::NewItem {
+                uuid: format!("uuid-{folder_id}-{name}"),
+                source_id: 1,
+                folder_id,
+                disk_name: name.into(),
+                ext: "jpg".into(),
+                orig_name: name.into(),
+                hash: None,
+                size_bytes: 1,
+                mtime: 0,
+                kind: "image".into(),
+                width: None,
+                height: None,
+                duration_ms: None,
+                codec: None,
+                bitrate: None,
+                captured_at: None,
+                captured_src: None,
+            },
+        )
+        .unwrap()
+    }
+
+    /// Library holds a.jpg; Trips holds two and Cairo one; People holds only Ana, who holds one.
+    /// One of Trips' files is in the Trash.
+    fn counted() -> (Connection, [i64; 5]) {
+        let (conn, root) = library();
+        let trips = create(&conn, root, "Trips").unwrap();
+        let cairo = create(&conn, trips, "Cairo").unwrap();
+        let people = create(&conn, root, "People").unwrap();
+        let ana = create(&conn, people, "Ana").unwrap();
+        file(&conn, root, "a.jpg");
+        file(&conn, trips, "t1.jpg");
+        file(&conn, trips, "t2.jpg");
+        let gone = file(&conn, trips, "gone.jpg");
+        crate::db::items::send_to_trash(&conn, gone).unwrap();
+        file(&conn, cairo, "c.jpg");
+        file(&conn, ana, "ana.jpg");
+        (conn, [root, trips, cairo, people, ana])
+    }
+
+    #[test]
+    fn a_folder_counts_its_own_files_and_everything_at_or_below_it() {
+        let (conn, [root, trips, cairo, people, ana]) = counted();
+        let counts: Vec<_> = children(&conn, root)
+            .unwrap()
+            .into_iter()
+            .map(|f| (f.title, f.item_count, f.all_count))
+            .collect();
+        assert_eq!(
+            counts,
+            [("People".into(), 0, 1), ("Trips".into(), 2, 3)],
+            "a folder of folders counts 0 of its own; the trashed file counts nowhere"
+        );
+        assert_eq!(own_count(&conn, root).unwrap(), 1);
+        assert_eq!(subtree_count(&conn, root).unwrap(), 5);
+        assert_eq!(subtree_count(&conn, cairo).unwrap(), 1);
+
+        let every: Vec<_> = every_live(&conn)
+            .unwrap()
+            .into_iter()
+            .map(|f| (f.id, f.item_count, f.all_count))
+            .collect();
+        assert_eq!(
+            every,
+            [
+                (root, 1, 5),
+                (people, 0, 1),
+                (trips, 2, 3),
+                (ana, 1, 1),
+                (cairo, 1, 1)
+            ]
+        );
     }
 
     #[test]
