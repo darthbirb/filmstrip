@@ -511,6 +511,10 @@ Shift+F10 did nothing at all.
   the key the folder holds. It opens the ten keys against the row, each with the folder it is on,
   "Free" or "gone" in the quiet ink, the folder's own on the plate, then No Key. Picking a key
   another folder holds moves it without a question: the row already said whose it was.
+- **Search in Folder and Search in Source open the second group.** Each is Ctrl+F with the offer
+  taken, for a place you are not standing in: it writes the place as the field's scope, replacing
+  any scope it held and keeping its other terms, and leaves the caret in the field without running
+  anything. A source that is away has none, as it has no Show in Explorer.
 - **Remove Source goes through the question Settings already asks.** It opens Sources with that
   source's row asking, Cancel focused. Forgetting a source drops the tags and notes on its files;
   a menu row must not do that in one press when the section that owns it asks first.
