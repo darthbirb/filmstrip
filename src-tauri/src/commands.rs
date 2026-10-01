@@ -1118,7 +1118,10 @@ mod tests {
         assert_eq!(folder["title"], "Cairo");
         assert_eq!(folder["path"][1]["title"], "Trips");
         assert_eq!(folder["sourceId"], 1);
-        assert_eq!(folder["count"], 1);
+        assert_eq!(
+            (&folder["ownCount"], &folder["count"]),
+            (&1.into(), &1.into())
+        );
         assert_eq!(
             folder["matched"],
             serde_json::json!({ "kind": "name", "value": "Cairo" })

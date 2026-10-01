@@ -1,10 +1,11 @@
 import type { Matched } from "../ipc/bindings/Matched";
-import { formatCount } from "../lib/format";
+import { CountPill } from "./Count";
 import { TermChip } from "./TermChip";
 
 type Props = {
   title: string;
-  /** Every file at or below it. */
+  /** The files directly in it, and every file at or below it. */
+  own: number;
   count: number;
   /** The folders above it, its source's first. */
   above: readonly string[];
@@ -18,7 +19,7 @@ type Props = {
  * A folder a search found: its cover, its name and count, where it is, and what it matched on,
  * key first. The card is the folder, so a click goes into it. Artboards › A search is a place.
  */
-export function FolderCard({ title, count, above, matched, cover, onOpen }: Props) {
+export function FolderCard({ title, own, count, above, matched, cover, onOpen }: Props) {
   return (
     <button
       type="button"
@@ -30,11 +31,9 @@ export function FolderCard({ title, count, above, matched, cover, onOpen }: Prop
         {cover && <img src={cover} alt="" draggable={false} className="size-full object-cover" />}
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-0.75 pr-6">
-        <span className="flex min-w-0 items-center gap-1.5 font-semibold text-fg text-row">
-          <span className="truncate">{title}</span>
-          <span className="flex h-badge shrink-0 items-center rounded-badge bg-raised px-1.75 font-normal text-fg-mid text-small tabular-nums inset-ring inset-ring-line-control">
-            {formatCount(count)}
-          </span>
+        <span className="flex min-w-0 items-center gap-1.5 text-fg text-row">
+          <span className="truncate font-semibold">{title}</span>
+          <CountPill own={own} all={count} />
         </span>
         {above.length > 0 && (
           <span className="truncate text-fg-dim text-small">in {above.join(" / ")}</span>

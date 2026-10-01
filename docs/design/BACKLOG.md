@@ -16,23 +16,6 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## A count always shows both figures · DRAWN
-
-The count drawn last pass shows `own/all` only where the two differ, one figure where they agree,
-and no pill at all on a place with nothing at or below it. Tried, one figure reads as ambiguous:
-a lone `3` could be either number, so the reader has to know the rule to read the row.
-
-Always show both, own then all: `0/9` for a folder whose files are all in its subfolders, `3/3`
-for one with no subfolders or none holding anything, and `0/0` for a folder that is empty and
-whose subfolders, if it has any, are empty too. Redraw every place the count appears: tree rows,
-sources, favourites, Move to…, a key's row in Settings, No Pictures Here's folder buttons, and the
-folder band's words. Say whether the Sorting Box and the Trash, which have no subfolders shown,
-follow the same form, and whether an offline source still shows only its word.
-
-Drawn: both places take `3/3` and `12/12`; an offline source keeps its word. The folded rail's
-badges on the Sorting Box and the Trash keep one figure, decided on 1 October 2026: the corner
-does not fit two, and neither place ever has subfolders.
-
 ## Folders and tags as controls · DRAWN
 
 The controls that write a term are not drawn anywhere. Draw each: a tag or a label in the pane's
@@ -56,8 +39,8 @@ drops a band with the cover beside rows for Path, Status, Labels, Tags and Note,
 rhythm as the pane's details. The Sorting Box and the Trash keep a plain header with no
 disclosure.
 
-Its counts read in the count pill's terms, as redrawn: `3 here · 9 in all`, or
-`3 here · nothing below` where the pill has one figure.
+Its counts read in the count pill's terms, as redrawn, always both parts: `3 here · 9 in all`,
+`3 here · 3 in all`, `0 here · 0 in all`.
 
 ## Scrubbing a video's tile · DRAWN
 

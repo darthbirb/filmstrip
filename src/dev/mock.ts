@@ -518,6 +518,7 @@ function searchFor(query: string): SearchOutcome {
       title,
       path: crumbs(id).folders,
       count: under(id).length,
+      ownCount: ITEMS[id]?.length ?? 0,
       cover: under(id)[0]?.thumb ?? null,
       matched: { kind: "name", value: title },
     }));

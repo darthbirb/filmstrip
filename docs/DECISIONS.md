@@ -270,14 +270,16 @@ structure the chrome has, and the chevrons already say which rows have children.
 
 **A row's count is a pill**, drawn on 15 September 2026 and built the day after. A bare number at
 the end of a row runs into the title beside it, where a plate ends the row and groups itself.
-**It reads a place's own files, then everything at or below it**, as `3/9`, and one figure where
-the two are equal; redrawn on 30 September 2026 after a library of nine files read as five, three
-of them loose in the source and one in a folder folded shut. The own figure comes first because it
-is what a click shows; the second is what folding hides, so a row reads the same folded or open,
-and a folder of folders reads `0/9`, where the nought is the news. A source's row has a pill now
-too, by the same rule. A place with nothing at or below it carries none: a nought in a plate is a
-number to read and dismiss on every empty folder, and an absence says the same in no ink. The
-Sorting Box and the Trash keep one figure, what their grids show.
+**It reads a place's own files, then everything at or below it, always both**, as `3/9`, `3/3`
+and `0/0`; redrawn on 30 September 2026 after a library of nine files read as five, three of them
+loose in the source and one in a folder folded shut, and again on 1 October when one figure where
+the two agreed read as ambiguous, since a lone `3` could be either number. The own figure comes
+first because it is what a click shows; the second is what folding hides, so a row reads the same
+folded or open, and a folder of folders reads `0/9`. Every row has its pill, a source's and an
+empty folder's included, so the column has no gaps to explain; the Sorting Box and the Trash read
+`3/3` the same way. Two exceptions: an offline source shows only its word, since the app cannot
+stand behind a count while the drive is away, and the folded rail's badges keep one figure,
+because two do not fit a glyph's corner and neither place has subfolders.
 
 **Choosing a row goes there; only its chevron, Right or a double-click opens it.** The tree is
 one tab stop and follows the ARIA tree pattern: the arrow keys move and open, Enter goes. A

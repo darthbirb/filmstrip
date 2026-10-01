@@ -231,6 +231,7 @@ export function Grid({ mode }: { mode: LayoutMode }) {
                   <FolderCard
                     key={folder.id}
                     title={folder.title}
+                    own={folder.ownCount}
                     count={folder.count}
                     above={folder.path.slice(0, -1).map((crumb) => crumb.title)}
                     matched={folder.matched}

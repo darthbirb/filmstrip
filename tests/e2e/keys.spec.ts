@@ -11,12 +11,12 @@ test("a key bound from a folder's menu moves the file in the pane there, and Ctr
   const tree = page.getByRole("tree", { name: "Places" });
   await tree.getByRole("treeitem", { name: "Pictures 1 of 6" }).click();
   await page.keyboard.press("ArrowRight");
-  await tree.getByRole("treeitem", { name: "People" }).click({ button: "right" });
+  await tree.getByRole("treeitem", { name: "People 0 of 0" }).click({ button: "right" });
   await page.getByRole("menuitem", { name: /^Assign Key…/ }).click();
   const keys = page.getByRole("menu", { name: "Key for People" });
   await keys.getByRole("menuitem").first().click();
   await expect(
-    tree.getByRole("treeitem", { name: "People" }).getByTitle("Destination Key 1"),
+    tree.getByRole("treeitem", { name: "People 0 of 0" }).getByTitle("Destination Key 1"),
   ).toBeVisible();
 
   await tree.getByRole("treeitem", { name: "Trips 2 of 5" }).click();

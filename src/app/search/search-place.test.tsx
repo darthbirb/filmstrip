@@ -69,6 +69,8 @@ test("a search's folders stand before its files, each under its heading, and a c
   await expect.element(card).toHaveAttribute("title", "Open Cairo");
   await expect.element(card.getByText("in Pictures / Trips")).toBeVisible();
   await expect.element(card.getByText("Name Cairo", { exact: true })).toBeVisible();
+  // Its count is navigation's: its own files, then all of it.
+  expect(card.element().querySelector(".rounded-badge [aria-hidden]")?.textContent).toBe("3/3");
 
   const pyramid = screen.getByRole("button", { name: "pyramid.jpg" });
   await expect.element(pyramid).toBeVisible();

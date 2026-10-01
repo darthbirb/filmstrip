@@ -51,7 +51,7 @@ const openKeys = async (name: string) => {
 test("a bound folder's row carries its key beside the count", async () => {
   await bound(["2", 6]);
   await renderTree();
-  await expect.poll(() => chipOn("Cairo 3")).toBe("2");
+  await expect.poll(() => chipOn("Cairo 3 of 3")).toBe("2");
   expect(chipOn("Trips 2 of 5")).toBeNull();
 });
 
@@ -94,7 +94,7 @@ test("picking a key another folder holds moves it, and No Key frees the folder's
   await openKeys("Trips 2 of 5");
   await userEvent.click(page.getByRole("menu").getByRole("menuitem").nth(1));
   await expect.poll(() => chipOn("Trips 2 of 5")).toBe("2");
-  expect(chipOn("Cairo 3")).toBeNull();
+  expect(chipOn("Cairo 3 of 3")).toBeNull();
 
   await openKeys("Trips 2 of 5");
   await userEvent.click(page.getByRole("menuitem", { name: "No Key" }));
@@ -108,7 +108,7 @@ test("a key whose folder has gone says so in the menu, and its folder has no row
   await refreshIndex();
   await renderTree();
   // Cairo has gone with its three files, so Trips holds only its own.
-  await openKeys("Trips 2");
+  await openKeys("Trips 2 of 2");
   const gone = page.getByRole("menu", { name: "Key for Trips" }).getByRole("menuitem").nth(3);
   expect(gone.element().textContent).toContain("Cairo · gone");
 });

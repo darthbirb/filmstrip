@@ -15,7 +15,7 @@ test("a file dragged onto a folder in navigation moves there, and Ctrl+Z brings 
 
   const grid = page.getByRole("main");
   const hotel = grid.getByRole("button", { name: "hotel.jpg" });
-  const people = tree.getByRole("treeitem", { name: "People" });
+  const people = tree.getByRole("treeitem", { name: "People 0 of 0" });
   const from = await hotel.boundingBox();
   const to = await people.boundingBox();
   if (!from || !to) throw new Error("the tile or the row is not on screen");

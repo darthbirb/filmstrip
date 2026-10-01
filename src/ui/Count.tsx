@@ -7,14 +7,14 @@ type Figures = {
   all?: number;
 };
 
-/** A count as text, "3/9" where the two figures differ and one figure where they do not. */
+/** A count as text, always both figures: "3/9", "3/3", "0/0". DECISIONS.md "Navigation". */
 export function countText({ own, all = own }: Figures) {
-  return all === own ? formatCount(own) : `${formatCount(own)}/${formatCount(all)}`;
+  return `${formatCount(own)}/${formatCount(all)}`;
 }
 
 /** A count as a screen reader says it: "3 of 9". */
 export function countLabel({ own, all = own }: Figures) {
-  return all === own ? formatCount(own) : `${formatCount(own)} of ${formatCount(all)}`;
+  return `${formatCount(own)} of ${formatCount(all)}`;
 }
 
 type Props = Figures & {
@@ -41,19 +41,13 @@ export function CountPill({ own, all = own, tone = "rest" }: Props) {
     <span
       className={`flex h-badge shrink-0 items-center rounded-badge px-1.5 text-small tabular-nums ${pill}`}
     >
-      {all === own ? (
-        formatCount(own)
-      ) : (
-        <>
-          {/* Read as "3 of 9": a slash between figures is not a word. */}
-          <span aria-hidden="true">
-            {formatCount(own)}
-            <span className={slash}>/</span>
-            {formatCount(all)}
-          </span>
-          <span className="sr-only">{countLabel({ own, all })}</span>
-        </>
-      )}
+      {/* Read as "3 of 9": a slash between figures is not a word. */}
+      <span aria-hidden="true">
+        {formatCount(own)}
+        <span className={slash}>/</span>
+        {formatCount(all)}
+      </span>
+      <span className="sr-only">{countLabel({ own, all })}</span>
     </span>
   );
 }

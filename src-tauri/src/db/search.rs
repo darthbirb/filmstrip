@@ -323,8 +323,9 @@ pub struct FolderMatch {
     pub title: String,
     /// From its source's own folder, by the source's title, down to it, as a place is named.
     pub path: Vec<Crumb>,
-    /// Every live file at or below it.
+    /// Every live file at or below it, and those directly in it.
     pub count: i64,
+    pub own_count: i64,
     /// The picture that stands for it, once its thumbnail is made. Filled by the command.
     pub cover: Option<String>,
     #[serde(skip)]
@@ -379,6 +380,7 @@ pub fn folders(conn: &Connection, expr: &Expr) -> Result<Vec<FolderMatch>> {
             title,
             path: crate::db::folders::ancestry(conn, id)?,
             count: live_count(conn, id)?,
+            own_count: crate::db::folders::own_count(conn, id)?,
             cover: None,
             cover_uuid: cover_uuid(conn, id)?,
         });
@@ -1163,8 +1165,9 @@ mod tests {
             .find(|folder| folder.id == l.people)
             .unwrap();
         assert_eq!(
-            people.count, 3,
-            "Ana's two and Bob's one; the Trash's is not counted"
+            (people.own_count, people.count),
+            (0, 3),
+            "none of its own; Ana's two and Bob's one; the Trash's is not counted"
         );
         let titles = |path: &[Crumb]| -> Vec<String> {
             path.iter().map(|crumb| crumb.title.clone()).collect()

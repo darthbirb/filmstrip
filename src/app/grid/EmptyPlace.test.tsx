@@ -32,8 +32,8 @@ test("a folder of folders lists them, and choosing one goes there", async () => 
   const screen = await render(<EmptyPlace place={PICTURES} />);
   await expect.element(screen.getByText("No Pictures Here")).toBeVisible();
   await expect.element(screen.getByText("Pictures holds 2 folders.")).toBeVisible();
-  // A folder with nothing of its own carries no count, exactly as its row in the tree carries no pill.
-  await expect.element(screen.getByRole("button", { name: "People" })).toBeVisible();
+  // An empty folder says so in both figures, exactly as its row in the tree does.
+  await expect.element(screen.getByRole("button", { name: "People 0/0" })).toBeVisible();
 
   // Trips holds two files and Cairo, with three more: its own, then all of it.
   await screen.getByRole("button", { name: "Trips 2/5" }).click();

@@ -58,7 +58,7 @@ async function renderBoth() {
     </>,
   );
   await expect.element(tile("sphinx.jpg")).toBeVisible();
-  await expect.element(row("People")).toBeVisible();
+  await expect.element(row("People 0 of 0")).toBeVisible();
 }
 
 const tile = (name: string) => page.getByRole("button", { name, exact: true });
@@ -87,7 +87,7 @@ const ghost = () => document.querySelector<HTMLElement>(".fixed[aria-hidden=true
 test("a tile dragged onto a folder says the move before the drop, and the drop is that move", async () => {
   await renderBoth();
   const pyramid = await idOf("pyramid.jpg");
-  await dragOnto("pyramid.jpg", "People");
+  await dragOnto("pyramid.jpg", "People 0 of 0");
   expect(ghost()?.textContent).toBe("Move 1 file to People");
   await recording(async (calls) => {
     letGo();
@@ -104,13 +104,13 @@ test("a checked tile carries the whole set, and an unchecked one only itself", a
   await userEvent.click(page.getByRole("checkbox", { name: "Check felucca.mp4" }));
   await userEvent.click(page.getByRole("checkbox", { name: "Check pyramid.jpg" }));
 
-  await dragOnto("pyramid.jpg", "People");
+  await dragOnto("pyramid.jpg", "People 0 of 0");
   expect(ghost()?.textContent).toBe("Move 2 files to People");
   // Escape is the drag's while it is on: the ghost goes and the set stays.
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
   expect(getSelection().ids).toEqual([felucca, pyramid]);
 
-  await dragOnto("sphinx.jpg", "People");
+  await dragOnto("sphinx.jpg", "People 0 of 0");
   expect(ghost()?.textContent).toBe("Move 1 file to People");
   letGo();
   expect(getSelection().ids).toEqual([felucca, pyramid]);
@@ -120,8 +120,8 @@ test("a row that refuses says why, after the prohibit, and a drop there moves no
   await renderBoth();
   await recording(async (calls) => {
     for (const [place, why] of [
-      ["Cairo 3", "Already in Cairo"],
-      ["Trash", "Delete sends to the Trash"],
+      ["Cairo 3 of 3", "Already in Cairo"],
+      ["Trash 0 of 0", "Delete sends to the Trash"],
       ["Archive offline", "Archive is offline"],
     ] as const) {
       await dragOnto("sphinx.jpg", place);
@@ -137,7 +137,7 @@ test("a row that refuses says why, after the prohibit, and a drop there moves no
 
 test("with one sorting source the Sorting Box takes a drop, and names it", async () => {
   await renderBoth();
-  await dragOnto("sphinx.jpg", "Sorting Box 3");
+  await dragOnto("sphinx.jpg", "Sorting Box 3 of 3");
   expect(ghost()?.textContent).toBe("Move 1 file to Incoming");
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 });
@@ -145,7 +145,7 @@ test("with one sorting source the Sorting Box takes a drop, and names it", async
 test("Escape puts the ghost away and moves nothing", async () => {
   await renderBoth();
   await recording(async (calls) => {
-    await dragOnto("sphinx.jpg", "People");
+    await dragOnto("sphinx.jpg", "People 0 of 0");
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     await expect.poll(ghost).toBeNull();
     letGo();

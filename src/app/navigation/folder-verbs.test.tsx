@@ -89,11 +89,11 @@ test("New Folder lands a row in its place, already in its field, and Enter makes
   // In its place in the order: after Cairo, one level in.
   const rows = screen.getByRole("treeitem").elements();
   const at = rows.findIndex((row) => row.contains(input));
-  expect(rows[at - 1]?.getAttribute("aria-label")).toBe("Cairo 3");
+  expect(rows[at - 1]?.getAttribute("aria-label")).toBe("Cairo 3 of 3");
   expect(rows[at]?.getAttribute("aria-level")).toBe("3");
 
   await userEvent.keyboard("Egypt{Enter}");
-  await expect.element(screen.getByRole("treeitem", { name: "Egypt" })).toBeVisible();
+  await expect.element(screen.getByRole("treeitem", { name: "Egypt 0 of 0" })).toBeVisible();
   await expect.element(screen.getByText("Created Egypt in Trips.")).toBeVisible();
   expect(await titles(4)).toEqual(["Cairo", "Egypt"]);
 });
@@ -117,12 +117,12 @@ test("Escape leaves nothing, and a name already there is said under the row", as
 test("New Folder opens a shut folder, and on a source's row makes one at its top level", async () => {
   const screen = await render(<Harness />);
   await openPictures(screen);
-  await choose(screen, "People", "People", "New Folder");
+  await choose(screen, "People 0 of 0", "People", "New Folder");
   await expect
-    .element(screen.getByRole("treeitem", { name: "People" }))
+    .element(screen.getByRole("treeitem", { name: "People 0 of 0" }))
     .toHaveAttribute("aria-expanded", "true");
   await userEvent.keyboard("Family{Enter}");
-  await expect.element(screen.getByRole("treeitem", { name: "Family" })).toBeVisible();
+  await expect.element(screen.getByRole("treeitem", { name: "Family 0 of 0" })).toBeVisible();
 
   await choose(screen, "Pictures 1 of 6", "Pictures", "New Folder");
   await userEvent.keyboard("{Enter}");
@@ -171,7 +171,7 @@ test("a folder moved while you stand in it takes you with it, the tree opened do
   await userEvent.keyboard("{Enter}");
 
   await expect.poll(where).toBe("Pictures/People/Trips/Cairo");
-  const cairo = screen.getByRole("treeitem", { name: "Cairo 3" });
+  const cairo = screen.getByRole("treeitem", { name: "Cairo 3 of 3" });
   await expect.element(cairo).toHaveAttribute("aria-selected", "true");
 });
 
@@ -181,7 +181,7 @@ test("a folder whose name is taken where it was going stays, and says so in the 
   await loadIndex();
   openFolders([1, 4]);
   const screen = await render(<Harness />);
-  await choose(screen, "Cairo 3", "Cairo", "Move to…");
+  await choose(screen, "Cairo 3 of 3", "Cairo", "Move to…");
   await screen.getByRole("dialog", { name: "Move to" }).getByRole("combobox").fill("pict");
   await userEvent.keyboard("{Enter}");
 
@@ -194,7 +194,7 @@ test("a folder whose name is taken where it was going stays, and says so in the 
 test("an empty folder goes without asking, and Undo brings it back", async () => {
   const screen = await render(<Harness />);
   await openPictures(screen);
-  await choose(screen, "People", "People", "Delete");
+  await choose(screen, "People 0 of 0", "People", "Delete");
   await expect.element(screen.getByText("Deleted People.")).toBeVisible();
   expect(await titles(1)).toEqual(["Trips"]);
 
@@ -282,12 +282,12 @@ test("a folder deleted while you stand in it leaves you in its parent", async ()
   });
   openFolders([1, 4]);
   const screen = await render(<Harness />);
-  await choose(screen, "Cairo 3", "Cairo", "Delete");
+  await choose(screen, "Cairo 3 of 3", "Cairo", "Delete");
   await screen.getByRole("button", { name: "Delete Files Too" }).click();
   await expect.poll(where).toBe("Pictures/Trips");
   // Cairo went with its three files, so Trips holds only its own.
   await expect
-    .element(screen.getByRole("treeitem", { name: "Trips 2" }))
+    .element(screen.getByRole("treeitem", { name: "Trips 2 of 2" }))
     .toHaveAttribute("aria-selected", "true");
 });
 

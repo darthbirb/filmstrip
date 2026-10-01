@@ -559,13 +559,14 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   than the name, and the count pill at the end. A source's has no parent. The group
   stands between the app's two places and the sources, a `line` rule either side. Where you are,
   it wears the plate, and so does the place's own row.
-- **Count pill.** A folder's or a source's files: its own, then everything at or below it, as
-  `3/9`, and one figure where the two are equal. `badge` tall at the `badge` corner, on `raised`
-  with a `line-control` ring, figures `fg-mid` and the slash `fg-faint`; on a selected row it sinks
-  to `on-plate-wash`, figures `on-plate-dim` and the slash `on-plate-faint`. A folded row and the
-  same row opened show the same pill. The Sorting Box and the Trash keep one figure. A place with
-  nothing at or below it carries no pill, and an offline source shows its word instead. Move to…'s
-  tree rows carry it too; Settings' key rows and No Pictures Here print the same figures as text.
+- **Count pill.** A place's files, always both figures: its own, then everything at or below it,
+  as `3/9`, `3/3` or `0/0`. `badge` tall at the `badge` corner, on `raised` with a `line-control`
+  ring, figures `fg-mid` and the slash `fg-faint`; on a selected row it sinks to `on-plate-wash`,
+  figures `on-plate-dim` and the slash `on-plate-faint`. A folded row and the same row opened
+  show the same pill. Every row carries one, the Sorting Box and the Trash included; an offline
+  source shows its word instead. Move to…'s tree rows and a matched folder's card carry it too;
+  Settings' key rows and No Pictures Here print the same figures as text. The folded rail's
+  badges keep one figure.
 - **Rail button.** A folded panel's place: a `control` square holding a filled glyph, `plate` with
   `on-plate` ink when it is where you are, a `wash` under the pointer otherwise. Its count rides the
   glyph's top-right corner as a `mark-badge` plate in `micro` figures, ringed in the panel's own

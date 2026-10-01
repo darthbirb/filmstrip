@@ -49,7 +49,7 @@ test("Destination Keys lists all ten, bound or free, and a gone one in the red w
     "9",
     "0",
   ]);
-  expect(words(rows[0])).toBe("1CairoTrips3");
+  expect(words(rows[0])).toBe("1CairoTrips3/3");
   expect(words(rows[1])).toBe("2Choose Folder…");
   expect(words(rows[3])).toBe("4Peoplegone from Pictures");
   expect(rows[3]?.querySelector("button")?.className).toContain("text-danger");
