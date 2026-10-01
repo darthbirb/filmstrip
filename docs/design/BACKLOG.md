@@ -16,7 +16,7 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## The count's slash and the Tab key use values the token sheet does not allow · DEFECT
+## The count's slash and the Tab key use values the token sheet does not allow · DRAWN
 
 Found while building the two-figure count and the scope offer.
 
