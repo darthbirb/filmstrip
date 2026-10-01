@@ -16,7 +16,7 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## A count always shows both figures
+## A count always shows both figures · DRAWN
 
 The count drawn last pass shows `own/all` only where the two differ, one figure where they agree,
 and no pill at all on a place with nothing at or below it. Tried, one figure reads as ambiguous:
@@ -28,6 +28,10 @@ whose subfolders, if it has any, are empty too. Redraw every place the count app
 sources, favourites, Move to…, a key's row in Settings, No Pictures Here's folder buttons, and the
 folder band's words. Say whether the Sorting Box and the Trash, which have no subfolders shown,
 follow the same form, and whether an offline source still shows only its word.
+
+Drawn: both places take `3/3` and `12/12`; an offline source keeps its word. The folded rail's
+badges on the Sorting Box and the Trash keep one figure, decided on 1 October 2026: the corner
+does not fit two, and neither place ever has subfolders.
 
 ## Folders and tags as controls · DRAWN
 
