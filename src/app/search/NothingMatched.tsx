@@ -25,7 +25,7 @@ export function NothingMatched({ place }: { place: Place & { kind: "search" } })
   const asked = withoutScope(outcome.terms) ?? place.query;
   const note = asked ? (
     <>
-      No file{where ? ` in ${where}` : ""} matches <span className="text-fg">{asked}</span>.
+      No file {where ? `in ${where}` : "anywhere"} matches <span className="text-fg">{asked}</span>.
     </>
   ) : undefined;
   return (

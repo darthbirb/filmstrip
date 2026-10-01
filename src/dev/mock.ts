@@ -545,7 +545,7 @@ function suggestionsFor(scope: string | null, text: string): Suggestions {
   const begins = (value: string) => value.toLowerCase().startsWith(word.toLowerCase());
   const below = scope?.startsWith("path:") ? scope.slice(5).toLowerCase().split("/") : null;
   const rows: Suggestion[] = [];
-  if (key === null) rows.push({ kind: "words", text: raw, shape: { kind: "text" }, path: [] });
+  if (key === null) rows.push({ kind: "words", text: raw, shape: { kind: "text" } });
   if ((key === null || key === "path") && scope !== "is:trashed") {
     for (const [id, { title }] of parents()) {
       const titles = crumbs(id).folders.map((crumb) => crumb.title);
@@ -557,24 +557,18 @@ function suggestionsFor(scope: string | null, text: string): Suggestions {
         kind: "folder",
         text: `${sign}path:${titles.join("/")}`,
         shape: { kind: "path", titles, exact: false },
-        path: titles.slice(below ? below.length - 1 : 0),
       });
     }
   }
   if (key === null || key === "tag") {
     for (const value of TAGS.filter(begins)) {
-      rows.push({
-        kind: "tag",
-        text: `${sign}tag:${value}`,
-        shape: { kind: "tag", value },
-        path: [],
-      });
+      rows.push({ kind: "tag", text: `${sign}tag:${value}`, shape: { kind: "tag", value } });
     }
   }
   if (key !== "path" && key !== "tag") {
     for (const label of LABELS.filter((one) => (!key || one.key === key) && begins(one.value))) {
       const term = `${sign}${label.key}:${label.value}`;
-      rows.push({ kind: "label", text: term, shape: { kind: "label", ...label }, path: [] });
+      rows.push({ kind: "label", text: term, shape: { kind: "label", ...label } });
     }
   }
   return { from, rows: rows.slice(0, 8) };

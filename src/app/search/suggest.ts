@@ -31,11 +31,12 @@ export function movePlate(at: number | null, by: 1 | -1, count: number): number 
 export function picked(held: Held, from: number, row: Suggestion): Held {
   const kept = held.text.slice(0, from);
   if (row.kind === "folder" && row.shape.kind === "path" && !row.text.startsWith("-")) {
-    const scope: Chip = { text: row.text, shape: row.shape };
-    return {
-      chips: [scope, ...held.chips.filter((chip) => !scoping(chip))],
-      text: kept.trimEnd(),
-    };
+    return withScope({ ...held, text: kept.trimEnd() }, { text: row.text, shape: row.shape });
   }
   return { chips: held.chips, text: `${kept}${row.text}` };
+}
+
+/** The field with this scope first in place of any it held: a query holds one place. */
+export function withScope(held: Held, scope: Chip): Held {
+  return { chips: [scope, ...held.chips.filter((chip) => !scoping(chip))], text: held.text };
 }

@@ -8,8 +8,8 @@ import { resetSearches } from "./results";
 import { SearchField } from "./SearchField";
 import { movePlate } from "./suggest";
 
-// Against the dev mock: under Pictures / Trips, `ca` begins the folder Cairo, the tag camel and
-// the label location:cairo.
+// Against the dev mock, standing in Pictures / Trips with nothing scoped: `ca` begins the folder
+// Cairo, the tag camel and the label location:cairo.
 
 const TRIPS: Place = {
   kind: "folder",
@@ -54,13 +54,19 @@ async function type(text: string) {
 test("the list opens at the first key, not on focus, with each row's kind at its end", async () => {
   await render(<Bar />);
   await field().click();
-  await expect.element(page.getByTitle("Pictures / Trips")).toBeVisible();
+  await expect.element(page.getByRole("button", { name: "Search Only in Trips" })).toBeVisible();
   expect(options().elements()).toHaveLength(0);
   await expect.element(field()).toHaveAttribute("aria-expanded", "false");
 
   await userEvent.keyboard("ca");
   await expect.element(options().first()).toBeVisible();
-  expect(rows()).toEqual(["caWords", "Trips /CairoFolder", "camelTag", "locationcairoLabel"]);
+  // A folder is named by its whole path from the source.
+  expect(rows()).toEqual([
+    "caWords",
+    "Pictures / Trips /CairoFolder",
+    "camelTag",
+    "locationcairoLabel",
+  ]);
   await expect.element(field()).toHaveAttribute("aria-expanded", "true");
   expect(plated()).toEqual([false, false, false, false]);
 });
@@ -91,27 +97,23 @@ test("the plate steps off either end to no row", () => {
 test("Enter writes the plated term in place of the word and runs the query", async () => {
   await type("giza ca");
   await userEvent.keyboard("{ArrowDown}{ArrowDown}{ArrowDown}{Enter}");
-  expect(getPlace()).toEqual({
-    kind: "search",
-    query: "path:Pictures/Trips giza tag:camel",
-    back: TRIPS,
-  });
+  expect(getPlace()).toEqual({ kind: "search", query: "giza tag:camel", back: TRIPS });
   await expect.element(page.getByTitle("tag:camel")).toBeVisible();
   await expect.element(field()).toHaveValue("giza");
   expect(options().elements()).toHaveLength(0);
 });
 
-test("Tab does the same, and Enter with no row plated runs the words as typed", async () => {
+test("Tab on a plated row picks it rather than the offer, and Enter with none runs the words", async () => {
   await type("ca");
   await userEvent.keyboard("{ArrowUp}{Tab}");
-  expect(getPlace()).toMatchObject({ query: "path:Pictures/Trips location:cairo" });
+  expect(getPlace()).toMatchObject({ query: "location:cairo" });
 
   setPlace(TRIPS);
   await field().click();
   await userEvent.keyboard("ca");
   await expect.element(options().first()).toBeVisible();
   await userEvent.keyboard("{Enter}");
-  expect(getPlace()).toMatchObject({ query: "path:Pictures/Trips ca" });
+  expect(getPlace()).toMatchObject({ query: "ca" });
 });
 
 test("a folder picked becomes the scope, and the other words stay", async () => {
@@ -129,7 +131,7 @@ test("a folder picked becomes the scope, and the other words stay", async () => 
 test("a click on a row picks it", async () => {
   await type("ca");
   await options().nth(2).click();
-  expect(getPlace()).toMatchObject({ query: "path:Pictures/Trips tag:camel" });
+  expect(getPlace()).toMatchObject({ query: "tag:camel" });
 });
 
 test("Escape closes the list and keeps what was typed; the next leaves the field", async () => {

@@ -27,15 +27,14 @@ type Props = {
 
 /** What a row writes, drawn as the field will show it once it is written. */
 function Term({ row, typed }: { row: Suggestion; typed: string }) {
-  if (row.kind === "folder") {
+  if (row.shape.kind === "path") {
+    const { titles } = row.shape;
     return (
       <>
-        {row.path.length > 1 && (
-          <span className="min-w-0 truncate text-fg-dim">
-            {row.path.slice(0, -1).join(" / ")} /
-          </span>
+        {titles.length > 1 && (
+          <span className="min-w-0 truncate text-fg-dim">{titles.slice(0, -1).join(" / ")} /</span>
         )}
-        <span className="shrink-0">{row.path.at(-1)}</span>
+        <span className="shrink-0">{titles.at(-1)}</span>
       </>
     );
   }

@@ -13,10 +13,13 @@ test("a search typed in a folder stands in its results, opens one, widens, acts 
   await page.keyboard.press("ArrowRight");
   await tree.getByRole("treeitem", { name: "Trips 2 of 5" }).click();
 
-  // Ctrl+F writes where you stand, and Enter runs what was typed after it.
+  // Ctrl+F offers where you stand, Tab takes it, and Enter runs what was typed after it.
   await page.keyboard.press("Control+f");
   const field = page.getByRole("combobox", { name: "Search" });
   await expect(field).toBeFocused();
+  await expect(page.getByRole("button", { name: "Search Only in Trips" })).toBeVisible();
+  await page.keyboard.press("Tab");
+  await expect(page.getByTitle("Pictures / Trips")).toBeVisible();
   await field.pressSequentially("cairo");
   await page.keyboard.press("Enter");
 

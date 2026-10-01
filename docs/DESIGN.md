@@ -608,9 +608,12 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   glass and the word Search centred in `fg-dim`, on `ground` in a `line-control` ring; with the
   caret in it, or a query held, it is left-aligned, on `well` in a `line-strong` ring while
   focused: the glass, the terms as chips, then the words in `ui` `fg`. Arriving by Ctrl+F draws the
-  focus ring; a click does not. A query that does not read turns the ring `danger`, underlines the
-  character in `danger`, and hangs one sentence below it on `panel` in a `line-danger` ring with
-  the warning glyph.
+  focus ring; a click does not. While focused with no scope, where you stand is offered at its end:
+  a `badge`-tall plate at the `badge` corner edged in dashed `line-strong`, its place's outlined
+  glyph and "in Cairo" in `small` `fg-dim`, then a key cap, `eyebrow` "Tab" on `panel` at the
+  `badge` corner in a `line-control` ring; under the pointer it lifts to `panel` with `fg` ink.
+  A query that does not read turns the ring `danger`, underlines the character in `danger`, and
+  hangs one sentence below it on `panel` in a `line-danger` ring with the warning glyph.
 - **Suggestion list.** Under the search field while a word is being typed, at the field's width:
   the menu's surface, `panel` at the `control` corner in a `line-control` ring with the overlay
   shadow, and rows `control` tall at the `nested` corner. A row is its kind's glyph in `fg-dim`

@@ -1165,7 +1165,7 @@ mod tests {
             serde_json::json!({
                 "from": 2,
                 "rows": [
-                    { "kind": "words", "text": "cai", "shape": { "kind": "text" }, "path": [] },
+                    { "kind": "words", "text": "cai", "shape": { "kind": "text" } },
                     {
                         "kind": "folder",
                         "text": "path:library/Trips/Cairo",
@@ -1173,8 +1173,7 @@ mod tests {
                             "kind": "path",
                             "titles": ["library", "Trips", "Cairo"],
                             "exact": false
-                        },
-                        "path": ["Trips", "Cairo"]
+                        }
                     }
                 ]
             })
@@ -1182,7 +1181,7 @@ mod tests {
         let spaced = suggestions_with(&conn, None, "cai ").unwrap();
         assert_eq!((spaced.from, spaced.rows.len()), (4, 0));
         let unscoped = suggestions_with(&conn, Some("(a or b)"), "cai").unwrap();
-        assert_eq!(unscoped.rows[1].path, ["library", "Trips", "Cairo"]);
+        assert_eq!(unscoped.rows[1].text, "path:library/Trips/Cairo");
     }
 
     #[test]

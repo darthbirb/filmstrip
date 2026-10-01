@@ -9,8 +9,8 @@ export type Suggestion = { kind: SuggestionKind,
 /**
  * The term as text that reads back as itself, with the `-` the word was typed with.
  */
-text: string, shape: Shape, 
+text: string, 
 /**
- * A folder's titles from the scope down to it, or from its source with no scope.
+ * A folder's is its whole path from the source, as its row names it.
  */
-path: Array<string>, };
+shape: Shape, };

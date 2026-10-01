@@ -16,44 +16,6 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## The count's slash and the Tab key use values the token sheet does not allow · DRAWN
-
-Found while building the two-figure count and the scope offer.
-
-- **The offer's Tab key** has a 3px corner. The radius scale is 5, 6, 8 and 10px. Its 10px mono
-  type matches `micro`'s size but not its 600 weight; say which it is.
-
-Draw each with a named token, or name the value on the token sheet and say where else it may be
-used. Every place the count or the key is drawn takes the answer.
-
-## The last pass left three things undecided · DRAWN
-
-The pass that drew search starting everywhere and the two-figure count listed these as open on
-its Notes sheet. The first blocks building the offer; settle all three.
-
-- **The offer's dashed edge is `#4a4845`**, a grey the token sheet does not name. Draw it with a
-  named colour, or name it on the token sheet and say where else it may be used.
-- **The folder band says `3 here · 0 below`**, where below leaves out the folder's own files,
-  while the pill's second figure counts them. Decide whether the band reads in the pill's terms,
-  and draw it that way.
-
-## A search starts scoped to where you stand · DRAWN
-
-Components › "The field holds the query, and shows it as terms" has focus write where you stand
-as the query's first term, so a search typed in Cairo searches Cairo. Tried against a real
-library, that is the wrong default: a search is for finding something whose place is not known,
-and the narrow answer hides what the wide one would have found.
-
-A search covers every source and the Sorting Box unless the person asks for less. The place they
-stand in, a folder, the Sorting Box or the Trash, is offered as a scope one Tab or one click away,
-and is never written for them. How it is offered is for this pass to decide.
-
-Redraw everything the old default reaches: the field on focus and on Ctrl+F; the scope typed in
-the Sorting Box and in the Trash, which is still the only way a trashed file reaches results; the
-results header and Nothing Matched, whose Search Everywhere assumed a scope to remove; the
-suggestion list's folders, drawn as under the scope; and "One scope per query". The scope stays a
-term in the text, read, removed and typed like any other.
-
 ## Folders and tags as controls · DRAWN
 
 The controls that write a term are not drawn anywhere. Draw each: a tag or a label in the pane's
@@ -76,6 +38,9 @@ band: a chevron, the folder's title and its counts, then the header's own contro
 drops a band with the cover beside rows for Path, Status, Labels, Tags and Note, in the same
 rhythm as the pane's details. The Sorting Box and the Trash keep a plain header with no
 disclosure.
+
+Its counts read in the count pill's terms, as redrawn: `3 here · 9 in all`, or
+`3 here · nothing below` where the pill has one figure.
 
 ## Scrubbing a video's tile · DRAWN
 

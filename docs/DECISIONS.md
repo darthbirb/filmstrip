@@ -616,9 +616,13 @@ are, not a result.
 **The field shows what it understood.** Folders, places, tags and labels become chips once a space
 closes them, and words stay the words typed, so the field is the parse and not a guess at it.
 **Ctrl+F** puts the caret there, as in Explorer and every browser; letters stay free for
-type-to-find and digits are destination keys. **Where you stand is the first term**: a folder
-writes `path:`, the Sorting Box `is:sorting` and the Trash `is:trashed`, so the same text means the
-same thing wherever it runs, and Search Everywhere is only that term removed. **Typing moves
+type-to-find and digits are destination keys. **A search starts everywhere, and where you stand is
+offered, never written**: a search is for finding something whose place is not known, and the
+first build, which wrote the folder as the first term, hid what the wide search would have found.
+The place sits dashed at the field's end, one Tab or one click away; taken, a folder writes
+`path:`, the Sorting Box `is:sorting` and the Trash `is:trashed`, a chip like any other, so the
+same text still means the same thing wherever it runs and Search Everywhere is only that term
+removed. Tab takes the offer only with no row of the list plated; with one, it picks the row. **Typing moves
 nothing; Enter runs the query**, because a grid that reflows under every letter is a grid nobody
 can look at. A query that does not read runs nothing: the field names the character and the
 results stay as they were.
