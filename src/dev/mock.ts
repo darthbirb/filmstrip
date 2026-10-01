@@ -57,6 +57,8 @@ function source(
     title,
     kind,
     addedAt: 0,
+    // 4 March 2026, when the mock's library was last read.
+    indexedAt: 1_772_582_400,
     rootFolderId: id,
     reachable: true,
     itemCount,

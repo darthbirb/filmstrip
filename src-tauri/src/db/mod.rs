@@ -27,6 +27,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (5, include_str!("migrations/005_trash.sql")),
     (6, include_str!("migrations/006_keys.sql")),
     (7, include_str!("migrations/007_search.sql")),
+    (8, include_str!("migrations/008_indexed.sql")),
 ];
 
 /// A connection with the app's pragmas. One per thread: WAL allows one writer

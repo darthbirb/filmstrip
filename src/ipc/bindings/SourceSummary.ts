@@ -16,4 +16,8 @@ itemCount: number, rootCount: number, totalBytes: number,
 /**
  * Whether its own folder is a favourite place.
  */
-favorite: boolean, id: number, root: string, title: string, kind: SourceKind, addedAt: number, };
+favorite: boolean, id: number, root: string, title: string, kind: SourceKind, addedAt: number, 
+/**
+ * When a walk last read all of it; `None` until the first one finishes.
+ */
+indexedAt: number | null, };
