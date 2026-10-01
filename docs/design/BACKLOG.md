@@ -16,7 +16,7 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## The offline band refuses what an offline source's menu still does · DEFECT
+## The offline band refuses what an offline source's menu still does · DRAWN
 
 Artboards › 04 "A source's own band" draws Pictures offline as read-only, Favourite included,
 reading "Not a favourite". But the build keeps every act on an offline source that touches only
