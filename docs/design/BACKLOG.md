@@ -16,7 +16,28 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## The folder band's edit controls open nothing · DEFECT
+## A folder with no chosen cover shows a picture on its card and none in its band · DEFECT
+
+Artboards › 04 draws a folder with no chosen cover as Set Cover, and Clear Cover as leaving the
+folder with no picture. But a matched folder's card in a search already shows a picture for that
+same folder: its chosen cover, or else its first picture or video, nearest first (`db::search`).
+ggallery did the same and never left a folder coverless while it held anything. So Cairo, with
+its cover cleared, has a picture on its card and none in its band.
+
+Draw one answer for both surfaces.
+
+## The name tags a folder passes down are missing from the band and the pane · DEFECT
+
+Every folder, a source's root included, carries its own name as a tag, and everything below it
+inherits that tag (SCHEMA.md "Tags and labels"). So Cairo carries `pictures` and `trips` from
+above, as well as its own `cairo`, and sphinx.jpg carries all three. The pane already shows them,
+as inherited chips. Artboards › 04 marks Cairo's own `cairo` with the folder glyph, but draws
+neither band with the names it inherits, and Pane › 04 draws sphinx.jpg with none of them.
+
+Draw how an inherited name tag shows in the band and in the pane, and what a refusal says when
+one is typed.
+
+## The folder band's edit controls open nothing · DRAWN
 
 Artboards › 04 draws Add Label…, Add Tag…, Set Cover, Change Cover and Add Note… as controls, and
 stops there. Nothing shows what a click on each one opens, how a label's key and value or a tag
@@ -28,7 +49,7 @@ A folder's title tag is its name, and goes only when the folder is renamed.
 
 Draw each one through to the end.
 
-## Tagging a file
+## Tagging a file · DRAWN
 
 The pane's details show a file's tags, its own and those inherited from its folders, and offer
 no way to change them. In ggallery a file's tags were added and removed by hand.
