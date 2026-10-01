@@ -16,6 +16,29 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
+## The folder band's edit controls open nothing · DEFECT
+
+Artboards › 04 draws Add Label…, Add Tag…, Set Cover, Change Cover and Add Note… as controls, and
+stops there. Nothing shows what a click on each one opens, how a label's key and value or a tag
+are typed and confirmed, how a chip already on the folder is removed, how a note is written,
+edited, saved and abandoned, or how a cover is chosen and cleared. Nor what the keyboard does in
+any of them, or what shows when a value is refused, such as a tag the folder already carries.
+
+A folder's title tag is its name, and goes only when the folder is renamed.
+
+Draw each one through to the end.
+
+## Tagging a file
+
+The pane's details show a file's tags, its own and those inherited from its folders, and offer
+no way to change them. In ggallery a file's tags were added and removed by hand.
+
+A file takes tags only, never a label. Inherited tags belong to a folder and cannot be removed from
+the file.
+
+Draw adding and removing a file's own tags in the pane's details. It is the same act as the folder
+band's Add Tag…, so the two should be one control.
+
 ## A folder's details · DRAWN
 
 The grid's header says only where you are. A folder has more to know, and nowhere to show it:

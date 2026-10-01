@@ -90,7 +90,7 @@ drawn. **Not started** — neither.
 | Capability | Filmstrip | Where |
 | --- | --- | --- |
 | An item's effective tags, inherited live | Built | `item_tags` |
-| Add or remove a tag on an item | Not started | an item owns tags only, never a label |
+| Add or remove a tag on an item | Backlogged | "Tagging a file"; an item owns tags only, never a label |
 | A folder's inherited tags | Not started | |
 | What a selection's tags cover | Not started | |
 | The vocabulary, with counts; rename and delete a tag | Not started | |
