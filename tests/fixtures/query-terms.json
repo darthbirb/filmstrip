@@ -23,5 +23,7 @@
   { "fn": "bareTerm", "args": ["Pinned Folder"], "expected": "\"Pinned Folder\"" },
   { "fn": "bareTerm", "args": ["a\\"], "expected": "a\\\\" },
   { "fn": "labelTerm", "args": ["location", "a\\\"b"], "expected": "location:a\\\\\\\"b" },
-  { "fn": "labelTerm", "args": ["location", "san diego"], "expected": "location:\"san diego\"" }
+  { "fn": "labelTerm", "args": ["location", "san diego"], "expected": "location:\"san diego\"" },
+  { "fn": "tagTerm", "args": ["sphinx"], "expected": "tag:sphinx" },
+  { "fn": "tagTerm", "args": ["day off"], "expected": "tag:\"day off\"" }
 ]

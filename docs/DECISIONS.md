@@ -648,6 +648,13 @@ rules are Filmstrip's own:
 - **Folder titles match without case in ASCII only**, which is SQLite's `LIKE`; tags and labels are
   stored folded, so they match in any script.
 
+**A tag or a label in the pane's details is a search**, so the visible control PRODUCT.md asks for
+sits where the term already is, and the syntax stays the fallback. **A click replaces the whole
+query**: it is a new question about the whole library, and a new search starts everywhere, so a
+taken scope goes with the rest and the field offers it again. **Ctrl+Click adds the term** and
+keeps everything the query holds, scope included, as Ctrl+Click adds a tile to a set; it never
+writes a scope, and a term the query already holds is not added twice.
+
 **A search is a place**, as Artboards › A search is a place draws it, so the grid, the pane and
 the selection work in it as anywhere. Its header names it by its terms and its back arrow, or
 Escape once nothing else is open, returns to where the search began; no row in navigation is lit,

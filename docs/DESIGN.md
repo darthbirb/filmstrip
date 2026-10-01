@@ -729,7 +729,9 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Facts.** Terms in `eyebrow` capitals, in a column as wide as the longest of them, values in
   `fg-mid`, each row the height of a chip.
 - **Chip.** A tag is a pill, raised with a ring; inherited, it sinks to `inset`. A label splits into
-  a sunk key and its value, and is never shown without the key.
+  a sunk key and its value, and is never shown without the key. In the pane's details each is a
+  control that searches for itself: under the pointer it is one step lighter, `raised-hi` with
+  `fg` ink, in a `line-strong` ring, and its tooltip says what a click writes.
 - **Settings.** A dialog over the `scrim`: a header with its `title` and a close button; a rail of
   sections grouped under `eyebrow` captions, with a filter field on `ground` above them, the one
   shown on `raised-hi`; and the section's settings as rows in an `inset` group, each a label and

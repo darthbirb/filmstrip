@@ -9,11 +9,13 @@ import {
   formatDuration,
   formatWhen,
 } from "../../lib/format";
+import { labelTerm, tagTerm } from "../../lib/queryTerm";
 import { Chip, Stat } from "../../ui/Chip";
 import { type Fact, Facts } from "../../ui/Facts";
 import { Glyph } from "../../ui/Glyph";
 import { NameField } from "../../ui/NameField";
 import { setPlace } from "../place";
+import { addToSearch, searchFor } from "../search/search";
 import { renameFile, startRename, stopRename, useRenaming } from "./rename";
 
 /** Where the item is, its file, its dates, its labels and tags, and the name it has on disk. */
@@ -175,19 +177,26 @@ function Dates({ item }: { item: ItemDetail }) {
   );
 }
 
-/** A label is never shown without its key. PRODUCT.md "Tags and labels". */
+/**
+ * A label is never shown without its key. Each chip searches for itself: a click asks anew, from
+ * everywhere, and Ctrl+Click adds it to the query. DECISIONS.md "Search".
+ */
 function Tags({ tags }: { tags: EffectiveTag[] }) {
   return (
     <span className="flex flex-wrap gap-1.5 py-px">
-      {tags.map((tag) => (
-        <Chip
-          key={`${tag.tagId}-${tag.originId ?? "own"}`}
-          value={tag.value}
-          tagKey={tag.key}
-          inherited={tag.originId !== null}
-          title={tag.originTitle ? `From ${tag.originTitle}` : "On This File"}
-        />
-      ))}
+      {tags.map((tag) => {
+        const term = tag.key ? labelTerm(tag.key, tag.value) : tagTerm(tag.value);
+        return (
+          <Chip
+            key={`${tag.tagId}-${tag.originId ?? "own"}`}
+            value={tag.value}
+            tagKey={tag.key}
+            inherited={tag.originId !== null}
+            title={tag.key ? `Search ${tag.key}: ${tag.value}` : `Search ${tag.value}`}
+            onSearch={(adding) => void (adding ? addToSearch(term) : searchFor(term))}
+          />
+        );
+      })}
     </span>
   );
 }

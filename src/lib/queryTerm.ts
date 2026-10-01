@@ -23,6 +23,10 @@ export function bareTerm(value: string) {
   return quoteWord(value);
 }
 
+export function tagTerm(value: string) {
+  return `tag:${quoteWord(value)}`;
+}
+
 export function labelTerm(key: string, value: string) {
   return `${key}:${quoteWord(value)}`;
 }
