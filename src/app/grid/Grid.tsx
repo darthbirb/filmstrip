@@ -30,6 +30,7 @@ import { showInPane, usePaneItem } from "../pane/pane-store";
 import { type Place, setPlace, usePlace } from "../place";
 import { usePreferences } from "../preferences";
 import { useSearchOutcome } from "../search/results";
+import { scopeTo } from "../search/search";
 import { pressTile } from "./drag";
 import { EmptyPlace } from "./EmptyPlace";
 import { rowOf, step } from "./keys";
@@ -239,6 +240,7 @@ export function Grid({ mode }: { mode: LayoutMode }) {
                     onOpen={() =>
                       setPlace({ kind: "folder", sourceId: folder.sourceId, path: folder.path })
                     }
+                    onScope={() => void scopeTo(folder.path.map((crumb) => crumb.title))}
                   />
                 ))}
               </div>

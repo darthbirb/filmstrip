@@ -94,6 +94,15 @@ test("a search's folders stand before its files, each under its heading, and a c
   });
 });
 
+test("a card's glass asks the same question inside its folder, in place of the old scope", async () => {
+  setPlace(searching("path:Pictures cairo"));
+  const screen = await renderPlace();
+  const glass = screen.getByRole("button", { name: "Search in Cairo" });
+  await expect.element(glass).toHaveAttribute("title", "Search in Folder");
+  await glass.click();
+  await expect.poll(() => getPlace()).toEqual(searching("path:Pictures/Trips/Cairo cairo"));
+});
+
 test("the header names the search by its terms, counts what it found, and goes back", async () => {
   setPlace(searching("path:Pictures/Trips cairo"));
   const screen = await renderPlace();

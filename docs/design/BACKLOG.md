@@ -16,17 +16,6 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## Folders and tags as controls · DRAWN
-
-The controls that write a term are not drawn anywhere. Draw each: a tag or a label in the pane's
-details, a folder's right-click menu (Search in Folder), and a matched folder among results, where
-going into the folder and scoping the search to it are two different things. Say whether a click
-replaces the query or adds its term, and which modifier does the other.
-
-Redrawn for a search that starts everywhere: a click replaces the whole query and the field
-offers the scope again; Ctrl+Click adds the term, keeps whatever the query holds, and never writes
-a scope of its own.
-
 ## A folder's details · DRAWN
 
 The grid's header says only where you are. A folder has more to know, and nowhere to show it:

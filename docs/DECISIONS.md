@@ -662,9 +662,11 @@ writes a scope, and a term the query already holds is not added twice.
 **A search is a place**, as Artboards › A search is a place draws it, so the grid, the pane and
 the selection work in it as anywhere. Its header names it by its terms and its back arrow, or
 Escape once nothing else is open, returns to where the search began; no row in navigation is lit,
-because none is this place. Folders come first, each saying what it matched, and a click on one
-goes into it; each file says where it lives, and a trashed one where it came from, keeping the
-Trash's verbs.
+because none is this place. Folders come first, each saying what it matched. **A matched folder
+has two targets**: the card is the folder, so a click goes into it and leaves the search, as a
+row in navigation does; its glass is the search, so a click asks the same question inside that
+folder, which takes the scope's place while the other terms stay. Each file says where it lives,
+and a trashed one where it came from, keeping the Trash's verbs.
 
 **Results come trashed first, newest first, then by name**, as the Trash and the Sorting Box each
 order their own. A trashed file is found only when the query names the Trash; the drawing's Trash

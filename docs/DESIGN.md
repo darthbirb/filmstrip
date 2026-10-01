@@ -634,8 +634,10 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Folder card.** A folder a search found: `card` wide on `panel` at the `control` corner in a
   `line` hairline, `line-strong` and `inset` under the pointer. Its cover is `card-cover` by
   `card-cover-height` at the `badge` corner; beside it the name in `row` semibold with its count
-  in a `badge` pill, the folders above it in `small` `fg-dim`, and what it matched, key first.
-  Folders come under an eyebrow heading before the files, which then take one of their own.
+  pill, the folders above it in `small` `fg-dim`, and what it matched, key first. In its top-right
+  corner, a tile-inset in, the glass: a `size-6` square at the `nested` corner, the search glyph
+  in `fg-dim`, `raised-hi` with `fg` under the pointer. Folders come under an eyebrow heading
+  before the files, which then take one of their own.
 - **Drag ghost.** One `control`-tall line following the pointer, `--ghost-x` and `--ghost-y` from
   its tip: `veil` glass at the `control` corner in a `line-control-hi` ring, with the overlay
   shadow. It holds the top file's picture as a `ghost-thumb` square at the `badge` corner, the

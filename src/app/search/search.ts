@@ -61,6 +61,15 @@ export async function addToSearch(term: string) {
   runQuery(`${place.query} ${term}`);
 }
 
+/** Asks the standing query again inside one folder: it takes the scope's place, the rest stays. */
+export async function scopeTo(titles: readonly string[]) {
+  const place = getPlace();
+  const { terms } = place?.kind === "search" ? await readQuery(place.query) : { terms: [] };
+  runQuery(
+    [pathTerm(titles), ...terms.filter((term) => !scoping(term)).map((t) => t.text)].join(" "),
+  );
+}
+
 /** From results to where the search began. */
 export function goBack() {
   const place = getPlace();

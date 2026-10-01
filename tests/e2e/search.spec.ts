@@ -82,3 +82,25 @@ test("a folder picked from the list under the field becomes the search's scope",
   await expect(grid.getByRole("button", { name: "felucca.mp4" })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
+
+test("a matched folder's glass asks the search again inside it", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.setViewportSize({ width: 1440, height: 860 });
+  await page.goto("/");
+
+  await page.keyboard.press("Control+f");
+  await page.getByRole("combobox", { name: "Search" }).pressSequentially("cairo");
+  await page.keyboard.press("Enter");
+
+  const grid = page.getByRole("main");
+  await expect(grid.getByRole("heading", { name: "Folders · 1" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Search Everywhere" })).toHaveCount(0);
+  await grid.getByRole("button", { name: "Search in Cairo" }).click();
+
+  // Now asked inside Cairo: the scope leads the header, and Search Everywhere comes back.
+  await expect(page.getByTitle("Pictures / Trips / Cairo").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Search Everywhere" })).toBeVisible();
+  await expect(grid.getByRole("button", { name: "pyramid.jpg" })).toBeVisible();
+  expect(errors).toEqual([]);
+});

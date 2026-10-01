@@ -101,7 +101,7 @@ drawn. **Not started** — neither.
 | --- | --- | --- |
 | A query language, compiled to SQL over an FTS index | Built | `read_query`, `search`, `item_fts` and `folder_fts`; typed in the bar, its terms shown as chips, Ctrl+F; a path starts at a source, `is:sorting` for `is:unsorted` |
 | A page of results | Built | a place of its own: matched folders as cards before the files, each file saying where it lives; the whole list at once, as every place is |
-| Folders and tags offered as controls that write the query | Partly | a search starts everywhere and where you stand is offered, one Tab or click away, and Search Everywhere removes it; a list under the field offers folders, tags and labels for the word being typed (`search_suggestions`); the pane's tags as controls are drawn and not built. Filmstrip's own change: the syntax is the fallback |
+| Folders and tags offered as controls that write the query | Built | a search starts everywhere and where you stand is offered, one Tab or click away, and Search Everywhere removes it; a list under the field offers folders, tags and labels for the word being typed (`search_suggestions`); the pane's labels and tags search on a click and add on Ctrl+Click; Search in Folder and Search in Source on their menus; a matched folder's glass scopes the search to it. Filmstrip's own change: the syntax is the fallback |
 
 ## Selecting, triage and the trash
 
