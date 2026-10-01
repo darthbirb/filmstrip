@@ -16,6 +16,19 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
+## The count's slash and the Tab key use values the token sheet does not allow · DEFECT
+
+Found while building the two-figure count and the scope offer.
+
+- **The count's slash** is drawn in `#6b6863`. That is `line-strong`, which the token sheet now
+  keeps to three edges you act on; a slash between two figures is not one of them.
+- **On the selection plate the slash is `rgba(23,24,26,.4)`**, which no token names.
+- **The offer's Tab key** has a 3px corner. The radius scale is 5, 6, 8 and 10px. Its 10px mono
+  type matches `micro`'s size but not its 600 weight; say which it is.
+
+Draw each with a named token, or name the value on the token sheet and say where else it may be
+used. Every place the count or the key is drawn takes the answer.
+
 ## The last pass left three things undecided · DRAWN
 
 The pass that drew search starting everywhere and the two-figure count listed these as open on
