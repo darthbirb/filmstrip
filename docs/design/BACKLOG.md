@@ -20,9 +20,6 @@ already lives on, never in a file of its own.
 
 Found while building the two-figure count and the scope offer.
 
-- **The count's slash** is drawn in `#6b6863`. That is `line-strong`, which the token sheet now
-  keeps to three edges you act on; a slash between two figures is not one of them.
-- **On the selection plate the slash is `rgba(23,24,26,.4)`**, which no token names.
 - **The offer's Tab key** has a 3px corner. The radius scale is 5, 6, 8 and 10px. Its 10px mono
   type matches `micro`'s size but not its 600 weight; say which it is.
 
@@ -39,8 +36,6 @@ its Notes sheet. The first blocks building the offer; settle all three.
 - **The folder band says `3 here · 0 below`**, where below leaves out the folder's own files,
   while the pill's second figure counts them. Decide whether the band reads in the pill's terms,
   and draw it that way.
-- **Move to… shows no counts.** This backlog asked for the count wherever one is shown, the
-  picker included, and the pass drew none there. Say whether a picker row carries the pill.
 
 ## A search starts scoped to where you stand · DRAWN
 
@@ -58,25 +53,6 @@ the Sorting Box and in the Trash, which is still the only way a trashed file rea
 results header and Nothing Matched, whose Search Everywhere assumed a scope to remove; the
 suggestion list's folders, drawn as under the scope; and "One scope per query". The scope stays a
 term in the text, read, removed and typed like any other.
-
-## A source's row shows no count · DRAWN
-
-In navigation every folder's row ends in a count and a source's row has none, so the files lying
-directly in a source's own folder cannot be seen from the tree. A library of nine files read as
-five: three lay in the source itself and one in a folder folded shut.
-
-Give a source's row its count, by the rule the entry below settles for folders.
-
-## A folder's count hides what is below it · DRAWN
-
-A folder's row counts only the files directly in it. A folder of folders reads as empty, and
-nothing says how much a branch holds.
-
-Show both where they differ: the folder's own files, then everything at or below it, as `3/9`;
-one number where the two are equal. Draw it on a folder's row, a source's row, the Sorting Box and
-the Trash if the rule reaches them, and the other places a count is shown: a destination key's
-row in Settings, the picker, and the folder buttons of No Pictures Here. Say whether a row folded
-shut and the same row opened show the same thing.
 
 ## Folders and tags as controls · DRAWN
 

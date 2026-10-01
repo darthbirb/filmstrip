@@ -9,9 +9,9 @@ test("a search typed in a folder stands in its results, opens one, widens, acts 
   await page.goto("/");
 
   const tree = page.getByRole("tree", { name: "Places" });
-  await tree.getByRole("treeitem", { name: "Pictures" }).click();
+  await tree.getByRole("treeitem", { name: "Pictures 1 of 6" }).click();
   await page.keyboard.press("ArrowRight");
-  await tree.getByRole("treeitem", { name: "Trips 2" }).click();
+  await tree.getByRole("treeitem", { name: "Trips 2 of 5" }).click();
 
   // Ctrl+F writes where you stand, and Enter runs what was typed after it.
   await page.keyboard.press("Control+f");
@@ -55,7 +55,7 @@ test("a folder picked from the list under the field becomes the search's scope",
   await page.goto("/");
 
   const tree = page.getByRole("tree", { name: "Places" });
-  await tree.getByRole("treeitem", { name: "Pictures" }).click();
+  await tree.getByRole("treeitem", { name: "Pictures 1 of 6" }).click();
   await page.keyboard.press("Control+f");
   const field = page.getByRole("combobox", { name: "Search" });
   await field.pressSequentially("jpg ca");

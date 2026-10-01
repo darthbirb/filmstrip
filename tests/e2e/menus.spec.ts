@@ -31,7 +31,7 @@ test("Shift+F10 on a focused tree row opens its menu under the row, and Escape g
 }) => {
   await page.setViewportSize({ width: 1440, height: 860 });
   await page.goto("/");
-  const row = page.getByRole("treeitem", { name: "Pictures" });
+  const row = page.getByRole("treeitem", { name: "Pictures 1 of 6" });
   await row.focus();
   await page.keyboard.press("Shift+F10");
   const menu = page.getByRole("menu", { name: "Pictures" });

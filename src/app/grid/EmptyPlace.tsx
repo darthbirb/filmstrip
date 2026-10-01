@@ -2,6 +2,7 @@ import { useEffect } from "react";
 
 import { formatCount } from "../../lib/format";
 import { Button } from "../../ui/Button";
+import { countText } from "../../ui/Count";
 import { EmptyState } from "../../ui/EmptyState";
 import { ensureChildren, useIndex } from "../navigation/index-store";
 import { type Place, setPlace } from "../place";
@@ -55,7 +56,11 @@ export function EmptyPlace({ place }: { place: Place }) {
           key={child.id}
           glyph="folder"
           filled
-          detail={child.itemCount > 0 ? formatCount(child.itemCount) : undefined}
+          detail={
+            child.allCount > 0
+              ? countText({ own: child.itemCount, all: child.allCount })
+              : undefined
+          }
           onClick={() =>
             setPlace({
               kind: "folder",

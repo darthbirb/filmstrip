@@ -194,7 +194,7 @@ test("Favourite from a tile's menu shows on the pane's bar at once", async () =>
 
 test("a folder's row holds every verb a place has; a source's adds the Sources section", async () => {
   const screen = await render(<Harness />);
-  const source = screen.getByRole("treeitem", { name: "Pictures" });
+  const source = screen.getByRole("treeitem", { name: "Pictures 1 of 6" });
   const sourceMenu = await menuOn(screen, source, "Pictures");
   expect(labels(sourceMenu)).toEqual([
     "New Folder",
@@ -214,7 +214,7 @@ test("a folder's row holds every verb a place has; a source's adds the Sources s
 
   await source.click();
   await userEvent.keyboard("{ArrowRight}");
-  const trips = screen.getByRole("treeitem", { name: "Trips 2" });
+  const trips = screen.getByRole("treeitem", { name: "Trips 2 of 5" });
   const folderMenu = await menuOn(screen, trips, "Trips");
   expect(labels(folderMenu)).toEqual([
     "New Folder",
@@ -233,12 +233,12 @@ test("a folder's row holds every verb a place has; a source's adds the Sources s
 test("the verbs reach the commands they name, for the folder they were opened on", async () => {
   const screen = await render(<Harness />);
   await recording(async (calls) => {
-    const source = screen.getByRole("treeitem", { name: "Pictures" });
+    const source = screen.getByRole("treeitem", { name: "Pictures 1 of 6" });
     let menu = await menuOn(screen, source, "Pictures");
     await menu.getByRole("menuitem", { name: "Refresh" }).click();
     await source.click();
     await userEvent.keyboard("{ArrowRight}");
-    const trips = screen.getByRole("treeitem", { name: "Trips 2" });
+    const trips = screen.getByRole("treeitem", { name: "Trips 2 of 5" });
     menu = await menuOn(screen, trips, "Trips");
     await menu.getByRole("menuitem", { name: "Show in Explorer" }).click();
     menu = await menuOn(screen, trips, "Trips");
@@ -293,7 +293,7 @@ test("an offline source keeps what needs no drive, and an offline folder opens n
 
 test("Manage Sources opens Settings on Sources, and Remove Source opens it asking", async () => {
   const screen = await render(<Harness />);
-  const source = screen.getByRole("treeitem", { name: "Pictures" });
+  const source = screen.getByRole("treeitem", { name: "Pictures 1 of 6" });
   let menu = await menuOn(screen, source, "Pictures");
   await menu.getByRole("menuitem", { name: "Manage Sources" }).click();
   const dialog = screen.getByRole("dialog", { name: "Settings" });
@@ -309,7 +309,7 @@ test("Manage Sources opens Settings on Sources, and Remove Source opens it askin
 
 test("Rename makes the source's row a field: Escape and a blank keep the name, Enter and leaving rename", async () => {
   const screen = await render(<Harness />);
-  const source = screen.getByRole("treeitem", { name: "Pictures" });
+  const source = screen.getByRole("treeitem", { name: "Pictures 1 of 6" });
   const field = screen.getByRole("textbox", { name: "Rename Pictures" });
   const rename = async () => {
     const menu = await menuOn(screen, source, "Pictures");
@@ -347,9 +347,9 @@ test("Rename makes the source's row a field: Escape and a blank keep the name, E
 
 test("a folder's Rename says when the name is taken, holds Enter, and renames once it is mended", async () => {
   const screen = await render(<Harness />);
-  await screen.getByRole("treeitem", { name: "Pictures" }).click();
+  await screen.getByRole("treeitem", { name: "Pictures 1 of 6" }).click();
   await userEvent.keyboard("{ArrowRight}");
-  const trips = screen.getByRole("treeitem", { name: "Trips 2" });
+  const trips = screen.getByRole("treeitem", { name: "Trips 2 of 5" });
   const menu = await menuOn(screen, trips, "Trips");
   await menu.getByRole("menuitem", { name: "Rename" }).click();
   const field = screen.getByRole("textbox", { name: "Rename Trips" });
@@ -365,7 +365,7 @@ test("a folder's Rename says when the name is taken, holds Enter, and renames on
   await userEvent.keyboard("{Control>}a{/Control}Journeys");
   await expect.element(field).toHaveAttribute("aria-invalid", "false");
   await userEvent.keyboard("{Enter}");
-  await expect.element(screen.getByRole("treeitem", { name: "Journeys 2" })).toHaveFocus();
+  await expect.element(screen.getByRole("treeitem", { name: "Journeys 2 of 5" })).toHaveFocus();
   expect(screen.getByText("Pictures already has a folder named people.").elements()).toHaveLength(
     0,
   );
@@ -373,9 +373,9 @@ test("a folder's Rename says when the name is taken, holds Enter, and renames on
 
 test("leaving a folder's field while its name is taken keeps the name it had", async () => {
   const screen = await render(<Harness />);
-  await screen.getByRole("treeitem", { name: "Pictures" }).click();
+  await screen.getByRole("treeitem", { name: "Pictures 1 of 6" }).click();
   await userEvent.keyboard("{ArrowRight}");
-  const trips = screen.getByRole("treeitem", { name: "Trips 2" });
+  const trips = screen.getByRole("treeitem", { name: "Trips 2 of 5" });
   const menu = await menuOn(screen, trips, "Trips");
   await menu.getByRole("menuitem", { name: "Rename" }).click();
   await userEvent.keyboard("People{Enter}");
@@ -388,5 +388,5 @@ test("leaving a folder's field while its name is taken keeps the name it had", a
   await expect
     .element(screen.getByRole("textbox", { name: "Rename Trips" }))
     .not.toBeInTheDocument();
-  await expect.element(screen.getByRole("treeitem", { name: "Trips 2" })).toBeVisible();
+  await expect.element(screen.getByRole("treeitem", { name: "Trips 2 of 5" })).toBeVisible();
 });

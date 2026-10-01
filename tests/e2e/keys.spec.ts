@@ -9,7 +9,7 @@ test("a key bound from a folder's menu moves the file in the pane there, and Ctr
   await page.goto("/");
 
   const tree = page.getByRole("tree", { name: "Places" });
-  await tree.getByRole("treeitem", { name: "Pictures" }).click();
+  await tree.getByRole("treeitem", { name: "Pictures 1 of 6" }).click();
   await page.keyboard.press("ArrowRight");
   await tree.getByRole("treeitem", { name: "People" }).click({ button: "right" });
   await page.getByRole("menuitem", { name: /^Assign Key…/ }).click();
@@ -19,7 +19,7 @@ test("a key bound from a folder's menu moves the file in the pane there, and Ctr
     tree.getByRole("treeitem", { name: "People" }).getByTitle("Destination Key 1"),
   ).toBeVisible();
 
-  await tree.getByRole("treeitem", { name: "Trips 2" }).click();
+  await tree.getByRole("treeitem", { name: "Trips 2 of 5" }).click();
   const grid = page.getByRole("main");
   await grid.getByRole("button", { name: "hotel.jpg" }).click();
   await page.keyboard.press("1");

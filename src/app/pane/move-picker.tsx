@@ -214,6 +214,8 @@ function tree(
       const inside = (children.get(folder.id) ?? []).length > 0;
       rows.push({
         ...row(folder, depth, barred),
+        // The tree's rows read as navigation's do; a recent or found row names its parent instead.
+        count: folder.allCount > 0 ? { own: folder.itemCount, all: folder.allCount } : undefined,
         detail: folder.id === current ? "current" : undefined,
         expanded: inside ? open.has(folder.id) : undefined,
       });

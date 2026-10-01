@@ -2,6 +2,7 @@ import { beforeEach, expect, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
+import { withoutGlyphs } from "../../dev/words";
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import { folderItems, itemDetail, renameItem, undoLast } from "../../ipc/commands";
 import { Foot } from "../navigation/Foot";
@@ -68,6 +69,33 @@ test("Move to… opens the tree down to the file's folder, which cannot be picke
   ]);
   const cairo = picker.getByRole("option", { name: /Cairo/ });
   await expect.element(cairo).toHaveAttribute("aria-disabled", "true");
+});
+
+test("the tree's rows carry navigation's pill, and a recent row names its parent instead", async () => {
+  const screen = await render(<Harness item={await inCairo("pyramid.jpg")} />);
+  await screen.getByRole("button", { name: "Move to…" }).click();
+  const picker = screen.getByRole("dialog", { name: "Move to" });
+  await expect.element(picker.getByRole("option", { name: /People/ })).toBeVisible();
+  const pills = () =>
+    [...picker.element().querySelectorAll('[role="option"]')].map((row) => [
+      row.querySelector(".truncate")?.textContent,
+      row.querySelector(".rounded-badge")?.firstElementChild?.textContent ??
+        row.querySelector(".rounded-badge")?.textContent,
+    ]);
+  expect(pills()).toEqual([
+    ["Pictures", "1/6"],
+    ["People", undefined],
+    ["Trips", "2/5"],
+    ["Cairo", "3"],
+    ["Incoming", "3"],
+  ]);
+
+  await picker.getByRole("option", { name: /People/ }).click();
+  await screen.getByRole("button", { name: "Move to…" }).click();
+  await expect.element(screen.getByText("Recent")).toBeVisible();
+  const recent = screen.getByRole("dialog", { name: "Move to" }).getByRole("option").first();
+  expect(recent.element().querySelector(".rounded-badge")).toBeNull();
+  expect(withoutGlyphs(recent.element().textContent)).toBe("PeoplePictures");
 });
 
 test("picking a folder moves the file there and says so at the foot, and it joins Recent", async () => {

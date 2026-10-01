@@ -35,7 +35,8 @@ test("a folder of folders lists them, and choosing one goes there", async () => 
   // A folder with nothing of its own carries no count, exactly as its row in the tree carries no pill.
   await expect.element(screen.getByRole("button", { name: "People" })).toBeVisible();
 
-  await screen.getByRole("button", { name: "Trips 2" }).click();
+  // Trips holds two files and Cairo, with three more: its own, then all of it.
+  await screen.getByRole("button", { name: "Trips 2/5" }).click();
   const place = getPlace();
   expect(place?.kind === "folder" && place.path.map((crumb) => crumb.title)).toEqual([
     "Pictures",

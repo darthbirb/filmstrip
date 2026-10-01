@@ -9,9 +9,9 @@ test("a file dragged onto a folder in navigation moves there, and Ctrl+Z brings 
   await page.goto("/");
 
   const tree = page.getByRole("tree", { name: "Places" });
-  await tree.getByRole("treeitem", { name: "Pictures" }).click();
+  await tree.getByRole("treeitem", { name: "Pictures 1 of 6" }).click();
   await page.keyboard.press("ArrowRight");
-  await tree.getByRole("treeitem", { name: "Trips 2" }).click();
+  await tree.getByRole("treeitem", { name: "Trips 2 of 5" }).click();
 
   const grid = page.getByRole("main");
   const hotel = grid.getByRole("button", { name: "hotel.jpg" });

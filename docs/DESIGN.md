@@ -26,6 +26,7 @@ colors:
   fg-faint: "#5c5a56"
   on-plate: "#17181a"
   on-plate-dim: "rgb(23 24 26 / 0.62)"
+  on-plate-faint: "rgb(23 24 26 / 0.4)"
   on-plate-wash: "rgb(23 24 26 / 0.14)"
   focus: "#c25a4a"
   in-pane: "#f2f2f2"
@@ -437,7 +438,7 @@ thing and is never decoration:** where the keyboard is, and close.
 | `panel` | The bar, navigation, the pane, the grid's header row, the filmstrip, Settings. |
 | `inset` | A sunk trough: a disabled control, an inherited chip, a group of settings, a tile still being read. |
 | `raised`, `raised-hi` | A control at rest, and its hover, open or chosen state. |
-| `plate`, `on-plate`, `on-plate-dim`, `on-plate-wash` | Selection, and only selection: a chosen place or option, its ink, its count, and the count pill's sunk plate. |
+| `plate`, `on-plate`, `on-plate-dim`, `on-plate-faint`, `on-plate-wash` | Selection, and only selection: a chosen place or option, its ink, its count, the count's slash, and the count pill's sunk plate. |
 | `hatch`, `hatch-alt` | The stand-in for a picture whose thumbnail is not made yet. |
 | `line`, `line-control`, `line-control-hi` | A panel's edge and the rule under a header; a control's ring; a ring on a raised-hi control. |
 | `line-strong` | The ring a tile shows under the pointer; a strip step's under the pointer. |
@@ -555,12 +556,16 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   field, arriving in its place among the folders it joins.
 - **Favourite place.** A tree row at the first level: a filled star where the chevron's square
   and the glyph would be, the name, then the folder it is in right after it in `small`, quieter
-  than the name, and the count pill at the end. A source's has no parent and no pill. The group
+  than the name, and the count pill at the end. A source's has no parent. The group
   stands between the app's two places and the sources, a `line` rule either side. Where you are,
   it wears the plate, and so does the place's own row.
-- **Count pill.** A row's own item count, `badge` tall at the `badge` corner, on `raised` with a
-  `line-control` ring; on a selected row it sinks to `on-plate-wash` with `on-plate` ink. A place
-  with no items of its own carries no pill, and an offline source shows its word instead.
+- **Count pill.** A folder's or a source's files: its own, then everything at or below it, as
+  `3/9`, and one figure where the two are equal. `badge` tall at the `badge` corner, on `raised`
+  with a `line-control` ring, figures `fg-mid` and the slash `fg-faint`; on a selected row it sinks
+  to `on-plate-wash`, figures `on-plate-dim` and the slash `on-plate-faint`. A folded row and the
+  same row opened show the same pill. The Sorting Box and the Trash keep one figure. A place with
+  nothing at or below it carries no pill, and an offline source shows its word instead. Move to…'s
+  tree rows carry it too; Settings' key rows and No Pictures Here print the same figures as text.
 - **Rail button.** A folded panel's place: a `control` square holding a filled glyph, `plate` with
   `on-plate` ink when it is where you are, a `wash` under the pointer otherwise. Its count rides the
   glyph's top-right corner as a `mark-badge` plate in `micro` figures, ringed in the panel's own

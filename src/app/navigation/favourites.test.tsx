@@ -40,19 +40,19 @@ const rows = (screen: Screen) =>
 
 test("Favourite on a folder's menu gives it a row of its own, between the app's places and the sources", async () => {
   const screen = await render(<Navigation />);
-  await screen.getByRole("treeitem", { name: "Pictures" }).click();
+  await screen.getByRole("treeitem", { name: "Pictures 1 of 6" }).click();
   await userEvent.keyboard("{ArrowRight}");
-  await choose(screen, "Trips 2", "Trips", "Favourite");
+  await choose(screen, "Trips 2 of 5", "Trips", "Favourite");
 
   await expect
     .poll(() => rows(screen))
     .toEqual([
       "Sorting Box 3",
       "Trash",
-      "Trips 2",
-      "Pictures",
+      "Trips 2 of 5",
+      "Pictures 1 of 6",
       "People",
-      "Trips 2",
+      "Trips 2 of 5",
       "Archive offline",
     ]);
   const favourite = screen.getByRole("treeitem").elements()[2];
@@ -61,11 +61,11 @@ test("Favourite on a folder's menu gives it a row of its own, between the app's 
   expect(favourite?.previousElementSibling?.getAttribute("aria-hidden")).toBe("true");
 
   // The same menu on the favourite's own row, reading what pressing it now does.
-  await screen.getByRole("treeitem", { name: "Trips 2", exact: true }).nth(0).click({
+  await screen.getByRole("treeitem", { name: "Trips 2 of 5", exact: true }).nth(0).click({
     button: "right",
   });
   await screen.getByRole("menuitem", { name: "Remove Favourite" }).click();
-  await expect.poll(() => rows(screen).filter((row) => row === "Trips 2")).toHaveLength(1);
+  await expect.poll(() => rows(screen).filter((row) => row === "Trips 2 of 5")).toHaveLength(1);
 });
 
 test("choosing a favourite goes there, and both of its rows wear the plate without the tree opening", async () => {
@@ -85,9 +85,9 @@ test("choosing a favourite goes there, and both of its rows wear the plate witho
   await expect.element(favourite).toHaveAttribute("aria-current", "location");
   expect(rows(screen)).not.toContain("People");
 
-  await screen.getByRole("treeitem", { name: "Pictures" }).click();
+  await screen.getByRole("treeitem", { name: "Pictures 1 of 6" }).click();
   await userEvent.keyboard("{ArrowRight}");
-  await screen.getByRole("treeitem", { name: "Trips 2", exact: true }).click();
+  await screen.getByRole("treeitem", { name: "Trips 2 of 5", exact: true }).click();
   await userEvent.keyboard("{ArrowRight}");
   await screen.getByRole("treeitem", { name: "Cairo 3" }).nth(1).click();
   await expect
@@ -95,13 +95,13 @@ test("choosing a favourite goes there, and both of its rows wear the plate witho
     .toHaveAttribute("aria-current", "location");
 });
 
-test("a source's favourite names no parent and counts nothing, and one that is away is muted", async () => {
+test("a source's favourite names no parent and counts itself, and one that is away is muted", async () => {
   await setFolderFavorite(3, true);
   await setFolderFavorite(1, true);
   resetIndex();
   await loadIndex();
   const screen = await render(<Navigation />);
-  await expect.poll(() => rows(screen).slice(2, 4)).toEqual(["Archive offline", "Pictures"]);
+  await expect.poll(() => rows(screen).slice(2, 4)).toEqual(["Archive offline", "Pictures 1 of 6"]);
   const archive = screen.getByRole("treeitem").elements()[2];
   expect(archive?.getAttribute("aria-description")).toBeNull();
 });

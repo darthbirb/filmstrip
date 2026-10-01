@@ -9,9 +9,9 @@ test("files checked in the grid move together from the bar, and Ctrl+Z brings th
   await page.goto("/");
 
   const tree = page.getByRole("tree", { name: "Places" });
-  await tree.getByRole("treeitem", { name: "Pictures" }).click();
+  await tree.getByRole("treeitem", { name: "Pictures 1 of 6" }).click();
   await page.keyboard.press("ArrowRight");
-  await tree.getByRole("treeitem", { name: "Trips 2" }).click();
+  await tree.getByRole("treeitem", { name: "Trips 2 of 5" }).click();
 
   const grid = page.getByRole("main");
   await grid.getByRole("checkbox", { name: "Check boarding-pass.png" }).click();

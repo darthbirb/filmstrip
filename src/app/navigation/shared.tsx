@@ -49,6 +49,14 @@ export function trashRow(trash: TrashSummary | null = null): TreeRow {
   return { id: TRASH_ID, label: "Trash", level: 1, expandable: false, glyph: "trash", count };
 }
 
+/**
+ * A folder's own files, then everything at or below it, for its row's pill; a place with nothing
+ * at or below it has none. DECISIONS.md "Navigation".
+ */
+export function pill(own: number, all: number): Pick<TreeRow, "count" | "total"> {
+  return all > 0 ? { count: own, total: all } : {};
+}
+
 /** A source's own row. One that cannot be read is muted and says so, but keeps its folders. */
 export function sourceRow(source: SourceSummary, row: Partial<TreeRow> = {}): TreeRow {
   return {
@@ -57,6 +65,8 @@ export function sourceRow(source: SourceSummary, row: Partial<TreeRow> = {}): Tr
     level: 1,
     expandable: false,
     glyph: "source",
+    // An offline source's count is the last walk's, which the app cannot stand behind.
+    ...(source.reachable ? pill(source.rootCount, source.itemCount) : {}),
     detail: source.reachable ? undefined : "offline",
     muted: !source.reachable,
     ...row,
@@ -105,8 +115,7 @@ export function addFolderRows(walk: Walk, parent: Crumb[], level: number) {
       expandable: node.childCount > 0 || walk.draft?.parent === node.id,
       expanded: walk.expanded.has(node.id),
       glyph: "folder",
-      // Its own items, not the ones below it: the grid's header says both when both are wanted.
-      count: node.itemCount > 0 ? node.itemCount : undefined,
+      ...pill(node.itemCount, node.allCount),
     });
     walk.places.set(id, { kind: "folder", sourceId: walk.sourceId, path });
     if (walk.expanded.has(node.id)) addFolderRows(walk, path, level + 1);
@@ -141,8 +150,7 @@ export function favouriteRow(
     expandable: false,
     glyph: "star",
     note: source ? undefined : place.path.at(-2)?.title,
-    // A source counts itself whole, so its row has no pill here either.
-    count: !source && place.itemCount > 0 ? place.itemCount : undefined,
+    ...(place.reachable ? pill(place.itemCount, place.allCount) : {}),
     detail: place.reachable ? undefined : "offline",
     muted: !place.reachable,
     separated: first,
