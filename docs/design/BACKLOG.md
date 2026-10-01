@@ -16,26 +16,15 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## A folder with no chosen cover shows a picture on its card and none in its band · DEFECT
+## A source's own band was never drawn · DEFECT
 
-Artboards › 04 draws a folder with no chosen cover as Set Cover, and Clear Cover as leaving the
-folder with no picture. But a matched folder's card in a search already shows a picture for that
-same folder: its chosen cover, or else its first picture or video, nearest first (`db::search`).
-ggallery did the same and never left a folder coverless while it held anything. So Cairo, with
-its cover cleared, has a picture on its card and none in its band.
+Clicking a source's row shows its root folder, and the header there is a disclosure like any
+folder's. Artboards › 04 draws the band only on folders below a root. A root differs: its path is
+the source's folder alone, its name tag is the source's name and changes when the source is
+renamed in Settings or on its row, nothing above it passes anything down, and an offline source's
+root has nothing on disk to show.
 
-Draw one answer for both surfaces.
-
-## The name tags a folder passes down are missing from the band and the pane · DEFECT
-
-Every folder, a source's root included, carries its own name as a tag, and everything below it
-inherits that tag (SCHEMA.md "Tags and labels"). So Cairo carries `pictures` and `trips` from
-above, as well as its own `cairo`, and sphinx.jpg carries all three. The pane already shows them,
-as inherited chips. Artboards › 04 marks Cairo's own `cairo` with the folder glyph, but draws
-neither band with the names it inherits, and Pane › 04 draws sphinx.jpg with none of them.
-
-Draw how an inherited name tag shows in the band and in the pane, and what a refusal says when
-one is typed.
+Draw the band on Pictures, reachable and offline.
 
 ## The folder band's edit controls open nothing · DRAWN
 
