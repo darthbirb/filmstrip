@@ -57,7 +57,9 @@ pub struct SourceSummary {
     pub root_folder_id: i64,
     /// False when its directory cannot be read — an unplugged drive, say.
     pub reachable: bool,
+    /// Every live file in it, and those directly in its own folder.
     pub item_count: i64,
+    pub root_count: i64,
     pub total_bytes: i64,
     /// Whether its own folder is a favourite place.
     pub favorite: bool,
@@ -446,6 +448,8 @@ pub struct FavouritePlace {
     /// From the source's own folder, by the source's title, down to the place.
     pub path: Vec<folders::Crumb>,
     pub item_count: i64,
+    /// Every live file at or below it.
+    pub all_count: i64,
     pub reachable: bool,
 }
 
@@ -467,6 +471,7 @@ pub fn favourites(conn: &Connection) -> Result<Vec<FavouritePlace>> {
                 source_id,
                 path: folders::ancestry(conn, folder_id)?,
                 item_count,
+                all_count: folders::subtree_count(conn, folder_id)?,
                 reachable,
             })
         })
@@ -494,6 +499,8 @@ pub struct DestinationKey {
     /// From the source's own folder, by the source's title, down to the folder, gone or not.
     pub path: Vec<folders::Crumb>,
     pub item_count: i64,
+    /// Every live file at or below it.
+    pub all_count: i64,
     /// Retired by a delete or a walk; the key stays, since an undo can bring the folder back.
     pub gone: bool,
     pub reachable: bool,
@@ -533,6 +540,7 @@ pub fn destination_key_list(conn: &Connection) -> Result<Vec<DestinationKey>> {
                 source_id,
                 path: folders::ancestry(conn, binding.folder_id)?,
                 item_count: binding.item_count,
+                all_count: folders::subtree_count(conn, binding.folder_id)?,
                 gone: binding.gone,
                 reachable,
             })
@@ -851,6 +859,7 @@ pub fn source_summaries(conn: &Connection) -> Result<Vec<SourceSummary>> {
                 root_folder_id,
                 reachable: Path::new(&source.root).is_dir(),
                 item_count,
+                root_count: folders::own_count(conn, root_folder_id)?,
                 total_bytes,
                 source,
             })
@@ -1067,6 +1076,7 @@ mod tests {
         let [summary] = source_summaries(&conn).unwrap().try_into().unwrap();
         assert!(summary.reachable);
         assert_eq!((summary.item_count, summary.total_bytes), (2, 5));
+        assert_eq!(summary.root_count, 0, "both files lie below its own folder");
 
         let [trips] = folders::children(&conn, summary.root_folder_id)
             .unwrap()
@@ -1155,7 +1165,7 @@ mod tests {
             serde_json::json!({
                 "from": 2,
                 "rows": [
-                    { "kind": "words", "text": "cai", "shape": { "kind": "text" }, "path": [] },
+                    { "kind": "words", "text": "cai", "shape": { "kind": "text" } },
                     {
                         "kind": "folder",
                         "text": "path:library/Trips/Cairo",
@@ -1163,8 +1173,7 @@ mod tests {
                             "kind": "path",
                             "titles": ["library", "Trips", "Cairo"],
                             "exact": false
-                        },
-                        "path": ["Trips", "Cairo"]
+                        }
                     }
                 ]
             })
@@ -1172,7 +1181,7 @@ mod tests {
         let spaced = suggestions_with(&conn, None, "cai ").unwrap();
         assert_eq!((spaced.from, spaced.rows.len()), (4, 0));
         let unscoped = suggestions_with(&conn, Some("(a or b)"), "cai").unwrap();
-        assert_eq!(unscoped.rows[1].path, ["library", "Trips", "Cairo"]);
+        assert_eq!(unscoped.rows[1].text, "path:library/Trips/Cairo");
     }
 
     #[test]
@@ -1264,6 +1273,11 @@ mod tests {
         let listed = favourites(&conn).unwrap();
         assert_eq!(titles(&listed), ["Cairo", "Lisbon", "Pictures"]);
         assert_eq!(listed[0].item_count, 1);
+        assert_eq!(
+            (listed[2].item_count, listed[2].all_count),
+            (0, summary.item_count),
+            "a source's own folder holds nothing itself and its whole tree below"
+        );
         assert!(listed[0].reachable);
         let [source] = source_summaries(&conn).unwrap().try_into().unwrap();
         assert!(source.favorite);
@@ -1304,6 +1318,10 @@ mod tests {
         assert_eq!(titles(&conn), ["Pictures", "Trips", "Lisbon"]);
         let [key] = destination_key_list(&conn).unwrap().try_into().unwrap();
         assert_eq!((key.item_count, key.gone, key.reachable), (1, false, true));
+        keys::set(&conn, "2", trips).unwrap();
+        let [_, trips_key] = destination_key_list(&conn).unwrap().try_into().unwrap();
+        assert_eq!((trips_key.item_count, trips_key.all_count), (0, 1));
+        keys::remove(&conn, "2").unwrap();
 
         fs_folders::move_into(&conn, lisbon, people, &journal::new_batch()).unwrap();
         assert_eq!(

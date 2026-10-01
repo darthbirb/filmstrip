@@ -47,7 +47,7 @@ test("a field still selects its own text", async ({ page }) => {
 
 test("right-click opens no browser menu, except in a field", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("treeitem", { name: "Pictures" })).toBeVisible();
+  await expect(page.getByRole("treeitem", { name: "Pictures 1 of 6" })).toBeVisible();
   const rightClick = (selector: string) =>
     page.evaluate((at) => {
       const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });

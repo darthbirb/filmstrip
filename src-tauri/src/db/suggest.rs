@@ -24,9 +24,8 @@ pub struct Suggestion {
     pub kind: SuggestionKind,
     /// The term as text that reads back as itself, with the `-` the word was typed with.
     pub text: String,
+    /// A folder's is its whole path from the source, as its row names it.
     pub shape: Shape,
-    /// A folder's titles from the scope down to it, or from its source with no scope.
-    pub path: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
@@ -53,7 +52,6 @@ pub fn suggest(
             kind: SuggestionKind::Words,
             text: typing.raw.clone(),
             shape: Shape::Text,
-            path: Vec::new(),
         });
     }
     let room = ROWS - rows.len();
@@ -135,7 +133,8 @@ fn folders_beginning(
         .query_map(params![like, CANDIDATES], |r| r.get(0))?
         .collect::<rusqlite::Result<_>>()?;
 
-    let mut found = Vec::new();
+    // How far below the scope each folder sits, beside its row.
+    let mut found: Vec<(usize, Suggestion)> = Vec::new();
     for id in ids {
         let titles: Vec<(i64, String)> = folders::ancestry(conn, id)?
             .into_iter()
@@ -156,20 +155,22 @@ fn folders_beginning(
             None => 0,
         };
         let all: Vec<String> = titles.iter().map(|(_, title)| title.clone()).collect();
-        found.push(Suggestion {
-            kind: SuggestionKind::Folder,
-            text: path_term(&all, false),
-            path: all[from..].to_vec(),
-            shape: Shape::Path {
-                titles: all,
-                exact: false,
+        let depth = all.len() - from;
+        found.push((
+            depth,
+            Suggestion {
+                kind: SuggestionKind::Folder,
+                text: path_term(&all, false),
+                shape: Shape::Path {
+                    titles: all,
+                    exact: false,
+                },
             },
-        });
+        ));
     }
     // Stable, so folders as near as each other keep the order of their titles.
-    found.sort_by_key(|row| row.path.len());
-    found.truncate(room);
-    Ok(found)
+    found.sort_by_key(|(depth, _)| *depth);
+    Ok(found.into_iter().take(room).map(|(_, row)| row).collect())
 }
 
 /// The own folder of every sorting source.
@@ -206,7 +207,6 @@ fn tags_beginning(conn: &Connection, like: &str, room: usize) -> Result<Vec<Sugg
                 kind: SuggestionKind::Tag,
                 text: tag_term(&value),
                 shape: Shape::Tag { value },
-                path: Vec::new(),
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
@@ -238,7 +238,6 @@ fn labels_beginning(
                 kind: SuggestionKind::Label,
                 text: label_term(&key, &value),
                 shape: Shape::Label { key, value },
-                path: Vec::new(),
             })
         })?
         .collect::<rusqlite::Result<_>>()?;
@@ -382,7 +381,7 @@ mod tests {
     }
 
     #[test]
-    fn folders_are_offered_below_the_scope_and_say_their_path_from_it() {
+    fn folders_are_offered_below_the_scope_and_named_from_their_source() {
         let conn = library();
         let typing = typing("d").unwrap();
         let Expr::Term(scope) = parse("path:Library/Trips").unwrap() else {
@@ -392,19 +391,22 @@ mod tests {
             .unwrap()
             .into_iter()
             .filter(|row| row.kind == Folder)
-            .map(|row| (row.text, row.path))
+            .map(|row| (row.text, row.shape))
             .collect();
-        let titles = |titles: &[&str]| titles.iter().map(|t| (*t).to_owned()).collect::<Vec<_>>();
+        let path = |titles: &[&str]| Shape::Path {
+            titles: titles.iter().map(|t| (*t).to_owned()).collect(),
+            exact: false,
+        };
         assert_eq!(
             folders,
             [
                 (
                     "path:\"Library/Trips/Oslo/Dark Days\"".to_owned(),
-                    titles(&["Trips", "Oslo", "Dark Days"])
+                    path(&["Library", "Trips", "Oslo", "Dark Days"])
                 ),
                 (
                     "path:\"Library/Trips/Cairo/Dawn Walks\"".to_owned(),
-                    titles(&["Trips", "Cairo", "Dawn Walks"])
+                    path(&["Library", "Trips", "Cairo", "Dawn Walks"])
                 ),
             ]
         );
@@ -482,8 +484,7 @@ mod tests {
             serde_json::json!([{
                 "kind": "label",
                 "text": "time:dawn",
-                "shape": { "kind": "label", "key": "time", "value": "dawn" },
-                "path": []
+                "shape": { "kind": "label", "key": "time", "value": "dawn" }
             }])
         );
     }

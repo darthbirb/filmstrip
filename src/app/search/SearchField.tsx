@@ -14,14 +14,22 @@ import type { Suggestion } from "../../ipc/bindings/Suggestion";
 import type { Suggestions as Offered } from "../../ipc/bindings/Suggestions";
 import { readQuery, searchSuggestions } from "../../ipc/commands";
 import { Glyph } from "../../ui/Glyph";
+import type { GlyphName } from "../../ui/glyphs";
 import { TermChip } from "../../ui/TermChip";
-import { backFrom, getPlace, placeKey, usePlace } from "../place";
+import { backFrom, getPlace, type Place, placeKey, usePlace } from "../place";
 import { faultSentence, marksCharacter } from "./fault";
 import { Suggestions } from "./Suggestions";
-import { runQuery, scopeOf } from "./search";
-import { type Chip, movePlate, picked, queryOf, scoping } from "./suggest";
+import { placeName, runQuery, scopeOf } from "./search";
+import { type Chip, movePlate, picked, queryOf, scoping, withScope } from "./suggest";
 
 const isChip = (term: QueryTerm): term is QueryTerm & Chip => term.shape.kind !== "text";
+
+const OFFER_GLYPHS: Record<Place["kind"], GlyphName> = {
+  folder: "folder",
+  sorting: "sortingBox",
+  trash: "trash",
+  search: "search",
+};
 
 // One field in the window; Ctrl+F reaches it from anywhere. DECISIONS.md "Search".
 let focusField: ((byKey: boolean) => void) | null = null;
@@ -122,13 +130,19 @@ export function SearchField() {
     if (sentence && focused) line.current?.showPopover();
   }, [sentence, focused]);
 
-  /** Where you stand becomes the first term, so the same words mean the same everywhere. */
-  async function begin() {
-    if (chips.length > 0 || text !== "") return;
-    const scope = scopeOf(backFrom(getPlace()));
+  // Where you stand is offered, never written: a search starts everywhere. DECISIONS.md "Search".
+  const here = backFrom(place);
+  const scope = scopeOf(here);
+  const offering = focused && here !== null && scope !== null && !chips.some(scoping);
+
+  /** Takes the offer: where you stand becomes the first term. */
+  async function takeOffer() {
     if (!scope) return;
     const reading = await readQuery(scope).catch(() => null);
-    setChips(reading?.terms.filter(isChip) ?? []);
+    const chip = reading?.terms.find(isChip);
+    if (!chip) return;
+    setChips((held) => [...withScope({ chips: held, text }, chip).chips]);
+    setFault(null);
   }
 
   /** Once a space closes a word, the terms it read as take their chips; words stay words. */
@@ -177,6 +191,9 @@ export function SearchField() {
     } else if (row && (event.key === "Enter" || event.key === "Tab")) {
       event.preventDefault();
       pick(row);
+    } else if (offering && event.key === "Tab" && !event.shiftKey) {
+      event.preventDefault();
+      void takeOffer();
     } else if (event.key === "Enter") {
       event.preventDefault();
       void run();
@@ -271,10 +288,7 @@ export function SearchField() {
           autoComplete="off"
           spellCheck={false}
           value={text}
-          onFocus={() => {
-            setFocused(true);
-            void begin();
-          }}
+          onFocus={() => setFocused(true)}
           onBlur={() => {
             setFocused(false);
             setRinged(false);
@@ -298,6 +312,24 @@ export function SearchField() {
           className={`h-full w-full min-w-0 appearance-none bg-transparent text-ui outline-none [&::-webkit-search-cancel-button]:hidden ${marking ? "text-transparent caret-fg" : "text-fg"}`}
         />
       </div>
+      {offering && (
+        // Dashed, because it is not yet a term. The caret stays in the field; Tab takes it too.
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label={`Search Only in ${placeName(here)}`}
+          title={`Search Only in ${placeName(here)} · Tab`}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => void takeOffer()}
+          className="flex h-badge shrink-0 items-center gap-1.25 whitespace-nowrap rounded-badge border border-line-strong border-dashed pr-0.75 pl-1.5 text-fg-dim text-small hover:bg-panel hover:text-fg"
+        >
+          <Glyph name={OFFER_GLYPHS[here.kind]} className="text-glyph-small" />
+          in {placeName(here)}
+          <span className="flex items-center rounded-badge bg-panel px-1.25 text-eyebrow text-fg-dim inset-ring inset-ring-line-control">
+            Tab
+          </span>
+        </button>
+      )}
       {listed && (
         <Suggestions
           id={`${anchor}-list`}

@@ -11,4 +11,8 @@ parentId: number | null, sourceId: number,
 /**
  * A source's own folder goes by the source's title, as navigation shows it.
  */
-title: string, };
+title: string, 
+/**
+ * Live files directly in it, then at or below it.
+ */
+itemCount: number, allCount: number, };

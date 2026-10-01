@@ -8,7 +8,11 @@ export type SourceSummary = { rootFolderId: number,
 /**
  * False when its directory cannot be read — an unplugged drive, say.
  */
-reachable: boolean, itemCount: number, totalBytes: number, 
+reachable: boolean, 
+/**
+ * Every live file in it, and those directly in its own folder.
+ */
+itemCount: number, rootCount: number, totalBytes: number, 
 /**
  * Whether its own folder is a favourite place.
  */

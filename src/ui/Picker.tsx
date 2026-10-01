@@ -1,5 +1,6 @@
 import { Fragment, type KeyboardEvent, useId, useLayoutEffect, useRef, useState } from "react";
 
+import { CountPill } from "./Count";
 import { Glyph } from "./Glyph";
 import type { GlyphName } from "./glyphs";
 import { type MenuAnchor, placement, SURFACE } from "./Menu";
@@ -12,6 +13,8 @@ export type PickerRow = {
   depth: number;
   /** Quieter words at the row's end: where it is, or why it cannot be picked. */
   detail?: string;
+  /** The folder's own files and those at or below it, for its pill; none, no pill. */
+  count?: { own: number; all: number };
   disabled?: boolean;
   /** Open or shut, for a row with rows under it; absent for one with none. */
   expanded?: boolean;
@@ -192,6 +195,7 @@ export function Picker({
                   className={`shrink-0 text-glyph ${row.disabled ? "" : "text-fg-dim"}`}
                 />
                 <span className="min-w-0 flex-1 truncate">{row.label}</span>
+                {row.count && <CountPill {...row.count} tone={row.disabled ? "barred" : "rest"} />}
                 {row.detail && (
                   <span
                     className={`shrink-0 whitespace-nowrap text-small ${row.disabled ? "" : "text-fg-dim"}`}

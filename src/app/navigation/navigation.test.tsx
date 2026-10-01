@@ -26,7 +26,7 @@ beforeEach(async () => {
 test("shows the Sorting Box with its count, every library source, and the Trash", async () => {
   const screen = await render(<Navigation />);
   await expect.element(screen.getByRole("treeitem", { name: "Sorting Box 3" })).toBeVisible();
-  await expect.element(screen.getByRole("treeitem", { name: "Pictures" })).toBeVisible();
+  await expect.element(screen.getByRole("treeitem", { name: "Pictures 1 of 6" })).toBeVisible();
   await expect.element(screen.getByRole("treeitem", { name: "Archive offline" })).toBeVisible();
   await expect.element(screen.getByRole("treeitem", { name: "Trash" })).toBeVisible();
 });
@@ -50,11 +50,13 @@ test("the app's own two places sit together at the top, above a rule, then the s
 test("a source opens in place, and choosing a folder goes there", async () => {
   const screen = await render(<Navigation />);
   const row = (name: string) => screen.getByRole("treeitem", { name });
-  await expect.poll(() => row("Pictures").element().getAttribute("aria-expanded")).toBe("false");
+  await expect
+    .poll(() => row("Pictures 1 of 6").element().getAttribute("aria-expanded"))
+    .toBe("false");
 
-  await row("Pictures").click();
+  await row("Pictures 1 of 6").click();
   await userEvent.keyboard("{ArrowRight}");
-  await row("Trips 2").click();
+  await row("Trips 2 of 5").click();
   expect(titles()).toEqual(["Pictures", "Trips"]);
   await userEvent.keyboard("{ArrowRight}");
   await row("Cairo 3").click();
@@ -78,10 +80,38 @@ test("a place with items ends in a count pill, and one without carries none", as
   expect(pill("Archive offline")).toBeNull();
   expect(pill("Trash")).toBeNull();
 
-  await row("Pictures").click();
+  await row("Pictures 1 of 6").click();
   await userEvent.keyboard("{ArrowRight}");
-  await expect.element(row("Trips 2")).toBeVisible();
+  await expect.element(row("Trips 2 of 5")).toBeVisible();
   expect(pill("People")).toBeNull();
+});
+
+test("a pill reads its own files, then everything at or below it, and one figure where they agree", async () => {
+  const screen = await render(<Navigation />);
+  const row = (name: string) => screen.getByRole("treeitem", { name });
+  const shown = (name: string) =>
+    row(name).element().querySelector(".rounded-badge [aria-hidden]")?.textContent;
+  await row("Pictures 1 of 6").click();
+  await userEvent.keyboard("{ArrowRight}");
+  await row("Trips 2 of 5").click();
+  await userEvent.keyboard("{ArrowRight}");
+  await expect.element(row("Cairo 3")).toBeVisible();
+
+  expect(shown("Pictures 1 of 6")).toBe("1/6");
+  // Folded shut or opened, a row's pill is the folder's, not what the tree shows of it.
+  await row("Trips 2 of 5").click();
+  await userEvent.keyboard("{ArrowLeft}");
+  await expect.element(row("Cairo 3")).not.toBeInTheDocument();
+  expect(shown("Trips 2 of 5")).toBe("2/5");
+  expect(row("Cairo 3").elements()).toHaveLength(0);
+
+  // The slash is the separator ink at rest, and the plate's on the row you stand in.
+  const slash = (name: string) =>
+    getComputedStyle(
+      row(name).element().querySelector(".rounded-badge [aria-hidden] span") as Element,
+    ).color;
+  expect(slash("Pictures 1 of 6")).toBe("rgb(92, 90, 86)");
+  expect(slash("Trips 2 of 5")).toBe("rgba(23, 24, 26, 0.4)");
 });
 
 test("the breadcrumb goes back up to any folder on the path", async () => {
@@ -119,7 +149,7 @@ test("the Sorting Box keeps its own way in, reachable after the row it sits on",
 
 test("a refused folder says so and changes nothing, and a second refusal replaces the first", async () => {
   const screen = await render(<Navigation />);
-  await expect.element(screen.getByRole("treeitem", { name: "Pictures" })).toBeVisible();
+  await expect.element(screen.getByRole("treeitem", { name: "Pictures 1 of 6" })).toBeVisible();
 
   setRefused({ why: "inside", clash: "Pictures", path: "C:UsersadaPicturesTrips" });
   expect(getRefused()?.why).toBe("inside");

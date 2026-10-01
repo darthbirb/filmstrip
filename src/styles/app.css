@@ -112,6 +112,8 @@
   --color-fg-faint: #5c5a56;
   --color-on-plate: #17181a;
   --color-on-plate-dim: rgb(23 24 26 / 0.62);
+  /* The count's slash on a selected row, and nothing else: the plate's fg-faint. */
+  --color-on-plate-faint: rgb(23 24 26 / 0.4);
   /* A plate's own sunk surface: the count pill on a selected row. */
   --color-on-plate-wash: rgb(23 24 26 / 0.14);
 

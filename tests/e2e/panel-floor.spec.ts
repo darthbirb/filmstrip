@@ -29,7 +29,7 @@ async function dragNarrower(page: Page, steps: number) {
 test("a panel being dragged narrower never pushes back", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/");
-  await expect(page.getByRole("treeitem", { name: "Pictures" })).toBeVisible();
+  await expect(page.getByRole("treeitem", { name: "Pictures 1 of 6" })).toBeVisible();
 
   // A width that grows while the pointer only ever moves left is the panel fighting it.
   const seen = await dragNarrower(page, 18);

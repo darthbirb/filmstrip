@@ -163,9 +163,9 @@ test("a press that moves less than a tile-gap is a click, and shows the picture"
 test("held on a closed folder for the hold, the ghost opens it", async () => {
   setOpenFolders(new Set([1]));
   await renderBoth();
-  await expect.element(row("Trips 2")).toHaveAttribute("aria-expanded", "false");
-  await dragOnto("sphinx.jpg", "Trips 2");
+  await expect.element(row("Trips 2 of 5")).toHaveAttribute("aria-expanded", "false");
+  await dragOnto("sphinx.jpg", "Trips 2 of 5");
   expect(ghost()?.textContent).toBe("Move 1 file to Trips");
-  await expect.element(row("Trips 2")).toHaveAttribute("aria-expanded", "true");
+  await expect.element(row("Trips 2 of 5")).toHaveAttribute("aria-expanded", "true");
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 });

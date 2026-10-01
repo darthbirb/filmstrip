@@ -60,13 +60,14 @@ function source(
     rootFolderId: id,
     reachable: true,
     itemCount,
+    rootCount: 0,
     totalBytes,
     favorite: false,
   };
 }
 
 function folder(id: number, title: string, childCount: number, itemCount: number): FolderNode {
-  return { id, title, childCount, itemCount, favorite: false };
+  return { id, title, childCount, itemCount, allCount: itemCount, favorite: false };
 }
 
 function items(folderId: number, names: string[]): ItemRow[] {
@@ -110,6 +111,7 @@ const ITEMS: Record<number, ItemRow[]> = {
   4: items(4, ["boarding-pass.png", "hotel.jpg"]),
   6: items(6, ["felucca.mp4", "pyramid.jpg", "sphinx.jpg"]),
 };
+recount();
 
 let nextFolderId = 100;
 
@@ -232,6 +234,12 @@ function recount() {
   for (const node of Object.values(FOLDERS).flat()) {
     node.childCount = FOLDERS[node.id]?.length ?? 0;
     node.itemCount = ITEMS[node.id]?.length ?? 0;
+    node.allCount = under(node.id).length;
+  }
+  // An offline source keeps the count it was last indexed with.
+  for (const one of SOURCES.filter((source) => source.reachable)) {
+    one.rootCount = ITEMS[one.rootFolderId]?.length ?? 0;
+    one.itemCount = under(one.rootFolderId).length;
   }
 }
 
@@ -537,7 +545,7 @@ function suggestionsFor(scope: string | null, text: string): Suggestions {
   const begins = (value: string) => value.toLowerCase().startsWith(word.toLowerCase());
   const below = scope?.startsWith("path:") ? scope.slice(5).toLowerCase().split("/") : null;
   const rows: Suggestion[] = [];
-  if (key === null) rows.push({ kind: "words", text: raw, shape: { kind: "text" }, path: [] });
+  if (key === null) rows.push({ kind: "words", text: raw, shape: { kind: "text" } });
   if ((key === null || key === "path") && scope !== "is:trashed") {
     for (const [id, { title }] of parents()) {
       const titles = crumbs(id).folders.map((crumb) => crumb.title);
@@ -549,24 +557,18 @@ function suggestionsFor(scope: string | null, text: string): Suggestions {
         kind: "folder",
         text: `${sign}path:${titles.join("/")}`,
         shape: { kind: "path", titles, exact: false },
-        path: titles.slice(below ? below.length - 1 : 0),
       });
     }
   }
   if (key === null || key === "tag") {
     for (const value of TAGS.filter(begins)) {
-      rows.push({
-        kind: "tag",
-        text: `${sign}tag:${value}`,
-        shape: { kind: "tag", value },
-        path: [],
-      });
+      rows.push({ kind: "tag", text: `${sign}tag:${value}`, shape: { kind: "tag", value } });
     }
   }
   if (key !== "path" && key !== "tag") {
     for (const label of LABELS.filter((one) => (!key || one.key === key) && begins(one.value))) {
       const term = `${sign}${label.key}:${label.value}`;
-      rows.push({ kind: "label", text: term, shape: { kind: "label", ...label }, path: [] });
+      rows.push({ kind: "label", text: term, shape: { kind: "label", ...label } });
     }
   }
   return { from, rows: rows.slice(0, 8) };
@@ -764,6 +766,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
           sourceId: home?.id ?? 0,
           path: folders,
           itemCount,
+          allCount: under(folderId).length,
           reachable: home?.reachable ?? false,
         };
       })
@@ -789,7 +792,8 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
           });
         }
         const itemCount = node ? node.itemCount : (ITEMS[held.folderId]?.length ?? 0);
-        return { key, ...held, itemCount: gone ? 0 : itemCount, gone };
+        const allCount = gone ? 0 : under(held.folderId).length;
+        return { key, ...held, itemCount: gone ? 0 : itemCount, allCount, gone };
       }),
   set_destination_key: ({ key, folderId }) => {
     const [digit, id] = [key as string, folderId as number];
@@ -814,12 +818,16 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       parentId: null,
       sourceId: one.id,
       title: one.title,
+      itemCount: ITEMS[one.rootFolderId]?.length ?? 0,
+      allCount: under(one.rootFolderId).length,
     })),
     ...[...parents()].map(([id, { parent, title }]) => ({
       id,
       parentId: parent,
       sourceId: crumbs(id).home?.id ?? 0,
       title,
+      itemCount: ITEMS[id]?.length ?? 0,
+      allCount: under(id).length,
     })),
   ],
   folder_items: ({ folderId }) => ITEMS[folderId as number] ?? [],

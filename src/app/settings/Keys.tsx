@@ -1,6 +1,6 @@
 import type { DestinationKey } from "../../ipc/bindings/DestinationKey";
 import { removeDestinationKey } from "../../ipc/commands";
-import { formatCount } from "../../lib/format";
+import { countText } from "../../ui/Count";
 import { DismissButton } from "../../ui/DismissButton";
 import { KeyChip } from "../../ui/KeyChip";
 import { PlaceButton } from "../../ui/PlaceButton";
@@ -56,7 +56,9 @@ function KeyRow({ digit, held }: { digit: string; held?: DestinationKey }) {
         />
       )}
       <span className="w-count shrink-0 text-right text-fg-dim text-small tabular-nums">
-        {held && !held.gone ? formatCount(held.itemCount) : ""}
+        {held && !held.gone && held.allCount > 0
+          ? countText({ own: held.itemCount, all: held.allCount })
+          : ""}
       </span>
       {held ? (
         <DismissButton

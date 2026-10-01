@@ -268,12 +268,16 @@ nobody looking for one should have to read past a tree to find it. **Nesting is 
 alone**, one step a level; a guide line per level competed with the panel's edge for the little
 structure the chrome has, and the chevrons already say which rows have children.
 
-**A row's count is a pill, and counts its own items only**, drawn on 15 September 2026 and built
-the day after. A bare number at the end of a row runs into the title beside it, where a plate
-ends the row and groups itself. A place with nothing of its own carries no pill at all: a nought
-in a plate is a number to read and dismiss on every empty folder in the tree, and an absence says
-the same thing in no ink. A source's row has no pill either, because the index counts a source
-whole rather than counting what sits loose in its root.
+**A row's count is a pill**, drawn on 15 September 2026 and built the day after. A bare number at
+the end of a row runs into the title beside it, where a plate ends the row and groups itself.
+**It reads a place's own files, then everything at or below it**, as `3/9`, and one figure where
+the two are equal; redrawn on 30 September 2026 after a library of nine files read as five, three
+of them loose in the source and one in a folder folded shut. The own figure comes first because it
+is what a click shows; the second is what folding hides, so a row reads the same folded or open,
+and a folder of folders reads `0/9`, where the nought is the news. A source's row has a pill now
+too, by the same rule. A place with nothing at or below it carries none: a nought in a plate is a
+number to read and dismiss on every empty folder, and an absence says the same in no ink. The
+Sorting Box and the Trash keep one figure, what their grids show.
 
 **Choosing a row goes there; only its chevron, Right or a double-click opens it.** The tree is
 one tab stop and follows the ARIA tree pattern: the arrow keys move and open, Enter goes. A
@@ -284,8 +288,8 @@ between sessions.
 **Favourite places are a group of their own**, between the app's two places and the sources, a
 rule either side, drawn by Claude Design and built on 25 September 2026, so a favourite is one
 press away however deep it sits. Each row is a filled star, the place's name and the folder it is
-in, since the tree around it is not there to say which Cairo; a source has no parent and no pill,
-and one that is away is muted and says so. They are in name order. **Choosing one plates both of
+in, since the tree around it is not there to say which Cairo; a source has no parent, and one
+that is away is muted and says so. They are in name order. **Choosing one plates both of
 its rows**: both are where you are standing, and the second says where the favourite lives, but
 the tree does not open to show it. A favourite moved keeps its star; one deleted leaves the group,
 and undoing the delete brings it back, since a retired folder keeps its flag. With none, there is
@@ -612,9 +616,13 @@ are, not a result.
 **The field shows what it understood.** Folders, places, tags and labels become chips once a space
 closes them, and words stay the words typed, so the field is the parse and not a guess at it.
 **Ctrl+F** puts the caret there, as in Explorer and every browser; letters stay free for
-type-to-find and digits are destination keys. **Where you stand is the first term**: a folder
-writes `path:`, the Sorting Box `is:sorting` and the Trash `is:trashed`, so the same text means the
-same thing wherever it runs, and Search Everywhere is only that term removed. **Typing moves
+type-to-find and digits are destination keys. **A search starts everywhere, and where you stand is
+offered, never written**: a search is for finding something whose place is not known, and the
+first build, which wrote the folder as the first term, hid what the wide search would have found.
+The place sits dashed at the field's end, one Tab or one click away; taken, a folder writes
+`path:`, the Sorting Box `is:sorting` and the Trash `is:trashed`, a chip like any other, so the
+same text still means the same thing wherever it runs and Search Everywhere is only that term
+removed. Tab takes the offer only with no row of the list plated; with one, it picks the row. **Typing moves
 nothing; Enter runs the query**, because a grid that reflows under every letter is a grid nobody
 can look at. A query that does not read runs nothing: the field names the character and the
 results stay as they were.

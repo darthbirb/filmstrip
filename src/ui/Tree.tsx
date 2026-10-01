@@ -1,6 +1,6 @@
 import { Fragment, type KeyboardEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { formatCount } from "../lib/format";
+import { CountPill, countLabel } from "./Count";
 import { Glyph } from "./Glyph";
 import type { GlyphName } from "./glyphs";
 import { KeyChip } from "./KeyChip";
@@ -17,6 +17,8 @@ export type TreeRow = {
   glyph?: GlyphName;
   /** How many items the row's own place holds; none at all shows no pill. */
   count?: number;
+  /** How many lie at or below it, where that differs from its own: the pill reads both. */
+  total?: number;
   /** The destination key bound to the row's folder, drawn beside the count. */
   key?: string;
   /** Quieter words right after the name, as a favourite says which folder it is in. */
@@ -158,7 +160,7 @@ export function Tree({
               // Named explicitly, so a trailing action's own label is not read as the row's.
               aria-label={[
                 row.label,
-                row.count === undefined ? null : formatCount(row.count),
+                row.count === undefined ? null : countLabel({ own: row.count, all: row.total }),
                 row.detail,
               ]
                 .filter(Boolean)
@@ -227,11 +229,7 @@ export function Tree({
               )}
               {row.key !== undefined && <KeyChip digit={row.key} plated={selected} />}
               {row.count !== undefined && (
-                <span
-                  className={`flex h-badge shrink-0 items-center rounded-badge px-1.5 text-small tabular-nums ${selected ? "bg-on-plate-wash text-on-plate" : "bg-raised text-fg-mid inset-ring inset-ring-line-control"}`}
-                >
-                  {formatCount(row.count)}
-                </span>
+                <CountPill own={row.count} all={row.total} tone={selected ? "plated" : "rest"} />
               )}
               {row.detail && (
                 <span

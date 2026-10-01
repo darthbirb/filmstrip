@@ -76,5 +76,5 @@ test("a free key's Choose Folder… opens the picker inside Settings, and a pick
       ["2", 4],
       ["4", 5],
     ]);
-  await expect.poll(() => words(keyRows()[1])).toBe("2TripsPictures2");
+  await expect.poll(() => words(keyRows()[1])).toBe("2TripsPictures2/5");
 });

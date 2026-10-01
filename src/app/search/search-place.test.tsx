@@ -140,6 +140,13 @@ test("a search that finds only folders says no files, and one that finds nothing
     .element(screen.getByText(/No file in Cairo matches/))
     .toHaveTextContent("No file in Cairo matches giza dawn.");
   expect(screen.getByRole("button", { name: "Search Everywhere" }).elements()).toHaveLength(2);
+
+  // Searched everywhere already, there is nowhere wider to go, and it says so.
+  setPlace(searching("giza dawn"));
+  await expect
+    .element(screen.getByText(/No file anywhere matches/))
+    .toHaveTextContent("No file anywhere matches giza dawn.");
+  expect(screen.getByRole("button", { name: "Search Everywhere" }).elements()).toHaveLength(0);
 });
 
 test("a trashed file among results says where it came from and goes only by Restore", async () => {

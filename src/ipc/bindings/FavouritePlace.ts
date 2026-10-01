@@ -9,4 +9,8 @@ export type FavouritePlace = { folderId: number, sourceId: number,
 /**
  * From the source's own folder, by the source's title, down to the place.
  */
-path: Array<Crumb>, itemCount: number, reachable: boolean, };
+path: Array<Crumb>, itemCount: number, 
+/**
+ * Every live file at or below it.
+ */
+allCount: number, reachable: boolean, };
