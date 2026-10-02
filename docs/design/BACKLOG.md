@@ -16,6 +16,22 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
+## The band's controls draw values the token sheet does not have · DEFECT
+
+Artboards › 04 "What the band's controls open" and "A source's own band":
+
+- The note's Cancel and Save turn `#383838` under the pointer, a surface the token sheet does not
+  name; the lightest raised surface it has is `raised-hi`, `#2e2e2e`.
+- The cover's pencil turns `rgba(10,10,10,.94)` under the pointer and while its picker is open,
+  which is no token either. The plate buttons already built, such as the zoom figure in the pane,
+  take a `wash` under the pointer over `veil`.
+- A label's value being changed has its text selected in `#3f4a5a`. The rename field already
+  built, in the tree and the pane's Name row, selects in `plate` with `on-plate` ink.
+- Add Note… is two shapes. People's empty band and "Saved empty" draw it as quiet text in
+  `fg-faint`; Trips' band below an offline root draws it as an outlined chip, as Add Label… is.
+
+Draw each in the token sheet's values, and Add Note… in one shape.
+
 ## The offline band refuses what an offline source's menu still does · DRAWN
 
 Artboards › 04 "A source's own band" draws Pictures offline as read-only, Favourite included,
