@@ -108,6 +108,8 @@ const SOURCES: SourceSummary[] = [
 const FOLDERS: Record<number, FolderNode[]> = {
   1: [folder(5, "People", 0, 0), folder(4, "Trips", 1, 2)],
   4: [folder(6, "Cairo", 0, 3)],
+  // A folder an offline source still knows, from when it was last indexed.
+  3: [folder(7, "Scans", 0, 0)],
 };
 
 const ITEMS: Record<number, ItemRow[]> = {
@@ -853,6 +855,12 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     return null;
   },
   folder_detail: ({ folderId }) => folderDetail(folderId as number),
+  set_folder_status: ({ folderId, status }) => {
+    const own = ownOf(folderId as number);
+    own.status = status as FolderStatus | null;
+    own.statusSetAt = status ? Math.floor(Date.now() / 1000) : null;
+    return null;
+  },
   favourite_places: (): FavouritePlace[] =>
     [
       ...SOURCES.filter((one) => one.kind === "library" && one.favorite).map((one) => ({

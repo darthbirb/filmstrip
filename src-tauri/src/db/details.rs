@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::db::folders::{self, Crumb};
+use crate::db::now;
 use crate::error::Result;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -159,6 +160,20 @@ fn tags_of(conn: &Connection, path: &[Crumb]) -> Result<Vec<FolderTag>> {
         .into_iter()
         .chain(levels.into_iter().rev().flatten())
         .collect())
+}
+
+/// Sets a folder's status and when it was set, or clears both. Only the index changes, so it is
+/// not journalled.
+pub fn set_status(conn: &Connection, folder_id: i64, status: Option<FolderStatus>) -> Result<()> {
+    conn.execute(
+        "UPDATE folder SET status = ?1, status_set_at = ?2 WHERE id = ?3",
+        params![
+            status.map(FolderStatus::as_str),
+            status.map(|_| now()),
+            folder_id
+        ],
+    )?;
+    Ok(())
 }
 
 /// The file that stands for a folder: its chosen cover while that is live at or below it, else
@@ -357,6 +372,19 @@ mod tests {
         assert_eq!(detail.status_set_at, Some(7));
         assert_eq!(detail.note.as_deref(), Some("dawn"));
         assert!(detail.favorite);
+    }
+
+    #[test]
+    fn a_status_is_stamped_when_set_and_both_go_when_cleared() {
+        let (conn, root) = library();
+        set_status(&conn, root, Some(FolderStatus::Complete)).unwrap();
+        let set = detail(&conn, root).unwrap().unwrap();
+        assert_eq!(set.status, Some(FolderStatus::Complete));
+        assert!(set.status_set_at.is_some());
+
+        set_status(&conn, root, None).unwrap();
+        let cleared = detail(&conn, root).unwrap().unwrap();
+        assert_eq!((cleared.status, cleared.status_set_at), (None, None));
     }
 
     #[test]

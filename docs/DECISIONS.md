@@ -410,6 +410,14 @@ plain header, having none of these.
 - **Its tags start with its own, its name first, then what it inherits**, each folder above in
   path order from the source down, that folder's name before its tags. A tag carried at two levels
   shows once, where it is nearest, as a file inherits it.
+- **The band stays open from folder to folder** for the session, closed when the app starts: a
+  person who opened it once wants it on the next folder too, and a band that flashed open on
+  every click would push the pictures down unasked.
+- **What a folder knows about itself lives in the index**, so setting it is not journalled, as a
+  favourite is not, and works while its drive is away. Only the counts and the cover's picker
+  need the drive.
+- **The header's counts are the tree's, in words**: its own files here, then everything at or
+  below it, the same two figures a pill shows. An offline source says `offline` instead.
 - **A folder that holds anything always has a picture.** Its chosen cover while that file is live
   at or below it, else its first picture or video, nearest first. A search's folder card shows the
   same one, so the band and the card never disagree; ggallery never left a folder coverless either.

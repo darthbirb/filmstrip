@@ -11,6 +11,7 @@ import type { FolderDetail } from "./bindings/FolderDetail";
 import type { FolderEntry } from "./bindings/FolderEntry";
 import type { FolderMade } from "./bindings/FolderMade";
 import type { FolderNode } from "./bindings/FolderNode";
+import type { FolderStatus } from "./bindings/FolderStatus";
 import type { ItemDetail } from "./bindings/ItemDetail";
 import type { ItemRow } from "./bindings/ItemRow";
 import type { ItemsMoved } from "./bindings/ItemsMoved";
@@ -102,6 +103,9 @@ export const setFolderFavorite = (folderId: number, favorite: boolean) =>
 
 export const folderDetail = (folderId: number) =>
   invoke<FolderDetail | null>("folder_detail", { folderId });
+
+export const setFolderStatus = (folderId: number, status: FolderStatus | null) =>
+  invoke<void>("set_folder_status", { folderId, status });
 
 export const favouritePlaces = () => invoke<FavouritePlace[]>("favourite_places");
 

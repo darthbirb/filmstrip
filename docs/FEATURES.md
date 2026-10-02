@@ -43,13 +43,13 @@ drawn. **Not started** — neither.
 | The tree, and a folder's children | Built | `folder_children` |
 | Reveal a folder in Explorer | Built | `reveal_folder`, its row's menu |
 | Read one folder again | Built | `read_folder_again`, its row's menu; ggallery walked only whole sources |
-| A folder's own details | Backlogged, and not in Rust | "A folder's details" |
+| A folder's own details | Built | `folder_detail`, the band under a folder's header |
 | Create a folder | Built | `create_folder`, New Folder on a folder's and a source's menu, a row already in its name field |
 | Move a folder | Built | `move_folder`, across drives too; Move to… on its menu, its own branch not a choice |
 | Delete a folder, choosing what happens to what is inside | Built | `delete_folder`, `folder_file_count`; asks in a banner, and Settings › Sources keeps the answer |
 | Rename a folder, on disk | Built | `rename_folder`, in its tree row, a name already there said under it |
 | A folder's cover | Not started | `folder.cover_item_id` exists |
-| A folder's status, notes, favourite | Partly | favourite: `set_folder_favorite`, `favourite_places`, a group of its own in navigation; status and notes not started |
+| A folder's status, notes, favourite | Partly | favourite: `set_folder_favorite`, `favourite_places`, a group of its own in navigation and in the band; status: `set_folder_status`, the band's segmented group; notes not started |
 | A folder's labels and tags, inherited by everything under it | Not started | items inherit labels, and never own one |
 | Every item id under a folder | Not started | |
 

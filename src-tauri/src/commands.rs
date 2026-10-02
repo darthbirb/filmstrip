@@ -466,6 +466,18 @@ pub fn folder_detail_with(
     Ok(detail)
 }
 
+#[tauri::command]
+pub async fn set_folder_status(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    status: Option<details::FolderStatus>,
+) -> Result<()> {
+    run(&state, move |conn| {
+        details::set_status(conn, folder_id, status)
+    })
+    .await
+}
+
 /// A favourite place as navigation's group shows it: the way down to it, the files directly in
 /// it, and whether its source can be read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]

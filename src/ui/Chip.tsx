@@ -1,5 +1,7 @@
 import type { MouseEvent, ReactNode } from "react";
 
+import { Glyph } from "./Glyph";
+
 /** A measured value as a chip: a shape, a length, a size. Quiet for what only names a kind. */
 export function Stat({ children, quiet = false }: { children: ReactNode; quiet?: boolean }) {
   return (
@@ -17,6 +19,8 @@ type Props = {
   tagKey?: string | null;
   /** Carried down from a folder rather than set on the item itself. */
   inherited?: boolean;
+  /** A folder's name, marked with the folder glyph; only renaming the folder changes it. */
+  name?: boolean;
   title?: string;
   /** Makes the chip a control that searches for it; `adding` when Ctrl was held. */
   onSearch?: (adding: boolean) => void;
@@ -26,7 +30,7 @@ type Props = {
 const SEARCHING = "cursor-default focus-ring hover:ring-1 hover:ring-line-strong";
 
 /** A tag is a pill; a label is a split chip, its key sunk. Inherited ones sit quieter than an item's own. */
-export function Chip({ value, tagKey, inherited = false, title, onSearch }: Props) {
+export function Chip({ value, tagKey, inherited = false, name = false, title, onSearch }: Props) {
   const Tag = onSearch ? "button" : "span";
   const control = onSearch && {
     type: "button" as const,
@@ -52,8 +56,11 @@ export function Chip({ value, tagKey, inherited = false, title, onSearch }: Prop
     <Tag
       {...control}
       title={title}
-      className={`inline-flex h-chip max-w-full items-center rounded-full px-2.5 text-small inset-ring ${inherited ? "bg-inset text-fg-dim inset-ring-line" : "bg-raised text-fg inset-ring-line-control-hi"} ${onSearch ? `${SEARCHING} hover:bg-raised-hi hover:text-fg` : ""}`}
+      className={`inline-flex h-chip max-w-full items-center gap-1.25 rounded-full pr-2.5 text-small inset-ring ${name ? "pl-2" : "pl-2.5"} ${inherited ? "bg-inset text-fg-dim inset-ring-line" : "bg-raised text-fg inset-ring-line-control-hi"} ${onSearch ? `${SEARCHING} hover:bg-raised-hi hover:text-fg` : ""}`}
     >
+      {name && (
+        <Glyph name="folderName" className={`text-glyph-small ${inherited ? "" : "text-fg-dim"}`} />
+      )}
       <span className="truncate">{value}</span>
     </Tag>
   );

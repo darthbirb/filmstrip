@@ -132,6 +132,8 @@ spacing:
   card: 17rem
   card-cover: 5rem
   card-cover-height: 3.75rem
+  band-cover: 9rem
+  band-cover-height: 6.75rem
   strip: 6rem
   strip-inset: 0.375rem
   strip-step: 1.5rem
@@ -647,8 +649,22 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Checkbox.** A `badge` square at the `badge` corner on `raised` in a `line-control` ring,
   filled with `plate` and a check in `on-plate` when ticked; its sentence beside it in `fg-mid`,
   `fg` under the pointer or ticked. The ring the keyboard sees is on the square.
-- **Breadcrumb.** Folders above as quiet `row` steps back, the place itself as the `title`. The
-  Trash's header adds what it holds and its size after the title, in `small` tabular `fg-dim`.
+- **Breadcrumb.** A folder's header is a disclosure: a chevron in the tree's `chevron` square, the
+  folders above as quiet `row` steps back, the folder as the `title`, then its two counts in words,
+  "3 here · 9 in all", in `small` tabular `fg-dim`. The whole header opens the band, a `wash` under
+  the pointer and `raised` while open; only the steps back are buttons of their own. While its
+  source is away the counts become `offline` in `--font-mono` `key`, the title `fg-mid` and the
+  steps `fg-dim`. The Sorting Box and the Trash keep a plain header with no chevron: the title,
+  then what waits or what the Trash holds and its size.
+- **Folder band.** Under a folder's header on its `panel`, pushed down: a `band-cover` picture at
+  the `control` corner beside the folder's Facts, Path, Status, Labels, Tags and Note. Path is the
+  source's directory then each folder down, each a way there, the folder itself in `fg`. Status
+  is a chip-sized Segmented, then Favourite as a chip button, then when it was set in `key`
+  `fg-faint`. The cover is the chosen one, a *Cover* plate on it, or the first picture standing
+  in; a frame on a `line` ring holds no-picture in `line-control-hi` for a folder with nothing at
+  or below it, or the unplugged glyph in `fg-faint` while the drive is away, when the path is
+  text followed by when it was last indexed in `--font-mono` `key`. It is capped at half the
+  grid's height and scrolls past that.
 - **Dropdown.** One named choice: a `control`-tall button on `raised` naming what it is on, a
   caret after it, opening a menu of every choice beneath it on `raised` with the overlay shadow.
   The chosen option wears the `plate`. The keyboard opens it with the arrows and Escape puts it
@@ -731,9 +747,14 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Facts.** Terms in `eyebrow` capitals, in a column as wide as the longest of them, values in
   `fg-mid`, each row the height of a chip.
 - **Chip.** A tag is a pill, raised with a ring; inherited, it sinks to `inset`. A label splits into
-  a sunk key and its value, and is never shown without the key. In the pane's details each is a
-  control that searches for itself: under the pointer it is one step lighter, `raised-hi` with
-  `fg` ink, in a `line-strong` ring, and its tooltip says what a click writes.
+  a sunk key and its value, and is never shown without the key. A folder's name among its tags
+  leads with the folder glyph in `glyph-small`. In the pane's details and a folder's band each is
+  a control that searches for itself: under the pointer it is one step lighter, `raised-hi` with
+  `fg` ink, in a `line-strong` ring, and its tooltip says what a click writes; an inherited one's
+  says where it comes from instead.
+- **Chip button.** An act in a row of the details, a `chip` high at the `nested` corner on
+  `raised` in a `line-control` ring, `small` `fg-mid` text after its `glyph`, `raised-hi` and
+  `fg` under the pointer. Favourite in a folder's band is one, its star filled while on.
 - **Settings.** A dialog over the `scrim`: a header with its `title` and a close button; a rail of
   sections grouped under `eyebrow` captions, with a filter field on `ground` above them, the one
   shown on `raised-hi`; and the section's settings as rows in an `inset` group, each a label and
@@ -749,7 +770,9 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   the two replaces the other. Folded, the rail keeps the Undo glyph button alone, its sentence in
   the tooltip; "Nothing to undo." comes out beside the rail on `panel` with the overlay shadow.
 - **Segmented.** A value with few enough answers to show them all at once, the one it is on filled
-  on `raised-hi` inside an `inset` trough. Real radios, so the arrow keys move between them.
+  on `raised-hi` inside an `inset` trough. Real radios, so the arrow keys move between them. In a
+  row of the details it is a `chip` high, its segments at the `badge` corner in `small`, `fg-dim`
+  until chosen.
 - **Source row.** In Settings, two lines: the source's glyph, its name as a field where it stands,
   its count — or the walk, while one runs — its kind as a segmented group, then reveal and remove;
   its path beneath in `--font-mono`. One that cannot be read keeps its remove and loses its reveal.
