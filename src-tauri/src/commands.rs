@@ -478,6 +478,18 @@ pub async fn set_folder_status(
     .await
 }
 
+#[tauri::command]
+pub async fn set_folder_note(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    note: Option<String>,
+) -> Result<()> {
+    run(&state, move |conn| {
+        details::set_note(conn, folder_id, note.as_deref())
+    })
+    .await
+}
+
 /// A favourite place as navigation's group shows it: the way down to it, the files directly in
 /// it, and whether its source can be read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]

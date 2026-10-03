@@ -416,6 +416,9 @@ plain header, having none of these.
 - **What a folder knows about itself lives in the index**, so setting it is not journalled, as a
   favourite is not, and works while its drive is away. Only the counts and the cover's picker
   need the drive.
+- **Escape abandons a note, and a click away keeps it.** Half a note is still what was meant, so
+  leaving the box saves it, where a half-typed tag or name is dropped; Enter is a new line, since
+  a note is prose, and Ctrl+Enter saves. Saved empty, the note is gone: none is no note.
 - **The header's counts are the tree's, in words**: its own files here, then everything at or
   below it, the same two figures a pill shows. An offline source says `offline` instead.
 - **A folder that holds anything always has a picture.** Its chosen cover while that file is live

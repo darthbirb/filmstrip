@@ -861,6 +861,10 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     own.statusSetAt = status ? Math.floor(Date.now() / 1000) : null;
     return null;
   },
+  set_folder_note: ({ folderId, note }) => {
+    ownOf(folderId as number).note = (note as string | null)?.trim() || null;
+    return null;
+  },
   favourite_places: (): FavouritePlace[] =>
     [
       ...SOURCES.filter((one) => one.kind === "library" && one.favorite).map((one) => ({

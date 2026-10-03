@@ -4,13 +4,14 @@ import type { FolderDetail } from "../../ipc/bindings/FolderDetail";
 import type { FolderStatus } from "../../ipc/bindings/FolderStatus";
 import type { FolderTag } from "../../ipc/bindings/FolderTag";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
-import { setFolderFavorite, setFolderStatus } from "../../ipc/commands";
+import { setFolderFavorite, setFolderNote, setFolderStatus } from "../../ipc/commands";
 import { formatDay, formatShortDate } from "../../lib/format";
 import { labelTerm, tagTerm } from "../../lib/queryTerm";
 import { Chip } from "../../ui/Chip";
 import { ChipButton } from "../../ui/ChipButton";
 import { type Fact, Facts } from "../../ui/Facts";
 import { Glyph } from "../../ui/Glyph";
+import { NoteField } from "../../ui/NoteField";
 import { Plate } from "../../ui/Plate";
 import { PushDown } from "../../ui/PushDown";
 import { Segmented } from "../../ui/Segmented";
@@ -100,14 +101,20 @@ function Body({ place, detail, source }: BodyProps) {
     facts.push(["Labels", <Chips key="labels" tags={labels} where={where} />]);
   }
   facts.push(["Tags", <Chips key="tags" tags={tags} where={where} />]);
-  if (detail.note) {
-    facts.push([
-      "Note",
-      <span key="note" className="text-pretty">
-        {detail.note}
-      </span>,
-    ]);
-  }
+  facts.push([
+    "Note",
+    <NoteField
+      // A note read again starts the row afresh, as another folder's does.
+      key={`${detail.id}-${detail.note}`}
+      note={detail.note}
+      of={title}
+      onSave={(note) =>
+        void setFolderNote(detail.id, note)
+          .then(detailChanged)
+          .catch(() => undefined)
+      }
+    />,
+  ]);
 
   return (
     // Positioned, so the radios a segmented group hides are clipped with the rest of it.

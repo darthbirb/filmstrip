@@ -1,5 +1,5 @@
 import { beforeEach, expect, test } from "vitest";
-import { page } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { withoutGlyphs } from "../../dev/words";
@@ -133,7 +133,38 @@ test("an empty folder's band frames no picture and leaves out what it has none o
     .toBeInTheDocument();
   await expect.poll(() => chipTexts(row(screen.container, "Tags"))).toEqual(["people", "pictures"]);
   expect(row(screen.container, "Labels")).toBeUndefined();
-  expect(row(screen.container, "Note")).toBeUndefined();
+  expect(row(screen.container, "Note")?.textContent).toBe("Add Note…");
+});
+
+test("a note is written in its row: Ctrl+Enter keeps it, Escape leaves it, emptied it goes", async () => {
+  const screen = await renderHeader(PEOPLE);
+  await details(screen).click();
+  await screen.getByRole("button", { name: "Add Note…" }).click();
+  const box = screen.getByRole("textbox", { name: "Note on People" });
+  await expect.element(box).toHaveFocus();
+  await userEvent.keyboard("Faces{Enter}and names{Control>}{Enter}{/Control}");
+  const note = screen.getByRole("button", { name: "Change Note on People" });
+  const said = () => withoutGlyphs(note.query()?.textContent);
+  await expect.poll(said).toBe("Faces\nand names");
+
+  // Escape leaves the note as it was; the caret had landed after what was written.
+  await note.click();
+  await expect.element(box).toHaveFocus();
+  expect((box.element() as HTMLTextAreaElement).selectionStart).toBe("Faces\nand names".length);
+  await userEvent.keyboard(" and more{Escape}");
+  await expect.poll(said).toBe("Faces\nand names");
+
+  // A click away keeps what was written.
+  await note.click();
+  await userEvent.keyboard(" kept");
+  await screen.getByText("Path", { exact: true }).click();
+  await expect.poll(said).toBe("Faces\nand names kept");
+
+  // Emptied and saved, the note is gone.
+  await note.click();
+  await userEvent.clear(box);
+  await screen.getByRole("button", { name: "Save" }).click();
+  await expect.element(screen.getByRole("button", { name: "Add Note…" })).toBeVisible();
 });
 
 test("a source's own band has no steps back, its path is its folder, and nothing comes down", async () => {

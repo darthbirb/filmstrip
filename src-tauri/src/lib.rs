@@ -116,6 +116,7 @@ pub fn run() {
             commands::set_folder_favorite,
             commands::folder_detail,
             commands::set_folder_status,
+            commands::set_folder_note,
             commands::favourite_places,
             commands::destination_keys,
             commands::set_destination_key,

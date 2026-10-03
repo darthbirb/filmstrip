@@ -752,9 +752,18 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   a control that searches for itself: under the pointer it is one step lighter, `raised-hi` with
   `fg` ink, in a `line-strong` ring, and its tooltip says what a click writes; an inherited one's
   says where it comes from instead.
-- **Chip button.** An act in a row of the details, a `chip` high at the `nested` corner on
-  `raised` in a `line-control` ring, `small` `fg-mid` text after its `glyph`, `raised-hi` and
-  `fg` under the pointer. Favourite in a folder's band is one, its star filled while on.
+- **Chip button.** An act in a row of the details, a `chip` high at the `nested` corner in `small`
+  text. Raised, it is `raised` in a `line-control` ring in `fg-mid`, `raised-hi` and `fg` under
+  the pointer: Favourite in a folder's band is one, its star filled while on. A field's Cancel is
+  the same and takes a `line-control-hi` ring under the pointer; its Save is `raised-hi` in that
+  ring with `fg` ink, and the pointer lays a `wash` over it. The way to add what a row has none of
+  yet, Add Note…, is an outline: no ground, a `line-control-hi` ring and `fg-dim` ink, `fg` in a
+  `line-strong` ring under the pointer.
+- **Note field.** A note reads as prose in `fg-mid`; under the pointer or the keyboard the Name
+  row's rename glyph comes after it, and a click anywhere in it opens it. Opened, it is a box on
+  `ground` at the `nested` corner in a `line-control` ring, three lines tall to begin with and
+  growing as it fills, `fg-hi` text with a sentence-case placeholder, and under it "Ctrl+Enter
+  saves · Escape abandons" in `key` `fg-faint` before Cancel and Save.
 - **Settings.** A dialog over the `scrim`: a header with its `title` and a close button; a rail of
   sections grouped under `eyebrow` captions, with a filter field on `ground` above them, the one
   shown on `raised-hi`; and the section's settings as rows in an `inset` group, each a label and

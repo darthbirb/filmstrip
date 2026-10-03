@@ -176,6 +176,16 @@ pub fn set_status(conn: &Connection, folder_id: i64, status: Option<FolderStatus
     Ok(())
 }
 
+/// Writes a folder's note; one with nothing but space in it is no note.
+pub fn set_note(conn: &Connection, folder_id: i64, note: Option<&str>) -> Result<()> {
+    let note = note.map(str::trim).filter(|text| !text.is_empty());
+    conn.execute(
+        "UPDATE folder SET notes = ?1 WHERE id = ?2",
+        params![note, folder_id],
+    )?;
+    Ok(())
+}
+
 /// The file that stands for a folder: its chosen cover while that is live at or below it, else
 /// its first picture or video, nearest first. A search's folder card shows the same one.
 pub fn cover(conn: &Connection, folder_id: i64) -> Result<Option<(i64, String)>> {
@@ -385,6 +395,25 @@ mod tests {
         set_status(&conn, root, None).unwrap();
         let cleared = detail(&conn, root).unwrap().unwrap();
         assert_eq!((cleared.status, cleared.status_set_at), (None, None));
+    }
+
+    #[test]
+    fn a_note_is_kept_as_written_and_one_of_only_space_is_none() {
+        let (conn, root) = library();
+        set_note(
+            &conn,
+            root,
+            Some("  Four mornings at Giza.\nThe dawn set.  "),
+        )
+        .unwrap();
+        let written = detail(&conn, root).unwrap().unwrap();
+        assert_eq!(
+            written.note.as_deref(),
+            Some("Four mornings at Giza.\nThe dawn set.")
+        );
+
+        set_note(&conn, root, Some(" \n ")).unwrap();
+        assert_eq!(detail(&conn, root).unwrap().unwrap().note, None);
     }
 
     #[test]

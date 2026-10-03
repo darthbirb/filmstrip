@@ -107,6 +107,9 @@ export const folderDetail = (folderId: number) =>
 export const setFolderStatus = (folderId: number, status: FolderStatus | null) =>
   invoke<void>("set_folder_status", { folderId, status });
 
+export const setFolderNote = (folderId: number, note: string | null) =>
+  invoke<void>("set_folder_note", { folderId, note });
+
 export const favouritePlaces = () => invoke<FavouritePlace[]>("favourite_places");
 
 export const destinationKeys = () => invoke<DestinationKey[]>("destination_keys");
