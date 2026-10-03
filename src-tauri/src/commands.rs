@@ -519,6 +519,37 @@ pub async fn set_folder_cover(
     .await
 }
 
+/// The tags the library has that begin with what is being typed in a tag field.
+#[tauri::command]
+pub async fn tag_offers(state: State<'_, AppState>, typed: String) -> Result<Vec<tags::TagOffer>> {
+    run(&state, move |conn| tags::tag_offers(conn, &typed)).await
+}
+
+/// Every file below the folder takes the tag too, in the same transaction.
+#[tauri::command]
+pub async fn add_folder_tag(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    value: String,
+) -> Result<()> {
+    run(&state, move |conn| {
+        in_transaction(conn, |tx| tags::add_folder_tag(tx, folder_id, &value))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn remove_folder_tag(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    tag_id: i64,
+) -> Result<()> {
+    run(&state, move |conn| {
+        in_transaction(conn, |tx| tags::remove_folder_tag(tx, folder_id, tag_id))
+    })
+    .await
+}
+
 /// A favourite place as navigation's group shows it: the way down to it, the files directly in
 /// it, and whether its source can be read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]

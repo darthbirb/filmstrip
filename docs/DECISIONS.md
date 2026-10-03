@@ -419,6 +419,11 @@ plain header, having none of these.
 - **Escape abandons a note, and a click away keeps it.** Half a note is still what was meant, so
   leaving the box saves it, where a half-typed tag or name is dropped; Enter is a new line, since
   a note is prose, and Ctrl+Enter saves. Saved empty, the note is gone: none is no note.
+- **A tag the folder already carries is refused where it is typed**, its own or one from above:
+  adding it again would change nothing a search can see. The line names the folder it comes from,
+  which is where it can be taken off. A folder's name is a tag only a rename changes, so it has no
+  ×. Tags come several at a time, so the field stays open after each until Escape or a click away,
+  which drop what was half typed.
 - **The header's counts are the tree's, in words**: its own files here, then everything at or
   below it, the same two figures a pill shows. An offline source says `offline` instead.
 - **A folder that holds anything always has a picture.** Its chosen cover while that file is live

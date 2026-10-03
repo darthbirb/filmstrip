@@ -73,13 +73,51 @@ pub fn add_folder_tag(conn: &Connection, folder_id: i64, value: &str) -> Result<
     rebuild_subtree(conn, folder_id)
 }
 
+/// Takes a tag or a label off a folder. Its name is not one it can lose: only a rename changes it.
 pub fn remove_folder_tag(conn: &Connection, folder_id: i64, tag_id: i64) -> Result<()> {
     conn.execute(
-        "DELETE FROM folder_tag WHERE folder_id = ?1 AND tag_id = ?2",
+        "DELETE FROM folder_tag WHERE folder_id = ?1 AND tag_id = ?2 AND source <> 'title'",
         params![folder_id, tag_id],
     )?;
     search::index_folder(conn, folder_id)?;
     rebuild_subtree(conn, folder_id)
+}
+
+/// The most offers a field lists under itself, before the row that adds what was typed.
+pub const OFFERS: i64 = 7;
+
+/// A tag the library already has, offered while one is typed, with how many files carry it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct TagOffer {
+    pub value: String,
+    pub files: i64,
+}
+
+/// The tags whose value begins with what was typed, the most carried first. A term nothing
+/// carries any more, on no folder and no file, is not offered.
+pub fn tag_offers(conn: &Connection, typed: &str) -> Result<Vec<TagOffer>> {
+    let like = format!("{}%", search::escape_like(&fold(typed.trim())));
+    let mut stmt = conn.prepare(
+        "SELECT t.value,
+                (SELECT COUNT(*) FROM item_effective_tag e JOIN item i ON i.id = e.item_id
+                  WHERE e.tag_id = t.id AND i.deleted_at IS NULL) AS files
+           FROM tag t
+          WHERE t.key IS NULL AND t.value LIKE ?1 ESCAPE '\\'
+            AND (EXISTS (SELECT 1 FROM folder_tag ft WHERE ft.tag_id = t.id)
+                 OR EXISTS (SELECT 1 FROM item_tag it WHERE it.tag_id = t.id))
+          ORDER BY files DESC, t.value
+          LIMIT ?2",
+    )?;
+    Ok(stmt
+        .query_map(params![like, OFFERS], |r| {
+            Ok(TagOffer {
+                value: r.get(0)?,
+                files: r.get(1)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?)
 }
 
 /// An item takes tags, never labels — a label describes a folder, and an item
@@ -316,6 +354,56 @@ mod tests {
                 .any(|t| t.value == "cairo" && t.origin_id == Some(cairo)),
             "the title tag is folded and inherited: {carried:?}"
         );
+    }
+
+    #[test]
+    fn offers_begin_with_what_was_typed_the_most_carried_first() {
+        let (conn, root) = library();
+        let trips = folders::create(&conn, root, "Trips").unwrap();
+        let cairo = folders::create(&conn, trips, "Cairo").unwrap();
+        item(&conn, cairo, "a.jpg");
+        item(&conn, cairo, "b.jpg");
+        let lone = item(&conn, trips, "c.jpg");
+        add_folder_tag(&conn, cairo, "Felucca").unwrap();
+        add_item_tag(&conn, lone, "fennel").unwrap();
+        get_or_create_tag(&conn, None, "fell").unwrap();
+
+        let offered = tag_offers(&conn, " Fe").unwrap();
+        assert_eq!(
+            offered,
+            [
+                TagOffer {
+                    value: "felucca".into(),
+                    files: 2
+                },
+                TagOffer {
+                    value: "fennel".into(),
+                    files: 1
+                },
+            ],
+            "a term nothing carries is not offered"
+        );
+        assert_eq!(
+            tag_offers(&conn, "f_").unwrap(),
+            [],
+            "the typed text is literal"
+        );
+    }
+
+    #[test]
+    fn a_folder_cannot_lose_its_name() {
+        let (conn, root) = library();
+        let cairo = folders::create(&conn, root, "Cairo").unwrap();
+        let name = get_or_create_tag(&conn, None, "Cairo").unwrap();
+        remove_folder_tag(&conn, cairo, name).unwrap();
+        let kept: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM folder_tag WHERE folder_id = ?1 AND tag_id = ?2",
+                params![cairo, name],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(kept, 1);
     }
 
     #[test]

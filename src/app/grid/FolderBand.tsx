@@ -1,11 +1,18 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
-import type { CSSProperties } from "react";
+import { type CSSProperties, useRef, useState } from "react";
 
 import type { FolderDetail } from "../../ipc/bindings/FolderDetail";
 import type { FolderStatus } from "../../ipc/bindings/FolderStatus";
 import type { FolderTag } from "../../ipc/bindings/FolderTag";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
-import { setFolderFavorite, setFolderNote, setFolderStatus } from "../../ipc/commands";
+import {
+  addFolderTag,
+  removeFolderTag,
+  setFolderFavorite,
+  setFolderNote,
+  setFolderStatus,
+  tagOffers,
+} from "../../ipc/commands";
 import { formatDay, formatShortDate } from "../../lib/format";
 import { labelTerm, tagTerm } from "../../lib/queryTerm";
 import { Chip } from "../../ui/Chip";
@@ -16,6 +23,8 @@ import { NoteField } from "../../ui/NoteField";
 import { Plate } from "../../ui/Plate";
 import { PushDown } from "../../ui/PushDown";
 import { Segmented } from "../../ui/Segmented";
+import { type Refusal, TagField } from "../../ui/TagField";
+import { libraryChanged } from "../library";
 import { refreshIndex, useIndex } from "../navigation/index-store";
 import { type Place, setPlace, usePlace } from "../place";
 import { addToSearch, searchFor } from "../search/search";
@@ -100,9 +109,17 @@ function Body({ place, detail, source }: BodyProps) {
     ],
   ];
   if (labels.length > 0) {
-    facts.push(["Labels", <Chips key="labels" tags={labels} where={where} />]);
+    facts.push([
+      "Labels",
+      <span key="labels" className="flex flex-wrap gap-1.5 py-px">
+        <Chips tags={labels} where={where} />
+      </span>,
+    ]);
   }
-  facts.push(["Tags", <Chips key="tags" tags={tags} where={where} />]);
+  facts.push([
+    "Tags",
+    <TagsRow key="tags" folderId={detail.id} title={title} tags={tags} where={where} />,
+  ]);
   facts.push([
     "Note",
     <NoteField
@@ -235,24 +252,88 @@ function lastIndexed(seconds: number) {
 
 type Where = { root: boolean; offline: boolean };
 
+type ChipsProps = {
+  tags: FolderTag[];
+  where: Where;
+  /** Takes off one of the folder's own; a name and what it inherits are never offered. */
+  onRemove?: (tag: FolderTag) => void;
+  /** The tag a value being typed repeats. */
+  echo?: number | null;
+};
+
 /** Its own first, its name leading, then what it inherits; each searches for itself on a click. */
-function Chips({ tags, where }: { tags: FolderTag[]; where: Where }) {
+function Chips({ tags, where, onRemove, echo = null }: ChipsProps) {
+  return tags.map((tag) => {
+    const term = tag.key ? labelTerm(tag.key, tag.value) : tagTerm(tag.value);
+    const own = tag.from === null && !tag.name;
+    return (
+      <Chip
+        key={`${tag.tagId}-${tag.from?.id ?? "own"}`}
+        value={tag.value}
+        tagKey={tag.key}
+        inherited={tag.from !== null}
+        name={tag.name}
+        echoed={tag.tagId === echo}
+        title={titleOf(tag, where)}
+        onSearch={(adding) => void (adding ? addToSearch(term) : searchFor(term))}
+        onRemove={own && onRemove ? () => onRemove(tag) : undefined}
+      />
+    );
+  });
+}
+
+type TagsRowProps = { folderId: number; title: string; tags: FolderTag[]; where: Where };
+
+/**
+ * The folder's tags and Add Tag…. A tag it carries already, its own or from above, is refused
+ * where it is typed; one taken off with the keyboard hands the focus to the next.
+ */
+function TagsRow({ folderId, title, tags, where }: TagsRowProps) {
+  const row = useRef<HTMLSpanElement>(null);
+  const [echo, setEcho] = useState<number | null>(null);
+  const stops = () => [
+    ...(row.current?.querySelectorAll<HTMLElement>("button:not([tabindex='-1'])") ?? []),
+  ];
+
+  const refuse = (value: string): Refusal | null => {
+    const had = tags.find((tag) => tag.value === value);
+    if (!had) return null;
+    const line = had.from
+      ? `${title} already has ${value}, ${had.name ? "the name of" : "from"} ${had.from.title}.`
+      : had.name
+        ? `${value} is this folder’s name.`
+        : `${title} already has ${value}.`;
+    return { line, tagId: had.tagId };
+  };
+  const changed = () => libraryChanged().then(detailChanged);
+  const remove = (tag: FolderTag) => {
+    const at = stops().indexOf(document.activeElement as HTMLElement);
+    void removeFolderTag(folderId, tag.tagId)
+      .then(changed)
+      // The tag that was after it now stands where it stood.
+      .then(() => at >= 0 && requestAnimationFrame(() => stops()[at]?.focus()))
+      .catch(() => undefined);
+  };
+  const backOut = () => {
+    const own = row.current?.querySelectorAll<HTMLElement>('button[data-chip="removable"]');
+    own?.[own.length - 1]?.focus();
+  };
+
   return (
-    <span className="flex flex-wrap gap-1.5 py-px">
-      {tags.map((tag) => {
-        const term = tag.key ? labelTerm(tag.key, tag.value) : tagTerm(tag.value);
-        return (
-          <Chip
-            key={`${tag.tagId}-${tag.from?.id ?? "own"}`}
-            value={tag.value}
-            tagKey={tag.key}
-            inherited={tag.from !== null}
-            name={tag.name}
-            title={titleOf(tag, where)}
-            onSearch={(adding) => void (adding ? addToSearch(term) : searchFor(term))}
-          />
-        );
-      })}
+    <span ref={row} className="flex flex-wrap items-center gap-1.5 py-px">
+      <Chips tags={tags} where={where} onRemove={remove} echo={echo} />
+      <TagField
+        of={title}
+        offers={tagOffers}
+        refuse={refuse}
+        onAdd={(value) =>
+          addFolderTag(folderId, value)
+            .then(changed)
+            .catch(() => undefined)
+        }
+        onEcho={setEcho}
+        onBackOut={backOut}
+      />
     </span>
   );
 }

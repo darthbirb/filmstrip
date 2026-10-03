@@ -3,7 +3,7 @@ import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { withoutGlyphs } from "../../dev/words";
-import { setFolderStatus } from "../../ipc/commands";
+import { folderDetail, removeFolderTag, setFolderStatus } from "../../ipc/commands";
 import { Breadcrumb } from "../navigation/Breadcrumb";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { getPlace, type Place, setPlace } from "../place";
@@ -57,7 +57,15 @@ function row(container: HTMLElement, term: string) {
 }
 
 const chipTexts = (value: HTMLElement | undefined) =>
-  [...(value?.querySelectorAll("button") ?? [])].map((chip) => withoutGlyphs(chip.textContent));
+  [...(value?.querySelectorAll("[data-chip]") ?? [])].map((chip) =>
+    withoutGlyphs(chip.textContent),
+  );
+
+/** Takes a tag a test added back off Cairo, so the next test starts from the mock's own. */
+async function untag(value: string) {
+  const tag = (await folderDetail(6))?.tags.find((one) => one.value === value && !one.from);
+  if (tag) await removeFolderTag(6, tag.tagId);
+}
 
 test("a folder's header says its two counts in words, and its chevron opens the band", async () => {
   const screen = await renderHeader(CAIRO);
@@ -197,6 +205,76 @@ test("the pencil picks a cover from the branch, the first standing in until one 
   await userEvent.keyboard("{Enter}");
   await expect.element(pencil).toBeVisible();
   expect(screen.getByText("Cover", { exact: true }).elements()).toHaveLength(0);
+});
+
+test("Add Tag… becomes a field that adds what is typed and stays open for the next", async () => {
+  const screen = await renderHeader(CAIRO);
+  await details(screen).click();
+  await screen.getByRole("button", { name: "Add Tag…" }).click();
+  const field = screen.getByRole("combobox", { name: "Add Tag to Cairo" });
+  await expect.element(field).toHaveFocus();
+
+  await userEvent.keyboard("pe");
+  await expect.element(screen.getByRole("option", { name: /^people/ })).toBeVisible();
+  await userEvent.clear(field);
+  await userEvent.keyboard("Felucca");
+  await expect.element(screen.getByRole("option", { name: "New tag “felucca”" })).toBeVisible();
+  await userEvent.keyboard("{Enter}");
+  await expect
+    .poll(() => chipTexts(row(screen.container, "Tags")))
+    .toEqual(["cairo", "egypt", "felucca", "pictures", "trips", "travel"]);
+  await expect.element(field).toHaveFocus();
+  await expect.element(field).toHaveValue("");
+
+  await userEvent.keyboard("{Escape}");
+  await expect.element(screen.getByRole("button", { name: "Add Tag…" })).toBeVisible();
+  await untag("felucca");
+});
+
+test("a tag the folder already carries is refused where it is typed, saying whose it is", async () => {
+  const screen = await renderHeader(CAIRO);
+  await details(screen).click();
+  await screen.getByRole("button", { name: "Add Tag…" }).click();
+  const field = screen.getByRole("combobox", { name: "Add Tag to Cairo" });
+  const refusals = [
+    ["egypt", "Cairo already has egypt."],
+    ["Travel", "Cairo already has travel, from Trips."],
+    ["trips", "Cairo already has trips, the name of Trips."],
+    ["cairo", "cairo is this folder’s name."],
+  ];
+  for (const [typed, line] of refusals) {
+    await userEvent.clear(field);
+    await userEvent.type(field, typed ?? "");
+    await expect.element(screen.getByText(line ?? "")).toBeVisible();
+    await expect.element(field).toHaveAttribute("aria-invalid", "true");
+  }
+  // Enter does nothing until the text changes.
+  await userEvent.keyboard("{Enter}");
+  expect(chipTexts(row(screen.container, "Tags")).filter((text) => text === "cairo")).toHaveLength(
+    1,
+  );
+});
+
+test("a folder's own tag is taken off with the keyboard; its name and what it inherits are not", async () => {
+  const screen = await renderHeader(CAIRO);
+  await details(screen).click();
+  await screen.getByRole("button", { name: "Add Tag…" }).click();
+  await userEvent.keyboard("dusk{Enter}");
+  await expect.poll(() => chipTexts(row(screen.container, "Tags"))).toContain("dusk");
+  const removable = () =>
+    [...screen.container.querySelectorAll('button[data-chip="removable"]')].map((chip) =>
+      withoutGlyphs(chip.textContent),
+    );
+  expect(removable()).toEqual(["egypt", "dusk"]);
+
+  // Backspace in the empty field reaches the last own tag, and Delete takes it off.
+  await userEvent.keyboard("{Backspace}");
+  await expect.element(screen.getByRole("button", { name: "dusk", exact: true })).toHaveFocus();
+  await userEvent.keyboard("{Delete}");
+  await expect.poll(() => chipTexts(row(screen.container, "Tags"))).not.toContain("dusk");
+  await expect.element(screen.getByRole("button", { name: "pictures" })).toHaveFocus();
+  await userEvent.keyboard("{Delete}");
+  expect(chipTexts(row(screen.container, "Tags"))).toContain("pictures");
 });
 
 test("a folder with nothing in it, or a drive that is away, has no pencil", async () => {

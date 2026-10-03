@@ -866,6 +866,36 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     own.statusSetAt = status ? Math.floor(Date.now() / 1000) : null;
     return null;
   },
+  tag_offers: ({ typed }) => {
+    const word = String(typed).trim().toLowerCase();
+    const carried = new Map<string, number>();
+    const places = [...SOURCES.map((one) => one.rootFolderId), ...parents().keys()];
+    for (const id of places) {
+      const name = crumbs(id).folders.at(-1)?.title.toLowerCase() ?? "";
+      const own = ownOf(id).tags.filter((tag) => tag.key === null);
+      for (const value of [name, ...own.map((tag) => tag.value)]) {
+        carried.set(value, (carried.get(value) ?? 0) + under(id).length);
+      }
+    }
+    return [...carried]
+      .filter(([value]) => value !== "" && value.startsWith(word))
+      .sort(([a, one], [b, two]) => two - one || a.localeCompare(b))
+      .slice(0, 7)
+      .map(([value, files]) => ({ value, files }));
+  },
+  add_folder_tag: ({ folderId, value }) => {
+    const own = ownOf(folderId as number);
+    const folded = String(value).trim().toLowerCase();
+    if (!own.tags.some((tag) => tag.key === null && tag.value === folded)) {
+      own.tags.push({ key: null, value: folded });
+    }
+    return null;
+  },
+  remove_folder_tag: ({ folderId, tagId: id }) => {
+    const own = ownOf(folderId as number);
+    own.tags = own.tags.filter((tag) => tagId(tag.key, tag.value) !== id);
+    return null;
+  },
   folder_cover_choices: ({ folderId }) =>
     coverChoices(folderId as number).map((item) => ({ itemId: item.id, thumb: item.thumb })),
   set_folder_cover: ({ folderId, itemId }) => {

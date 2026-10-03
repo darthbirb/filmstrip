@@ -25,6 +25,7 @@ import type { SearchOutcome } from "./bindings/SearchOutcome";
 import type { SourceKind } from "./bindings/SourceKind";
 import type { SourceSummary } from "./bindings/SourceSummary";
 import type { Suggestions } from "./bindings/Suggestions";
+import type { TagOffer } from "./bindings/TagOffer";
 import type { Trashed } from "./bindings/Trashed";
 import type { TrashSummary } from "./bindings/TrashSummary";
 import type { UndoReport } from "./bindings/UndoReport";
@@ -116,6 +117,14 @@ export const folderCoverChoices = (folderId: number) =>
 
 export const setFolderCover = (folderId: number, itemId: number | null) =>
   invoke<void>("set_folder_cover", { folderId, itemId });
+
+export const tagOffers = (typed: string) => invoke<TagOffer[]>("tag_offers", { typed });
+
+export const addFolderTag = (folderId: number, value: string) =>
+  invoke<void>("add_folder_tag", { folderId, value });
+
+export const removeFolderTag = (folderId: number, tagId: number) =>
+  invoke<void>("remove_folder_tag", { folderId, tagId });
 
 export const favouritePlaces = () => invoke<FavouritePlace[]>("favourite_places");
 

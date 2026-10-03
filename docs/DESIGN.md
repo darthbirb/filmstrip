@@ -753,13 +753,21 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   a control that searches for itself: under the pointer it is one step lighter, `raised-hi` with
   `fg` ink, in a `line-strong` ring, and its tooltip says what a click writes; an inherited one's
   says where it comes from instead.
+- **Tag field.** Add Tag… is an outline chip at the end of the Tags row; it becomes the field in
+  the chip's own shape, a pill on `ground` in a `line-control` ring, `fg-hi` text with "tag" for its
+  placeholder. The library's tags are offered under it in the menu's shape, the most carried
+  first, each with "on 4 files" in `key` `fg-dim`, the lit one on `raised-hi`, and a last row "New
+  tag “…”" for exactly what was typed. A value the folder already carries turns the ring
+  `line-danger`, outlines the chip it repeats in `line-strong`, and says whose it is underneath in
+  `key` `danger`. A folder's own tags, never its name or what it inherits, show an × under the
+  pointer or the keyboard, a `badge`-sized circle that takes a `wash`.
 - **Chip button.** An act in a row of the details, a `chip` high at the `nested` corner in `small`
   text. Raised, it is `raised` in a `line-control` ring in `fg-mid`, `raised-hi` and `fg` under
   the pointer: Favourite in a folder's band is one, its star filled while on. A field's Cancel is
   the same and takes a `line-control-hi` ring under the pointer; its Save is `raised-hi` in that
   ring with `fg` ink, and the pointer lays a `wash` over it. The way to add what a row has none of
-  yet, Add Note…, is an outline: no ground, a `line-control-hi` ring and `fg-dim` ink, `fg` in a
-  `line-strong` ring under the pointer.
+  yet, Add Note… or Add Tag…, is an outline: no ground, a `line-control-hi` ring and `fg-dim` ink,
+  `fg` in a `line-strong` ring under the pointer; Add Tag… is a pill, as a tag is.
 - **Cover picker.** A pencil on the band's cover, a `badge` square on `veil` at the `badge`
   corner, a `wash` under the pointer and while its picker is open, ringed in `in-pane` then. The
   picker opens beside the cover in the menu's shape: "Cover for Cairo" in `eyebrow` capitals, then
