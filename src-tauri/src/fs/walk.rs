@@ -207,7 +207,7 @@ fn walk_source(conn: &Connection, source: &sources::Source, report: &mut WalkRep
     items::begin_sweep(conn)?;
     record_all(conn, &root, root_folder, source.id, report)?;
     report.items_retired += items::finish_sweep(conn, source.id)?;
-    Ok(())
+    sources::mark_indexed(conn, source.id)
 }
 
 /// Every directory under `dir` mirrored into folders under `folder_id`, and every file recorded.
@@ -469,6 +469,7 @@ mod tests {
         write(&root.join("Trips/a.jpg"), "a");
         reconcile(&conn).unwrap();
         let before = live_items(&conn).len();
+        let stamped = indexed_at(&conn);
 
         std::fs::remove_dir_all(&root).unwrap();
         let report = reconcile(&conn).unwrap();
@@ -479,6 +480,25 @@ mod tests {
             "nothing was walked, so nothing is judged"
         );
         assert_eq!(live_items(&conn).len(), before, "its items are still there");
+        assert_eq!(
+            indexed_at(&conn),
+            stamped,
+            "it was last indexed when it was read"
+        );
+    }
+
+    #[test]
+    fn a_walk_stamps_the_source_it_read() {
+        let (conn, root) = library("stamped");
+        write(&root.join("a.jpg"), "a");
+        assert_eq!(indexed_at(&conn), None, "never read yet");
+
+        reconcile(&conn).unwrap();
+        assert!(indexed_at(&conn).is_some());
+    }
+
+    fn indexed_at(conn: &Connection) -> Option<i64> {
+        sources::list(conn).unwrap()[0].indexed_at
     }
 
     #[test]

@@ -55,8 +55,10 @@ migration arrives with the feature that needs it and is never edited once shippe
   derived from it is folded.
 - **A label belongs to a folder only.** Items take tags, and `tags::add_item_tag` has no key
   parameter.
+- **A folder holds one value per key.** `tags::set_folder_label` gives a key the folder already
+  has its new value in the same row, so the label keeps its place among the folder's own.
 - Every folder carries a tag derived from its title (`folder_tag.source = 'title'`), kept in
-  step with the title.
+  step with the title. It is the one tag `tags::remove_folder_tag` never takes off.
 - An item carries its own tags plus every tag and label on its folder and on each ancestor.
   `item_effective_tag.origin_id` records the folder each came from; NULL means the item
   carries it itself.
@@ -74,6 +76,8 @@ migration arrives with the feature that needs it and is never edited once shippe
   the same name.
 - A walk retires the items it did not find, one source at a time, and the folders whose
   directory is gone — only in sources it could actually read.
+- `source.indexed_at` is stamped when a walk finishes reading the whole source. A source it
+  could not read keeps the stamp it had, which is what "last indexed" reports while it is away.
 - Removing a source deletes its rows outright. Its directory is never touched.
 - A file moved or restored to a name that only a retired row holds takes it: that row is deleted
   outright. A trashed row never holds a name.

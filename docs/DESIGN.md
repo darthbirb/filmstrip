@@ -132,6 +132,9 @@ spacing:
   card: 17rem
   card-cover: 5rem
   card-cover-height: 3.75rem
+  band-cover: 9rem
+  band-cover-height: 6.75rem
+  cover-choice: 3.25rem
   strip: 6rem
   strip-inset: 0.375rem
   strip-step: 1.5rem
@@ -647,8 +650,22 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Checkbox.** A `badge` square at the `badge` corner on `raised` in a `line-control` ring,
   filled with `plate` and a check in `on-plate` when ticked; its sentence beside it in `fg-mid`,
   `fg` under the pointer or ticked. The ring the keyboard sees is on the square.
-- **Breadcrumb.** Folders above as quiet `row` steps back, the place itself as the `title`. The
-  Trash's header adds what it holds and its size after the title, in `small` tabular `fg-dim`.
+- **Breadcrumb.** A folder's header is a disclosure: a chevron in the tree's `chevron` square, the
+  folders above as quiet `row` steps back, the folder as the `title`, then its two counts in words,
+  "3 here · 9 in all", in `small` tabular `fg-dim`. The whole header opens the band, a `wash` under
+  the pointer and `raised` while open; only the steps back are buttons of their own. While its
+  source is away the counts become `offline` in `--font-mono` `key`, the title `fg-mid` and the
+  steps `fg-dim`. The Sorting Box and the Trash keep a plain header with no chevron: the title,
+  then what waits or what the Trash holds and its size.
+- **Folder band.** Under a folder's header on its `panel`, pushed down: a `band-cover` picture at
+  the `control` corner beside the folder's Facts, Path, Status, Labels, Tags and Note. Path is the
+  source's directory then each folder down, each a way there, the folder itself in `fg`. Status
+  is a chip-sized Segmented, then Favourite as a chip button, then when it was set in `key`
+  `fg-faint`. The cover is the chosen one, a *Cover* plate on it, or the first picture standing
+  in; a frame on a `line` ring holds no-picture in `line-control-hi` for a folder with nothing at
+  or below it, or the unplugged glyph in `fg-faint` while the drive is away, when the path is
+  text followed by when it was last indexed in `--font-mono` `key`. It is capped at half the
+  grid's height and scrolls past that.
 - **Dropdown.** One named choice: a `control`-tall button on `raised` naming what it is on, a
   caret after it, opening a menu of every choice beneath it on `raised` with the overlay shadow.
   The chosen option wears the `plate`. The keyboard opens it with the arrows and Escape puts it
@@ -731,9 +748,46 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Facts.** Terms in `eyebrow` capitals, in a column as wide as the longest of them, values in
   `fg-mid`, each row the height of a chip.
 - **Chip.** A tag is a pill, raised with a ring; inherited, it sinks to `inset`. A label splits into
-  a sunk key and its value, and is never shown without the key. In the pane's details each is a
-  control that searches for itself: under the pointer it is one step lighter, `raised-hi` with
-  `fg` ink, in a `line-strong` ring, and its tooltip says what a click writes.
+  a sunk key and its value, and is never shown without the key. A folder's name among its tags
+  leads with the folder glyph in `glyph-small`. In the pane's details and a folder's band each is
+  a control that searches for itself: under the pointer it is one step lighter, `raised-hi` with
+  `fg` ink, in a `line-strong` ring, and its tooltip says what a click writes; an inherited one's
+  says where it comes from instead.
+- **Tag field.** Add Tag… is an outline chip at the end of the Tags row; it becomes the field in
+  the chip's own shape, a pill on `ground` in a `line-control` ring, `fg-hi` text with "tag" for its
+  placeholder. The library's tags are offered under it in the menu's shape, the most carried
+  first, each with "on 4 files" in `key` `fg-dim`, the lit one on `raised-hi`, and a last row "New
+  tag “…”" for exactly what was typed. A value the folder already carries turns the ring
+  `line-danger`, outlines the chip it repeats in `line-strong`, and says whose it is underneath in
+  `key` `danger`. A folder's own tags, never its name or what it inherits, show an × under the
+  pointer or the keyboard, a `badge`-sized circle that takes a `wash`.
+- **Label field.** Add Label… is an outline chip at the nested corner; it becomes a label in its
+  own two halves, the key on `well` and the value on `ground` in one `line-control` ring, "key" and
+  "value" for placeholders, each offered what the library has in the tag field's list with "on 2
+  folders" and a last row for a new key or value. A key the folder already has is refused as a tag
+  is, the label it repeats outlined. A folder's own label shows its × on the value half, and a
+  click on that half makes it a field with its text selected in `plate` and `on-plate` ink; an
+  emptied one turns its ring `line-danger` and says a label needs a value.
+- **Chip button.** An act in a row of the details, a `chip` high at the `nested` corner in `small`
+  text. Raised, it is `raised` in a `line-control` ring in `fg-mid`, `raised-hi` and `fg` under
+  the pointer: Favourite in a folder's band is one, its star filled while on. A field's Cancel is
+  the same and takes a `line-control-hi` ring under the pointer; its Save is `raised-hi` in that
+  ring with `fg` ink, and the pointer lays a `wash` over it. The way to add what a row has none of
+  yet, Add Note… or Add Tag…, is an outline: no ground, a `line-control-hi` ring and `fg-dim` ink,
+  `fg` in a `line-strong` ring under the pointer; Add Tag… is a pill, as a tag is.
+- **Cover picker.** A pencil on the band's cover, a `badge` square on `veil` at the `badge`
+  corner, a `wash` under the pointer and while its picker is open, ringed in `in-pane` then. The
+  picker opens beside the cover in the menu's shape: "Cover for Cairo" in `eyebrow` capitals, then
+  every picture in the branch three to a row, `cover-choice` tall at the `badge` corner, scrolling
+  past three rows. The first wears a *First* plate and the chosen one a *Cover* plate, `micro`
+  capitals on `veil`; an `in-pane` hairline under the pointer, the `focus` ring for the keyboard.
+  While one is chosen a rule and Clear Cover follow, "back to the first" after it in `key` `fg-dim`.
+  A folder with nothing at or below it, and one whose drive is away, has no pencil.
+- **Note field.** A note reads as prose in `fg-mid`; under the pointer or the keyboard the Name
+  row's rename glyph comes after it, and a click anywhere in it opens it. Opened, it is a box on
+  `ground` at the `nested` corner in a `line-control` ring, three lines tall to begin with and
+  growing as it fills, `fg-hi` text with a sentence-case placeholder, and under it "Ctrl+Enter
+  saves · Escape abandons" in `key` `fg-faint` before Cancel and Save.
 - **Settings.** A dialog over the `scrim`: a header with its `title` and a close button; a rail of
   sections grouped under `eyebrow` captions, with a filter field on `ground` above them, the one
   shown on `raised-hi`; and the section's settings as rows in an `inset` group, each a label and
@@ -749,7 +803,9 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   the two replaces the other. Folded, the rail keeps the Undo glyph button alone, its sentence in
   the tooltip; "Nothing to undo." comes out beside the rail on `panel` with the overlay shadow.
 - **Segmented.** A value with few enough answers to show them all at once, the one it is on filled
-  on `raised-hi` inside an `inset` trough. Real radios, so the arrow keys move between them.
+  on `raised-hi` inside an `inset` trough. Real radios, so the arrow keys move between them. In a
+  row of the details it is a `chip` high, its segments at the `badge` corner in `small`, `fg-dim`
+  until chosen.
 - **Source row.** In Settings, two lines: the source's glyph, its name as a field where it stands,
   its count — or the walk, while one runs — its kind as a segmented group, then reveal and remove;
   its path beneath in `--font-mono`. One that cannot be read keeps its remove and loses its reveal.

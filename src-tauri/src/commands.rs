@@ -11,6 +11,7 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 use ts_rs::TS;
 
+use crate::db::details::{self, FolderDetail};
 use crate::db::folders::{self, FolderEntry, FolderNode};
 use crate::db::items::{self, ItemDetail, ItemRow};
 use crate::db::jobs::{self as job_table, Failure};
@@ -433,6 +434,156 @@ pub async fn set_folder_favorite(
 ) -> Result<()> {
     run(&state, move |conn| {
         folders::set_favorite(conn, folder_id, favorite)
+    })
+    .await
+}
+
+/// Everything a folder's band shows, or nothing once the folder has gone.
+#[tauri::command]
+pub async fn folder_detail(
+    state: State<'_, AppState>,
+    folder_id: i64,
+) -> Result<Option<FolderDetail>> {
+    let thumbs = state.thumbs.clone();
+    run(&state, move |conn| {
+        folder_detail_with(conn, folder_id, &thumbs)
+    })
+    .await
+}
+
+pub fn folder_detail_with(
+    conn: &Connection,
+    folder_id: i64,
+    thumbs: &Path,
+) -> Result<Option<FolderDetail>> {
+    let mut detail = details::detail(conn, folder_id)?;
+    if let Some(detail) = &mut detail {
+        detail.cover = detail
+            .cover_uuid
+            .as_deref()
+            .and_then(|uuid| thumb_of(uuid, thumbs));
+    }
+    Ok(detail)
+}
+
+#[tauri::command]
+pub async fn set_folder_status(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    status: Option<details::FolderStatus>,
+) -> Result<()> {
+    run(&state, move |conn| {
+        details::set_status(conn, folder_id, status)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn set_folder_note(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    note: Option<String>,
+) -> Result<()> {
+    run(&state, move |conn| {
+        details::set_note(conn, folder_id, note.as_deref())
+    })
+    .await
+}
+
+/// What the cover can be: every picture at or below the folder, the one standing in first.
+#[tauri::command]
+pub async fn folder_cover_choices(
+    state: State<'_, AppState>,
+    folder_id: i64,
+) -> Result<Vec<details::CoverChoice>> {
+    let thumbs = state.thumbs.clone();
+    run(&state, move |conn| {
+        let mut choices = details::cover_choices(conn, folder_id)?;
+        for choice in &mut choices {
+            choice.thumb = thumb_of(&choice.uuid, &thumbs);
+        }
+        Ok(choices)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn set_folder_cover(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    item_id: Option<i64>,
+) -> Result<()> {
+    run(&state, move |conn| {
+        details::set_cover(conn, folder_id, item_id)
+    })
+    .await
+}
+
+/// The tags the library has that begin with what is being typed in a tag field.
+#[tauri::command]
+pub async fn tag_offers(state: State<'_, AppState>, typed: String) -> Result<Vec<tags::TagOffer>> {
+    run(&state, move |conn| tags::tag_offers(conn, &typed)).await
+}
+
+/// Every file below the folder takes the tag too, in the same transaction.
+#[tauri::command]
+pub async fn add_folder_tag(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    value: String,
+) -> Result<()> {
+    run(&state, move |conn| {
+        in_transaction(conn, |tx| tags::add_folder_tag(tx, folder_id, &value))
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn remove_folder_tag(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    tag_id: i64,
+) -> Result<()> {
+    run(&state, move |conn| {
+        in_transaction(conn, |tx| tags::remove_folder_tag(tx, folder_id, tag_id))
+    })
+    .await
+}
+
+/// The keys labels already use, for the key half of a label being added.
+#[tauri::command]
+pub async fn label_key_offers(
+    state: State<'_, AppState>,
+    typed: String,
+) -> Result<Vec<tags::LabelOffer>> {
+    run(&state, move |conn| tags::label_key_offers(conn, &typed)).await
+}
+
+/// The values a key already has, for the value half.
+#[tauri::command]
+pub async fn label_value_offers(
+    state: State<'_, AppState>,
+    key: String,
+    typed: String,
+) -> Result<Vec<tags::LabelOffer>> {
+    run(&state, move |conn| {
+        tags::label_value_offers(conn, &key, &typed)
+    })
+    .await
+}
+
+/// A label, or a new value for the key the folder has; everything below takes it too.
+#[tauri::command]
+pub async fn set_folder_label(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    key: String,
+    value: String,
+) -> Result<()> {
+    run(&state, move |conn| {
+        in_transaction(conn, |tx| {
+            tags::set_folder_label(tx, folder_id, &key, &value)
+        })
     })
     .await
 }

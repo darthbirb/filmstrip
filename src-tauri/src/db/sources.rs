@@ -58,6 +58,8 @@ pub struct Source {
     pub title: String,
     pub kind: SourceKind,
     pub added_at: i64,
+    /// When a walk last read all of it; `None` until the first one finishes.
+    pub indexed_at: Option<i64>,
 }
 
 fn read(row: &rusqlite::Row<'_>) -> rusqlite::Result<Source> {
@@ -67,6 +69,7 @@ fn read(row: &rusqlite::Row<'_>) -> rusqlite::Result<Source> {
         title: row.get(2)?,
         kind: SourceKind::parse(&row.get::<_, String>(3)?),
         added_at: row.get(4)?,
+        indexed_at: row.get(5)?,
     })
 }
 
@@ -86,13 +89,23 @@ pub fn add(conn: &Connection, root: &Path, title: &str, kind: SourceKind) -> Res
         title: title.into(),
         kind,
         added_at,
+        indexed_at: None,
     })
+}
+
+/// A walk read every directory of it just now. SCHEMA.md "Lifecycle".
+pub fn mark_indexed(conn: &Connection, id: i64) -> Result<()> {
+    conn.execute(
+        "UPDATE source SET indexed_at = ?1 WHERE id = ?2",
+        params![now(), id],
+    )?;
+    Ok(())
 }
 
 pub fn get(conn: &Connection, id: i64) -> Result<Option<Source>> {
     Ok(conn
         .query_row(
-            "SELECT id, root, title, kind, added_at FROM source WHERE id = ?1",
+            "SELECT id, root, title, kind, added_at, indexed_at FROM source WHERE id = ?1",
             params![id],
             read,
         )
@@ -101,13 +114,13 @@ pub fn get(conn: &Connection, id: i64) -> Result<Option<Source>> {
 
 pub fn list(conn: &Connection) -> Result<Vec<Source>> {
     let mut stmt =
-        conn.prepare("SELECT id, root, title, kind, added_at FROM source ORDER BY id")?;
+        conn.prepare("SELECT id, root, title, kind, added_at, indexed_at FROM source ORDER BY id")?;
     Ok(stmt.query_map([], read)?.collect::<rusqlite::Result<_>>()?)
 }
 
 pub fn list_of_kind(conn: &Connection, kind: SourceKind) -> Result<Vec<Source>> {
     let mut stmt = conn.prepare(
-        "SELECT id, root, title, kind, added_at FROM source WHERE kind = ?1 ORDER BY id",
+        "SELECT id, root, title, kind, added_at, indexed_at FROM source WHERE kind = ?1 ORDER BY id",
     )?;
     Ok(stmt
         .query_map(params![kind.as_str()], read)?

@@ -7,22 +7,46 @@ type Props<T extends string> = {
   options: readonly Choice<T>[];
   value: T;
   onChange: (value: T) => void;
+  /** A chip high, for a row of the details; a control high everywhere else. */
+  size?: "control" | "chip";
+};
+
+const SIZES = {
+  control: {
+    group: "h-control gap-0.5 rounded-control p-0.5",
+    option: "rounded-nested text-ui",
+    idle: "text-fg-mid hover:bg-wash hover:text-fg",
+    chosen: "bg-raised-hi text-fg-hi",
+  },
+  chip: {
+    group: "h-chip gap-0.75 rounded-nested p-0.75",
+    option: "rounded-badge text-small",
+    idle: "text-fg-dim hover:text-fg",
+    chosen: "bg-raised-hi text-fg",
+  },
 };
 
 /** A value with few enough answers to show them all, the one it is on filled. DESIGN.md "Shapes". */
-export function Segmented<T extends string>({ label, options, value, onChange }: Props<T>) {
+export function Segmented<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  size = "control",
+}: Props<T>) {
   // Real radios, so the arrow keys move between them without the component saying how.
   const group = useId();
+  const look = SIZES[size];
   return (
-    <fieldset className="flex h-control shrink-0 items-center gap-0.5 rounded-control border-0 bg-inset p-0.5 inset-ring inset-ring-line-control">
+    <fieldset
+      className={`flex shrink-0 items-center border-0 bg-inset inset-ring inset-ring-line-control ${look.group}`}
+    >
       <legend className="sr-only">{label}</legend>
       {options.map((option) => (
         <label
           key={option.value}
-          className={`flex h-full cursor-default items-center rounded-nested px-2 text-ui transition-colors duration-(--motion-quick) has-focus-visible:outline has-focus-visible:outline-focus motion-reduce:transition-none ${
-            option.value === value
-              ? "bg-raised-hi text-fg-hi"
-              : "text-fg-mid hover:bg-wash hover:text-fg"
+          className={`flex h-full cursor-default items-center px-2 transition-colors duration-(--motion-quick) has-focus-visible:outline has-focus-visible:outline-focus motion-reduce:transition-none ${look.option} ${
+            option.value === value ? look.chosen : look.idle
           }`}
         >
           <input

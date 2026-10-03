@@ -2,19 +2,23 @@ import { invoke } from "@tauri-apps/api/core";
 import type { AddOutcome } from "./bindings/AddOutcome";
 import type { Batch } from "./bindings/Batch";
 import type { Contents } from "./bindings/Contents";
+import type { CoverChoice } from "./bindings/CoverChoice";
 import type { DestinationKey } from "./bindings/DestinationKey";
 import type { EffectiveTag } from "./bindings/EffectiveTag";
 import type { Failure } from "./bindings/Failure";
 import type { FavouritePlace } from "./bindings/FavouritePlace";
 import type { FolderDeleted } from "./bindings/FolderDeleted";
+import type { FolderDetail } from "./bindings/FolderDetail";
 import type { FolderEntry } from "./bindings/FolderEntry";
 import type { FolderMade } from "./bindings/FolderMade";
 import type { FolderNode } from "./bindings/FolderNode";
+import type { FolderStatus } from "./bindings/FolderStatus";
 import type { ItemDetail } from "./bindings/ItemDetail";
 import type { ItemRow } from "./bindings/ItemRow";
 import type { ItemsMoved } from "./bindings/ItemsMoved";
 import type { ItemsRestored } from "./bindings/ItemsRestored";
 import type { ItemsTrashed } from "./bindings/ItemsTrashed";
+import type { LabelOffer } from "./bindings/LabelOffer";
 import type { Progress } from "./bindings/Progress";
 import type { Reading } from "./bindings/Reading";
 import type { Reason } from "./bindings/Reason";
@@ -22,6 +26,7 @@ import type { SearchOutcome } from "./bindings/SearchOutcome";
 import type { SourceKind } from "./bindings/SourceKind";
 import type { SourceSummary } from "./bindings/SourceSummary";
 import type { Suggestions } from "./bindings/Suggestions";
+import type { TagOffer } from "./bindings/TagOffer";
 import type { Trashed } from "./bindings/Trashed";
 import type { TrashSummary } from "./bindings/TrashSummary";
 import type { UndoReport } from "./bindings/UndoReport";
@@ -98,6 +103,38 @@ export const listFolders = () => invoke<FolderEntry[]>("list_folders");
 
 export const setFolderFavorite = (folderId: number, favorite: boolean) =>
   invoke<void>("set_folder_favorite", { folderId, favorite });
+
+export const folderDetail = (folderId: number) =>
+  invoke<FolderDetail | null>("folder_detail", { folderId });
+
+export const setFolderStatus = (folderId: number, status: FolderStatus | null) =>
+  invoke<void>("set_folder_status", { folderId, status });
+
+export const setFolderNote = (folderId: number, note: string | null) =>
+  invoke<void>("set_folder_note", { folderId, note });
+
+export const folderCoverChoices = (folderId: number) =>
+  invoke<CoverChoice[]>("folder_cover_choices", { folderId });
+
+export const setFolderCover = (folderId: number, itemId: number | null) =>
+  invoke<void>("set_folder_cover", { folderId, itemId });
+
+export const tagOffers = (typed: string) => invoke<TagOffer[]>("tag_offers", { typed });
+
+export const addFolderTag = (folderId: number, value: string) =>
+  invoke<void>("add_folder_tag", { folderId, value });
+
+export const removeFolderTag = (folderId: number, tagId: number) =>
+  invoke<void>("remove_folder_tag", { folderId, tagId });
+
+export const labelKeyOffers = (typed: string) =>
+  invoke<LabelOffer[]>("label_key_offers", { typed });
+
+export const labelValueOffers = (key: string, typed: string) =>
+  invoke<LabelOffer[]>("label_value_offers", { key, typed });
+
+export const setFolderLabel = (folderId: number, key: string, value: string) =>
+  invoke<void>("set_folder_label", { folderId, key, value });
 
 export const favouritePlaces = () => invoke<FavouritePlace[]>("favourite_places");
 
