@@ -538,7 +538,8 @@ Shift+F10 did nothing at all.
   between two groups that both hold rows, so an absent verb leaves no stray line, and a menu with
   nothing in it opens nothing.
 - **What a drive that is away cannot do is absent too.** An offline source keeps Rename, Manage
-  Sources and Remove Source, which touch only the index; its folders have nothing left.
+  Sources and Remove Source, which touch only the index; its folders keep Favourite and Assign
+  Key…, as their band keeps what the index holds, and lose every verb that needs the folder on disk.
 - **Favourite is on a folder's and a source's menu**, reading Remove Favourite when on, from
   either of the place's rows. It changes nothing on disk, so it is not journalled and a source
   that is away keeps it.
