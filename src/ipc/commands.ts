@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { AddOutcome } from "./bindings/AddOutcome";
 import type { Batch } from "./bindings/Batch";
 import type { Contents } from "./bindings/Contents";
+import type { CoverChoice } from "./bindings/CoverChoice";
 import type { DestinationKey } from "./bindings/DestinationKey";
 import type { EffectiveTag } from "./bindings/EffectiveTag";
 import type { Failure } from "./bindings/Failure";
@@ -109,6 +110,12 @@ export const setFolderStatus = (folderId: number, status: FolderStatus | null) =
 
 export const setFolderNote = (folderId: number, note: string | null) =>
   invoke<void>("set_folder_note", { folderId, note });
+
+export const folderCoverChoices = (folderId: number) =>
+  invoke<CoverChoice[]>("folder_cover_choices", { folderId });
+
+export const setFolderCover = (folderId: number, itemId: number | null) =>
+  invoke<void>("set_folder_cover", { folderId, itemId });
 
 export const favouritePlaces = () => invoke<FavouritePlace[]>("favourite_places");
 

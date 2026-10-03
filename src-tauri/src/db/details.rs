@@ -186,6 +186,52 @@ pub fn set_note(conn: &Connection, folder_id: i64, note: Option<&str>) -> Result
     Ok(())
 }
 
+/// A picture the cover can be, as the picker offers it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct CoverChoice {
+    pub item_id: i64,
+    /// Its thumbnail, once made. Filled by the command.
+    pub thumb: Option<String>,
+    #[serde(skip)]
+    pub uuid: String,
+}
+
+/// Every picture and video at or below a folder, in the order a cover stands in, so the first is
+/// the one that stands in while none is chosen.
+pub fn cover_choices(conn: &Connection, folder_id: i64) -> Result<Vec<CoverChoice>> {
+    let mut stmt = conn.prepare(
+        "WITH RECURSIVE subtree(id, depth) AS (
+             SELECT ?1, 0
+           UNION ALL
+             SELECT f.id, s.depth + 1 FROM folder f JOIN subtree s ON f.parent_id = s.id
+              WHERE f.deleted_at IS NULL
+         )
+         SELECT i.id, i.uuid FROM item i JOIN subtree s ON s.id = i.folder_id
+          WHERE i.deleted_at IS NULL AND i.kind IN ('image', 'video')
+          ORDER BY s.depth, i.disk_name COLLATE NOCASE",
+    )?;
+    Ok(stmt
+        .query_map(params![folder_id], |r| {
+            Ok(CoverChoice {
+                item_id: r.get(0)?,
+                thumb: None,
+                uuid: r.get(1)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?)
+}
+
+/// Chooses a folder's cover, or with `None` goes back to the picture that stands in.
+pub fn set_cover(conn: &Connection, folder_id: i64, item_id: Option<i64>) -> Result<()> {
+    conn.execute(
+        "UPDATE folder SET cover_item_id = ?1 WHERE id = ?2",
+        params![item_id, folder_id],
+    )?;
+    Ok(())
+}
+
 /// The file that stands for a folder: its chosen cover while that is live at or below it, else
 /// its first picture or video, nearest first. A search's folder card shows the same one.
 pub fn cover(conn: &Connection, folder_id: i64) -> Result<Option<(i64, String)>> {
@@ -414,6 +460,39 @@ mod tests {
 
         set_note(&conn, root, Some(" \n ")).unwrap();
         assert_eq!(detail(&conn, root).unwrap().unwrap().note, None);
+    }
+
+    #[test]
+    fn the_first_choice_is_the_one_that_stands_in_and_a_chosen_one_takes_over_until_cleared() {
+        let (conn, root) = library();
+        let trips = folders::create(&conn, root, "Trips").unwrap();
+        let cairo = folders::create(&conn, trips, "Cairo").unwrap();
+        let sphinx = item(&conn, cairo, "sphinx.jpg");
+        let hotel = item(&conn, trips, "hotel.jpg");
+        let boarding = item(&conn, trips, "Boarding.png");
+
+        let choices: Vec<i64> = cover_choices(&conn, trips)
+            .unwrap()
+            .iter()
+            .map(|choice| choice.item_id)
+            .collect();
+        assert_eq!(
+            choices,
+            [boarding, hotel, sphinx],
+            "its own first, by name, then below"
+        );
+        let standing = detail(&conn, trips).unwrap().unwrap();
+        assert_eq!(standing.cover_uuid.as_deref(), Some("uuid-Boarding.png"));
+
+        set_cover(&conn, trips, Some(sphinx)).unwrap();
+        let chosen = detail(&conn, trips).unwrap().unwrap();
+        assert_eq!(chosen.cover_item_id, Some(sphinx));
+        assert_eq!(chosen.cover_uuid.as_deref(), Some("uuid-sphinx.jpg"));
+
+        set_cover(&conn, trips, None).unwrap();
+        let cleared = detail(&conn, trips).unwrap().unwrap();
+        assert_eq!(cleared.cover_item_id, None);
+        assert_eq!(cleared.cover_uuid.as_deref(), Some("uuid-Boarding.png"));
     }
 
     #[test]

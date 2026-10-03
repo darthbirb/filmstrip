@@ -490,6 +490,35 @@ pub async fn set_folder_note(
     .await
 }
 
+/// What the cover can be: every picture at or below the folder, the one standing in first.
+#[tauri::command]
+pub async fn folder_cover_choices(
+    state: State<'_, AppState>,
+    folder_id: i64,
+) -> Result<Vec<details::CoverChoice>> {
+    let thumbs = state.thumbs.clone();
+    run(&state, move |conn| {
+        let mut choices = details::cover_choices(conn, folder_id)?;
+        for choice in &mut choices {
+            choice.thumb = thumb_of(&choice.uuid, &thumbs);
+        }
+        Ok(choices)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn set_folder_cover(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    item_id: Option<i64>,
+) -> Result<()> {
+    run(&state, move |conn| {
+        details::set_cover(conn, folder_id, item_id)
+    })
+    .await
+}
+
 /// A favourite place as navigation's group shows it: the way down to it, the files directly in
 /// it, and whether its source can be read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]

@@ -117,6 +117,8 @@ pub fn run() {
             commands::folder_detail,
             commands::set_folder_status,
             commands::set_folder_note,
+            commands::folder_cover_choices,
+            commands::set_folder_cover,
             commands::favourite_places,
             commands::destination_keys,
             commands::set_destination_key,

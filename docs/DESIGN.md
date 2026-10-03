@@ -134,6 +134,7 @@ spacing:
   card-cover-height: 3.75rem
   band-cover: 9rem
   band-cover-height: 6.75rem
+  cover-choice: 3.25rem
   strip: 6rem
   strip-inset: 0.375rem
   strip-step: 1.5rem
@@ -759,6 +760,14 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   ring with `fg` ink, and the pointer lays a `wash` over it. The way to add what a row has none of
   yet, Add Note…, is an outline: no ground, a `line-control-hi` ring and `fg-dim` ink, `fg` in a
   `line-strong` ring under the pointer.
+- **Cover picker.** A pencil on the band's cover, a `badge` square on `veil` at the `badge`
+  corner, a `wash` under the pointer and while its picker is open, ringed in `in-pane` then. The
+  picker opens beside the cover in the menu's shape: "Cover for Cairo" in `eyebrow` capitals, then
+  every picture in the branch three to a row, `cover-choice` tall at the `badge` corner, scrolling
+  past three rows. The first wears a *First* plate and the chosen one a *Cover* plate, `micro`
+  capitals on `veil`; an `in-pane` hairline under the pointer, the `focus` ring for the keyboard.
+  While one is chosen a rule and Clear Cover follow, "back to the first" after it in `key` `fg-dim`.
+  A folder with nothing at or below it, and one whose drive is away, has no pencil.
 - **Note field.** A note reads as prose in `fg-mid`; under the pointer or the keyboard the Name
   row's rename glyph comes after it, and a click anywhere in it opens it. Opened, it is a box on
   `ground` at the `nested` corner in a `line-control` ring, three lines tall to begin with and

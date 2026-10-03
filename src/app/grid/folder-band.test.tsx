@@ -167,6 +167,51 @@ test("a note is written in its row: Ctrl+Enter keeps it, Escape leaves it, empti
   await expect.element(screen.getByRole("button", { name: "Add Note…" })).toBeVisible();
 });
 
+test("the pencil picks a cover from the branch, the first standing in until one is chosen", async () => {
+  const screen = await renderHeader(CAIRO);
+  await details(screen).click();
+  const pencil = screen.getByRole("button", { name: "Choose Cover · now the first picture" });
+  await pencil.click();
+  const picker = screen.getByRole("listbox", { name: "Cover for Cairo" });
+  await expect.element(picker).toBeVisible();
+  expect(picker.getByRole("option").elements()).toHaveLength(3);
+  const first = picker.getByRole("option", { name: "Picture 1 · First" });
+  await expect.element(first).toHaveFocus();
+  expect(screen.getByText("Clear Cover").elements()).toHaveLength(0);
+
+  await userEvent.keyboard("{ArrowRight}{Enter}");
+  await expect.poll(() => picker.query()).toBeNull();
+  const change = screen.getByRole("button", { name: "Change Cover" });
+  await expect.element(change).toHaveFocus();
+  await expect.element(screen.getByText("Cover", { exact: true }).first()).toBeVisible();
+
+  // Opened again, the chosen one has the keyboard, and down from the last row is Clear Cover.
+  await change.click();
+  await expect.element(picker.getByRole("option", { name: "Picture 2 · Cover" })).toHaveFocus();
+  await userEvent.keyboard("{Escape}");
+  await expect.poll(() => picker.query()).toBeNull();
+  await change.click();
+  await expect.element(picker.getByRole("option", { name: "Picture 2 · Cover" })).toHaveFocus();
+  await userEvent.keyboard("{ArrowDown}");
+  await expect.element(screen.getByRole("button", { name: /^Clear Cover/ })).toHaveFocus();
+  await userEvent.keyboard("{Enter}");
+  await expect.element(pencil).toBeVisible();
+  expect(screen.getByText("Cover", { exact: true }).elements()).toHaveLength(0);
+});
+
+test("a folder with nothing in it, or a drive that is away, has no pencil", async () => {
+  const screen = await renderHeader(PEOPLE);
+  await details(screen).click();
+  await expect.element(screen.getByTitle("Nothing in People to use as a cover")).toBeVisible();
+  expect(screen.getByRole("button", { name: /Cover/ }).elements()).toHaveLength(0);
+
+  setPlace(folderAt(3, ARCHIVE));
+  await expect
+    .element(screen.getByTitle("Archive is offline · its pictures are on the drive"))
+    .toBeVisible();
+  expect(screen.getByRole("button", { name: /Cover/ }).elements()).toHaveLength(0);
+});
+
 test("a source's own band has no steps back, its path is its folder, and nothing comes down", async () => {
   const screen = await renderHeader(folderAt(1, PICTURES));
   await expect.element(screen.getByText("1 here · 6 in all")).toBeVisible();

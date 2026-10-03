@@ -1,4 +1,5 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
+import type { CSSProperties } from "react";
 
 import type { FolderDetail } from "../../ipc/bindings/FolderDetail";
 import type { FolderStatus } from "../../ipc/bindings/FolderStatus";
@@ -18,6 +19,7 @@ import { Segmented } from "../../ui/Segmented";
 import { refreshIndex, useIndex } from "../navigation/index-store";
 import { type Place, setPlace, usePlace } from "../place";
 import { addToSearch, searchFor } from "../search/search";
+import { CoverPicker } from "./CoverPicker";
 import { detailChanged, useBandOpen, useFolderDetail } from "./folder-detail";
 
 const STATUSES = [
@@ -160,19 +162,26 @@ function Cover({
       </span>
     );
   }
-  // Its picture exists once its thumbnail is made; until then the frame stands in.
-  if (!detail.cover) return <span className={`${frame} bg-inset`} />;
+  // The picker opens beside the picture, which names itself for it to anchor to.
+  const anchor = `--cover-${detail.id}`;
   return (
-    <span className="relative h-band-cover-height w-band-cover shrink-0 overflow-hidden rounded-control">
-      <img
-        src={convertFileSrc(detail.cover)}
-        alt=""
-        draggable={false}
-        className="size-full object-cover"
-      />
+    <span
+      style={{ anchorName: anchor } as CSSProperties}
+      className="relative h-band-cover-height w-band-cover shrink-0 overflow-hidden rounded-control bg-inset"
+    >
+      {/* Its picture exists once its thumbnail is made; until then the ground stands in. */}
+      {detail.cover && (
+        <img
+          src={convertFileSrc(detail.cover)}
+          alt=""
+          draggable={false}
+          className="size-full object-cover"
+        />
+      )}
       {detail.coverItemId !== null && (
         <Plate className="absolute bottom-1.5 left-1.5 text-eyebrow uppercase">Cover</Plate>
       )}
+      <CoverPicker folderId={detail.id} title={title} chosen={detail.coverItemId} anchor={anchor} />
     </span>
   );
 }

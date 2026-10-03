@@ -55,6 +55,7 @@ export const GLYPHS = {
   // A folder's name among its tags, which only renaming it changes.
   folderName: { icon: "folder-simple", code: 0xe25a },
   noCover: { icon: "image-square", code: 0xe2cc },
+  pencil: { icon: "pencil-simple", code: 0xe3b4 },
 } as const;
 
 export type GlyphName = keyof typeof GLYPHS;

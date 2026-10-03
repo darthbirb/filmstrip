@@ -636,6 +636,14 @@ const tagId = (key: string | null, value: string) => {
   return TAG_IDS.get(term) ?? 0;
 };
 
+/** Every picture and video at or below a folder, nearest first, then by name. */
+function coverChoices(folderId: number) {
+  const depth = (item: ItemRow) => crumbs(item.folderId).folders.length;
+  return under(folderId)
+    .filter((item) => item.kind !== "other")
+    .sort((a, b) => depth(a) - depth(b) || a.diskName.localeCompare(b.diskName));
+}
+
 /** A folder's band, as `folder_detail` answers: its own tags, then each folder's above it. */
 function folderDetail(folderId: number): FolderDetail | null {
   const isRoot = SOURCES.some((one) => one.rootFolderId === folderId);
@@ -659,11 +667,8 @@ function folderDetail(folderId: number): FolderDetail | null {
     }),
   );
   const own = ownOf(folderId);
-  const pictures = under(folderId).filter((item) => item.kind !== "other");
-  const depth = (item: ItemRow) => crumbs(item.folderId).folders.length;
-  const standing =
-    pictures.find((item) => item.id === own.cover) ??
-    [...pictures].sort((a, b) => depth(a) - depth(b))[0];
+  const pictures = coverChoices(folderId);
+  const standing = pictures.find((item) => item.id === own.cover) ?? pictures[0];
   return {
     id: folderId,
     sourceId: home.id,
@@ -859,6 +864,12 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     const own = ownOf(folderId as number);
     own.status = status as FolderStatus | null;
     own.statusSetAt = status ? Math.floor(Date.now() / 1000) : null;
+    return null;
+  },
+  folder_cover_choices: ({ folderId }) =>
+    coverChoices(folderId as number).map((item) => ({ itemId: item.id, thumb: item.thumb })),
+  set_folder_cover: ({ folderId, itemId }) => {
+    ownOf(folderId as number).cover = itemId as number | null;
     return null;
   },
   set_folder_note: ({ folderId, note }) => {
