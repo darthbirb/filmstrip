@@ -644,6 +644,22 @@ function coverChoices(folderId: number) {
     .sort((a, b) => depth(a) - depth(b) || a.diskName.localeCompare(b.diskName));
 }
 
+/** A label's keys or one key's values that begin with what was typed, by how many folders use them. */
+function labelOffers(text: (label: { key: string; value: string }) => string, typed: string) {
+  const word = typed.trim().toLowerCase();
+  const used = new Map<string, number>();
+  for (const own of OWN.values()) {
+    for (const tag of own.tags) {
+      const said = tag.key === null ? "" : text({ key: tag.key, value: tag.value });
+      if (said.startsWith(word) && said !== "") used.set(said, (used.get(said) ?? 0) + 1);
+    }
+  }
+  return [...used]
+    .sort(([a, one], [b, two]) => two - one || a.localeCompare(b))
+    .slice(0, 7)
+    .map(([offer, folders]) => ({ text: offer, folders }));
+}
+
 /** A folder's band, as `folder_detail` answers: its own tags, then each folder's above it. */
 function folderDetail(folderId: number): FolderDetail | null {
   const isRoot = SOURCES.some((one) => one.rootFolderId === folderId);
@@ -894,6 +910,23 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   remove_folder_tag: ({ folderId, tagId: id }) => {
     const own = ownOf(folderId as number);
     own.tags = own.tags.filter((tag) => tagId(tag.key, tag.value) !== id);
+    return null;
+  },
+  label_key_offers: ({ typed }) => labelOffers((label) => label.key, String(typed)),
+  label_value_offers: ({ key, typed }) =>
+    labelOffers(
+      (label) => (label.key === String(key).trim().toLowerCase() ? label.value : ""),
+      String(typed),
+    ),
+  set_folder_label: ({ folderId, key, value }) => {
+    const own = ownOf(folderId as number);
+    const label = {
+      key: String(key).trim().toLowerCase(),
+      value: String(value).trim().toLowerCase(),
+    };
+    const held = own.tags.findIndex((tag) => tag.key === label.key);
+    if (held >= 0) own.tags[held] = label;
+    else own.tags.push(label);
     return null;
   },
   folder_cover_choices: ({ folderId }) =>

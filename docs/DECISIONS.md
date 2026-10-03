@@ -424,6 +424,11 @@ plain header, having none of these.
   which is where it can be taken off. A folder's name is a tag only a rename changes, so it has no
   ×. Tags come several at a time, so the field stays open after each until Escape or a click away,
   which drop what was half typed.
+- **A label is one fact with two parts**, so Add Label… closes once it is added, where Add Tag…
+  stays open. A folder holds one value per key, as ggallery's did: a label answers a question,
+  where or which trip, and a folder with two answers answers twice. A key it has is refused where
+  it is typed and its value is changed with a click on it instead; one from above names the
+  folder it comes from.
 - **The header's counts are the tree's, in words**: its own files here, then everything at or
   below it, the same two figures a pill shows. An offline source says `offline` instead.
 - **A folder that holds anything always has a picture.** Its chosen cover while that file is live

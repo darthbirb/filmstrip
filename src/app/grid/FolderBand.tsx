@@ -7,8 +7,11 @@ import type { FolderTag } from "../../ipc/bindings/FolderTag";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import {
   addFolderTag,
+  labelKeyOffers,
+  labelValueOffers,
   removeFolderTag,
   setFolderFavorite,
+  setFolderLabel,
   setFolderNote,
   setFolderStatus,
   tagOffers,
@@ -19,6 +22,7 @@ import { Chip } from "../../ui/Chip";
 import { ChipButton } from "../../ui/ChipButton";
 import { type Fact, Facts } from "../../ui/Facts";
 import { Glyph } from "../../ui/Glyph";
+import { LabelField, LabelValueField } from "../../ui/LabelField";
 import { NoteField } from "../../ui/NoteField";
 import { Plate } from "../../ui/Plate";
 import { PushDown } from "../../ui/PushDown";
@@ -108,14 +112,10 @@ function Body({ place, detail, source }: BodyProps) {
       </span>,
     ],
   ];
-  if (labels.length > 0) {
-    facts.push([
-      "Labels",
-      <span key="labels" className="flex flex-wrap gap-1.5 py-px">
-        <Chips tags={labels} where={where} />
-      </span>,
-    ]);
-  }
+  facts.push([
+    "Labels",
+    <LabelsRow key="labels" folderId={detail.id} title={title} labels={labels} where={where} />,
+  ]);
   facts.push([
     "Tags",
     <TagsRow key="tags" folderId={detail.id} title={title} tags={tags} where={where} />,
@@ -282,6 +282,95 @@ function Chips({ tags, where, onRemove, echo = null }: ChipsProps) {
   });
 }
 
+/** What the folder's own terms changing means: everything below carries something new. */
+const changed = () => libraryChanged().then(detailChanged);
+
+/** Takes a tag or a label off; one taken off with the keyboard hands the focus to the next. */
+function takeOff(folderId: number, tag: FolderTag, stops: () => HTMLElement[]) {
+  const at = stops().indexOf(document.activeElement as HTMLElement);
+  void removeFolderTag(folderId, tag.tagId)
+    .then(changed)
+    // What was after it now stands where it stood.
+    .then(() => at >= 0 && requestAnimationFrame(() => stops()[at]?.focus()))
+    .catch(() => undefined);
+}
+
+type LabelsRowProps = { folderId: number; title: string; labels: FolderTag[]; where: Where };
+
+/**
+ * The folder's labels and Add Label…. A folder holds one value per key, so a key it has, its own
+ * or from above, is refused; its own value is changed with a click on it instead.
+ */
+function LabelsRow({ folderId, title, labels, where }: LabelsRowProps) {
+  const row = useRef<HTMLSpanElement>(null);
+  const [echo, setEcho] = useState<number | null>(null);
+  const [editing, setEditing] = useState<number | null>(null);
+  const stops = () => [
+    ...(row.current?.querySelectorAll<HTMLElement>("button:not([tabindex='-1'])") ?? []),
+  ];
+
+  const refuseKey = (key: string): Refusal | null => {
+    const had = labels.find((label) => label.key === key);
+    if (!had) return null;
+    const article = /^[aeiou]/.test(key) ? "an" : "a";
+    const line = had.from
+      ? `${key} comes from ${had.from.title}.`
+      : `${title} already has ${article} ${key}. Click its value to change it.`;
+    return { line, tagId: had.tagId };
+  };
+
+  return (
+    <span ref={row} className="flex flex-wrap items-center gap-1.5 py-px">
+      {labels.map((label) => {
+        const own = label.from === null;
+        const key = label.key ?? "";
+        if (own && editing === label.tagId) {
+          return (
+            <LabelValueField
+              key={label.tagId}
+              tagKey={key}
+              value={label.value}
+              onCancel={() => setEditing(null)}
+              onCommit={(value) => {
+                setEditing(null);
+                void setFolderLabel(folderId, key, value)
+                  .then(changed)
+                  .catch(() => undefined);
+              }}
+            />
+          );
+        }
+        const term = labelTerm(key, label.value);
+        return (
+          <Chip
+            key={`${label.tagId}-${label.from?.id ?? "own"}`}
+            value={label.value}
+            tagKey={key}
+            inherited={!own}
+            echoed={label.tagId === echo}
+            title={titleOf(label, where)}
+            onSearch={(adding) => void (adding ? addToSearch(term) : searchFor(term))}
+            onRemove={own ? () => takeOff(folderId, label, stops) : undefined}
+            onEdit={own ? () => setEditing(label.tagId) : undefined}
+          />
+        );
+      })}
+      <LabelField
+        of={title}
+        keyOffers={labelKeyOffers}
+        valueOffers={labelValueOffers}
+        refuseKey={refuseKey}
+        onAdd={(key, value) =>
+          setFolderLabel(folderId, key, value)
+            .then(changed)
+            .catch(() => undefined)
+        }
+        onEcho={setEcho}
+      />
+    </span>
+  );
+}
+
 type TagsRowProps = { folderId: number; title: string; tags: FolderTag[]; where: Where };
 
 /**
@@ -305,17 +394,9 @@ function TagsRow({ folderId, title, tags, where }: TagsRowProps) {
         : `${title} already has ${value}.`;
     return { line, tagId: had.tagId };
   };
-  const changed = () => libraryChanged().then(detailChanged);
-  const remove = (tag: FolderTag) => {
-    const at = stops().indexOf(document.activeElement as HTMLElement);
-    void removeFolderTag(folderId, tag.tagId)
-      .then(changed)
-      // The tag that was after it now stands where it stood.
-      .then(() => at >= 0 && requestAnimationFrame(() => stops()[at]?.focus()))
-      .catch(() => undefined);
-  };
+  const remove = (tag: FolderTag) => takeOff(folderId, tag, stops);
   const backOut = () => {
-    const own = row.current?.querySelectorAll<HTMLElement>('button[data-chip="removable"]');
+    const own = row.current?.querySelectorAll<HTMLElement>("button[data-removable]");
     own?.[own.length - 1]?.focus();
   };
 

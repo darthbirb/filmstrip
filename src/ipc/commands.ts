@@ -18,6 +18,7 @@ import type { ItemRow } from "./bindings/ItemRow";
 import type { ItemsMoved } from "./bindings/ItemsMoved";
 import type { ItemsRestored } from "./bindings/ItemsRestored";
 import type { ItemsTrashed } from "./bindings/ItemsTrashed";
+import type { LabelOffer } from "./bindings/LabelOffer";
 import type { Progress } from "./bindings/Progress";
 import type { Reading } from "./bindings/Reading";
 import type { Reason } from "./bindings/Reason";
@@ -125,6 +126,15 @@ export const addFolderTag = (folderId: number, value: string) =>
 
 export const removeFolderTag = (folderId: number, tagId: number) =>
   invoke<void>("remove_folder_tag", { folderId, tagId });
+
+export const labelKeyOffers = (typed: string) =>
+  invoke<LabelOffer[]>("label_key_offers", { typed });
+
+export const labelValueOffers = (key: string, typed: string) =>
+  invoke<LabelOffer[]>("label_value_offers", { key, typed });
+
+export const setFolderLabel = (folderId: number, key: string, value: string) =>
+  invoke<void>("set_folder_label", { folderId, key, value });
 
 export const favouritePlaces = () => invoke<FavouritePlace[]>("favourite_places");
 

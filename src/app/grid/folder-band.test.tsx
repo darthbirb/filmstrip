@@ -140,7 +140,7 @@ test("an empty folder's band frames no picture and leaves out what it has none o
     .element(screen.getByTitle("Nothing in People to use as a cover"))
     .toBeInTheDocument();
   await expect.poll(() => chipTexts(row(screen.container, "Tags"))).toEqual(["people", "pictures"]);
-  expect(row(screen.container, "Labels")).toBeUndefined();
+  expect(row(screen.container, "Labels")?.textContent).toBe("Add Label…");
   expect(row(screen.container, "Note")?.textContent).toBe("Add Note…");
 });
 
@@ -262,8 +262,8 @@ test("a folder's own tag is taken off with the keyboard; its name and what it in
   await userEvent.keyboard("dusk{Enter}");
   await expect.poll(() => chipTexts(row(screen.container, "Tags"))).toContain("dusk");
   const removable = () =>
-    [...screen.container.querySelectorAll('button[data-chip="removable"]')].map((chip) =>
-      withoutGlyphs(chip.textContent),
+    [...(row(screen.container, "Tags")?.querySelectorAll("button[data-removable]") ?? [])].map(
+      (chip) => withoutGlyphs(chip.textContent),
     );
   expect(removable()).toEqual(["egypt", "dusk"]);
 
@@ -275,6 +275,74 @@ test("a folder's own tag is taken off with the keyboard; its name and what it in
   await expect.element(screen.getByRole("button", { name: "pictures" })).toHaveFocus();
   await userEvent.keyboard("{Delete}");
   expect(chipTexts(row(screen.container, "Tags"))).toContain("pictures");
+});
+
+test("Add Label… asks for the key, then its value, and a key the folder has is refused", async () => {
+  const screen = await renderHeader(CAIRO);
+  await details(screen).click();
+  await screen.getByRole("button", { name: "Add Label…" }).click();
+  const key = screen.getByRole("combobox", { name: "Key" });
+  await expect.element(key).toHaveFocus();
+
+  await userEvent.keyboard("Location");
+  await expect
+    .element(screen.getByText("Cairo already has a location. Click its value to change it."))
+    .toBeVisible();
+  await userEvent.keyboard("{Tab}");
+  await expect.element(key).toHaveFocus();
+  await userEvent.clear(key);
+  await userEvent.keyboard("trip");
+  await expect.element(screen.getByText("trip comes from Trips.")).toBeVisible();
+
+  await userEvent.clear(key);
+  await userEvent.keyboard("Season");
+  await expect.element(screen.getByRole("option", { name: "New key “season”" })).toBeVisible();
+  await userEvent.keyboard("{Enter}");
+  await expect.element(screen.getByRole("combobox", { name: "Value" })).toHaveFocus();
+  await userEvent.keyboard("{Enter}");
+  await expect.element(screen.getByRole("combobox", { name: "Value" })).toHaveFocus();
+  await userEvent.keyboard("Winter{Enter}");
+  await expect
+    .poll(() => chipTexts(row(screen.container, "Labels")))
+    .toEqual(["locationcairo", "seasonwinter", "tripegypt 2024"]);
+  await expect.element(screen.getByRole("button", { name: "Add Label…" })).toBeVisible();
+
+  // Taken off with the keyboard from either half.
+  (screen.getByRole("button", { name: "Change season: winter" }).element() as HTMLElement).focus();
+  await userEvent.keyboard("{Delete}");
+  await expect
+    .poll(() => chipTexts(row(screen.container, "Labels")))
+    .toEqual(["locationcairo", "tripegypt 2024"]);
+});
+
+test("a click on a label's own value changes it where it stands, and it cannot be emptied", async () => {
+  const screen = await renderHeader(CAIRO);
+  await details(screen).click();
+  await screen.getByRole("button", { name: "Change location: cairo" }).click();
+  const value = screen.getByRole("textbox", { name: "Value of location" });
+  await expect.element(value).toHaveFocus();
+  const field = value.element() as HTMLInputElement;
+  expect([field.selectionStart, field.selectionEnd]).toEqual([0, "cairo".length]);
+
+  await userEvent.keyboard("{Backspace}{Enter}");
+  await expect
+    .element(screen.getByText("A label needs a value. Use × to remove it."))
+    .toBeVisible();
+  await userEvent.keyboard("Giza{Enter}");
+  await expect
+    .poll(() => chipTexts(row(screen.container, "Labels")))
+    .toEqual(["locationgiza", "tripegypt 2024"]);
+
+  await screen.getByRole("button", { name: "Change location: giza" }).click();
+  await userEvent.keyboard("Luxor{Escape}");
+  await expect
+    .poll(() => chipTexts(row(screen.container, "Labels")))
+    .toEqual(["locationgiza", "tripegypt 2024"]);
+  await screen.getByRole("button", { name: "Change location: giza" }).click();
+  await userEvent.keyboard("cairo{Enter}");
+  await expect
+    .poll(() => chipTexts(row(screen.container, "Labels")))
+    .toEqual(["locationcairo", "tripegypt 2024"]);
 });
 
 test("a folder with nothing in it, or a drive that is away, has no pencil", async () => {

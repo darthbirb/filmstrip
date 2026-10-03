@@ -761,6 +761,13 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   `line-danger`, outlines the chip it repeats in `line-strong`, and says whose it is underneath in
   `key` `danger`. A folder's own tags, never its name or what it inherits, show an × under the
   pointer or the keyboard, a `badge`-sized circle that takes a `wash`.
+- **Label field.** Add Label… is an outline chip at the nested corner; it becomes a label in its
+  own two halves, the key on `well` and the value on `ground` in one `line-control` ring, "key" and
+  "value" for placeholders, each offered what the library has in the tag field's list with "on 2
+  folders" and a last row for a new key or value. A key the folder already has is refused as a tag
+  is, the label it repeats outlined. A folder's own label shows its × on the value half, and a
+  click on that half makes it a field with its text selected in `plate` and `on-plate` ink; an
+  emptied one turns its ring `line-danger` and says a label needs a value.
 - **Chip button.** An act in a row of the details, a `chip` high at the `nested` corner in `small`
   text. Raised, it is `raised` in a `line-control` ring in `fg-mid`, `raised-hi` and `fg` under
   the pointer: Favourite in a folder's band is one, its star filled while on. A field's Cancel is

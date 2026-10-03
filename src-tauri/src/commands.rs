@@ -550,6 +550,44 @@ pub async fn remove_folder_tag(
     .await
 }
 
+/// The keys labels already use, for the key half of a label being added.
+#[tauri::command]
+pub async fn label_key_offers(
+    state: State<'_, AppState>,
+    typed: String,
+) -> Result<Vec<tags::LabelOffer>> {
+    run(&state, move |conn| tags::label_key_offers(conn, &typed)).await
+}
+
+/// The values a key already has, for the value half.
+#[tauri::command]
+pub async fn label_value_offers(
+    state: State<'_, AppState>,
+    key: String,
+    typed: String,
+) -> Result<Vec<tags::LabelOffer>> {
+    run(&state, move |conn| {
+        tags::label_value_offers(conn, &key, &typed)
+    })
+    .await
+}
+
+/// A label, or a new value for the key the folder has; everything below takes it too.
+#[tauri::command]
+pub async fn set_folder_label(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    key: String,
+    value: String,
+) -> Result<()> {
+    run(&state, move |conn| {
+        in_transaction(conn, |tx| {
+            tags::set_folder_label(tx, folder_id, &key, &value)
+        })
+    })
+    .await
+}
+
 /// A favourite place as navigation's group shows it: the way down to it, the files directly in
 /// it, and whether its source can be read.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]

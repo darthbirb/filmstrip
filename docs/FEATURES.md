@@ -50,7 +50,7 @@ drawn. **Not started** — neither.
 | Rename a folder, on disk | Built | `rename_folder`, in its tree row, a name already there said under it |
 | A folder's cover | Built | `folder_cover_choices`, `set_folder_cover`, the pencil on the band's cover; the first picture stands in while none is chosen |
 | A folder's status, notes, favourite | Built | favourite: `set_folder_favorite`, `favourite_places`, a group of its own in navigation and in the band; status: `set_folder_status`, the band's segmented group; notes: `set_folder_note`, written in the band |
-| A folder's labels and tags, inherited by everything under it | Partly | tags: `add_folder_tag`, `remove_folder_tag`, `tag_offers`, the band's Add Tag…; labels not started; items inherit labels, and never own one |
+| A folder's labels and tags, inherited by everything under it | Built | `add_folder_tag`, `set_folder_label`, `remove_folder_tag` and their offers, the band's Add Tag… and Add Label…; one value per key; items inherit labels, and never own one |
 | Every item id under a folder | Not started | |
 
 ## Items
