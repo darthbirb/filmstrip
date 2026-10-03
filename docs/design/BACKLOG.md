@@ -16,7 +16,7 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## The band's controls draw values the token sheet does not have · DEFECT
+## The band's controls draw values the token sheet does not have · DRAWN
 
 Artboards › 04 "What the band's controls open" and "A source's own band":
 
