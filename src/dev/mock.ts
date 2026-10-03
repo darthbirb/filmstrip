@@ -499,7 +499,15 @@ function searchFor(query: string): SearchOutcome {
         const path = lower(hit.at.path);
         if (shape.kind === "path") return within(path, shape);
         if (shape.kind === "place") return shape.place === "trash" || hit.folderId === 2;
-        if (shape.kind === "tag") return path.includes(shape.value.toLowerCase());
+        if (shape.kind === "tag") {
+          const value = shape.value.toLowerCase();
+          // A file carries every tag its folders do, a band's as well as their names.
+          const above = trashed.get(hit.id)?.folders ?? crumbs(hit.folderId).folders;
+          const added = above.some((crumb) =>
+            ownOf(crumb.id).tags.some((tag) => tag.key === null && tag.value === value),
+          );
+          return path.includes(value) || added;
+        }
         if (shape.kind === "label") return false;
         const word = text.toLowerCase();
         return hit.diskName.toLowerCase().includes(word) || path.includes(word);
