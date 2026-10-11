@@ -2,6 +2,8 @@ name: Labels
 
 # Keeps the repository's labels to .github/labels.json. Labels it does not name are left alone.
 on:
+  schedule:
+    - cron: "41 3 * * 1"
   push:
     branches: [main]
     paths: [.github/labels.json, .github/workflows/labels.yml]

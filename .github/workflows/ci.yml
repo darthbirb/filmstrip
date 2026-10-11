@@ -14,16 +14,12 @@ concurrency:
 
 jobs:
   gates:
-    # Windows is where the app ships; Linux is where cloud sessions work, so both stay green.
-    name: Gates (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}-latest
+    name: Gates
+    runs-on: windows-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows, ubuntu]
 
-    # Actions are pinned to commit SHAs. On Windows, Edge and Rust come with the runner image.
+    # Actions are pinned to commit SHAs. Edge and Rust come with the runner image, so no browser
+    # or toolchain is downloaded.
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -35,14 +31,6 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: Tauri's Linux libraries
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq --no-install-recommends \
-            libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev \
-            librsvg2-dev libxdo-dev libssl-dev
-
       - name: Rust cache
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
@@ -50,10 +38,6 @@ jobs:
 
       - name: Install
         run: npx --yes pnpm@12.4.1 install --frozen-lockfile
-
-      - name: Chromium for the tests
-        if: runner.os == 'Linux'
-        run: npx --yes pnpm@12.4.1 exec playwright install --with-deps chromium
 
       - name: Lint and format
         run: npx --yes pnpm@12.4.1 lint

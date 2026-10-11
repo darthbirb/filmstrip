@@ -1,10 +1,11 @@
 name: Release
 
-# Every commit on main becomes the "nightly" pre-release; a vX.Y.Z tag becomes a release.
+# Nightly: main's latest commit, built once a day when it has moved. A vX.Y.Z tag: a release.
 # Both carry the portable Filmstrip.exe. CONTRIBUTING.md "Releases".
 on:
+  schedule:
+    - cron: "17 3 * * *"
   push:
-    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
 
@@ -13,7 +14,6 @@ permissions:
 
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   build:
@@ -21,29 +21,49 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
+      # Auto-merge lands commits with the workflow token, which starts no push runs; hence a
+      # schedule, skipping a day main did not move.
+      - name: Has main moved since the last Nightly?
+        id: moved
+        if: github.ref_type != 'tag'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          built=$(gh release view nightly --repo "$GITHUB_REPOSITORY" --json targetCommitish --jq .targetCommitish 2>/dev/null || true)
+          if [ "$built" = "$GITHUB_SHA" ] && [ "$GITHUB_EVENT_NAME" = schedule ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Checkout
+        if: steps.moved.outputs.skip != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
       - name: Set up Node
+        if: steps.moved.outputs.skip != 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
 
       - name: Rust cache
+        if: steps.moved.outputs.skip != 'true'
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: src-tauri
           key: release
 
       - name: Install
+        if: steps.moved.outputs.skip != 'true'
         run: npx --yes pnpm@12.4.1 install --frozen-lockfile
 
       - name: Build
+        if: steps.moved.outputs.skip != 'true'
         run: npx --yes pnpm@12.4.1 tauri build
 
       - name: Publish
+        if: steps.moved.outputs.skip != 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -53,7 +73,7 @@ jobs:
             gh release create "$GITHUB_REF_NAME" "$exe" --repo "$GITHUB_REPOSITORY" \
               --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
           else
-            notes="The latest build of main, at ${GITHUB_SHA::7}. Replaced by every merge."
+            notes="The latest build of main, at ${GITHUB_SHA::7}. Rebuilt daily when main moves."
             gh release delete nightly --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
             gh release create nightly "$exe" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
               --title "Nightly" --notes "$notes" --prerelease --latest=false
