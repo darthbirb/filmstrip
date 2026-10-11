@@ -5,9 +5,10 @@ description: Conventions for driving a Filmstrip pull request to merged — CI, 
 
 # Stewarding a pull request
 
-- **Merging is automatic.** The Auto-merge workflow arms every pull request the owner or
-  Dependabot opens; it merges by squash, its title the commit subject, once Gates, Title and
-  Review pass. No session merges anything itself.
+- **Auto-merge is the normal path.** The Auto-merge workflow arms every pull request the owner
+  or Dependabot opens; it merges by squash, its title the commit subject, once Gates, Title and
+  Review pass. A session may run `gh pr merge --squash` when the owner asks it to. Either way
+  GitHub's required checks on `main` decide; nothing bypasses them (`--admin` is denied).
 - **Review** passes when the latest pull-request review on the head commit, posted by the
   repository's owner account, ends in `<!-- review: pass -->`. Every push needs a fresh review;
   run the `reviewer` agent again after fixing findings, and post its body unchanged.
