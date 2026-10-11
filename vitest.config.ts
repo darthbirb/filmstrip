@@ -16,7 +16,12 @@ export default mergeConfig(
       browser: {
         enabled: true,
         headless: true,
-        provider: playwright({ launchOptions: { channel: "msedge" } }),
+        // Dates and numbers follow the browser's locale; one fixed locale keeps
+        // assertions identical on every machine.
+        provider: playwright({
+          launchOptions: { channel: "msedge" },
+          contextOptions: { locale: "en-GB" },
+        }),
         instances: [{ browser: "chromium" }],
       },
     },

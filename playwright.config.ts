@@ -6,6 +6,7 @@ export default defineConfig({
   use: {
     ...devices["Desktop Edge"],
     channel: "msedge",
+    locale: "en-GB",
     baseURL: "http://localhost:1422",
   },
   webServer: {
