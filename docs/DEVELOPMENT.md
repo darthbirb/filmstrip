@@ -4,7 +4,7 @@
 
 Node 24 (see `.nvmrc`), Rust stable (1.90 or newer, which Tauri 2.12 needs), and Microsoft Edge —
 the tests drive the Edge you already have rather than downloading a browser. WebView2 ships
-with Windows 11. For the queue, Claude Code and the GitHub CLI (`gh`), signed in.
+with Windows 11. For the queue, the Claude desktop app and the GitHub CLI (`gh`), signed in.
 
 ## Commands
 
@@ -120,13 +120,17 @@ real surface.
 
 ## Running the queue
 
-`scripts/agent.ps1` works the issue queue on this machine: one fresh Claude Code session per
-issue, each running the `deliver` skill from `ready` to merged, until nothing is left. Sessions
-run with every permission (`--permission-mode bypassPermissions`, which a repository's own
-settings cannot grant); the deny rules in `.claude/settings.json` still hold, and branch
-protection keeps `main` safe from all of them. A failed session, usually a usage limit, is
-retried after a wait. To skip bypass mode's confirmation, set `skipDangerousModePermissionPrompt`
-in your own `~/.claude/settings.json`.
+Ask a Code-tab session in the desktop app to run the queue; the `queue` skill takes it from
+there until nothing is `ready` or waiting on `design`. That session only orchestrates: each
+issue is built by a fresh `general-purpose` subagent running `deliver`, and reviewed by a fresh
+`reviewer` subagent, so neither inherits the other's context and the session stays small across
+many issues. Failed reviews go back to a builder for at most three rounds before `needs-human`.
+Nothing runs outside the app: no CLI, no API key, no Claude secret on GitHub.
+
+GitHub holds the state, so a run stopped by a usage limit or a closed app resumes when asked to
+continue. Each issue adds a line to `.queue/log.md`, git-ignored: what merged, what waits on the
+owner, and what the next run should know. The repository's `.npmrc` pins npm and pnpm to the
+public registry, whatever the machine's own npm configuration says.
 
 `.claude/settings.json` turns off Claude Code's attribution, so commits and pull requests carry
 none. `scripts/update-latest.ps1` fetches the Nightly into `latest\` to try by hand.
@@ -135,10 +139,12 @@ none. `scripts/update-latest.ps1` fetches the Nightly into `latest\` to try by h
 
 Every pull request is reviewed by the `reviewer` agent, which did not write it, to the bar in
 `.claude/skills/review/SKILL.md`. Its review is posted on the pull request ending in
-`<!-- review: pass -->` or `<!-- review: fail -->`. The Review check
-(`.github/workflows/review.yml`) passes only on a pass for the exact head commit, from the
-repository's own account, and fails while `needs-human` is on; auto-merge waits on it. The
-reviewer runs the branch in a worktree of its own, never in the author's checkout.
+`<!-- review: pass -->` or `<!-- review: fail -->`. On a pass, and only then, the reviewer sets
+the `Review` commit status on the commit it reviewed; `main`'s ruleset requires it beside Gates
+and Title. A push makes a new head with no status, so every change after a review is reviewed
+again, and a `needs-human` pull request gets none. The Dependabot workflow sets it for
+Dependabot's updates, which the gates review. The reviewer runs the branch in a worktree of its
+own, never in the author's checkout.
 
 ## Porting from ggallery
 

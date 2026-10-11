@@ -1,29 +1,34 @@
-name: Auto-merge
+name: Dependabot
 
-# The owner's pull requests and Dependabot's merge by squash once the required checks pass.
-# The ruleset on main, not this workflow, decides when. CONTRIBUTING.md "Pull requests".
+# Dependabot's pull requests are reviewed by the gates themselves: this marks each head commit
+# Reviewed and arms a squash merge, which the ruleset on main holds until Gates pass.
+# CONTRIBUTING.md "Pull requests".
 on:
   # The base repository's workflow and token, so Dependabot's pull requests can be enabled too.
   # Nothing from the pull request is checked out or run.
   pull_request_target:
-    types: [opened, reopened, ready_for_review]
+    types: [opened, reopened, synchronize, ready_for_review]
 
 permissions:
   contents: write
   pull-requests: write
+  statuses: write
 
 jobs:
   enable:
     name: Enable
     if: >-
       !github.event.pull_request.draft &&
-      (github.event.pull_request.user.login == github.repository_owner ||
-       github.event.pull_request.user.login == 'dependabot[bot]')
+      github.event.pull_request.user.login == 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Squash once the checks pass
+      - name: Mark it reviewed and squash once the checks pass
         env:
           GH_TOKEN: ${{ github.token }}
           URL: ${{ github.event.pull_request.html_url }}
-        run: gh pr merge --auto --squash "$URL"
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$HEAD" -f state=success \
+            -f context=Review -f description="Dependabot: reviewed by the gates" >/dev/null
+          gh pr merge --auto --squash "$URL"
