@@ -1,0 +1,42 @@
+name: Feature
+description: One capability, specified well enough to build without asking.
+labels: [feature]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: What someone using the app can do once this lands, in a sentence or two.
+    validations:
+      required: true
+  - type: textarea
+    id: criteria
+    attributes:
+      label: Acceptance criteria
+      description: Each one observable and testable. The pull request proves every one.
+      placeholder: |
+        - [ ] …
+    validations:
+      required: true
+  - type: textarea
+    id: design
+    attributes:
+      label: Design
+      description: The sheet and artboard in docs/design that draw it, or "needs drawing".
+    validations:
+      required: true
+  - type: textarea
+    id: port
+    attributes:
+      label: Port from ggallery
+      description: The modules to read first, or "nothing to port".
+  - type: textarea
+    id: out
+    attributes:
+      label: Out of scope
+      description: What this deliberately leaves for later.
+  - type: textarea
+    id: depends
+    attributes:
+      label: Depends on
+      description: Issues that must land first, as owner/repo#n.
