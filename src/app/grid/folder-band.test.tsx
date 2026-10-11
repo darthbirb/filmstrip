@@ -242,6 +242,9 @@ test("the band's Cover plate and the picker's plates are one plate, and the open
     for (const plate of plates) expect(plate.getBoundingClientRect().height).toBe(badge);
     expect(new Set(plates.map((plate) => getComputedStyle(plate).fontSize)).size).toBe(1);
 
+    // Away from the pointer, so the wash is the open state's and not the hover's.
+    await details(screen).hover();
+    await expect.element(picker).toBeVisible();
     const open = getComputedStyle(pencil.element());
     expect(open.boxShadow).toContain("inset");
     expect(open.outlineWidth).toBe(root.getPropertyValue("--focus-width").trim());
