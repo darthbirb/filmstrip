@@ -202,20 +202,23 @@ pub struct CoverChoice {
     pub uuid: String,
 }
 
+/// The live pictures and videos at or below the folder `?1`, as `i`, with their depth below it as
+/// `s.depth`: the files a cover can be.
+const COVERABLE: &str = "WITH RECURSIVE subtree(id, depth) AS (
+         SELECT ?1, 0
+       UNION ALL
+         SELECT f.id, s.depth + 1 FROM folder f JOIN subtree s ON f.parent_id = s.id
+          WHERE f.deleted_at IS NULL
+     )
+     SELECT i.id, i.uuid FROM item i JOIN subtree s ON s.id = i.folder_id
+      WHERE i.deleted_at IS NULL AND i.kind IN ('image', 'video')";
+
 /// Every picture and video at or below a folder, in the order a cover stands in, so the first is
 /// the one that stands in while none is chosen.
 pub fn cover_choices(conn: &Connection, folder_id: i64) -> Result<Vec<CoverChoice>> {
-    let mut stmt = conn.prepare(
-        "WITH RECURSIVE subtree(id, depth) AS (
-             SELECT ?1, 0
-           UNION ALL
-             SELECT f.id, s.depth + 1 FROM folder f JOIN subtree s ON f.parent_id = s.id
-              WHERE f.deleted_at IS NULL
-         )
-         SELECT i.id, i.uuid FROM item i JOIN subtree s ON s.id = i.folder_id
-          WHERE i.deleted_at IS NULL AND i.kind IN ('image', 'video')
-          ORDER BY s.depth, i.disk_name COLLATE NOCASE",
-    )?;
+    let mut stmt = conn.prepare(&format!(
+        "{COVERABLE} ORDER BY s.depth, i.disk_name COLLATE NOCASE"
+    ))?;
     Ok(stmt
         .query_map(params![folder_id], |r| {
             Ok(CoverChoice {
@@ -230,27 +233,17 @@ pub fn cover_choices(conn: &Connection, folder_id: i64) -> Result<Vec<CoverChoic
 /// Chooses a folder's cover, or with `None` goes back to the picture that stands in. Only a file
 /// the picker could offer is taken.
 pub fn set_cover(conn: &Connection, folder_id: i64, item_id: Option<i64>) -> Result<()> {
-    let offered = |item_id: i64| -> Result<bool> {
-        Ok(conn.query_row(
-            "WITH RECURSIVE subtree(id) AS (
-                 SELECT ?1
-               UNION ALL
-                 SELECT f.id FROM folder f JOIN subtree s ON f.parent_id = s.id
-                  WHERE f.deleted_at IS NULL
-             )
-             SELECT EXISTS (SELECT 1 FROM item i JOIN subtree s ON s.id = i.folder_id
-                             WHERE i.id = ?2 AND i.deleted_at IS NULL
-                               AND i.kind IN ('image', 'video'))",
+    if let Some(item_id) = item_id {
+        let offered: bool = conn.query_row(
+            &format!("SELECT EXISTS ({COVERABLE} AND i.id = ?2)"),
             params![folder_id, item_id],
             |r| r.get(0),
-        )?)
-    };
-    if let Some(item_id) = item_id
-        && !offered(item_id)?
-    {
-        return Err(AppError::invalid(
-            "that file is not a live picture in this folder",
-        ));
+        )?;
+        if !offered {
+            return Err(AppError::invalid(
+                "that file is not a picture or video at or below this folder",
+            ));
+        }
     }
     conn.execute(
         "UPDATE folder SET cover_item_id = ?1 WHERE id = ?2",
@@ -264,17 +257,12 @@ pub fn set_cover(conn: &Connection, folder_id: i64, item_id: Option<i64>) -> Res
 pub fn cover(conn: &Connection, folder_id: i64) -> Result<Option<(i64, String)>> {
     Ok(conn
         .query_row(
-            "WITH RECURSIVE subtree(id, depth) AS (
-                 SELECT ?1, 0
-               UNION ALL
-                 SELECT f.id, s.depth + 1 FROM folder f JOIN subtree s ON f.parent_id = s.id
-                  WHERE f.deleted_at IS NULL
-             )
-             SELECT i.id, i.uuid FROM item i JOIN subtree s ON s.id = i.folder_id
-              WHERE i.deleted_at IS NULL AND i.kind IN ('image', 'video')
-              ORDER BY i.id = (SELECT cover_item_id FROM folder WHERE id = ?1) DESC,
-                       s.depth, i.disk_name COLLATE NOCASE
-              LIMIT 1",
+            &format!(
+                "{COVERABLE}
+                  ORDER BY i.id = (SELECT cover_item_id FROM folder WHERE id = ?1) DESC,
+                           s.depth, i.disk_name COLLATE NOCASE
+                  LIMIT 1"
+            ),
             params![folder_id],
             |r| Ok((r.get(0)?, r.get(1)?)),
         )
