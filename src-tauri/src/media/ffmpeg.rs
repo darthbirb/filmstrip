@@ -188,30 +188,39 @@ mod tests {
         assert_eq!(found.location(), tools.join(executable("ffmpeg")));
     }
 
+    /// The platform's shell, and the flag that hands it one line to run.
+    const SHELL: (&str, &str) = if cfg!(windows) {
+        ("cmd", "/c")
+    } else {
+        ("sh", "-c")
+    };
+
     #[test]
     fn what_a_program_prints_comes_back_and_a_failure_says_why() {
         let limit = Duration::from_secs(20);
-        let out = run(Path::new("cmd"), &["/c", "echo filmstrip"], limit).unwrap();
+        let (shell, flag) = SHELL;
+        let out = run(Path::new(shell), &[flag, "echo filmstrip"], limit).unwrap();
         assert_eq!(String::from_utf8_lossy(&out).trim(), "filmstrip");
 
-        let error = run(
-            Path::new("cmd"),
-            &["/c", "echo broken 1>&2 & exit 3"],
-            limit,
-        )
-        .unwrap_err();
-        assert_eq!(error.to_string(), "cmd failed: broken");
+        let line = if cfg!(windows) {
+            "echo broken 1>&2 & exit 3"
+        } else {
+            "echo broken 1>&2; exit 3"
+        };
+        let error = run(Path::new(shell), &[flag, line], limit).unwrap_err();
+        assert_eq!(error.to_string(), format!("{shell} failed: broken"));
     }
 
     #[test]
     fn a_program_still_running_at_its_limit_is_stopped() {
         let started = Instant::now();
-        let error = run(
-            Path::new("ping"),
-            &["-n", "30", "127.0.0.1"],
-            Duration::from_millis(500),
-        )
-        .unwrap_err();
+        // Run directly, not through a shell, so stopping it stops the program itself.
+        let (program, args): (&str, &[&str]) = if cfg!(windows) {
+            ("ping", &["-n", "30", "127.0.0.1"])
+        } else {
+            ("sleep", &["30"])
+        };
+        let error = run(Path::new(program), args, Duration::from_millis(500)).unwrap_err();
         assert!(error.to_string().contains("gave up"), "{error}");
         assert!(started.elapsed() < Duration::from_secs(10));
     }
