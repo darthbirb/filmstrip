@@ -14,7 +14,5 @@ imports from it.
 | `notes.dc.html` | notes beside the drawings |
 | `ggallery-drawing.html` | the predecessor's drawing, for structure and behaviour only |
 
-`BACKLOG.md` is what the next pass draws. The `design-pass` skill draws it on the canvas and
-brings the sheets back here.
-
-**Canvas:** none yet — the first design pass creates it and links it here.
+`BACKLOG.md` is what the next pass draws; the `design-pass` skill draws it in these sheets.
+To look at them, serve the folder: `npx --yes pnpm@12.4.1 exec vite docs/design --port 1423`.

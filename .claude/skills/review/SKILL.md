@@ -11,8 +11,8 @@ first is a finding.
 
 ## Gather
 
-1. The change: `gh` is not available; use the GitHub tools for a pull request (its diff, files,
-   commits, body and linked issue), or `git diff origin/main...HEAD` for a branch.
+1. The change: `gh pr view <n>` and `gh pr diff <n>` for a pull request, with the issue it
+   closes (`gh issue view`), or `git diff origin/main...HEAD` for a branch.
 2. What it was meant to do: the linked issue's outcome and acceptance criteria, and the section
    of `docs/PRD.md` it implements.
 3. The context of every changed hunk: read whole functions and their callers, not just the diff.

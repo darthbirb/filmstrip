@@ -2,10 +2,9 @@
 
 ## What you need
 
-Node 24 (see `.nvmrc`) and Rust stable (1.85 or newer, for edition 2024). On Windows, Microsoft
-Edge — the tests drive the Edge you already have — and WebView2, which ships with Windows 11. On
-Linux, Playwright's Chromium and Tauri's WebKitGTK libraries; a cloud session's startup hook
-installs both ("Cloud sessions").
+Node 24 (see `.nvmrc`), Rust stable (1.85 or newer, for edition 2024), and Microsoft Edge —
+the tests drive the Edge you already have rather than downloading a browser. WebView2 ships
+with Windows 11. For the queue, Claude Code and the GitHub CLI (`gh`), signed in.
 
 ## Commands
 
@@ -115,21 +114,22 @@ takes the first. When the owner picks, the others and their picker entry are del
 ## Designs
 
 The sheets in `docs/design/` are what the interface is built from; its README lists them. The
-`design-pass` skill draws `docs/design/BACKLOG.md` on a Claude Design canvas and brings the
-sheets back into the repository, which stays the source of truth (DECISIONS.md "The look").
+`design-pass` skill draws `docs/design/BACKLOG.md` in them directly (DECISIONS.md "The look").
 **A feature that adds a shape adds it to `docs/DESIGN.md`**, and its states are checked on the
 real surface.
 
-## Cloud sessions
+## Running the queue
 
-Agents work in Claude Code cloud sessions: Linux containers that clone this repository fresh.
-`.claude/hooks/session-start.sh` readies one — Tauri's Linux libraries, the npm install, a
-warm Rust build, and `CHROMIUM_PATH` pointing the tests at the image's Chromium. ggallery is
-attached as a second repository and cloned to `../ggallery`.
+`scripts/agent.ps1` works the issue queue on this machine: one fresh Claude Code session per
+issue, each running the `deliver` skill from `ready` to merged, until nothing is left. Sessions
+run with every permission (`--permission-mode bypassPermissions`, which a repository's own
+settings cannot grant); the deny rules in `.claude/settings.json` still hold, and branch
+protection keeps `main` safe from all of them. A failed session, usually a usage limit, is
+retried after a wait. To skip bypass mode's confirmation, set `skipDangerousModePermissionPrompt`
+in your own `~/.claude/settings.json`.
 
-Windows-only code (`#[cfg(windows)]`) is tested by CI's Windows job, not in the session. The
-real window is Windows-only too; a session checks the interface in Chromium against the dev
-mock, which is the same engine as WebView2.
+`.claude/settings.json` turns off Claude Code's attribution, so commits and pull requests carry
+none. `scripts/update-latest.ps1` fetches the Nightly into `latest\` to try by hand.
 
 ## Review
 
@@ -137,7 +137,8 @@ Every pull request is reviewed by the `reviewer` agent, which did not write it, 
 `.claude/skills/review/SKILL.md`. Its review is posted on the pull request ending in
 `<!-- review: pass -->` or `<!-- review: fail -->`. The Review check
 (`.github/workflows/review.yml`) passes only on a pass for the exact head commit, from the
-repository's own account, and fails while `needs-human` is on; auto-merge waits on it.
+repository's own account, and fails while `needs-human` is on; auto-merge waits on it. The
+reviewer runs the branch in a worktree of its own, never in the author's checkout.
 
 ## Porting from ggallery
 

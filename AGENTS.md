@@ -7,7 +7,8 @@ Tauri 2 · Rust · React 19 · TypeScript · Vite · Tailwind v4 · Base UI · S
 
 ## How work flows
 
-Work is built by agents, from a queue, with the owner stepping in only where a pull request asks.
+Work is built by Claude Code sessions on the owner's Windows machine, from a queue, with the
+owner stepping in only where a pull request asks. `scripts/agent.ps1` runs them.
 
 - **The queue is GitHub issues.** `docs/PRD.md` says what the app must do; each capability not
   yet built is an issue with acceptance criteria, labelled `design` until it is drawn and
@@ -16,10 +17,10 @@ Work is built by agents, from a queue, with the owner stepping in only where a p
 - **One issue, one branch, one pull request.** The `deliver` skill takes an issue from `ready`
   to merged; `design-pass` draws what is waiting on `design`; `review` is the bar both meet.
 - **Every pull request is reviewed independently** by the `reviewer` agent, which did not write
-  it, and merges itself by squash once CI, Title and Review pass. `needs-human` holds it for the
-  owner. See the `steward` skill.
-- **`main` is always releasable.** Each merge publishes a Nightly `Filmstrip.exe` on GitHub's
-  Releases page; that is how the owner tries the app.
+  it, and merges itself by squash once Gates, Title and Review pass. `needs-human` holds it for
+  the owner. See the `steward` skill.
+- **`main` is always releasable.** A Nightly `Filmstrip.exe` is built from it each day it moves;
+  `scripts/update-latest.ps1` puts it in `latest\`, where the owner tries the app.
 
 ## Commands
 
@@ -27,13 +28,12 @@ Work is built by agents, from a queue, with the owner stepping in only where a p
 
 - `npx --yes pnpm@12.4.1 install` — install
 - `npx --yes pnpm@12.4.1 dev --port 1422 --strictPort` — dev server for checking the UI
-- `npx --yes pnpm@12.4.1 tauri dev` — the real app in its own window (Windows)
+- `npx --yes pnpm@12.4.1 tauri dev` — the real app in its own window
 - `npx --yes pnpm@12.4.1 lint | check | check:docs | test | test:e2e` — the frontend gates
 - `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and `cargo test`, each with
   `--manifest-path src-tauri/Cargo.toml` — the Rust gates
 
-Every gate runs on Windows and on Linux. Cloud sessions are Linux; their startup hook installs
-what the gates need (`docs/DEVELOPMENT.md` "Cloud sessions").
+CI runs the same gates on Windows. GitHub is reached with the `gh` CLI.
 
 ## Rules
 
@@ -51,8 +51,8 @@ what the gates need (`docs/DEVELOPMENT.md` "Cloud sessions").
   into the pull request.
 - **A new dependency is named in the pull request with its reason.** Versions are exact; npm's in
   `package.json`, Rust's in `Cargo.lock`.
-- **Nothing changes the machine** outside the project and its cloud container: no global
-  installs on someone's own computer, no system settings, no registry.
+- **Nothing changes the machine** outside the project: no global installs, no system settings,
+  no registry. A test that seems to need one is reaching too far — say so instead.
 - **Primitives own every visual decision; surfaces compose them.** Sizes, colours and durations
   come from the token layer in `src/styles/app.css`. A component may not invent a number.
   `docs/DESIGN.md` describes the tokens and every shape; a feature that adds a shape adds it there.
@@ -64,7 +64,10 @@ what the gates need (`docs/DEVELOPMENT.md` "Cloud sessions").
 
 ## Gotchas
 
-- **Tests run in a real browser, never jsdom**: Edge on Windows, Chromium elsewhere.
+- **Tests run in the installed Edge, never jsdom.** jsdom reports every element as zero-sized,
+  which hides exactly the bugs worth catching.
+- **The editor's Browser pane never draws.** No screenshots, no animation frames, no transitions.
+  Use the Playwright MCP — `docs/DEVELOPMENT.md` "Seeing the app".
 - **`src/ipc/bindings/` is generated** by `cargo test`. Never edit it; rerun the tests and
   commit what changed.
 - **Port 1420 belongs to `tauri dev`**; agents' dev servers use 1422. Stop a server you started.

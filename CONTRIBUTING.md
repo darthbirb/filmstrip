@@ -6,9 +6,10 @@ issue first; it is the faster route.
 
 ## Getting it running
 
-You need Node 24 (see `.nvmrc`) and Rust stable 1.85 or newer. The app ships for Windows, where
-the tests drive the installed Edge; on Linux they drive Playwright's Chromium, and Tauri needs
-its WebKitGTK libraries ([Tauri's prerequisites](https://v2.tauri.app/start/prerequisites/)).
+You need Node 24 (see `.nvmrc`), Rust stable 1.85 or newer, and Windows with Edge installed —
+the tests drive the Edge you already have rather than downloading a browser. Elsewhere they fall
+back to Playwright's Chromium (`tests/browser.ts`), and Tauri needs
+[its prerequisites](https://v2.tauri.app/start/prerequisites/).
 
 ```bash
 npx --yes pnpm@12.4.1 install
@@ -23,8 +24,7 @@ go through `npx` at the pinned version.
 
 ## Before opening a pull request
 
-Every gate in [AGENTS.md](AGENTS.md) "Commands" passes. CI runs the same set on Windows and on
-Linux.
+Every gate in [AGENTS.md](AGENTS.md) "Commands" passes. CI runs the same set on Windows.
 
 ## Conventions
 
@@ -57,8 +57,9 @@ squash-merged, so `git log main` reads as one line per pull request.
 - **The title is the squash commit's subject**, so it follows the commit format below; the Title
   check holds it to that. The description follows the template: what changes for someone using
   the app, how it was checked, what was left out, and the issue it closes.
-- **It merges itself** once Gates (Windows and Linux), Title and Review pass, by auto-merge.
-  Review is an independent review of the head commit; `needs-human` holds it for the owner.
+- **It merges itself**: the Auto-merge workflow arms the owner's and Dependabot's pull requests,
+  which squash once Gates, Title and Review pass. Review is an independent review of the head
+  commit; `needs-human` holds it for the owner.
 
 ### Commits
 
@@ -82,8 +83,8 @@ Optional body, wrapped at 72 columns: why, when neither the diff nor docs/DECISI
 
 ### Releases
 
-Every merge to `main` replaces the **Nightly** pre-release with a fresh portable
-`Filmstrip.exe`. A release proper is a tag on `main`, `vMAJOR.MINOR.PATCH`, built the same way
+Each day `main` has moved, the **Nightly** pre-release is replaced with a fresh portable
+`Filmstrip.exe`; run the Release workflow by hand for one sooner. A release proper is a tag on `main`, `vMAJOR.MINOR.PATCH`, built the same way
 with notes drawn from the pull requests since the last tag. The version stays below 1.0 until
 every capability in [docs/FEATURES.md](docs/FEATURES.md) is built.
 

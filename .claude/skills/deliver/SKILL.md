@@ -1,6 +1,6 @@
 ---
 name: deliver
-description: Take one Filmstrip issue from the queue to merged — pick it, port and build it, verify it, open the pull request, get it independently reviewed, and drive it to an automatic merge. Use when asked to work the next issue, a named issue, or to keep working the queue; scheduled sessions start here.
+description: Take one Filmstrip issue from the queue to merged — pick it, port and build it, verify it, open the pull request, get it independently reviewed, and drive it to an automatic merge. Use when asked to work the next issue, a named issue, or to keep working the queue; scripts/agent.ps1 starts every session here.
 ---
 
 # Deliver an issue
@@ -10,17 +10,16 @@ there and in the pull requests: never keep progress only in the conversation.
 
 ## 1. Ready the workspace
 
-- `git fetch --prune origin`, then work from `origin/main`.
-- ggallery must sit at `../ggallery`. If it does not, attach `darthbirb/ggallery` (read access)
-  and clone it there. It is a reference: never edit, install or run anything in it.
-- Open pull requests come first. If one of yours is red, conflicted or has review findings,
-  finish it before taking new work.
+- `git fetch --prune origin`, then work from `origin/main`. GitHub is reached with the `gh` CLI.
+- ggallery sits at `../ggallery`. It is a reference: never edit, install or run anything in it.
+- Open pull requests come first (`gh pr list --author @me`). If one is red, conflicted or has
+  review findings, finish it before taking new work.
 
 ## 2. Pick the issue
 
 Asked for a number: take it. Otherwise the open issue labelled `ready` and none of
 `in-progress`, `blocked` or `needs-human`, in the earliest milestone, lowest number first.
-Label it `in-progress`. Nothing `ready`: stop and say so; if issues wait on `design`, run the
+Label it `in-progress` (`gh issue edit <n> --add-label in-progress`). Nothing `ready`: stop and say so; if issues wait on `design`, run the
 `design-pass` skill instead.
 
 ## 3. Understand it
@@ -41,7 +40,8 @@ Read the issue, its section of `docs/PRD.md`, its sheet in `docs/design/`, every
 ## 5. Verify it
 
 Every gate in `AGENTS.md` "Commands", all green. Then look at it: the dev server on 1422 and the
-Playwright MCP, at several widths, against the sheet it was drawn on. Screenshots are evidence
+Playwright MCP, at several widths, against the sheet it was drawn on; and for anything the mock
+cannot show, the real window (`docs/DEVELOPMENT.md` "Seeing the app"). Screenshots are evidence
 for you, never a substitute for the gates.
 
 ## 6. Review it
@@ -50,15 +50,16 @@ for you, never a substitute for the gates.
 2. Push, and open the pull request: the title is the squash commit's subject, the body follows
    `.github/pull_request_template.md` and says `Closes #n`.
 3. Independent review: run the `reviewer` agent with the pull request number. Post its body
-   unchanged as a pull-request review with the COMMENT event. A fail: fix every blocking and
+   unchanged: `gh pr review <n> --comment --body-file <file>`. A fail: fix every blocking and
    should-fix finding, push, and run the reviewer again, until it passes on the head commit.
    Nits that are plainly right ride along in the next push.
 
 ## 7. Land it
 
-Enable auto-merge, squash method, as soon as the pull request is open. It merges itself once CI,
-Title and Review are green. Subscribe to its activity and drive it to green: a CI failure is
-yours to root-cause and fix, never to skip. After the merge the issue closes itself; take the
+The Auto-merge workflow arms the pull request as it opens; it merges itself, by squash, once
+Gates, Title and Review are green. Watch it with `gh pr checks <n> --watch --required`: a
+failure is yours to root-cause and fix, never to skip; then review and watch again. The
+session ends when `gh pr view <n> --json state` says MERGED. The issue closes itself; take the
 `in-progress` label off if it is still there.
 
 ## When the owner decides
@@ -71,5 +72,5 @@ itself by the PRD, the sheets and `DECISIONS.md`.
 
 ## Keeping the queue going
 
-When asked to keep working, take the next issue after each merge. Usage limits pause a session,
-not the work: the next one resumes from the issues and pull requests.
+`scripts/agent.ps1` runs one session per issue until the queue is empty. Usage limits pause a
+session, not the work: the next one resumes from the issues and pull requests.
