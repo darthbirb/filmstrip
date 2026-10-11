@@ -2,9 +2,10 @@
 
 ## What you need
 
-Node 24 (see `.nvmrc`), Rust stable (1.85 or newer, for edition 2024), and Microsoft Edge —
-the tests drive the Edge you already have rather than downloading a browser. WebView2 ships
-with Windows 11.
+Node 24 (see `.nvmrc`) and Rust stable (1.85 or newer, for edition 2024). On Windows, Microsoft
+Edge — the tests drive the Edge you already have — and WebView2, which ships with Windows 11. On
+Linux, Playwright's Chromium and Tauri's WebKitGTK libraries; a cloud session's startup hook
+installs both ("Cloud sessions").
 
 ## Commands
 
@@ -22,7 +23,9 @@ version through `npx`:
 | `npx --yes pnpm@12.4.1 test` | component tests |
 | `npx --yes pnpm@12.4.1 test:e2e` | end-to-end tests |
 | `npx --yes pnpm@12.4.1 check:docs` | doc pointers resolve, comments stay short |
-| `cargo test --manifest-path src-tauri/Cargo.toml` | the Rust gate; also writes `src/ipc/bindings` |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check` | Rust format |
+| `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | Rust lint |
+| `cargo test --manifest-path src-tauri/Cargo.toml` | Rust tests; also writes `src/ipc/bindings` |
 
 ## Ports
 
@@ -60,9 +63,9 @@ Three ways, cheapest first.
 - **A test that needs ffmpeg is `#[ignore]`d**, because CI has none. Where ffmpeg is on PATH,
   `cargo test --manifest-path src-tauri/Cargo.toml -- --ignored` runs them; run it after touching
   video.
-- **Component tests** run in Vitest's browser mode on Edge (`channel: "msedge"`), over
-  `src/**/*.test.tsx`. **Never jsdom** — see
-  DECISIONS.md "Testing in a real browser, never jsdom".
+- **Component tests** run in Vitest's browser mode over `src/**/*.test.tsx`, on Edge under
+  Windows and Chromium elsewhere, in the `en-GB` locale (`tests/browser.ts`). **Never jsdom** —
+  see DECISIONS.md "Testing in a real browser, never jsdom".
 - **End-to-end tests** run in Playwright over `tests/e2e`, against the dev server on 1422.
   Screenshots land in `test-results/`, which is git-ignored.
 - **A check proves something at more than one size.** Sweep widths, and fail on any console
@@ -99,35 +102,42 @@ tests/e2e/     Playwright
 
 ## Slices
 
-The interface is built one slice at a time: **window bar → the frame (navigation, grid, pane)
-→ navigation → grid and tiles → the visual direction → the pane → selection and moving → search
-→ menus and dialogs → settings and the tags screen → empty states and guidance.**
+The interface was built one slice at a time — window bar, frame, navigation, grid, the visual
+direction, pane, selection, search, menus, settings — each from two to four candidates the owner
+picked between in the real window. What won is written into DECISIONS.md.
 
-Each slice builds two to four candidates that differ in **structure**, not colour. Claude
-checks them in a real browser first; the user then picks one in the real window, the rest are
-deleted, and what won is written into DECISIONS.md.
-
-**Until the visual direction, the look was deliberately plain** — Windows metrics and neutral
-greys — so each structure was judged on its own. That slice ran once the grid showed real
-pictures: three looks of its own were rejected, and so was one taken from ggallery's drawing.
-**Since 14 September 2026 each new surface is drawn in Claude Design** from a prompt Claude
-writes, and built from the files in `docs/design/` (DECISIONS.md "The look"). **A feature that
-adds a shape adds it to `docs/DESIGN.md`**, and its states are checked on the real surface, in
-the real window.
+**Now each capability is an issue**, built from its drawing by the `deliver` skill. Candidates
+come back only when a pull request is labelled `needs-human` for a direction the sheets do not
+settle: the dev readout at the foot of a debug window switches between them, by click or by the
+digit beside each, and its last entry shows every candidate at once. A production build always
+takes the first. When the owner picks, the others and their picker entry are deleted.
 
 ## Designs
 
-Claude Design's files live in `docs/design/`, one per sheet, beside the `support.js` that renders
-them; open one in a browser. Claude imports them from the project itself, and only the files a
-build needs. They load fonts and icons from the network to draw, which suits a reference and is
-never true of the app. Biome skips the folder, and nothing in `src/` imports from it.
+The sheets in `docs/design/` are what the interface is built from; its README lists them. The
+`design-pass` skill draws `docs/design/BACKLOG.md` on a Claude Design canvas and brings the
+sheets back into the repository, which stays the source of truth (DECISIONS.md "The look").
+**A feature that adds a shape adds it to `docs/DESIGN.md`**, and its states are checked on the
+real surface.
 
-**Candidates are compared live in `tauri dev`, never by screenshot.** The dev readout at the
-bottom of the window switches between them instantly, by click or by the digit beside each, and
-its last entry, compare, shows every candidate at once, each over dev-only stand-ins and still
-driving the real window: side by side, or stacked at full width when the slice is a layout. The choice survives a reload; a production build always takes
-the first candidate. **A turn that ends on a choice leaves `tauri dev` running** with the
-candidates on it. When the user picks, the others and their picker entry are deleted.
+## Cloud sessions
+
+Agents work in Claude Code cloud sessions: Linux containers that clone this repository fresh.
+`.claude/hooks/session-start.sh` readies one — Tauri's Linux libraries, the npm install, a
+warm Rust build, and `CHROMIUM_PATH` pointing the tests at the image's Chromium. ggallery is
+attached as a second repository and cloned to `../ggallery`.
+
+Windows-only code (`#[cfg(windows)]`) is tested by CI's Windows job, not in the session. The
+real window is Windows-only too; a session checks the interface in Chromium against the dev
+mock, which is the same engine as WebView2.
+
+## Review
+
+Every pull request is reviewed by the `reviewer` agent, which did not write it, to the bar in
+`.claude/skills/review/SKILL.md`. Its review is posted on the pull request ending in
+`<!-- review: pass -->` or `<!-- review: fail -->`. The Review check
+(`.github/workflows/review.yml`) passes only on a pass for the exact head commit, from the
+repository's own account, and fails while `needs-human` is on; auto-merge waits on it.
 
 ## Porting from ggallery
 
@@ -200,4 +210,5 @@ of the base look, at the same value, and every component reference pointing at a
   optimized then and reloads the page, killing whichever test was in flight, so every such
   dependency is named in `optimizeDeps.include` in `vitest.config.ts`. A warm local cache never
   shows it: check with `node_modules/.vite/vitest` moved aside, and read the log for "reloading".
-- **CI compiles Rust from scratch**; there is no build cache yet, which is most of its runtime.
+- **CI caches Rust's build** per job and per `Cargo.lock`; a lockfile change compiles from
+  scratch once.
