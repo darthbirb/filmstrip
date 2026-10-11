@@ -17,9 +17,9 @@ description: Conventions for driving a Filmstrip pull request to merged — CI, 
   merge and takes off one already armed. Never remove the label yourself.
 - **Dependabot:** for its grouped patch and minor updates, the Dependabot workflow marks each
   head Dependabot pushed reviewed and arms the merge, so they merge on green by themselves. A lone
-  update, usually a major, goes through the queue like any pull request: the reviewer reviews it,
-  and one whose release notes or gates show a break gets `needs-human` with one comment on what
-  breaks.
+  update, a major or any GitHub Actions bump, goes through the queue like any pull request: the
+  reviewer reviews it, and one whose release notes or gates show a break gets `needs-human` with
+  one comment on what breaks.
 - **Commits and descriptions carry no AI attribution**: no co-author trailer, no generated-by
   line. They are authored as the repository's owner.
 - **A red `main`** is fixed before anything else lands.

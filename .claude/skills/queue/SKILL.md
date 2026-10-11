@@ -14,16 +14,21 @@ the issues and pull requests; "continue the queue" picks up where it left off.
 
 0. **Auto mode.** The owner starts the session in Auto mode, so nothing waits on a prompt; the
    deny rules in `.claude/settings.json` still hold. In any other mode, say so and ask once.
-1. **Resume first.** `git fetch --prune origin`. An open pull request that is not `needs-human`
-   comes before new work: the owner's; one of Dependabot's whose head branch has no
-   `/patch-and-minor-` (a lone update, usually a major); or a grouped one of Dependabot's whose
-   head carries a failing Review (held, then released). Its head already failed review: step 5. Otherwise:
-   step 4. A Dependabot major is checked against its release notes and the gates; if it breaks
+1. **Resume first.** `git fetch --prune origin`. An open pull request that is neither a draft nor
+   `needs-human` comes before new work: the owner's; one of Dependabot's whose head branch has no
+   `/patch-and-minor-` (a major, or any GitHub Actions bump); or a grouped one of Dependabot's
+   whose head has a failing Review or none. Route it by its head commit:
+   - the latest review on that commit ends in `<!-- review: fail -->`: step 5;
+   - the head carries the reviewer's Review = success: step 6;
+   - otherwise (no review of that commit, or only the Hold workflow's failure): step 4.
+
+   A Dependabot major is checked against its release notes and the gates; if it breaks
    something, label it `needs-human` with one comment on what breaks.
 2. **Pick.** The open issue labelled `ready` and none of `in-progress`, `blocked` or
    `needs-human`, earliest milestone, lowest number first. None ready but some labelled `design`:
-   run the `design-pass` skill in a builder subagent instead. Neither: stop, and say the queue is
-   empty.
+   start a `general-purpose` subagent: "Use the design-pass skill, up to and including opening
+   its pull request; return the pull request number and its head commit", then steps 4 to 7.
+   Neither: stop, and say the queue is empty.
 3. **Build.** Start a `general-purpose` subagent in the foreground: "Use the deliver skill on
    issue #n, up to and including opening its pull request. Return the pull request number, its
    head commit, and a five-line summary of what changed and how it was checked." Wait for it.

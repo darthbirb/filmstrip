@@ -17,7 +17,7 @@ permissions:
 jobs:
   enable:
     name: Enable
-    # The group in dependabot.yml; a lone update, usually a major, is reviewed like any other.
+    # The group in dependabot.yml; a major or an Actions bump is reviewed like any other.
     if: >-
       !github.event.pull_request.draft &&
       github.event.pull_request.user.login == 'dependabot[bot]' &&
