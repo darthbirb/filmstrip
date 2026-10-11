@@ -5,7 +5,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..");
-const DOCS = ["PRODUCT", "DECISIONS", "DEVELOPMENT", "SCHEMA", "DESIGN"];
+const DOCS = ["PRD", "PRODUCT", "DECISIONS", "DEVELOPMENT", "SCHEMA", "DESIGN"];
 const MAX_COMMENT_LINES = 3;
 const SCANNED = ["src", "src-tauri/src", "tests", "scripts"];
 const GENERATED = ["src/ipc/bindings"];

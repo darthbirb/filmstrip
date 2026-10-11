@@ -254,7 +254,7 @@ test("the verbs reach the commands they name, for the folder they were opened on
   });
 });
 
-test("an offline source keeps what needs no drive, and an offline folder opens nothing", async () => {
+test("an offline source and its folders keep what needs no drive", async () => {
   const old: FolderNode = {
     id: 99,
     title: "Old",
@@ -282,10 +282,9 @@ test("an offline source keeps what needs no drive, and an offline folder opens n
       await archive.click();
       await userEvent.keyboard("{ArrowRight}");
       // A folder of an offline source keeps its row, and its count with it.
+      // Favourite and a key are the index's, as the folder's band offers them too.
       const folder = screen.getByRole("treeitem", { name: "Old 0 of 0" });
-      await folder.click({ button: "right" });
-      await new Promise((settle) => setTimeout(settle, 100));
-      expect(screen.getByRole("menu").elements()).toHaveLength(0);
+      expect(labels(await menuOn(screen, folder, "Old"))).toEqual(["Favourite", "Assign Key…"]);
     },
     (cmd, args) =>
       cmd === "folder_children" && (args as { folderId: number }).folderId === 3

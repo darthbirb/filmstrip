@@ -16,20 +16,16 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## A folder's details · DRAWN
+## Tagging a file · DRAWN
 
-The grid's header says only where you are. A folder has more to know, and nowhere to show it:
-how many items it holds, its labels and tags, and, in the schema already, a status, a favourite
-flag, a note and a cover.
+The pane's details show a file's tags, its own and those inherited from its folders, and offer
+no way to change them. In ggallery a file's tags were added and removed by hand.
 
-Make the grid's header a disclosure, as the pane's header is, taking the old drawing's folder
-band: a chevron, the folder's title and its counts, then the header's own controls. Opened, it
-drops a band with the cover beside rows for Path, Status, Labels, Tags and Note, in the same
-rhythm as the pane's details. The Sorting Box and the Trash keep a plain header with no
-disclosure.
+A file takes tags only, never a label. Inherited tags belong to a folder and cannot be removed from
+the file.
 
-Its counts read in the count pill's terms, as redrawn, always both parts: `3 here · 9 in all`,
-`3 here · 3 in all`, `0 here · 0 in all`.
+Draw adding and removing a file's own tags in the pane's details. It is the same act as the folder
+band's Add Tag…, so the two should be one control.
 
 ## Scrubbing a video's tile · DRAWN
 

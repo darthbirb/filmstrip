@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { GlyphButton } from "../ui/GlyphButton";
 import { Frame } from "./frame/Frame";
 import { Dragging } from "./grid/drag";
+import { FolderBand } from "./grid/FolderBand";
 import { Grid } from "./grid/Grid";
 import { DEFAULT_LAYOUT } from "./grid/layout";
 import { Notices } from "./grid/Notices";
@@ -65,6 +66,7 @@ export function App() {
               <TileSize />
             </>
           }
+          band={<FolderBand />}
           notices={
             <>
               <DeleteQuestion />

@@ -223,8 +223,8 @@ export function Navigation() {
         groups: sourceMenu(source, rename, newFolder, star, assign, search),
       };
     }
-    // Nothing on it can act on a folder whose drive is away, and an empty menu opens nothing.
-    if (!source.reachable) return { groups: [] };
+    // A folder whose drive is away keeps what only the index holds, as its source's row does.
+    if (!source.reachable) return { groups: [[star, assign]] };
     const moveTo: MenuAction = {
       id: "move",
       label: "Move to…",

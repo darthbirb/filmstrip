@@ -17,7 +17,7 @@ export function SearchHeader({ place }: { place: Place & { kind: "search" } }) {
   const wider = found && withoutScope(found.terms);
   const back = place.back ? `Back to ${placeName(place.back)}` : "Back";
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2">
+    <div className="flex min-w-0 flex-1 items-center gap-2 pl-3">
       <GlyphButton glyph="back" label={`${back} · Escape`} onClick={goBack} />
       {/* The place's name, as a folder's title is the grid's. */}
       <h2 className="m-0 flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden font-normal">
