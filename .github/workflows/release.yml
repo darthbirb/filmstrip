@@ -1,0 +1,60 @@
+name: Release
+
+# Every commit on main becomes the "nightly" pre-release; a vX.Y.Z tag becomes a release.
+# Both carry the portable Filmstrip.exe. CONTRIBUTING.md "Releases".
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Filmstrip.exe
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+          key: release
+
+      - name: Install
+        run: npx --yes pnpm@12.4.1 install --frozen-lockfile
+
+      - name: Build
+        run: npx --yes pnpm@12.4.1 tauri build
+
+      - name: Publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          exe=src-tauri/target/release/Filmstrip.exe
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            gh release create "$GITHUB_REF_NAME" "$exe" --repo "$GITHUB_REPOSITORY" \
+              --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+          else
+            notes="The latest build of main, at ${GITHUB_SHA::7}. Replaced by every merge."
+            gh release delete nightly --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
+            gh release create nightly "$exe" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "Nightly" --notes "$notes" --prerelease --latest=false
+          fi
