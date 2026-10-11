@@ -12,12 +12,14 @@ description: Conventions for driving a Filmstrip pull request to merged — CI, 
 - **Review** is a commit status the `reviewer` agent sets on the commit it reviewed, and only on
   a pass, after posting its review ending in `<!-- review: pass -->`. A push makes a new head
   with no status, so it needs a fresh review. No other session or agent sets it.
-- **`needs-human`** holds a pull request for the owner: the reviewer sets no status on it and the
-  queue arms no merge. Never remove the label yourself.
-- **Dependabot:** the Dependabot workflow marks its head commits reviewed and arms the merge, so
-  patch and minor updates merge on green by themselves. A major update gets `needs-human` with
-  one comment on what breaks, unless its release notes and the gates show nothing does; take its
-  armed merge off with `gh pr merge <n> --disable-auto` when labelling it.
+- **`needs-human`** holds a pull request for the owner: the Hold workflow marks its head
+  Review = failure as the label goes on, the reviewer sets no status on it, and the queue arms no
+  merge and takes off one already armed. Never remove the label yourself.
+- **Dependabot:** for its grouped patch and minor updates, the Dependabot workflow marks each
+  head Dependabot pushed reviewed and arms the merge, so they merge on green by themselves. A lone
+  update, usually a major, goes through the queue like any pull request: the reviewer reviews it,
+  and one whose release notes or gates show a break gets `needs-human` with one comment on what
+  breaks.
 - **Commits and descriptions carry no AI attribution**: no co-author trailer, no generated-by
   line. They are authored as the repository's owner.
 - **A red `main`** is fixed before anything else lands.

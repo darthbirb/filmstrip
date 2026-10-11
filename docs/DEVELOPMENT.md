@@ -125,7 +125,8 @@ there until nothing is `ready` or waiting on `design`. That session only orchest
 issue is built by a fresh `general-purpose` subagent running `deliver`, and reviewed by a fresh
 `reviewer` subagent, so neither inherits the other's context and the session stays small across
 many issues. Failed reviews go back to a builder for at most three rounds before `needs-human`.
-Nothing runs outside the app: no CLI, no API key, no Claude secret on GitHub.
+Nothing runs outside the app: no CLI, no API key, no Claude secret on GitHub. The session runs
+in Auto mode, so nothing waits on a prompt, and the deny rules in `.claude/settings.json` hold.
 
 GitHub holds the state, so a run stopped by a usage limit or a closed app resumes when asked to
 continue. Each issue adds a line to `.queue/log.md`, git-ignored: what merged, what waits on the
@@ -142,9 +143,12 @@ Every pull request is reviewed by the `reviewer` agent, which did not write it, 
 `<!-- review: pass -->` or `<!-- review: fail -->`. On a pass, and only then, the reviewer sets
 the `Review` commit status on the commit it reviewed; `main`'s ruleset requires it beside Gates
 and Title. A push makes a new head with no status, so every change after a review is reviewed
-again, and a `needs-human` pull request gets none. The Dependabot workflow sets it for
-Dependabot's updates, which the gates review. The reviewer runs the branch in a worktree of its
-own, never in the author's checkout.
+again. Labelling a pull request `needs-human` holds it: the Hold workflow marks its head
+Review = failure, and only a fresh passing review after the label comes off replaces it. The
+Dependabot workflow sets it for Dependabot's grouped patch and minor updates, which the gates
+review. The ruleset takes Review from any source, so it is as trustworthy as the account and
+workflows that can set it, as Gates is. The reviewer runs the branch in a worktree of its own,
+never in the author's checkout.
 
 ## Porting from ggallery
 

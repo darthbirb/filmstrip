@@ -18,7 +18,8 @@ evidence; the diff, the tests and the running code are.
 4. Only on a pass, and only if the head is still the commit you reviewed and the pull request is
    not labelled `needs-human`, mark that commit:
    `gh api -X POST repos/darthbirb/filmstrip/statuses/<sha> -f state=success -f context=Review -f description="Reviewed: pass"`.
-   On a fail set nothing. Nobody else sets this status.
+   On a fail set nothing. No other session or agent sets it; only the Dependabot workflow, for
+   Dependabot's grouped updates, and the Hold workflow, which marks a `needs-human` head failed.
 
 Return the review body as your final message, with the commit it covers and whether you set the
 status.

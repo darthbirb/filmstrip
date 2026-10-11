@@ -12,8 +12,13 @@ the issues and pull requests; "continue the queue" picks up where it left off.
 
 ## Each turn of the loop
 
-1. **Resume first.** `git fetch --prune origin`. An open pull request of the owner's that is not
-   `needs-human` comes before new work: take it to **Review** below.
+0. **Run in Auto mode.** The session's permission mode is Auto, so nothing waits on a prompt;
+   the deny rules in `.claude/settings.json` still hold.
+1. **Resume first.** `git fetch --prune origin`. An open pull request that is not `needs-human`,
+   the owner's or one of Dependabot's the Dependabot workflow does not land (a lone update,
+   usually a major), comes before new work. Its head already failed review: step 5. Otherwise:
+   step 4. A Dependabot major is checked against its release notes and the gates; if it breaks
+   something, label it `needs-human` with one comment on what breaks.
 2. **Pick.** The open issue labelled `ready` and none of `in-progress`, `blocked` or
    `needs-human`, earliest milestone, lowest number first. None ready but some labelled `design`:
    run the `design-pass` skill in a builder subagent instead. Neither: stop, and say the queue is
@@ -21,6 +26,7 @@ the issues and pull requests; "continue the queue" picks up where it left off.
 3. **Build.** Start a `general-purpose` subagent in the foreground: "Use the deliver skill on
    issue #n, up to and including opening its pull request. Return the pull request number, its
    head commit, and a five-line summary of what changed and how it was checked." Wait for it.
+   If it labelled the pull request `needs-human`, log it and go to the next issue.
 4. **Review.** Start the `reviewer` subagent in the foreground with the pull request number. It
    posts its review and, on a pass, sets the Review status on the commit it reviewed. Wait for it.
 5. **Fix, at most three rounds.** A fail: start a `general-purpose` subagent: "Use the deliver
@@ -39,6 +45,8 @@ the issues and pull requests; "continue the queue" picks up where it left off.
 
 - Never merge, and never set the Review status, yourself: the reviewer marks the commit, and
   GitHub merges once Gates, Title and Review are green. Nothing bypasses `main`'s ruleset.
+- Labelling a pull request `needs-human` holds it: the Hold workflow marks its head Review =
+  failure. Take its armed merge off too (`gh pr merge <n> --disable-auto`).
 - One issue at a time, each in its own subagent and branch. Never start a builder while another
   pull request of the owner's is waiting for review or a fix.
 - The owner decides only what the `deliver` skill's "When the owner decides" names; everything

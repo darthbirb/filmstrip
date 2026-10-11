@@ -1,8 +1,8 @@
 name: Dependabot
 
-# Dependabot's pull requests are reviewed by the gates themselves: this marks each head commit
-# Reviewed and arms a squash merge, which the ruleset on main holds until Gates pass.
-# CONTRIBUTING.md "Pull requests".
+# Dependabot's grouped patch and minor updates are reviewed by the gates: this marks each head it
+# pushed Reviewed and arms a squash, held by main's ruleset until Gates pass. Its other pull
+# requests go through the queue. CONTRIBUTING.md "Pull requests".
 on:
   # The base repository's workflow and token, so Dependabot's pull requests can be enabled too.
   # Nothing from the pull request is checked out or run.
@@ -17,9 +17,13 @@ permissions:
 jobs:
   enable:
     name: Enable
+    # The group in dependabot.yml; a lone update, usually a major, is reviewed like any other.
     if: >-
       !github.event.pull_request.draft &&
-      github.event.pull_request.user.login == 'dependabot[bot]'
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.actor == 'dependabot[bot]' &&
+      contains(github.event.pull_request.head.ref, '/patch-and-minor-') &&
+      !contains(github.event.pull_request.labels.*.name, 'needs-human')
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

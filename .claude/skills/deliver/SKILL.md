@@ -66,10 +66,10 @@ check is root-caused and fixed the same way, never skipped.
 ## When the owner decides
 
 Label the pull request `needs-human`, say in one comment exactly what is being asked, and
-return; the queue goes on to the next issue. Only for: a change that deletes or moves the user's files in a way the
-app did not before, a migration that rewrites existing data, a new visual direction the sheets
-do not settle, or a requirement the PRD contradicts or leaves open. Everything else decides
-itself by the PRD, the sheets and `DECISIONS.md`.
+return; the queue goes on to the next issue. Only for: a change that deletes or moves the user's
+files in a way the app did not before, a migration that rewrites existing data, a new visual
+direction the sheets do not settle, or a requirement the PRD contradicts or leaves open.
+Everything else decides itself by the PRD, the sheets and `DECISIONS.md`.
 
 ## Keeping the queue going
 

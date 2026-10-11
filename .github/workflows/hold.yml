@@ -1,0 +1,27 @@
+name: Hold
+
+# Labelled needs-human, a pull request's head is marked Review = failure, so nothing merges it
+# until the owner takes the label off and a fresh passing review replaces the mark.
+# DEVELOPMENT.md "Review".
+on:
+  # The base repository's workflow and token; nothing from the pull request is checked out or run.
+  pull_request_target:
+    types: [labeled, synchronize]
+
+permissions:
+  statuses: write
+
+jobs:
+  hold:
+    name: Hold
+    if: contains(github.event.pull_request.labels.*.name, 'needs-human')
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Mark the head held
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          gh api -X POST "repos/$GITHUB_REPOSITORY/statuses/$HEAD" -f state=failure \
+            -f context=Review -f description="Held: needs-human" >/dev/null

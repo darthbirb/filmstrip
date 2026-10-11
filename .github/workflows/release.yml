@@ -21,8 +21,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
-      # Auto-merge lands commits with the workflow token, which starts no push runs; hence a
-      # schedule, skipping a day main did not move.
+      # Dependabot's merges land with the workflow token, which starts no push runs, and a push to
+      # main is not a release anyway; hence a schedule, skipping a day main did not move.
       - name: Has main moved since the last Nightly?
         id: moved
         if: github.ref_type != 'tag'
