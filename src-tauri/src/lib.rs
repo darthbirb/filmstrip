@@ -154,3 +154,32 @@ pub fn run() {
         }
     });
 }
+
+#[cfg(test)]
+mod tests {
+    fn minor(version: &str) -> &str {
+        let end = version
+            .match_indices('.')
+            .nth(1)
+            .map_or(version.len(), |(at, _)| at);
+        &version[..end]
+    }
+
+    #[test]
+    fn the_tauri_crate_and_its_npm_packages_share_a_minor_release() {
+        let package: serde_json::Value =
+            serde_json::from_str(include_str!("../../package.json")).unwrap();
+        for name in ["@tauri-apps/api", "@tauri-apps/cli"] {
+            let npm = package["devDependencies"][name]
+                .as_str()
+                .or_else(|| package["dependencies"][name].as_str())
+                .unwrap_or_else(|| panic!("package.json names {name}"));
+            assert_eq!(
+                minor(npm),
+                minor(tauri::VERSION),
+                "{name} {npm} against the tauri crate {}; tauri build refuses a mismatch",
+                tauri::VERSION
+            );
+        }
+    }
+}

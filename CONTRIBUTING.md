@@ -6,7 +6,7 @@ issue first; it is the faster route.
 
 ## Getting it running
 
-You need Node 24 (see `.nvmrc`), Rust stable 1.85 or newer, and Windows with Edge installed —
+You need Node 24 (see `.nvmrc`), Rust stable 1.90 or newer, and Windows with Edge installed —
 the tests drive the Edge you already have rather than downloading a browser. Elsewhere they fall
 back to Playwright's Chromium (`tests/browser.ts`), and Tauri needs
 [its prerequisites](https://v2.tauri.app/start/prerequisites/).

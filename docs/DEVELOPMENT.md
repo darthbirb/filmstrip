@@ -2,7 +2,7 @@
 
 ## What you need
 
-Node 24 (see `.nvmrc`), Rust stable (1.85 or newer, for edition 2024), and Microsoft Edge —
+Node 24 (see `.nvmrc`), Rust stable (1.90 or newer, which Tauri 2.12 needs), and Microsoft Edge —
 the tests drive the Edge you already have rather than downloading a browser. WebView2 ships
 with Windows 11. For the queue, Claude Code and the GitHub CLI (`gh`), signed in.
 
