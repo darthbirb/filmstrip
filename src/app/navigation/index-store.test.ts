@@ -15,6 +15,7 @@ function source(id: number, title: string): SourceSummary {
     title,
     kind: "library",
     addedAt: 0,
+    indexedAt: null,
     rootFolderId: id,
     reachable: true,
     itemCount: 2,

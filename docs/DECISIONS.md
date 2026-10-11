@@ -400,6 +400,41 @@ its whole path in the tooltip and the pane, and "gone" when that folder no longe
 refused Restore is not the first they hear of it. The line ellipsises and the tile never grows to
 fit it. The Trash counts itself on its row, its rail square and its header, with its size there.
 
+## A folder's details
+
+**A folder's band is the pane's details one level up**, opened from the grid's header, as
+Artboards › 04 draws it. Same caption column, same row, same chips: a folder and a file both have
+a path, labels and tags, and should not need two vocabularies. The Sorting Box and the Trash keep a
+plain header, having none of these.
+
+- **Its tags start with its own, its name first, then what it inherits**, each folder above in
+  path order from the source down, that folder's name before its tags. A tag carried at two levels
+  shows once, where it is nearest, as a file inherits it.
+- **The band stays open from folder to folder** for the session, closed when the app starts: a
+  person who opened it once wants it on the next folder too, and a band that flashed open on
+  every click would push the pictures down unasked.
+- **What a folder knows about itself lives in the index**, so setting it is not journalled, as a
+  favourite is not, and works while its drive is away. Only the counts and the cover's picker
+  need the drive.
+- **Escape abandons a note, and a click away keeps it.** Half a note is still what was meant, so
+  leaving the box saves it, where a half-typed tag or name is dropped; Enter is a new line, since
+  a note is prose, and Ctrl+Enter saves. Saved empty, the note is gone: none is no note.
+- **A tag the folder already carries is refused where it is typed**, its own or one from above:
+  adding it again would change nothing a search can see. The line names the folder it comes from,
+  which is where it can be taken off. A folder's name is a tag only a rename changes, so it has no
+  ×. Tags come several at a time, so the field stays open after each until Escape or a click away,
+  which drop what was half typed.
+- **A label is one fact with two parts**, so Add Label… closes once it is added, where Add Tag…
+  stays open. A folder holds one value per key, as ggallery's did: a label answers a question,
+  where or which trip, and a folder with two answers answers twice. A key it has is refused where
+  it is typed and its value is changed with a click on it instead; one from above names the
+  folder it comes from.
+- **The header's counts are the tree's, in words**: its own files here, then everything at or
+  below it, the same two figures a pill shows. An offline source says `offline` instead.
+- **A folder that holds anything always has a picture.** Its chosen cover while that file is live
+  at or below it, else its first picture or video, nearest first. A search's folder card shows the
+  same one, so the band and the card never disagree; ggallery never left a folder coverless either.
+
 ## The pane
 
 **The picture, a row that opens onto what is known, and a filmstrip**: the predecessor's
@@ -503,7 +538,8 @@ Shift+F10 did nothing at all.
   between two groups that both hold rows, so an absent verb leaves no stray line, and a menu with
   nothing in it opens nothing.
 - **What a drive that is away cannot do is absent too.** An offline source keeps Rename, Manage
-  Sources and Remove Source, which touch only the index; its folders have nothing left.
+  Sources and Remove Source, which touch only the index; its folders keep Favourite and Assign
+  Key…, as their band keeps what the index holds, and lose every verb that needs the folder on disk.
 - **Favourite is on a folder's and a source's menu**, reading Remove Favourite when on, from
   either of the place's rows. It changes nothing on disk, so it is not journalled and a source
   that is away keeps it.

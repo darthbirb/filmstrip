@@ -6,9 +6,12 @@ import type { Crumb } from "../ipc/bindings/Crumb";
 import type { DestinationKey } from "../ipc/bindings/DestinationKey";
 import type { Fault } from "../ipc/bindings/Fault";
 import type { FavouritePlace } from "../ipc/bindings/FavouritePlace";
+import type { FolderDetail } from "../ipc/bindings/FolderDetail";
 import type { FolderEntry } from "../ipc/bindings/FolderEntry";
 import type { FolderMatch } from "../ipc/bindings/FolderMatch";
 import type { FolderNode } from "../ipc/bindings/FolderNode";
+import type { FolderStatus } from "../ipc/bindings/FolderStatus";
+import type { FolderTag } from "../ipc/bindings/FolderTag";
 import type { Hit } from "../ipc/bindings/Hit";
 import type { ItemDetail } from "../ipc/bindings/ItemDetail";
 import type { ItemRow } from "../ipc/bindings/ItemRow";
@@ -57,6 +60,8 @@ function source(
     title,
     kind,
     addedAt: 0,
+    // 4 March 2026, when the mock's library was last read.
+    indexedAt: 1_772_582_400,
     rootFolderId: id,
     reachable: true,
     itemCount,
@@ -103,6 +108,8 @@ const SOURCES: SourceSummary[] = [
 const FOLDERS: Record<number, FolderNode[]> = {
   1: [folder(5, "People", 0, 0), folder(4, "Trips", 1, 2)],
   4: [folder(6, "Cairo", 0, 3)],
+  // A folder an offline source still knows, from when it was last indexed.
+  3: [folder(7, "Scans", 0, 0)],
 };
 
 const ITEMS: Record<number, ItemRow[]> = {
@@ -492,7 +499,15 @@ function searchFor(query: string): SearchOutcome {
         const path = lower(hit.at.path);
         if (shape.kind === "path") return within(path, shape);
         if (shape.kind === "place") return shape.place === "trash" || hit.folderId === 2;
-        if (shape.kind === "tag") return path.includes(shape.value.toLowerCase());
+        if (shape.kind === "tag") {
+          const value = shape.value.toLowerCase();
+          // A file carries every tag its folders do, a band's as well as their names.
+          const above = trashed.get(hit.id)?.folders ?? crumbs(hit.folderId).folders;
+          const added = above.some((crumb) =>
+            ownOf(crumb.id).tags.some((tag) => tag.key === null && tag.value === value),
+          );
+          return path.includes(value) || added;
+        }
         if (shape.kind === "label") return false;
         const word = text.toLowerCase();
         return hit.diskName.toLowerCase().includes(word) || path.includes(word);
@@ -573,6 +588,125 @@ function suggestionsFor(scope: string | null, text: string): Suggestions {
     }
   }
   return { from, rows: rows.slice(0, 8) };
+}
+
+/** What a folder knows about itself beyond its place, as the band reads it. */
+type Own = {
+  status: FolderStatus | null;
+  statusSetAt: number | null;
+  note: string | null;
+  cover: number | null;
+  /** Its hand-made tags and labels, in the order they were added; its name is not among them. */
+  tags: { key: string | null; value: string }[];
+};
+
+const OWN = new Map<number, Own>([
+  [
+    4,
+    {
+      ...blank(),
+      tags: [
+        { key: null, value: "travel" },
+        { key: "trip", value: "egypt 2024" },
+      ],
+    },
+  ],
+  [
+    6,
+    {
+      ...blank(),
+      status: "wip",
+      statusSetAt: 1_749_859_200,
+      note: "Four mornings at Giza. The dawn set is the keepers.",
+      tags: [
+        { key: null, value: "egypt" },
+        { key: "location", value: "cairo" },
+      ],
+    },
+  ],
+]);
+
+function blank(): Own {
+  return { status: null, statusSetAt: null, note: null, cover: null, tags: [] };
+}
+
+function ownOf(folderId: number): Own {
+  const found = OWN.get(folderId) ?? blank();
+  OWN.set(folderId, found);
+  return found;
+}
+
+/** One id per distinct term, as the `tag` table keeps them. */
+const TAG_IDS = new Map<string, number>();
+const tagId = (key: string | null, value: string) => {
+  const term = `${key ?? ""}:${value}`;
+  if (!TAG_IDS.has(term)) TAG_IDS.set(term, TAG_IDS.size + 1);
+  return TAG_IDS.get(term) ?? 0;
+};
+
+/** Every picture and video at or below a folder, nearest first, then by name. */
+function coverChoices(folderId: number) {
+  const depth = (item: ItemRow) => crumbs(item.folderId).folders.length;
+  return under(folderId)
+    .filter((item) => item.kind !== "other")
+    .sort((a, b) => depth(a) - depth(b) || a.diskName.localeCompare(b.diskName));
+}
+
+/** A label's keys or one key's values that begin with what was typed, by how many folders use them. */
+function labelOffers(text: (label: { key: string; value: string }) => string, typed: string) {
+  const word = typed.trim().toLowerCase();
+  const used = new Map<string, number>();
+  for (const own of OWN.values()) {
+    for (const tag of own.tags) {
+      const said = tag.key === null ? "" : text({ key: tag.key, value: tag.value });
+      if (said.startsWith(word) && said !== "") used.set(said, (used.get(said) ?? 0) + 1);
+    }
+  }
+  return [...used]
+    .sort(([a, one], [b, two]) => two - one || a.localeCompare(b))
+    .slice(0, 7)
+    .map(([offer, folders]) => ({ text: offer, folders }));
+}
+
+/** A folder's band, as `folder_detail` answers: its own tags, then each folder's above it. */
+function folderDetail(folderId: number): FolderDetail | null {
+  const isRoot = SOURCES.some((one) => one.rootFolderId === folderId);
+  if (!isRoot && !parents().has(folderId)) return null;
+  const { folders, home } = crumbs(folderId);
+  if (!home) return null;
+  const levels = folders.map((crumb) => {
+    const from = crumb.id === folderId ? null : crumb;
+    const name = { key: null, value: crumb.title.toLowerCase() };
+    return [name, ...ownOf(crumb.id).tags].map(
+      (tag, at): FolderTag => ({ tagId: tagId(tag.key, tag.value), ...tag, from, name: at === 0 }),
+    );
+  });
+  // A tag carried at two levels shows once, where it is nearest.
+  const seen = new Set<number>();
+  const [self = [], ...above] = levels.reverse().map((level) =>
+    level.filter((tag) => {
+      if (seen.has(tag.tagId)) return false;
+      seen.add(tag.tagId);
+      return true;
+    }),
+  );
+  const own = ownOf(folderId);
+  const pictures = coverChoices(folderId);
+  const standing = pictures.find((item) => item.id === own.cover) ?? pictures[0];
+  return {
+    id: folderId,
+    sourceId: home.id,
+    path: folders,
+    status: own.status,
+    statusSetAt: own.statusSetAt,
+    favorite: isRoot ? home.favorite : (live(folderId)?.node.favorite ?? false),
+    note: own.note,
+    coverItemId: standing && standing.id === own.cover ? standing.id : null,
+    cover: standing?.thumb ?? null,
+    ownCount: ITEMS[folderId]?.length ?? 0,
+    allCount: under(folderId).length,
+    tags: [...self, ...above.reverse().flat()],
+  };
 }
 
 type Args = Record<string, unknown>;
@@ -747,6 +881,70 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     const node = live(id)?.node;
     if (node) node.favorite = favorite as boolean;
     for (const one of SOURCES) if (one.rootFolderId === id) one.favorite = favorite as boolean;
+    return null;
+  },
+  folder_detail: ({ folderId }) => folderDetail(folderId as number),
+  set_folder_status: ({ folderId, status }) => {
+    const own = ownOf(folderId as number);
+    own.status = status as FolderStatus | null;
+    own.statusSetAt = status ? Math.floor(Date.now() / 1000) : null;
+    return null;
+  },
+  tag_offers: ({ typed }) => {
+    const word = String(typed).trim().toLowerCase();
+    const carried = new Map<string, number>();
+    const places = [...SOURCES.map((one) => one.rootFolderId), ...parents().keys()];
+    for (const id of places) {
+      const name = crumbs(id).folders.at(-1)?.title.toLowerCase() ?? "";
+      const own = ownOf(id).tags.filter((tag) => tag.key === null);
+      for (const value of [name, ...own.map((tag) => tag.value)]) {
+        carried.set(value, (carried.get(value) ?? 0) + under(id).length);
+      }
+    }
+    return [...carried]
+      .filter(([value]) => value !== "" && value.startsWith(word))
+      .sort(([a, one], [b, two]) => two - one || a.localeCompare(b))
+      .slice(0, 7)
+      .map(([value, files]) => ({ value, files }));
+  },
+  add_folder_tag: ({ folderId, value }) => {
+    const own = ownOf(folderId as number);
+    const folded = String(value).trim().toLowerCase();
+    if (!own.tags.some((tag) => tag.key === null && tag.value === folded)) {
+      own.tags.push({ key: null, value: folded });
+    }
+    return null;
+  },
+  remove_folder_tag: ({ folderId, tagId: id }) => {
+    const own = ownOf(folderId as number);
+    own.tags = own.tags.filter((tag) => tagId(tag.key, tag.value) !== id);
+    return null;
+  },
+  label_key_offers: ({ typed }) => labelOffers((label) => label.key, String(typed)),
+  label_value_offers: ({ key, typed }) =>
+    labelOffers(
+      (label) => (label.key === String(key).trim().toLowerCase() ? label.value : ""),
+      String(typed),
+    ),
+  set_folder_label: ({ folderId, key, value }) => {
+    const own = ownOf(folderId as number);
+    const label = {
+      key: String(key).trim().toLowerCase(),
+      value: String(value).trim().toLowerCase(),
+    };
+    const held = own.tags.findIndex((tag) => tag.key === label.key);
+    if (held >= 0) own.tags[held] = label;
+    else own.tags.push(label);
+    return null;
+  },
+  folder_cover_choices: ({ folderId }) =>
+    coverChoices(folderId as number).map((item) => ({ itemId: item.id, thumb: item.thumb })),
+  set_folder_cover: ({ folderId, itemId }) => {
+    ownOf(folderId as number).cover = itemId as number | null;
+    return null;
+  },
+  set_folder_note: ({ folderId, note }) => {
+    ownOf(folderId as number).note = (note as string | null)?.trim() || null;
     return null;
   },
   favourite_places: (): FavouritePlace[] =>

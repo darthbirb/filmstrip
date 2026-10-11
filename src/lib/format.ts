@@ -47,6 +47,13 @@ export function formatDay(seconds: number, now = new Date()) {
   return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "long", year }).format(day);
 }
 
+/** A day in short, the year always: 14 Jun 2025. */
+export function formatShortDate(seconds: number) {
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
+    new Date(seconds * 1000),
+  );
+}
+
 /** A moment as its day and its time: Today, 14:02. */
 export function formatWhen(seconds: number, now = new Date()) {
   const time = new Intl.DateTimeFormat(undefined, { timeStyle: "short" }).format(

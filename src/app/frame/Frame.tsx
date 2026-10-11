@@ -13,6 +13,8 @@ export type Regions = {
   navRail?: ReactNode;
   navRailFoot?: ReactNode;
   location?: ReactNode;
+  /** Under the grid's header row, on its ground: a folder's details, when opened. */
+  band?: ReactNode;
   /** Above the grid, where something needing a decision waits until it is dealt with. */
   notices?: ReactNode;
   grid?: ReactNode;
@@ -35,6 +37,7 @@ export function Frame({
   navRail,
   navRailFoot,
   location,
+  band,
   notices,
   grid,
   gridFoot,
@@ -69,8 +72,10 @@ export function Frame({
             : ""
         }`}
       >
-        <div className="flex h-toolbar shrink-0 items-center gap-3 border-line border-b bg-panel pr-2 pl-3">
-          {location}
+        {/* The header owns its left inset: a disclosure's chevron sits nearer the edge than a title. */}
+        <div className="flex max-h-1/2 shrink-0 flex-col border-line border-b bg-panel">
+          <div className="flex h-toolbar shrink-0 items-center gap-2 pr-2">{location}</div>
+          {band}
         </div>
         {notices}
         <div className="min-h-0 flex-1 overflow-auto">{grid}</div>

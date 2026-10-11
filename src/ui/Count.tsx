@@ -12,6 +12,11 @@ export function countText({ own, all = own }: Figures) {
   return `${formatCount(own)}/${formatCount(all)}`;
 }
 
+/** The same two figures in words, as a folder's header says them: "3 here · 9 in all". */
+export function countWords({ own, all = own }: Figures) {
+  return `${formatCount(own)} here · ${formatCount(all)} in all`;
+}
+
 /** A count as a screen reader says it: "3 of 9". */
 export function countLabel({ own, all = own }: Figures) {
   return `${formatCount(own)} of ${formatCount(all)}`;

@@ -30,11 +30,18 @@ export function EmptyPlace({ place }: { place: Place }) {
   // A source that cannot be read still knows what it held, so it says that rather than "empty".
   const source = sources?.find((candidate) => candidate.id === place.sourceId);
   if (source && !source.reachable) {
+    // A folder below the source's own counts everything it held, as the source counts all of it.
+    const parent = place.path.at(-2);
+    const node = parent && children.get(parent.id)?.find((child) => child.id === folder.id);
     return (
       <EmptyState
         glyph="unplugged"
         title={`${source.title} Is Offline`}
-        note={`${formatCount(source.itemCount)} items when last indexed.`}
+        note={
+          node
+            ? `${formatCount(node.allCount)} items in ${folder.title} when last indexed.`
+            : `${formatCount(source.itemCount)} items when last indexed.`
+        }
       />
     );
   }
