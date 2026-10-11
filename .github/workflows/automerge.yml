@@ -1,7 +1,7 @@
 name: Auto-merge
 
 # The owner's pull requests and Dependabot's merge by squash once the required checks pass.
-# No session merges anything itself. CONTRIBUTING.md "Pull requests".
+# The ruleset on main, not this workflow, decides when. CONTRIBUTING.md "Pull requests".
 on:
   # The base repository's workflow and token, so Dependabot's pull requests can be enabled too.
   # Nothing from the pull request is checked out or run.
