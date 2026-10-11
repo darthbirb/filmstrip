@@ -196,7 +196,9 @@ function Cover({
         />
       )}
       {detail.coverItemId !== null && (
-        <Plate className="absolute bottom-1.5 left-1.5 text-eyebrow uppercase">Cover</Plate>
+        <Plate look="mark" className="absolute bottom-1.5 left-1.5">
+          Cover
+        </Plate>
       )}
       <CoverPicker folderId={detail.id} title={title} chosen={detail.coverItemId} anchor={anchor} />
     </span>

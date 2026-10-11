@@ -121,6 +121,7 @@ spacing:
   chevron: 1.25rem
   control: 2rem
   chip: 1.625rem
+  chip-remove: 1.125rem
   badge: 1.25rem
   mark-badge: 0.875rem
   tile-gap: 0.375rem
@@ -738,7 +739,8 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   shapes at the tile size, filling the view until the place's tiles arrive. Never a spinner.
 - **Plate.** A small fact laid over a picture: `badge`-tall at the `badge` corner on `veil`, `small`
   tabular figures in `fg`. A video's length on its tile and a zoom's figure in the pane are the same
-  plate. One that acts takes `hover-wash` under the pointer and the focus ring, never a new ground.
+  plate. A word that marks the picture, *Cover* or *First*, is the same plate in `eyebrow`
+  capitals. One that acts takes `hover-wash` under the pointer and the focus ring, never a new ground.
 - **Zoom.** Nothing on the picture at fit. Off fit, a plate a `tile-inset` inside the media area's
   bottom-left states the scale, and is the way back: under the pointer the figure becomes the `fit`
   glyph and **Fit**. The media area clips the picture at its `control` corner at every scale. The
@@ -760,7 +762,7 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   tag “…”" for exactly what was typed. A value the folder already carries turns the ring
   `line-danger`, outlines the chip it repeats in `line-strong`, and says whose it is underneath in
   `key` `danger`. A folder's own tags, never its name or what it inherits, show an × under the
-  pointer or the keyboard, a `badge`-sized circle that takes a `wash`.
+  pointer or the keyboard, a `chip-remove` circle that takes a `wash`.
 - **Label field.** Add Label… is an outline chip at the nested corner; it becomes a label in its
   own two halves, the key on `well` and the value on `ground` in one `line-control` ring, "key" and
   "value" for placeholders, each offered what the library has in the tag field's list with "on 2
@@ -779,8 +781,8 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   corner, a `wash` under the pointer and while its picker is open, ringed in `in-pane` then. The
   picker opens beside the cover in the menu's shape: "Cover for Cairo" in `eyebrow` capitals, then
   every picture in the branch three to a row, `cover-choice` tall at the `badge` corner, scrolling
-  past three rows. The first wears a *First* plate and the chosen one a *Cover* plate, `micro`
-  capitals on `veil`; an `in-pane` hairline under the pointer, the `focus` ring for the keyboard.
+  past three rows. The first wears a *First* plate and the chosen one a *Cover* plate, the band's
+  own; an `in-pane` hairline under the pointer, the `focus` ring for the keyboard.
   While one is chosen a rule and Clear Cover follow, "back to the first" after it in `key` `fg-dim`.
   A folder with nothing at or below it, and one whose drive is away, has no pencil.
 - **Note field.** A note reads as prose in `fg-mid`; under the pointer or the keyboard the Name
