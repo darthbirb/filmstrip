@@ -1,5 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
   "permissions": {
     "allow": [
       "Bash(npx --yes pnpm@12.4.1 *)",

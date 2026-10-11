@@ -3,17 +3,20 @@
 
 use std::path::PathBuf;
 
+#[cfg(windows)]
 use clipboard_win::{Clipboard, raw};
 
 use crate::error::{AppError, Result};
 
 /// The clipboard has one owner at a time, and another program may be holding it for a moment.
+#[cfg(windows)]
 fn open() -> Result<Clipboard> {
     Clipboard::new_attempts(10)
         .map_err(|err| AppError::invalid(format!("the clipboard would not open: {err}")))
 }
 
 /// Copies the files under the names they already have: nothing here is renamed on the way out.
+#[cfg(windows)]
 pub fn copy_files(paths: &[PathBuf]) -> Result<()> {
     let list: Vec<String> = paths
         .iter()
@@ -22,4 +25,12 @@ pub fn copy_files(paths: &[PathBuf]) -> Result<()> {
     let _clipboard = open()?;
     raw::set_file_list(&list)
         .map_err(|err| AppError::invalid(format!("the files would not copy: {err}")))
+}
+
+/// The app ships for Windows only; elsewhere it builds so the tests can run.
+#[cfg(not(windows))]
+pub fn copy_files(_paths: &[PathBuf]) -> Result<()> {
+    Err(AppError::invalid(
+        "copying files to the clipboard needs Windows",
+    ))
 }

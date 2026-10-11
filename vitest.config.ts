@@ -1,9 +1,10 @@
 import { playwright } from "@vitest/browser-playwright";
 import { defineConfig, mergeConfig } from "vitest/config";
 
+import { launchOptions, locale } from "./tests/browser.ts";
 import viteConfig from "./vite.config.ts";
 
-// Component tests run in the installed Edge, never jsdom. DEVELOPMENT.md "Tests".
+// Component tests run in a real browser, never jsdom. DEVELOPMENT.md "Tests".
 export default mergeConfig(
   viteConfig,
   defineConfig({
@@ -16,12 +17,7 @@ export default mergeConfig(
       browser: {
         enabled: true,
         headless: true,
-        // Dates and numbers follow the browser's locale; one fixed locale keeps
-        // assertions identical on every machine.
-        provider: playwright({
-          launchOptions: { channel: "msedge" },
-          contextOptions: { locale: "en-GB" },
-        }),
+        provider: playwright({ launchOptions, contextOptions: { locale } }),
         instances: [{ browser: "chromium" }],
       },
     },

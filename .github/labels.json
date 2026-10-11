@@ -1,0 +1,22 @@
+[
+  { "name": "feature", "color": "1f6feb", "description": "A capability from docs/PRD.md" },
+  { "name": "bug", "color": "d73a4a", "description": "Something does not work as specified" },
+  { "name": "design", "color": "a371f7", "description": "Needs drawing before it can be built" },
+  {
+    "name": "ready",
+    "color": "2da44e",
+    "description": "Specified and drawn: the next session may take it"
+  },
+  { "name": "in-progress", "color": "fbca04", "description": "A session is working on it" },
+  {
+    "name": "needs-human",
+    "color": "e99695",
+    "description": "Waits on the owner; a pull request with it does not merge"
+  },
+  {
+    "name": "blocked",
+    "color": "6e7781",
+    "description": "Waits on another issue, named in its body"
+  },
+  { "name": "dependencies", "color": "0366d6", "description": "Dependabot's updates" }
+]

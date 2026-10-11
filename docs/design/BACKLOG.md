@@ -9,7 +9,7 @@ drawing that disagrees with what is already built, or a state that was never dra
 are drawn before anything else and nothing is built from a sheet that carries one: a surface built
 from an incomplete drawing is built twice.
 
-"The old drawing" is `old-ggallery-design.html` in this folder. Where an entry borrows from it,
+"The old drawing" is `ggallery-drawing.html` in this folder. Where an entry borrows from it,
 take its structure and behaviour, and fit its values to the current token sheet: Plex, Phosphor,
 the red focus ring, the white in-pane mark.
 

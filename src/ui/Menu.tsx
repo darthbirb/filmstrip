@@ -204,8 +204,11 @@ export function Menu({ label, glyph, groups, align = "end" }: Props) {
   );
 }
 
-/** Where a right-click menu opens: at the pointer, or against the element the keyboard is on. */
-export type MenuAnchor = { x: number; y: number } | { element: HTMLElement };
+/**
+ * Where a right-click menu opens: at the pointer, or against the element the keyboard is on.
+ * `held` says the button was still down, as it is wherever the menu opens on press.
+ */
+export type MenuAnchor = { x: number; y: number; held?: boolean } | { element: HTMLElement };
 
 type ContextProps = {
   label: string;
@@ -231,8 +234,21 @@ export function ContextMenu({ label, heading, groups, anchor, onClose }: Context
     if (!element) return;
     back.current =
       "element" in anchor ? anchor.element : (document.activeElement as HTMLElement | null);
-    if (!element.matches(":popover-open")) element.showPopover();
-    setAt(placement(anchor, element.getBoundingClientRect()));
+    const show = () => {
+      if (!element.matches(":popover-open")) element.showPopover();
+      setAt(placement(anchor, element.getBoundingClientRect()));
+    };
+    if (!("held" in anchor && anchor.held)) return show();
+    // Opened on press (Linux, macOS), the release would light-dismiss it: show once that is over.
+    let timer = 0;
+    const released = () => {
+      timer = window.setTimeout(show);
+    };
+    window.addEventListener("pointerup", released, { once: true });
+    return () => {
+      window.removeEventListener("pointerup", released);
+      window.clearTimeout(timer);
+    };
   }, [anchor]);
 
   // Hidden until it is placed, and a hidden row cannot take the focus.
@@ -325,7 +341,7 @@ export function useContextMenu() {
     const anchor =
       event.button === -1
         ? { element: event.currentTarget }
-        : { x: event.clientX, y: event.clientY };
+        : { x: event.clientX, y: event.clientY, held: event.buttons !== 0 };
     setOpen({ label, anchor, heading, groups: filled });
   };
 

@@ -807,7 +807,9 @@ a splitter does. A dialog that can be cancelled implies a draft, and there is no
 
 jsdom reports every element as zero-sized, so anything about size, overflow, position or
 visibility passes there and fails in life. Vitest's browser mode runs on the Edge already
-installed on the machine, so no browser is downloaded and the numbers are real.
+installed on a Windows machine, the engine WebView2 shares, so the numbers are real. Elsewhere
+the same tests drive Chromium, the same engine; where the platforms differ (a right-click opens
+its menu on press off Windows) the app works on both.
 
 ## The mark
 
@@ -853,10 +855,10 @@ states, its tokens. Nothing is described ahead of the feature that uses it.
 ## The look
 
 **Drawn in Claude Design and built from its files**, since 14 September 2026, after the look
-taken from ggallery's drawing was turned down. For each new surface Claude writes a prompt
-carrying its features, states and decisions; Claude Design, which reads this repository but never
-changes it, draws the surface; its files land in `docs/design/` and are built from there. The
-earlier drawing stays beside them as `old-ggallery-design.html`.
+taken from ggallery's drawing was turned down. The sheets live in `docs/design/` and the
+repository is their source of truth: a design pass draws the backlog in them directly and
+commits them, with no hand-off in between. The earlier drawing stays
+beside them as `ggallery-drawing.html`.
 
 **What it holds:** warm near-neutral surfaces a step apart; warm grey ink in four weights; **no
 accent**, since the pictures are the colour; controls one height on a hairline ring, with one

@@ -1,0 +1,29 @@
+name: Auto-merge
+
+# The owner's pull requests and Dependabot's merge by squash once the required checks pass.
+# No session merges anything itself. CONTRIBUTING.md "Pull requests".
+on:
+  # The base repository's workflow and token, so Dependabot's pull requests can be enabled too.
+  # Nothing from the pull request is checked out or run.
+  pull_request_target:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  enable:
+    name: Enable
+    if: >-
+      !github.event.pull_request.draft &&
+      (github.event.pull_request.user.login == github.repository_owner ||
+       github.event.pull_request.user.login == 'dependabot[bot]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Squash once the checks pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+          URL: ${{ github.event.pull_request.html_url }}
+        run: gh pr merge --auto --squash "$URL"

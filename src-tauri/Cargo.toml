@@ -34,7 +34,9 @@ kamadak-exif = "0.6.1"
 tauri-plugin-opener = "2"
 # The system's own folder picker: the app draws no part of choosing. DESIGN.md "Shapes".
 tauri-plugin-dialog = "2"
+
 # A real CF_HDROP copy, so pasting into Explorer produces the file and not its path.
+[target.'cfg(windows)'.dependencies]
 clipboard-win = "5"
 
 [profile.release]

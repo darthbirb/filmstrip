@@ -1,12 +1,14 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// Runs against Claude's own port and the installed Edge. DEVELOPMENT.md "Seeing the app".
+import { launchOptions, locale } from "./tests/browser.ts";
+
+// Runs against Claude's own port. DEVELOPMENT.md "Seeing the app".
 export default defineConfig({
   testDir: "tests/e2e",
   use: {
     ...devices["Desktop Edge"],
-    channel: "msedge",
-    locale: "en-GB",
+    launchOptions,
+    locale,
     baseURL: "http://localhost:1422",
   },
   webServer: {
