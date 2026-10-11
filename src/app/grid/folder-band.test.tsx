@@ -8,6 +8,7 @@ import {
   folderDetail,
   removeFolderTag,
   setFolderCover,
+  setFolderLabel,
   setFolderStatus,
 } from "../../ipc/commands";
 import { Breadcrumb } from "../navigation/Breadcrumb";
@@ -110,6 +111,20 @@ test("the band reads in the pane's rhythm: status, labels, then tags, its own na
   expect(titled("The folder’s name · changes only when the folder is renamed")).toBe("cairo");
   expect(titled("The name of Trips")).toBe("trips");
   await expect.element(screen.getByTitle("From Trips").first()).toBeVisible();
+});
+
+test("a key Cairo holds hides the same key from Trips: the nearest value is the one shown", async () => {
+  await setFolderLabel(4, "location", "egypt");
+  try {
+    const screen = await renderHeader(CAIRO);
+    await details(screen).click();
+    await expect
+      .poll(() => chipTexts(row(screen.container, "Labels")))
+      .toEqual(["locationcairo", "tripegypt 2024"]);
+  } finally {
+    const label = (await folderDetail(4))?.tags.find((one) => one.key === "location");
+    if (label) await removeFolderTag(4, label.tagId);
+  }
 });
 
 test("a step of the band's path goes there, and the status is set from its group", async () => {
