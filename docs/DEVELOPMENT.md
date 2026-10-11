@@ -125,8 +125,9 @@ there until nothing is `ready` or waiting on `design`. That session only orchest
 issue is built by a fresh `general-purpose` subagent running `deliver`, and reviewed by a fresh
 `reviewer` subagent, so neither inherits the other's context and the session stays small across
 many issues. Failed reviews go back to a builder for at most three rounds before `needs-human`.
-Nothing runs outside the app: no CLI, no API key, no Claude secret on GitHub. The session runs
-in Auto mode, so nothing waits on a prompt, and the deny rules in `.claude/settings.json` hold.
+Nothing runs outside the app: no CLI, no API key, no Claude secret on GitHub. Start the session
+in Auto mode, from the Code tab's mode picker, so nothing waits on a prompt; the deny rules in
+`.claude/settings.json` still hold.
 
 GitHub holds the state, so a run stopped by a usage limit or a closed app resumes when asked to
 continue. Each issue adds a line to `.queue/log.md`, git-ignored: what merged, what waits on the

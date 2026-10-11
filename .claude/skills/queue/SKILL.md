@@ -12,11 +12,12 @@ the issues and pull requests; "continue the queue" picks up where it left off.
 
 ## Each turn of the loop
 
-0. **Run in Auto mode.** The session's permission mode is Auto, so nothing waits on a prompt;
-   the deny rules in `.claude/settings.json` still hold.
-1. **Resume first.** `git fetch --prune origin`. An open pull request that is not `needs-human`,
-   the owner's or one of Dependabot's the Dependabot workflow does not land (a lone update,
-   usually a major), comes before new work. Its head already failed review: step 5. Otherwise:
+0. **Auto mode.** The owner starts the session in Auto mode, so nothing waits on a prompt; the
+   deny rules in `.claude/settings.json` still hold. In any other mode, say so and ask once.
+1. **Resume first.** `git fetch --prune origin`. An open pull request that is not `needs-human`
+   comes before new work: the owner's; one of Dependabot's whose head branch has no
+   `/patch-and-minor-` (a lone update, usually a major); or a grouped one of Dependabot's whose
+   head carries a failing Review (held, then released). Its head already failed review: step 5. Otherwise:
    step 4. A Dependabot major is checked against its release notes and the gates; if it breaks
    something, label it `needs-human` with one comment on what breaks.
 2. **Pick.** The open issue labelled `ready` and none of `in-progress`, `blocked` or

@@ -18,9 +18,10 @@ queue, with the owner stepping in only where a pull request asks. The `queue` sk
   builder subagent running `deliver`, up to an open pull request; `design-pass` draws what is
   waiting on `design`; `review` is the bar both meet.
 - **Every pull request is reviewed independently** by the `reviewer` subagent, which did not
-  write it, sees only the change, and marks the commit it passed with the Review status. It
-  merges by squash once Gates, Title and Review pass; `needs-human` holds it for the owner. See
-  the `steward` skill.
+  write it, sees only the change, and marks the commit it passed with the Review status;
+  Dependabot's grouped patch and minor updates excepted, which the gates review. It merges by
+  squash once Gates, Title and Review pass; `needs-human` holds it for the owner. See the
+  `steward` skill.
 - **`main` is always releasable.** A Nightly `Filmstrip.exe` is built from it each day it moves;
   `scripts/update-latest.ps1` puts it in `latest\`, where the owner tries the app.
 

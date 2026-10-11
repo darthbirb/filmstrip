@@ -58,8 +58,9 @@ squash-merged, so `git log main` reads as one line per pull request.
   check holds it to that. The description follows the template: what changes for someone using
   the app, how it was checked, what was left out, and the issue it closes.
 - **It merges itself** by squash once Gates, Title and Review pass. Review is a status the
-  independent reviewer sets on the head commit it passed; the queue then arms the merge, and the
-  Dependabot workflow does both for Dependabot's updates. `needs-human` holds it for the owner.
+  independent reviewer sets on the head commit it passed; the queue then arms the merge. The
+  Dependabot workflow does both for Dependabot's grouped patch and minor updates; its others go
+  through the queue. `needs-human` holds it for the owner.
 
 ### Commits
 
