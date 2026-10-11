@@ -63,7 +63,7 @@ export function Chip({
       title="Remove"
       aria-label={`Remove ${tagKey ? `${tagKey}: ` : ""}${value}`}
       onClick={onRemove}
-      className="hidden size-4.5 shrink-0 place-items-center rounded-full text-fg-mid text-glyph-small hover:bg-wash hover:text-fg group-hover:grid group-has-focus-visible:grid"
+      className="hidden size-chip-remove shrink-0 place-items-center rounded-full text-fg-mid text-glyph-small hover:bg-wash hover:text-fg group-hover:grid group-has-focus-visible:grid"
     >
       <Glyph name="close" />
     </button>

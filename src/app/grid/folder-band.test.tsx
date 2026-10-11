@@ -3,7 +3,14 @@ import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { withoutGlyphs } from "../../dev/words";
-import { folderDetail, removeFolderTag, setFolderStatus } from "../../ipc/commands";
+import {
+  folderCoverChoices,
+  folderDetail,
+  removeFolderTag,
+  setFolderCover,
+  setFolderLabel,
+  setFolderStatus,
+} from "../../ipc/commands";
 import { Breadcrumb } from "../navigation/Breadcrumb";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { getPlace, type Place, setPlace } from "../place";
@@ -106,6 +113,20 @@ test("the band reads in the pane's rhythm: status, labels, then tags, its own na
   await expect.element(screen.getByTitle("From Trips").first()).toBeVisible();
 });
 
+test("a key Cairo holds hides the same key from Trips: the nearest value is the one shown", async () => {
+  await setFolderLabel(4, "location", "egypt");
+  try {
+    const screen = await renderHeader(CAIRO);
+    await details(screen).click();
+    await expect
+      .poll(() => chipTexts(row(screen.container, "Labels")))
+      .toEqual(["locationcairo", "tripegypt 2024"]);
+  } finally {
+    const label = (await folderDetail(4))?.tags.find((one) => one.key === "location");
+    if (label) await removeFolderTag(4, label.tagId);
+  }
+});
+
 test("a step of the band's path goes there, and the status is set from its group", async () => {
   const screen = await renderHeader(CAIRO);
   await details(screen).click();
@@ -150,6 +171,13 @@ test("a note is written in its row: Ctrl+Enter keeps it, Escape leaves it, empti
   await screen.getByRole("button", { name: "Add Note…" }).click();
   const box = screen.getByRole("textbox", { name: "Note on People" });
   await expect.element(box).toHaveFocus();
+  // Empty, it is three of its own lines tall inside its padding.
+  const empty = getComputedStyle(box.element());
+  const inner =
+    box.element().getBoundingClientRect().height -
+    Number.parseFloat(empty.paddingTop) -
+    Number.parseFloat(empty.paddingBottom);
+  expect(inner).toBe(3 * Number.parseFloat(empty.lineHeight));
   await userEvent.keyboard("Faces{Enter}and names{Control>}{Enter}{/Control}");
   const note = screen.getByRole("button", { name: "Change Note on People" });
   const said = () => withoutGlyphs(note.query()?.textContent);
@@ -205,6 +233,44 @@ test("the pencil picks a cover from the branch, the first standing in until one 
   await userEvent.keyboard("{Enter}");
   await expect.element(pencil).toBeVisible();
   expect(screen.getByText("Cover", { exact: true }).elements()).toHaveLength(0);
+});
+
+test("the band's Cover plate and the picker's plates are one plate, and the open pencil keeps its wash and ring", async () => {
+  const [, second] = await folderCoverChoices(6);
+  await setFolderCover(6, second?.itemId ?? null);
+  try {
+    const screen = await renderHeader(CAIRO);
+    await details(screen).click();
+    const pencil = screen.getByRole("button", { name: "Change Cover" });
+    await pencil.click();
+    const picker = screen.getByRole("listbox", { name: "Cover for Cairo" });
+    await expect.element(picker.getByRole("option", { name: "Picture 2 · Cover" })).toHaveFocus();
+
+    const root = getComputedStyle(document.documentElement);
+    const rem = Number.parseFloat(root.fontSize);
+    const badge = Number.parseFloat(root.getPropertyValue("--spacing-badge")) * rem;
+    const plates = [
+      ...screen.getByText("Cover", { exact: true }).elements(),
+      ...screen.getByText("First", { exact: true }).elements(),
+    ];
+    expect(plates).toHaveLength(3);
+    for (const plate of plates) expect(plate.getBoundingClientRect().height).toBe(badge);
+    expect(new Set(plates.map((plate) => getComputedStyle(plate).fontSize)).size).toBe(1);
+
+    // Away from the pointer, so the wash is the open state's and not the hover's.
+    await details(screen).hover();
+    await expect.element(picker).toBeVisible();
+    const open = getComputedStyle(pencil.element());
+    expect(open.boxShadow).toContain("inset");
+    expect(open.outlineWidth).toBe(root.getPropertyValue("--focus-width").trim());
+    expect(open.outlineOffset).toBe(root.getPropertyValue("--focus-gap").trim());
+    await userEvent.keyboard("{Escape}");
+    await expect.poll(() => picker.query()).toBeNull();
+    await screen.getByText("Path", { exact: true }).hover();
+    expect(getComputedStyle(pencil.element()).boxShadow).toBe("none");
+  } finally {
+    await setFolderCover(6, null);
+  }
 });
 
 test("Add Tag… becomes a field that adds what is typed and stays open for the next", async () => {

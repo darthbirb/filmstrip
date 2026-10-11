@@ -169,6 +169,8 @@
   --spacing-chevron: 1.25rem;
   --spacing-control: 2rem;
   --spacing-chip: 1.625rem;
+  /* The × a chip shows to take it off, inside the chip's own height. */
+  --spacing-chip-remove: 1.125rem;
   --spacing-badge: 1.25rem;
   --spacing-mark-badge: 0.875rem;
   --spacing-tile-gap: 0.375rem;
@@ -308,9 +310,11 @@
   --glyph-face: var(--font-glyph-fill);
 }
 
-/* The hover of something that is already filled: a wash over its fill rather than a new one. */
+/* The hover of something that is already filled: a wash over its fill rather than a new one.
+   A control whose popup is open keeps it while it stays open; an expanded tree row has no popup. */
 @utility hover-wash {
-  &:hover {
+  &:hover,
+  &[aria-haspopup][aria-expanded="true"] {
     box-shadow: inset 0 0 0 100vmax var(--color-wash);
   }
 }

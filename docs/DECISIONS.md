@@ -429,6 +429,12 @@ plain header, having none of these.
   where or which trip, and a folder with two answers answers twice. A key it has is refused where
   it is typed and its value is changed with a click on it instead; one from above names the
   folder it comes from.
+- **Down the tree, the nearest value of a key wins.** Trips can take `location: egypt` while
+  Cairo, under it, holds `location: cairo`: Cairo's files carry Cairo's, the rest of Trips' carry
+  Egypt, and Cairo's band shows only its own. Refusing the key on Trips instead would not hold,
+  because moving a labelled folder under another brings the two together all the same; resolving
+  it where an item's tags are built holds however the folders arrived there. Taking Cairo's off
+  lets Trips' reach its files.
 - **The header's counts are the tree's, in words**: its own files here, then everything at or
   below it, the same two figures a pill shows. An offline source says `offline` instead.
 - **A folder that holds anything always has a picture.** Its chosen cover while that file is live

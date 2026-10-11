@@ -5,6 +5,7 @@ import type { CoverChoice } from "../../ipc/bindings/CoverChoice";
 import { folderCoverChoices, setFolderCover } from "../../ipc/commands";
 import { Glyph } from "../../ui/Glyph";
 import { SURFACE } from "../../ui/Menu";
+import { Plate } from "../../ui/Plate";
 import { detailChanged } from "./folder-detail";
 
 type Props = {
@@ -67,7 +68,7 @@ export function CoverPicker({ folderId, title, chosen, anchor }: Props) {
         aria-expanded={open}
         aria-label={chosen === null ? "Choose Cover · now the first picture" : "Change Cover"}
         title={chosen === null ? "Choose Cover · now the first picture" : "Change Cover"}
-        className={`focus-ring hover-wash absolute top-1.5 right-1.5 grid size-badge place-items-center rounded-badge bg-veil text-fg text-glyph-small ${open ? "shadow-[inset_0_0_0_100vmax_var(--color-wash)] outline-2 outline-in-pane outline-offset-1" : ""}`}
+        className="focus-ring hover-wash absolute top-1.5 right-1.5 grid size-badge place-items-center rounded-badge bg-veil text-fg text-glyph-small aria-expanded:outline-(length:--focus-width) aria-expanded:outline-in-pane aria-expanded:outline-offset-(--focus-gap)"
       >
         <Glyph name="pencil" />
       </button>
@@ -81,14 +82,16 @@ export function CoverPicker({ folderId, title, chosen, anchor }: Props) {
           const opened = event.newState === "open";
           setOpen(opened);
           if (!opened) return;
-          void folderCoverChoices(folderId).then((found) => {
-            setChoices(found);
-            // The picture it is now takes the keyboard, once the list has drawn.
-            requestAnimationFrame(() => {
-              const now = chosen ?? found[0]?.itemId;
-              panel.current?.querySelector<HTMLElement>(`[data-choice="${now}"]`)?.focus();
-            });
-          });
+          void folderCoverChoices(folderId)
+            .then((found) => {
+              setChoices(found);
+              // The picture it is now takes the keyboard, once the list has drawn.
+              requestAnimationFrame(() => {
+                const now = chosen ?? found[0]?.itemId;
+                panel.current?.querySelector<HTMLElement>(`[data-choice="${now}"]`)?.focus();
+              });
+            })
+            .catch(() => setChoices([]));
         }}
         onKeyDown={onKeyDown}
         style={
@@ -133,9 +136,9 @@ export function CoverPicker({ folderId, title, chosen, anchor }: Props) {
                   />
                 )}
                 {mark && (
-                  <span className="absolute bottom-1 left-1 flex h-4 items-center rounded-badge bg-veil px-1.5 text-fg text-micro uppercase tracking-(--text-eyebrow--letter-spacing)">
+                  <Plate look="mark" className="absolute bottom-1 left-1">
                     {mark}
-                  </span>
+                  </Plate>
                 )}
               </button>
             );

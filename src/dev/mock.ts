@@ -681,12 +681,14 @@ function folderDetail(folderId: number): FolderDetail | null {
       (tag, at): FolderTag => ({ tagId: tagId(tag.key, tag.value), ...tag, from, name: at === 0 }),
     );
   });
-  // A tag carried at two levels shows once, where it is nearest.
+  // A tag carried at two levels shows once, where it is nearest, and so does a label's key.
   const seen = new Set<number>();
+  const keys = new Set<string>();
   const [self = [], ...above] = levels.reverse().map((level) =>
     level.filter((tag) => {
-      if (seen.has(tag.tagId)) return false;
+      if (seen.has(tag.tagId) || (tag.key !== null && keys.has(tag.key))) return false;
       seen.add(tag.tagId);
+      if (tag.key !== null) keys.add(tag.key);
       return true;
     }),
   );
