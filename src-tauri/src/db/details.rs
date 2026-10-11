@@ -9,7 +9,7 @@ use ts_rs::TS;
 
 use crate::db::folders::{self, Crumb};
 use crate::db::now;
-use crate::error::Result;
+use crate::error::{AppError, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -121,7 +121,7 @@ pub fn detail(conn: &Connection, folder_id: i64) -> Result<Option<FolderDetail>>
 }
 
 /// The folder's own tags, then each folder's above it from the source down. A tag carried twice
-/// is shown once, where it is nearest, as `item_effective_tag` keeps it.
+/// is shown once, where it is nearest, and so is a label's key, as `item_effective_tag` keeps them.
 fn tags_of(conn: &Connection, path: &[Crumb]) -> Result<Vec<FolderTag>> {
     let mut stmt = conn.prepare(
         "SELECT t.id, t.key, t.value, ft.source = 'title' FROM folder_tag ft
@@ -131,6 +131,7 @@ fn tags_of(conn: &Connection, path: &[Crumb]) -> Result<Vec<FolderTag>> {
     )?;
     let mut levels: Vec<Vec<FolderTag>> = Vec::new();
     let mut seen = HashSet::new();
+    let mut keys = HashSet::new();
     for (depth, crumb) in path.iter().rev().enumerate() {
         let from = (depth > 0).then(|| crumb.clone());
         let level = stmt
@@ -147,7 +148,10 @@ fn tags_of(conn: &Connection, path: &[Crumb]) -> Result<Vec<FolderTag>> {
         levels.push(
             level
                 .into_iter()
-                .filter(|tag| seen.insert(tag.tag_id))
+                .filter(|tag| {
+                    seen.insert(tag.tag_id)
+                        && tag.key.as_ref().is_none_or(|key| keys.insert(key.clone()))
+                })
                 .collect(),
         );
     }
@@ -223,8 +227,31 @@ pub fn cover_choices(conn: &Connection, folder_id: i64) -> Result<Vec<CoverChoic
         .collect::<rusqlite::Result<_>>()?)
 }
 
-/// Chooses a folder's cover, or with `None` goes back to the picture that stands in.
+/// Chooses a folder's cover, or with `None` goes back to the picture that stands in. Only a file
+/// the picker could offer is taken.
 pub fn set_cover(conn: &Connection, folder_id: i64, item_id: Option<i64>) -> Result<()> {
+    let offered = |item_id: i64| -> Result<bool> {
+        Ok(conn.query_row(
+            "WITH RECURSIVE subtree(id) AS (
+                 SELECT ?1
+               UNION ALL
+                 SELECT f.id FROM folder f JOIN subtree s ON f.parent_id = s.id
+                  WHERE f.deleted_at IS NULL
+             )
+             SELECT EXISTS (SELECT 1 FROM item i JOIN subtree s ON s.id = i.folder_id
+                             WHERE i.id = ?2 AND i.deleted_at IS NULL
+                               AND i.kind IN ('image', 'video'))",
+            params![folder_id, item_id],
+            |r| r.get(0),
+        )?)
+    };
+    if let Some(item_id) = item_id
+        && !offered(item_id)?
+    {
+        return Err(AppError::invalid(
+            "that file is not a live picture in this folder",
+        ));
+    }
     conn.execute(
         "UPDATE folder SET cover_item_id = ?1 WHERE id = ?2",
         params![item_id, folder_id],
@@ -365,6 +392,59 @@ mod tests {
                 "travel<Trips"
             ]
         );
+    }
+
+    #[test]
+    fn a_key_held_below_hides_the_same_key_from_above() {
+        let (conn, root) = library();
+        let trips = folders::create(&conn, root, "Trips").unwrap();
+        let cairo = folders::create(&conn, trips, "Cairo").unwrap();
+        tags::set_folder_label(&conn, cairo, "Location", "Cairo").unwrap();
+        tags::set_folder_label(&conn, trips, "Location", "Egypt").unwrap();
+        tags::set_folder_label(&conn, trips, "Trip", "Egypt 2024").unwrap();
+
+        let detail = detail(&conn, cairo).unwrap().unwrap();
+        assert_eq!(
+            tag_line(&detail),
+            [
+                "#cairo",
+                "location:cairo",
+                "#pictures<Pictures",
+                "#trips<Trips",
+                "trip:egypt 2024<Trips",
+            ]
+        );
+    }
+
+    #[test]
+    fn a_cover_must_be_a_live_file_at_or_below_the_folder() {
+        let (conn, root) = library();
+        let trips = folders::create(&conn, root, "Trips").unwrap();
+        let cairo = folders::create(&conn, trips, "Cairo").unwrap();
+        let sphinx = item(&conn, cairo, "sphinx.jpg");
+        let hotel = item(&conn, trips, "hotel.jpg");
+
+        assert!(set_cover(&conn, cairo, Some(hotel)).is_err(), "above it");
+        assert!(
+            set_cover(&conn, cairo, Some(9_999)).is_err(),
+            "no such file"
+        );
+        conn.execute(
+            "UPDATE item SET deleted_at = 1 WHERE id = ?1",
+            params![sphinx],
+        )
+        .unwrap();
+        assert!(set_cover(&conn, cairo, Some(sphinx)).is_err(), "trashed");
+
+        let chosen: Option<i64> = conn
+            .query_row(
+                "SELECT cover_item_id FROM folder WHERE id = ?1",
+                params![cairo],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(chosen, None, "nothing refused was kept");
+        set_cover(&conn, trips, Some(hotel)).unwrap();
     }
 
     #[test]

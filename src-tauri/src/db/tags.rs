@@ -1,6 +1,8 @@
 //! Tags, labels, and what an item carries once inheritance is resolved.
 //! PRODUCT.md "Tags and labels"; the rules the data keeps are in SCHEMA.md.
 
+use std::collections::HashSet;
+
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 use ts_rs::TS;
@@ -207,7 +209,8 @@ pub fn remove_item_tag(conn: &Connection, item_id: i64, tag_id: i64) -> Result<(
 }
 
 /// Every tag on the folder and its ancestors, as `(tag_id, the folder it came
-/// from)`, nearest first.
+/// from)`, nearest first. A label whose key a nearer folder holds is left out:
+/// the nearest value of a key is the one that reaches below. DECISIONS.md "A folder's details".
 pub fn ancestor_tags(conn: &Connection, folder_id: i64) -> Result<Vec<(i64, i64)>> {
     let mut stmt = conn.prepare(
         "WITH RECURSIVE ancestry(id, depth) AS (
@@ -217,13 +220,23 @@ pub fn ancestor_tags(conn: &Connection, folder_id: i64) -> Result<Vec<(i64, i64)
                FROM folder f JOIN ancestry a ON f.id = a.id
               WHERE f.parent_id IS NOT NULL
          )
-         SELECT ft.tag_id, ft.folder_id
-           FROM folder_tag ft JOIN ancestry a ON a.id = ft.folder_id
+         SELECT ft.tag_id, ft.folder_id, t.key
+           FROM folder_tag ft
+           JOIN ancestry a ON a.id = ft.folder_id
+           JOIN tag t ON t.id = ft.tag_id
           ORDER BY a.depth",
     )?;
-    Ok(stmt
-        .query_map(params![folder_id], |r| Ok((r.get(0)?, r.get(1)?)))?
-        .collect::<rusqlite::Result<_>>()?)
+    let rows = stmt
+        .query_map(params![folder_id], |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get::<_, Option<String>>(2)?))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let mut keys = HashSet::new();
+    Ok(rows
+        .into_iter()
+        .filter(|(_, _, key)| key.as_ref().is_none_or(|key| keys.insert(key.clone())))
+        .map(|(tag_id, origin, _)| (tag_id, origin))
+        .collect())
 }
 
 /// Recomputes what one item carries: its ancestry's tags, then its own.
@@ -489,6 +502,36 @@ mod tests {
         assert!(
             !carried.iter().any(|t| t.value == "giza"),
             "the old value went from below"
+        );
+    }
+
+    #[test]
+    fn an_item_carries_one_value_per_key_the_nearest_folder_s() {
+        let (conn, root) = library();
+        let trips = folders::create(&conn, root, "Trips").unwrap();
+        let cairo = folders::create(&conn, trips, "Cairo").unwrap();
+        let sphinx = item(&conn, cairo, "sphinx.jpg");
+        let ticket = item(&conn, trips, "ticket.jpg");
+        set_folder_label(&conn, cairo, "Location", "Cairo").unwrap();
+        set_folder_label(&conn, trips, "Location", "Egypt").unwrap();
+
+        let locations = |id| -> Vec<(String, Option<i64>)> {
+            item_effective_tags(&conn, id)
+                .unwrap()
+                .into_iter()
+                .filter(|t| t.key.as_deref() == Some("location"))
+                .map(|t| (t.value, t.origin_id))
+                .collect()
+        };
+        assert_eq!(locations(sphinx), [("cairo".into(), Some(cairo))]);
+        assert_eq!(locations(ticket), [("egypt".into(), Some(trips))]);
+
+        let cairo_label = get_or_create_tag(&conn, Some("Location"), "Cairo").unwrap();
+        remove_folder_tag(&conn, cairo, cairo_label).unwrap();
+        assert_eq!(
+            locations(sphinx),
+            [("egypt".into(), Some(trips))],
+            "with its own gone, the value above reaches it"
         );
     }
 

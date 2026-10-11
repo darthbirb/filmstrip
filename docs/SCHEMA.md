@@ -59,9 +59,10 @@ migration arrives with the feature that needs it and is never edited once shippe
   has its new value in the same row, so the label keeps its place among the folder's own.
 - Every folder carries a tag derived from its title (`folder_tag.source = 'title'`), kept in
   step with the title. It is the one tag `tags::remove_folder_tag` never takes off.
-- An item carries its own tags plus every tag and label on its folder and on each ancestor.
-  `item_effective_tag.origin_id` records the folder each came from; NULL means the item
-  carries it itself.
+- An item carries its own tags plus every tag and label on its folder and on each ancestor,
+  **one value per key**: of two folders holding a key, the nearer one's label is the one carried
+  (`tags::ancestor_tags`). `item_effective_tag.origin_id` records the folder each came from; NULL
+  means the item carries it itself.
 - `item_effective_tag` is maintained as things change (`tags::rebuild_item`,
   `tags::rebuild_subtree`), not computed when read.
 

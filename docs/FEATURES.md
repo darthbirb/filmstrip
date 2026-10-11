@@ -48,9 +48,9 @@ drawn. **Not started** — neither.
 | Move a folder | Built | `move_folder`, across drives too; Move to… on its menu, its own branch not a choice |
 | Delete a folder, choosing what happens to what is inside | Built | `delete_folder`, `folder_file_count`; asks in a banner, and Settings › Sources keeps the answer |
 | Rename a folder, on disk | Built | `rename_folder`, in its tree row, a name already there said under it |
-| A folder's cover | Built | `folder_cover_choices`, `set_folder_cover`, the pencil on the band's cover; the first picture stands in while none is chosen |
+| A folder's cover | Built | `folder_cover_choices`, `set_folder_cover`, the pencil on the band's cover, which takes only a live picture at or below the folder; the first picture stands in while none is chosen |
 | A folder's status, notes, favourite | Built | favourite: `set_folder_favorite`, `favourite_places`, a group of its own in navigation and in the band; status: `set_folder_status`, the band's segmented group; notes: `set_folder_note`, written in the band |
-| A folder's labels and tags, inherited by everything under it | Built | `add_folder_tag`, `set_folder_label`, `remove_folder_tag` and their offers, the band's Add Tag… and Add Label…; one value per key; items inherit labels, and never own one |
+| A folder's labels and tags, inherited by everything under it | Built | `add_folder_tag`, `set_folder_label`, `remove_folder_tag` and their offers, the band's Add Tag… and Add Label…; one value per key, the nearest folder's down the tree; items inherit labels, and never own one |
 | Every item id under a folder | Not started | |
 
 ## Items
