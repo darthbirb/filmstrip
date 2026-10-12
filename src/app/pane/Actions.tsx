@@ -1,7 +1,7 @@
 import { type RefObject, useLayoutEffect, useRef, useState } from "react";
 
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
-import { copyItems, openItem, revealItem } from "../../ipc/commands";
+import { copyItemPaths, copyItems, openItem, revealItem } from "../../ipc/commands";
 import { Button } from "../../ui/Button";
 import { GlyphButton } from "../../ui/GlyphButton";
 import type { GlyphName } from "../../ui/glyphs";
@@ -12,7 +12,7 @@ import { openMovePicker } from "./move-picker";
 import { startRename } from "./rename";
 import { restoreFiles } from "./restore";
 
-type Action = { id: string; label: string; glyph: GlyphName; run: () => void };
+type Action = { id: string; label: string; glyph: GlyphName; menuOnly?: boolean; run: () => void };
 
 /** What the app can do to the file the pane is showing. DECISIONS.md "The pane". */
 export function Actions({ item }: { item: ItemDetail }) {
@@ -70,6 +70,13 @@ function InLibrary({ item }: { item: ItemDetail }) {
       run: () => void copyItems([item.id]).catch(() => undefined),
     },
     {
+      id: "copy-path",
+      label: "Copy Path",
+      glyph: "copy",
+      menuOnly: true,
+      run: () => void copyItemPaths([item.id]).catch(() => undefined),
+    },
+    {
       id: "open",
       label: "Open with Default App",
       glyph: "openExternal",
@@ -77,9 +84,10 @@ function InLibrary({ item }: { item: ItemDetail }) {
     },
   ];
 
-  const fits = useFitting(bar, kept, actions.length);
-  const shown = actions.slice(0, fits);
-  const folded = actions.slice(fits);
+  const buttons = actions.filter((action) => !action.menuOnly);
+  const fits = useFitting(bar, kept, buttons.length);
+  const shown = buttons.slice(0, fits);
+  const folded = actions.filter((action) => action.menuOnly || !shown.includes(action));
 
   return (
     <div

@@ -67,7 +67,7 @@ drawn. **Not started** — neither.
 | Delete items to the trash | Built | `trash_items`, Delete on the pane's bar and a file's menu; undo takes an item back |
 | Rename a file, on disk | Built | `rename_item`, the pane's Name row; not in ggallery; a name already taken is refused |
 | Paste files in, and take an OS drop | Not started | |
-| Copy an item's path | Not started | |
+| Copy an item's path | Built | `copy_item_paths`, Copy Path in a file's menu, a set's and the pane's ⋯; one path to a line |
 | Counts: unsorted, trashed, totals, arrival duplicates | Partly | the foot counts items and sources, the Trash its files and their size |
 
 ## The pane

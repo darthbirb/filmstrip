@@ -197,7 +197,7 @@ Its interface is never read for the look, which comes from Claude Design (DECISI
 | Probing video and capture dates | `media/probe.rs`, `sidecar/` | the pane |
 | Scrub sprites | `media/sprites.rs`, `sidecar/ffmpeg.rs` `frames` | scrubbing a video's tile |
 | Show in Explorer, Open with Default App | `commands/items.rs`, `tauri-plugin-opener` | the pane |
-| Copying a file to the clipboard | `fs/clipboard.rs` | the pane |
+| Copying a file, or its path, to the clipboard | `fs/clipboard.rs`, `commands/items.rs` `copy_item_path` | the pane |
 | Moving, renaming, undo | `fs/relocate.rs`, `fs/undo.rs`, `db/journal.rs`, `commands/triage.rs` | selection and moving |
 | Trash | `fs/trash.rs` | selection and moving |
 | Destination hotkeys | `db/hotkeys.rs`, `state/hotkeys.ts` | selection and moving |

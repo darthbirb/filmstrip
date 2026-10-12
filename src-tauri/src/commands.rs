@@ -913,9 +913,31 @@ pub async fn copy_items(state: State<'_, AppState>, item_ids: Vec<i64>) -> Resul
     .await
 }
 
+/// The paths as text, one to a line, for wherever a path is typed. The index knows them, so a
+/// source that is away still answers.
+#[tauri::command]
+pub async fn copy_item_paths(state: State<'_, AppState>, item_ids: Vec<i64>) -> Result<()> {
+    run(&state, move |conn| {
+        crate::fs::clipboard::copy_text(&item_paths_text(conn, &item_ids)?)
+    })
+    .await
+}
+
 /// Every file's path, in the order asked for; one no longer in the index refuses them all.
 fn item_abs_paths(conn: &Connection, item_ids: &[i64]) -> Result<Vec<PathBuf>> {
     item_ids.iter().map(|&id| item_abs_path(conn, id)).collect()
+}
+
+/// Rebuilt from its parts, so a root stored with forward slashes still reads as Windows writes it.
+fn item_paths_text(conn: &Connection, item_ids: &[i64]) -> Result<String> {
+    let lines: Vec<String> = item_abs_paths(conn, item_ids)?
+        .iter()
+        .map(|path| {
+            let path: PathBuf = path.components().collect();
+            path.to_string_lossy().into_owned()
+        })
+        .collect();
+    Ok(lines.join("\r\n"))
 }
 
 /// Queues a walk of every source; asking again while one waits or runs does nothing.
@@ -1555,6 +1577,45 @@ mod tests {
         assert_eq!(names, ["b.jpg", "a.jpg"]);
         assert!(paths.iter().all(|path| path.starts_with(&library)));
         assert!(item_abs_paths(&conn, &[a.id, 999]).is_err());
+    }
+
+    #[test]
+    fn copied_paths_are_one_full_path_to_a_line_and_need_no_drive() {
+        let base = scratch("copy-paths");
+        let app = app_dir(&base);
+        let library = base.join("Pictures");
+        std::fs::create_dir_all(library.join("Cairo")).unwrap();
+        std::fs::write(library.join("Cairo/a.jpg"), "a").unwrap();
+        std::fs::write(library.join("Cairo/b.jpg"), "b").unwrap();
+        let conn = conn();
+        let root = format!("{}/Pictures", base.display());
+        register(&conn, Path::new(&root), &app).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let [summary] = source_summaries(&conn).unwrap().try_into().unwrap();
+        let cairo = folders::child_id(&conn, summary.root_folder_id, "Cairo")
+            .unwrap()
+            .unwrap();
+        let [a, b] = items::in_folder(&conn, cairo)
+            .unwrap()
+            .try_into()
+            .unwrap_or_else(|_| panic!("two files in Cairo"));
+
+        let expected = |name: &str| {
+            let path: PathBuf = library.join("Cairo").join(name).components().collect();
+            path.to_string_lossy().into_owned()
+        };
+        let text = item_paths_text(&conn, &[b.id, a.id]).unwrap();
+        assert_eq!(
+            text,
+            format!("{}\r\n{}", expected("b.jpg"), expected("a.jpg"))
+        );
+        assert_eq!(item_paths_text(&conn, &[a.id]).unwrap(), expected("a.jpg"));
+        #[cfg(windows)]
+        assert!(!text.contains('/'), "{text} keeps a forward slash");
+
+        std::fs::remove_dir_all(&library).unwrap();
+        assert_eq!(item_paths_text(&conn, &[b.id, a.id]).unwrap(), text);
+        assert!(item_paths_text(&conn, &[a.id, 999]).is_err());
     }
 
     #[test]
