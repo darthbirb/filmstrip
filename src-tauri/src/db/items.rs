@@ -190,20 +190,15 @@ pub(crate) fn row(r: &rusqlite::Row) -> rusqlite::Result<ItemRow> {
 
 /// The live items directly in a folder, by name whatever the case.
 pub fn in_folder(conn: &Connection, folder_id: i64) -> Result<Vec<ItemRow>> {
-    in_branch(conn, folder_id, false)
-}
-
-/// The live items directly in a folder, or when `deep` everywhere beneath it too, in the order a
-/// folder lists them.
-pub fn in_branch(conn: &Connection, folder_id: i64, deep: bool) -> Result<Vec<ItemRow>> {
-    let mut stmt = conn.prepare(&branch_query(ROW, deep))?;
+    let mut stmt = conn.prepare(&branch_query(ROW, false))?;
     let rows = stmt
         .query_map(params![folder_id], row)?
         .collect::<rusqlite::Result<_>>()?;
     Ok(rows)
 }
 
-/// The ids [`in_branch`] would list, in its order, without reading the rest of each row.
+/// The live ids directly in a folder, or when `deep` everywhere beneath it too, in
+/// [`branch_query`]'s order, without reading the rest of each row.
 pub fn branch_ids(conn: &Connection, folder_id: i64, deep: bool) -> Result<Vec<i64>> {
     let mut stmt = conn.prepare(&branch_query("i.id", deep))?;
     let ids = stmt
@@ -223,7 +218,7 @@ pub struct BranchFile {
     pub favorite: bool,
 }
 
-/// Every live file at or below a folder, in [`in_branch`]'s order, with only what the bar reads.
+/// Every live file at or below a folder, in [`branch_query`]'s order, with only what the bar reads.
 pub fn branch_files(conn: &Connection, folder_id: i64) -> Result<Vec<BranchFile>> {
     let mut stmt = conn.prepare(&branch_query(
         "i.id, i.folder_id, i.size_bytes, i.favorite",
@@ -738,12 +733,12 @@ mod tests {
             [map, nile, pyramid, ticket, ticket_too],
             "by name whatever the case, a shared name by id, nothing retired or gone"
         );
-        let rows: Vec<i64> = in_branch(&conn, trips, true)
+        let rows: Vec<i64> = in_folder(&conn, trips)
             .unwrap()
             .into_iter()
             .map(|row| row.id)
             .collect();
-        assert_eq!(rows, branch_ids(&conn, trips, true).unwrap());
+        assert_eq!(rows, branch_ids(&conn, trips, false).unwrap());
         let files: Vec<(i64, i64)> = branch_files(&conn, trips)
             .unwrap()
             .into_iter()
