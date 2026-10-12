@@ -190,15 +190,49 @@ pub(crate) fn row(r: &rusqlite::Row) -> rusqlite::Result<ItemRow> {
 
 /// The live items directly in a folder, by name whatever the case.
 pub fn in_folder(conn: &Connection, folder_id: i64) -> Result<Vec<ItemRow>> {
-    let mut stmt = conn.prepare(&format!(
-        "SELECT {ROW} FROM item i
-          WHERE i.folder_id = ?1 AND i.deleted_at IS NULL
-          ORDER BY i.disk_name COLLATE NOCASE"
-    ))?;
+    in_branch(conn, folder_id, false)
+}
+
+/// The live items directly in a folder, or when `deep` everywhere beneath it too, in the order a
+/// folder lists them.
+pub fn in_branch(conn: &Connection, folder_id: i64, deep: bool) -> Result<Vec<ItemRow>> {
+    let mut stmt = conn.prepare(&branch_query(ROW, deep))?;
     let rows = stmt
         .query_map(params![folder_id], row)?
         .collect::<rusqlite::Result<_>>()?;
     Ok(rows)
+}
+
+/// The ids [`in_branch`] would list, in its order, without reading the rest of each row.
+pub fn branch_ids(conn: &Connection, folder_id: i64, deep: bool) -> Result<Vec<i64>> {
+    let mut stmt = conn.prepare(&branch_query("i.id", deep))?;
+    let ids = stmt
+        .query_map(params![folder_id], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(ids)
+}
+
+/// By name whatever the case, then by id where two folders of a branch share a name.
+fn branch_query(columns: &str, deep: bool) -> String {
+    let (subtree, within) = if deep {
+        (
+            "WITH RECURSIVE subtree(id) AS (
+                 SELECT ?1
+               UNION ALL
+                 SELECT f.id FROM folder f JOIN subtree s ON f.parent_id = s.id
+                  WHERE f.deleted_at IS NULL
+             )",
+            "i.folder_id IN (SELECT id FROM subtree)",
+        )
+    } else {
+        ("", "i.folder_id = ?1")
+    };
+    format!(
+        "{subtree}
+         SELECT {columns} FROM item i
+          WHERE {within} AND i.deleted_at IS NULL
+          ORDER BY i.disk_name COLLATE NOCASE, i.id"
+    )
 }
 
 /// Whether the item is in the index and not retired.
@@ -648,6 +682,98 @@ mod tests {
             })
             .unwrap();
         assert!(deleted.is_none(), "it is not retired any more");
+    }
+
+    #[test]
+    fn a_branch_lists_its_own_files_or_everything_beneath_it_in_the_folder_order() {
+        let (conn, root) = library();
+        let trips = folders::create(&conn, root, "Trips").unwrap();
+        let egypt = folders::create(&conn, trips, "Egypt").unwrap();
+        let cairo = folders::create(&conn, egypt, "Cairo").unwrap();
+        let gone = folders::create(&conn, trips, "Gone").unwrap();
+        upsert(&conn, &sample(1, root, "above.jpg")).unwrap();
+        let ticket = upsert(&conn, &sample(1, trips, "ticket.jpg")).unwrap();
+        let map = upsert(&conn, &sample(1, trips, "Map.jpg")).unwrap();
+        let pyramid = upsert(&conn, &sample(1, cairo, "pyramid.jpg")).unwrap();
+        let ticket_too = upsert(&conn, &sample(1, cairo, "TICKET.jpg")).unwrap();
+        let nile = upsert(&conn, &sample(1, egypt, "nile.jpg")).unwrap();
+        let retired = upsert(&conn, &sample(1, cairo, "blurred.jpg")).unwrap();
+        retire(&conn, retired).unwrap();
+        upsert(&conn, &sample(1, gone, "lost.jpg")).unwrap();
+        folders::trash_subtree(&conn, gone).unwrap();
+
+        assert_eq!(branch_ids(&conn, trips, false).unwrap(), [map, ticket]);
+        assert_eq!(
+            branch_ids(&conn, trips, true).unwrap(),
+            [map, nile, pyramid, ticket, ticket_too],
+            "by name whatever the case, a shared name by id, nothing retired or gone"
+        );
+        let rows: Vec<i64> = in_branch(&conn, trips, true)
+            .unwrap()
+            .into_iter()
+            .map(|row| row.id)
+            .collect();
+        assert_eq!(rows, branch_ids(&conn, trips, true).unwrap());
+    }
+
+    #[test]
+    fn an_empty_folder_has_nothing_in_its_branch() {
+        let (conn, root) = library();
+        let empty = folders::create(&conn, root, "Empty").unwrap();
+        folders::create(&conn, empty, "Also empty").unwrap();
+        upsert(&conn, &sample(1, root, "beside.jpg")).unwrap();
+
+        assert!(branch_ids(&conn, empty, false).unwrap().is_empty());
+        assert!(branch_ids(&conn, empty, true).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_source_that_is_away_still_answers_for_its_branch_from_the_index() {
+        let (conn, _) = library();
+        let away = sources::add(
+            &conn,
+            Path::new("Z:/unplugged"),
+            "Unplugged",
+            SourceKind::Library,
+        )
+        .unwrap();
+        let root = folders::source_root_folder(&conn, away.id).unwrap();
+        let scans = folders::create(&conn, root, "Scans").unwrap();
+        let a = upsert(&conn, &sample(away.id, root, "a.jpg")).unwrap();
+        let b = upsert(&conn, &sample(away.id, scans, "b.jpg")).unwrap();
+
+        assert_eq!(branch_ids(&conn, root, true).unwrap(), [a, b]);
+    }
+
+    #[test]
+    fn forty_thousand_ids_come_back_well_inside_a_second() {
+        let (conn, root) = library();
+        let tx = conn.unchecked_transaction().unwrap();
+        let mut parent = root;
+        let mut at = Vec::new();
+        for depth in 0..8 {
+            parent = folders::create(&tx, parent, &format!("level {depth}")).unwrap();
+            for side in 0..5 {
+                at.push(folders::create(&tx, parent, &format!("side {side}")).unwrap());
+            }
+            at.push(parent);
+        }
+        for n in 0..40_000 {
+            let folder = at[n % at.len()];
+            upsert(&tx, &sample(1, folder, &format!("IMG_{n:05}.jpg"))).unwrap();
+        }
+        tx.commit().unwrap();
+        let top = folders::child_id(&conn, root, "level 0").unwrap().unwrap();
+
+        let started = std::time::Instant::now();
+        let ids = branch_ids(&conn, top, true).unwrap();
+        let took = started.elapsed();
+
+        assert_eq!(ids.len(), 40_000);
+        assert!(
+            took < std::time::Duration::from_millis(500),
+            "took {took:?}"
+        );
     }
 
     #[test]

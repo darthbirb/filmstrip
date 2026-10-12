@@ -174,6 +174,14 @@ function under(folderId: number): ItemRow[] {
   ];
 }
 
+/** Every file in a folder's branch, by name whatever the case and then by id, as SQLite orders them. */
+function branch(folderId: number): ItemRow[] {
+  const name = (row: ItemRow) => row.diskName.toLowerCase();
+  return under(folderId).sort((a, b) =>
+    name(a) === name(b) ? a.id - b.id : name(a) < name(b) ? -1 : 1,
+  );
+}
+
 /** From the source's own folder down to this one, and the source it is in. */
 function crumbs(folderId: number) {
   const PARENTS = parents();
@@ -1097,7 +1105,10 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       allCount: under(id).length,
     })),
   ],
-  folder_items: ({ folderId }) => ITEMS[folderId as number] ?? [],
+  folder_items: ({ folderId, deep }) =>
+    deep ? branch(folderId as number) : (ITEMS[folderId as number] ?? []),
+  folder_item_ids: ({ folderId, deep }) =>
+    (deep ? branch(folderId as number) : (ITEMS[folderId as number] ?? [])).map((item) => item.id),
   trash_listing: (): Trashed[] =>
     (ITEMS[TRASH] ?? [])
       .map((item) => {

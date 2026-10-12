@@ -408,13 +408,31 @@ pub async fn list_folders(state: State<'_, AppState>) -> Result<Vec<FolderEntry>
     run(&state, folders::every_live).await
 }
 
+/// A folder's own files, or with `deep` its whole branch, as the grid lists them.
 #[tauri::command]
-pub async fn folder_items(state: State<'_, AppState>, folder_id: i64) -> Result<Vec<ItemRow>> {
+pub async fn folder_items(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    deep: bool,
+) -> Result<Vec<ItemRow>> {
     let thumbs = state.thumbs.clone();
     run(&state, move |conn| {
-        Ok(with_thumbnails(items::in_folder(conn, folder_id)?, &thumbs))
+        Ok(with_thumbnails(
+            items::in_branch(conn, folder_id, deep)?,
+            &thumbs,
+        ))
     })
     .await
+}
+
+/// The ids `folder_items` would list, in its order, for acting on a branch without its rows.
+#[tauri::command]
+pub async fn folder_item_ids(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    deep: bool,
+) -> Result<Vec<i64>> {
+    run(&state, move |conn| items::branch_ids(conn, folder_id, deep)).await
 }
 
 #[tauri::command]

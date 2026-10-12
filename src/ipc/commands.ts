@@ -146,7 +146,11 @@ export const setDestinationKey = (key: string, folderId: number) =>
 export const removeDestinationKey = (key: string) =>
   invoke<void>("remove_destination_key", { key });
 
-export const folderItems = (folderId: number) => invoke<ItemRow[]>("folder_items", { folderId });
+export const folderItems = (folderId: number, deep = false) =>
+  invoke<ItemRow[]>("folder_items", { folderId, deep });
+
+export const folderItemIds = (folderId: number, deep: boolean) =>
+  invoke<number[]>("folder_item_ids", { folderId, deep });
 
 export const itemTags = (itemId: number) => invoke<EffectiveTag[]>("item_tags", { itemId });
 
