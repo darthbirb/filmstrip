@@ -136,6 +136,30 @@ test("a tag the file already carries is refused where it is typed, saying whose 
   expect(screen.getByRole("option", { name: /^(trips|travel)/ }).elements()).toHaveLength(0);
 });
 
+test.each([
+  [820, 640],
+  [640, 480],
+])(
+  "at %i × %i, a refusal at the foot of the details is brought into view",
+  async (width, height) => {
+    await page.viewport(width, height);
+    const screen = await renderPane({ width: 300, height: height - 40 });
+    await screen.getByRole("button", { name: "Add Tag…" }).click();
+    await userEvent.keyboard("felucca{Enter}dusk{Enter}");
+    await expect.poll(() => removable()).toEqual(["felucca", "dusk"]);
+    await userEvent.keyboard("egypt");
+
+    const line = screen.getByText("sphinx.jpg already has egypt, from Cairo.");
+    await expect.element(line).toBeVisible();
+    const details = screen.getByRole("region", { name: "Details" }).element();
+    expect(details.scrollHeight).toBeGreaterThan(details.clientHeight);
+    const shown = line.element().getBoundingClientRect();
+    const port = details.getBoundingClientRect();
+    expect(shown.top).toBeGreaterThanOrEqual(port.top);
+    expect(shown.bottom).toBeLessThanOrEqual(port.bottom);
+  },
+);
+
 test("a file's own tag comes off with the keyboard or its ×; what it inherits does not", async () => {
   const screen = await renderPane();
   await screen.getByRole("button", { name: "Add Tag…" }).click();

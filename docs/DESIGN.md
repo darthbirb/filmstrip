@@ -814,7 +814,8 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   tag “…”" for exactly what was typed. They flip above the field when there is no room below, and
   end at its right edge when there is none to the right. A value the folder or file already carries turns the ring
   `line-danger`, outlines the chip it repeats in `line-strong`, and says whose it is underneath in
-  `key` `danger`. Its own tags, never a folder's name or what it inherits, show an × under the
+  `key` `danger`, scrolled into view as it appears when the field sits at the foot of a short
+  scroller. Its own tags, never a folder's name or what it inherits, show an × under the
   pointer or the keyboard, a `chip-remove` circle that takes a `wash`. A file's Labels row has no
   field: a file takes tags only.
 - **Label field.** Add Label… is an outline chip at the nested corner; it becomes a label in its
