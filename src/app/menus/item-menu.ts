@@ -1,4 +1,4 @@
-import { copyItems, openItem, revealItem } from "../../ipc/commands";
+import { copyItemPaths, copyItems, openItem, revealItem } from "../../ipc/commands";
 import { formatCount } from "../../lib/format";
 import type { HeadedMenu, MenuAction, MenuGroups } from "../../ui/Menu";
 import { isFavourite, setFavourite, setFavourites } from "../favourites";
@@ -72,6 +72,12 @@ export function setMenu(items: readonly Item[], trash: boolean): HeadedMenu {
           label: "Copy",
           glyph: "copy",
           onSelect: () => void copyItems(ids).catch(() => undefined),
+        },
+        {
+          id: "copy-path",
+          label: "Copy Path",
+          glyph: "copy",
+          onSelect: () => void copyItemPaths(ids).catch(() => undefined),
         },
       ],
       [
@@ -157,6 +163,12 @@ export function itemMenu(item: Item, show: () => void): MenuGroups {
         onSelect: () => quietly(revealItem(item.id)),
       },
       { id: "copy", label: "Copy", glyph: "copy", onSelect: () => quietly(copyItems([item.id])) },
+      {
+        id: "copy-path",
+        label: "Copy Path",
+        glyph: "copy",
+        onSelect: () => quietly(copyItemPaths([item.id])),
+      },
       {
         id: "open",
         label: "Open with Default App",

@@ -1,5 +1,6 @@
 //! Putting a file on the Windows clipboard as a real file (`CF_HDROP`), so pasting into Explorer
-//! produces the file itself rather than its path as text. PRODUCT.md "Folders and sources".
+//! produces the file itself, or its path as text when the path is what was asked for.
+//! PRODUCT.md "Folders and sources".
 
 use std::path::PathBuf;
 
@@ -27,10 +28,23 @@ pub fn copy_files(paths: &[PathBuf]) -> Result<()> {
         .map_err(|err| AppError::invalid(format!("the files would not copy: {err}")))
 }
 
+/// Plain text, for pasting where a path is typed rather than where a file is dropped.
+#[cfg(windows)]
+pub fn copy_text(text: &str) -> Result<()> {
+    let _clipboard = open()?;
+    raw::set_string(text)
+        .map_err(|err| AppError::invalid(format!("the text would not copy: {err}")))
+}
+
 /// The app ships for Windows only; elsewhere it builds so the tests can run.
 #[cfg(not(windows))]
 pub fn copy_files(_paths: &[PathBuf]) -> Result<()> {
     Err(AppError::invalid(
         "copying files to the clipboard needs Windows",
     ))
+}
+
+#[cfg(not(windows))]
+pub fn copy_text(_text: &str) -> Result<()> {
+    Err(AppError::invalid("copying to the clipboard needs Windows"))
 }

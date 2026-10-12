@@ -514,6 +514,13 @@ the field but outside the selection, so it can be changed on purpose and not by 
 already taken is said under the field, which keeps it and holds Enter until it is edited; nothing
 is renamed behind the person's back and no suffix is invented.
 
+**Copy Path is a row, never a button**, added on 12 October 2026: the bar is drawn with three glyph
+buttons, and a second copy glyph beside the first would be two squares no one could tell apart.
+It lives in the ⋯ with Rename, directly after Copy once Copy has folded in, and in a file's menu
+and a set's directly after Copy, with Copy's glyph, since the sheets draw no glyph for a path. The
+clipboard gets text, the full Windows path, one to a line for a set. The index knows the path, so
+a source that is away keeps the verb.
+
 **A file in the Trash has the way back and nothing else**, drawn by Claude Design and built on 25
 September 2026. Its bar holds Restore and Restore to…, worded and from the left, and no ⋯, since
 nothing is left to fold; its menu holds the same two under Full Screen. Favourite, Move to… and
@@ -596,8 +603,8 @@ Shift+F10 did nothing at all.
   a menu row must not do that in one press when the section that owns it asks first.
 - **A checked tile opens the set's menu, and right-clicking never changes the set.** It is counted
   at its head, since it is the one menu that acts on more than one file, and holds the verbs that
-  mean something for a set: Favourite, Move to…, Copy, and Delete with the count again; in the
-  Trash, Restore and Restore to…. A tile with no check opens its own menu and the set stays
+  mean something for a set: Favourite, Move to…, Copy, Copy Path, and Delete with the count again;
+  in the Trash, Restore and Restore to…. A tile with no check opens its own menu and the set stays
   checked, as a drag from it would, and that menu acts on that tile alone, so its Delete never
   reaches a tile out of sight.
 - **Opening a menu changes nothing.** The pane keeps what it shows until a verb in the menu says

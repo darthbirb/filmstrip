@@ -211,11 +211,26 @@ test("right-clicking a checked tile opens the set's menu, counted, with the verb
   await userEvent.click(tile("sphinx.jpg"), { button: "right" });
 
   await expect.element(page.getByRole("menu", { name: "2 Files" })).toBeVisible();
-  expect(menuRows()).toEqual(["Favourite", "Move to…", "Copy", "Delete 2 Files"]);
+  expect(menuRows()).toEqual(["Favourite", "Move to…", "Copy", "Copy Path", "Delete 2 Files"]);
   await recording(async (calls) => {
     await userEvent.click(page.getByRole("menuitem", { name: "Delete 2 Files" }));
     await expect
       .poll(() => calls.find(([cmd]) => cmd === "trash_items")?.[1])
+      .toEqual({ itemIds: ids });
+  });
+});
+
+test("Copy Path on the set's menu copies every checked file's path", async () => {
+  await renderGrid();
+  const ids = [await idOf("pyramid.jpg"), await idOf("felucca.mp4")];
+  await userEvent.click(box("pyramid.jpg"));
+  await userEvent.click(box("felucca.mp4"));
+  await userEvent.click(tile("pyramid.jpg"), { button: "right" });
+
+  await recording(async (calls) => {
+    await userEvent.click(page.getByRole("menuitem", { name: "Copy Path" }));
+    await expect
+      .poll(() => calls.find(([cmd]) => cmd === "copy_item_paths")?.[1])
       .toEqual({ itemIds: ids });
   });
 });

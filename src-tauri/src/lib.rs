@@ -138,6 +138,7 @@ pub fn run() {
             commands::reveal_item,
             commands::open_item,
             commands::copy_items,
+            commands::copy_item_paths,
             commands::start_index,
             commands::index_progress,
             commands::index_failures,

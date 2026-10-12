@@ -182,6 +182,8 @@ export const openItem = (itemId: number) => invoke<void>("open_item", { itemId }
 
 export const copyItems = (itemIds: number[]) => invoke<void>("copy_items", { itemIds });
 
+export const copyItemPaths = (itemIds: number[]) => invoke<void>("copy_item_paths", { itemIds });
+
 export const startIndex = () => invoke<void>("start_index");
 
 export const indexProgress = () => invoke<Progress>("index_progress");
