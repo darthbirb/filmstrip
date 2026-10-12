@@ -974,6 +974,27 @@ mod tests {
             carried_line(&conn, id),
             ["#library<Library", "#trips<Trips", "trip leg:one<Trips"]
         );
+        let held: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM folder_tag ft JOIN tag t ON t.id = ft.tag_id
+                  WHERE ft.folder_id = ?1 AND t.key = 'trip leg'",
+                [trips],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(held, 1, "Trips holds one trip leg label");
+        let one: i64 = conn
+            .query_row(
+                "SELECT id FROM tag WHERE key = 'trip leg' AND value = 'one'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        remove_folder_tag(&conn, trips, one).unwrap();
+        assert_eq!(
+            carried_line(&conn, id),
+            ["#library<Library", "#trips<Trips"]
+        );
     }
 
     #[test]
