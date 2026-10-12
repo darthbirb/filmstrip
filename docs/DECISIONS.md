@@ -434,6 +434,32 @@ its whole path in the tooltip and the pane, and "gone" when that folder no longe
 refused Restore is not the first they hear of it. The line ellipsises and the tile never grows to
 fit it. The Trash counts itself on its row, its rail square and its header, with its size there.
 
+## Sorting a place
+
+**A folder, the Sorting Box and a search each run in an order chosen in the grid's header**,
+drawn on Artboards › Sorting a place and built on 13 October 2026 from ggallery's `order_clause`:
+Date Taken, Date Added, Size, Length or Random, newest, largest or longest first until reversed.
+Date Taken is the default everywhere and reads when a file was taken or else when it was
+modified, as `year:` does, so a screenshot sits among the photographs of its day. **The order
+is made in SQL**, never on the frontend, so the grid, the filmstrip and the pane moving on after
+a delete all read one list in one order; a folder of 40,000 reorders well inside a second.
+
+**A tie falls to the id, run the same way as the key**, so a reversed order is the first read
+backwards, as ggallery found. **Length puts whatever has no length last either way**: reversing
+turns the videos over, not the pictures to the front. **A random order is a seeded hash, not
+`RANDOM()`**, so a walk finishing, a scroll or coming back to the folder never reshuffles it;
+only Shuffle draws a new seed. ggallery added the seed to one multiplication, which made every
+new seed the old order rotated; here the id is spread over a prime and squared twice, each half
+of the seed entering a round of its own, so every seed draws an order of its own. Reverse is
+disabled in place while Random is the key, since a shuffle has no direction.
+
+**Each kind of place keeps its own order**, in the interface's preferences: going from Cairo to
+Trips keeps the folder's, and the Sorting Box can run oldest added first while folders run
+newest taken. A key picked starts the way it reads first. **The Trash has no sort**: it runs by
+the day each file left, and any other order would scatter its days. Reordering keeps the tiles
+until the new order arrives, as a place read again does. As the header narrows the tile size
+gives up its word first, then the sort, each keeping its glyph, which says the direction.
+
 ## A folder's details
 
 **A folder's band is the pane's details one level up**, opened from the grid's header, as
@@ -788,8 +814,8 @@ row in navigation does; its glass is the search, so a click asks the same questi
 folder, which takes the scope's place while the other terms stay. Each file says where it lives,
 and a trashed one where it came from, keeping the Trash's verbs.
 
-**Results come trashed first, newest first, then by name**, as the Trash and the Sorting Box each
-order their own. A trashed file is found only when the query names the Trash; the drawing's Trash
+**Results come trashed first, then in the order chosen for searches**, as "Sorting a place"
+says. A trashed file is found only when the query names the Trash; the drawing's Trash
 scope writes `is:trashed`, so the two meet only when someone types both.
 
 ## Undo

@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 
+import type { Sort } from "../ipc/bindings/Sort";
 import { setUiPreferences, uiPreferences } from "../ipc/commands";
 import type { LayoutMode } from "./grid/layout";
 
@@ -18,7 +19,13 @@ export type Preferences = {
   recent?: number[];
   /** The sorting source a deleted folder's files move to without asking; absent, it asks. */
   deleteInto?: number;
+  /** The order last chosen in each kind of place that has one. */
+  sort?: Partial<Record<SortPlace, Sort>>;
 };
+
+/** The kinds of place that keep an order of their own; the Trash runs by its days. */
+export const SORT_PLACES = ["folder", "sorting", "search"] as const;
+export type SortPlace = (typeof SORT_PLACES)[number];
 
 /** How many folders the move picker's Recent keeps. */
 export const RECENT = 3;
@@ -86,10 +93,8 @@ function applyScale() {
 
 function validated(value: unknown): Partial<Preferences> {
   if (typeof value !== "object" || value === null) return {};
-  const { scale, widths, hidden, tile, layout, details, recent, deleteInto } = value as Record<
-    string,
-    unknown
-  >;
+  const { scale, widths, hidden, tile, layout, details, recent, deleteInto, sort } =
+    value as Record<string, unknown>;
   const valid: Partial<Preferences> = {};
   if (typeof scale === "number" && Number.isFinite(scale)) valid.scale = nearestScale(scale);
   const savedWidths = pair<number>(widths, "number");
@@ -101,7 +106,28 @@ function validated(value: unknown): Partial<Preferences> {
   if (typeof details === "boolean") valid.details = details;
   if (Array.isArray(recent)) valid.recent = recent.filter(Number.isInteger).slice(0, RECENT);
   if (typeof deleteInto === "number" && Number.isInteger(deleteInto)) valid.deleteInto = deleteInto;
+  const sorts = sortsOf(sort);
+  if (sorts) valid.sort = sorts;
   return valid;
+}
+
+const SORT_KEYS: readonly unknown[] = ["taken", "added", "size", "length", "random"];
+
+/** Each kind of place's saved order that reads as one; a malformed one falls back to the first. */
+function sortsOf(value: unknown) {
+  if (typeof value !== "object" || value === null) return undefined;
+  const sorts: Partial<Record<SortPlace, Sort>> = {};
+  for (const place of SORT_PLACES) {
+    const { key, dir, seed } = ((value as Record<string, unknown>)[place] ?? {}) as Record<
+      string,
+      unknown
+    >;
+    if (!SORT_KEYS.includes(key) || (dir !== "asc" && dir !== "desc")) continue;
+    if (typeof seed !== "number" || !Number.isInteger(seed) || seed < 0 || seed >= 2 ** 32)
+      continue;
+    sorts[place] = { key: key as Sort["key"], dir, seed };
+  }
+  return sorts;
 }
 
 /** The step a saved size is nearest, so a size saved under older steps still lands on one. */

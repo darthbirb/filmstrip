@@ -935,7 +935,7 @@ mod tests {
 
     fn found_by(conn: &Connection, query: &str) -> Vec<i64> {
         let expr = crate::query::parse(query).unwrap();
-        search::items(conn, &expr)
+        search::items(conn, &expr, &crate::db::items::Sort::default())
             .unwrap()
             .into_iter()
             .map(|(row, _)| row.id)

@@ -10,7 +10,7 @@ use ts_rs::TS;
 
 use crate::db::fold;
 use crate::db::folders::Crumb;
-use crate::db::items::{self, ItemRow};
+use crate::db::items::{self, ItemRow, Sort};
 use crate::error::Result;
 use crate::media::probe::days_from_civil;
 use crate::query::{Expr, IsFlag, LabelMatch, StatusValue, Term, split_path_segments};
@@ -72,8 +72,8 @@ fn mentions_trash(expr: &Expr) -> bool {
 // Files.
 
 /// Every file the query finds, and when it went to the Trash for one that is there. Trashed
-/// files come first, newest first, then the rest by name. DECISIONS.md "Search".
-pub fn items(conn: &Connection, expr: &Expr) -> Result<Vec<(ItemRow, Option<i64>)>> {
+/// files come first, then each part in the order chosen. DECISIONS.md "Search".
+pub fn items(conn: &Connection, expr: &Expr, sort: &Sort) -> Result<Vec<(ItemRow, Option<i64>)>> {
     let mut sql = Sql::new();
     let found = item_condition(conn, expr, &mut sql)?;
     let alive = if mentions_trash(expr) {
@@ -84,8 +84,9 @@ pub fn items(conn: &Connection, expr: &Expr) -> Result<Vec<(ItemRow, Option<i64>
     let mut stmt = conn.prepare(&format!(
         "SELECT {}, i.trashed_at FROM item i
           WHERE {alive} AND {found}
-          ORDER BY i.trashed_at IS NULL, i.trashed_at DESC, i.disk_name COLLATE NOCASE, i.id",
-        items::ROW
+          ORDER BY i.trashed_at IS NULL, {}",
+        items::ROW,
+        sort.order()
     ))?;
     let rows = stmt
         .query_map(sql.bound().as_slice(), |r| {
@@ -561,7 +562,7 @@ mod tests {
     use std::path::Path;
 
     use super::*;
-    use crate::db::items::NewItem;
+    use crate::db::items::{NewItem, SortDir, SortKey};
     use crate::db::sources::{self, SourceKind};
     use crate::db::{self, folders, tags};
     use crate::query::{bare_term, label_term, parse, path_term};
@@ -759,9 +760,9 @@ mod tests {
         }
     }
 
-    /// Every file the query finds, by name, in the order found.
+    /// Every file the query finds, by name, in the default order: newest taken first.
     fn found(conn: &Connection, query: &str) -> Vec<String> {
-        items(conn, &parse(query).unwrap())
+        items(conn, &parse(query).unwrap(), &Sort::default())
             .unwrap()
             .into_iter()
             .map(|(row, _)| row.disk_name)
@@ -789,12 +790,12 @@ mod tests {
         let l = library();
         assert_eq!(
             found(&l.conn, "beach"),
-            ["ana_clip.mp4", "bob_at_beach.jpg", "sunset_at_beach.jpg"],
+            ["sunset_at_beach.jpg", "ana_clip.mp4", "bob_at_beach.jpg"],
             "Ana's tag, and Bob's file's own name"
         );
         assert_eq!(
             found(&l.conn, "tag:beach"),
-            ["ana_clip.mp4", "sunset_at_beach.jpg"]
+            ["sunset_at_beach.jpg", "ana_clip.mp4"]
         );
     }
 
@@ -803,15 +804,15 @@ mod tests {
         let l = library();
         assert_eq!(
             found(&l.conn, "ana"),
-            ["ana_clip.mp4", "sunset_at_beach.jpg"]
+            ["sunset_at_beach.jpg", "ana_clip.mp4"]
         );
         assert_eq!(
             found(&l.conn, "people"),
             [
+                "sunset_at_beach.jpg",
                 "ana_clip.mp4",
                 "bob_at_beach.jpg",
-                "old_portrait.jpg",
-                "sunset_at_beach.jpg"
+                "old_portrait.jpg"
             ]
         );
     }
@@ -821,7 +822,7 @@ mod tests {
         let l = library();
         assert_eq!(
             found(&l.conn, "@ana"),
-            ["ana_clip.mp4", "sunset_at_beach.jpg"]
+            ["sunset_at_beach.jpg", "ana_clip.mp4"]
         );
         assert_eq!(found(&l.conn, "view"), ["lisbon_view.png"]);
         assert!(found(&l.conn, "nonexistentword").is_empty());
@@ -852,13 +853,13 @@ mod tests {
         let l = library();
         assert_eq!(
             found(&l.conn, "tag:bea*"),
-            ["ana_clip.mp4", "sunset_at_beach.jpg"]
+            ["sunset_at_beach.jpg", "ana_clip.mp4"]
         );
         assert!(found(&l.conn, "tag:nope").is_empty());
         for query in ["instagram:@ana", "instagram:*", "instagram:@a*", ":@ana"] {
             assert_eq!(
                 found(&l.conn, query),
-                ["ana_clip.mp4", "sunset_at_beach.jpg"],
+                ["sunset_at_beach.jpg", "ana_clip.mp4"],
                 "{query}"
             );
         }
@@ -874,13 +875,13 @@ mod tests {
         let l = library();
         assert_eq!(
             found(&l.conn, "path:Library/People"),
-            ["ana_clip.mp4", "bob_at_beach.jpg", "sunset_at_beach.jpg"]
+            ["sunset_at_beach.jpg", "ana_clip.mp4", "bob_at_beach.jpg"]
         );
         assert_eq!(found(&l.conn, "path:archive/people"), ["old_portrait.jpg"]);
         assert!(found(&l.conn, "path:=Library/People").is_empty());
         assert_eq!(
             found(&l.conn, "path:=Library/People/Ana"),
-            ["ana_clip.mp4", "sunset_at_beach.jpg"]
+            ["sunset_at_beach.jpg", "ana_clip.mp4"]
         );
         assert!(
             found(&l.conn, "path:People").is_empty(),
@@ -903,7 +904,7 @@ mod tests {
                 plain(MB, 2020),
             );
         }
-        assert_eq!(found(&conn, "path:Photos/Trips"), ["one.jpg", "two.jpg"]);
+        assert_eq!(found(&conn, "path:Photos/Trips"), ["two.jpg", "one.jpg"]);
     }
 
     #[test]
@@ -927,7 +928,7 @@ mod tests {
         assert_eq!(found(&l.conn, "size:>20mb"), ["sunset_at_beach.jpg"]);
         assert_eq!(
             found(&l.conn, "size:>=10mb"),
-            ["bob_at_beach.jpg", "sunset_at_beach.jpg"]
+            ["sunset_at_beach.jpg", "bob_at_beach.jpg"]
         );
         assert_eq!(found(&l.conn, "w:>=1920 h:>=1080"), ["sunset_at_beach.jpg"]);
     }
@@ -957,7 +958,43 @@ mod tests {
         assert_eq!(
             found(&l.conn, "bob or is:trashed"),
             ["old_trashed.jpg", "bob_at_beach.jpg"],
-            "trashed first, then by name"
+            "trashed first, then the rest"
+        );
+    }
+
+    #[test]
+    fn results_take_the_order_chosen_with_the_trashed_still_first() {
+        let l = library();
+        let by = |key, dir| -> Vec<String> {
+            items(
+                &l.conn,
+                &parse("people or is:trashed").unwrap(),
+                &Sort { key, dir, seed: 0 },
+            )
+            .unwrap()
+            .into_iter()
+            .map(|(row, _)| row.disk_name)
+            .collect()
+        };
+        assert_eq!(
+            by(SortKey::Size, SortDir::Asc),
+            [
+                "old_trashed.jpg",
+                "old_portrait.jpg",
+                "ana_clip.mp4",
+                "bob_at_beach.jpg",
+                "sunset_at_beach.jpg"
+            ]
+        );
+        assert_eq!(
+            by(SortKey::Size, SortDir::Desc),
+            [
+                "old_trashed.jpg",
+                "sunset_at_beach.jpg",
+                "bob_at_beach.jpg",
+                "ana_clip.mp4",
+                "old_portrait.jpg"
+            ]
         );
     }
 
@@ -966,7 +1003,7 @@ mod tests {
         let l = library();
         assert_eq!(
             found(&l.conn, "status:wip"),
-            ["ana_clip.mp4", "sunset_at_beach.jpg"]
+            ["sunset_at_beach.jpg", "ana_clip.mp4"]
         );
         assert_eq!(found(&l.conn, "status:complete"), ["bob_at_beach.jpg"]);
         let none = found(&l.conn, "status:none");
@@ -1005,7 +1042,7 @@ mod tests {
         tags::rebuild_item(&l.conn, l.keepsake).unwrap();
         assert_eq!(
             found(&l.conn, "lisbon"),
-            ["keepsake.jpg", "lisbon_view.png"]
+            ["lisbon_view.png", "keepsake.jpg"]
         );
         assert!(found(&l.conn, "pinned").is_empty());
     }

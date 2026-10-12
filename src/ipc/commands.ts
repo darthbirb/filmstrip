@@ -24,6 +24,7 @@ import type { Progress } from "./bindings/Progress";
 import type { Reading } from "./bindings/Reading";
 import type { Reason } from "./bindings/Reason";
 import type { SearchOutcome } from "./bindings/SearchOutcome";
+import type { Sort } from "./bindings/Sort";
 import type { SourceKind } from "./bindings/SourceKind";
 import type { SourceSummary } from "./bindings/SourceSummary";
 import type { Suggestions } from "./bindings/Suggestions";
@@ -42,6 +43,9 @@ export type AppError = {
   /** Why, for a refusal, in terms the interface words itself. */
   reason?: Reason;
 };
+
+/** The order every place starts in, newest taken first, as `Sort::default` is. */
+export const FIRST_SORT: Sort = { key: "taken", dir: "desc", seed: 0 };
 
 export const listSources = () => invoke<SourceSummary[]>("list_sources");
 
@@ -147,7 +151,8 @@ export const setDestinationKey = (key: string, folderId: number) =>
 export const removeDestinationKey = (key: string) =>
   invoke<void>("remove_destination_key", { key });
 
-export const folderItems = (folderId: number) => invoke<ItemRow[]>("folder_items", { folderId });
+export const folderItems = (folderId: number, sort: Sort = FIRST_SORT) =>
+  invoke<ItemRow[]>("folder_items", { folderId, sort });
 
 export const folderItemIds = (folderId: number, deep: boolean) =>
   invoke<number[]>("folder_item_ids", { folderId, deep });
@@ -167,7 +172,8 @@ export const itemDetail = (itemId: number) => invoke<ItemDetail | null>("item_de
 
 export const itemPath = (itemId: number) => invoke<string | null>("item_path", { itemId });
 
-export const sortingItems = () => invoke<ItemRow[]>("sorting_items");
+export const sortingItems = (sort: Sort = FIRST_SORT) =>
+  invoke<ItemRow[]>("sorting_items", { sort });
 
 export const trashListing = () => invoke<Trashed[]>("trash_listing");
 
@@ -175,7 +181,8 @@ export const trashSummary = () => invoke<TrashSummary>("trash_summary");
 
 export const readQuery = (text: string) => invoke<Reading>("read_query", { text });
 
-export const search = (query: string) => invoke<SearchOutcome>("search", { query });
+export const search = (query: string, sort: Sort = FIRST_SORT) =>
+  invoke<SearchOutcome>("search", { query, sort });
 
 export const searchSuggestions = (scope: string | null, text: string) =>
   invoke<Suggestions>("search_suggestions", { scope, text });

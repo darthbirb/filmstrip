@@ -74,7 +74,9 @@ export function Frame({
       >
         {/* The header owns its left inset: a disclosure's chevron sits nearer the edge than a title. */}
         <div className="flex max-h-1/2 shrink-0 flex-col border-line border-b bg-panel">
-          <div className="flex h-toolbar shrink-0 items-center gap-2 pr-2">{location}</div>
+          <div className="@container flex h-toolbar shrink-0 items-center gap-2 pr-2">
+            {location}
+          </div>
           {band}
         </div>
         {notices}

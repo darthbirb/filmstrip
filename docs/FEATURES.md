@@ -62,7 +62,7 @@ drawn. **Not started** — neither.
 | The Sorting Box's items | Built | `sorting_items` |
 | Favourite an item | Built | `set_item_favorite` |
 | Reveal, open, copy the file | Built | the pane's bar |
-| Sort by key and direction, random order held steady | Not started | |
+| Sort by key and direction, random order held steady | Built | `folder_items`, `sorting_items` and `search` take the order; the grid's header chooses it per kind of place |
 | Move items between folders | Built | `move_items`, Move to… on the pane's bar and a file's menu; a name already taken is reported, never changed |
 | Delete items to the trash | Built | `trash_items`, Delete on the pane's bar and a file's menu; undo takes an item back |
 | Rename a file, on disk | Built | `rename_item`, the pane's Name row; not in ggallery; a name already taken is refused |

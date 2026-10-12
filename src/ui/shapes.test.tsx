@@ -136,7 +136,8 @@ test("an open menu sits just under its button, lined up with the edge it is give
   const button = screen.getByRole("button", { name: "Layout: Rows" });
   await button.click();
   const below = button.element().getBoundingClientRect();
-  const menu = screen.getByRole("listbox", { name: "Layout" }).element().getBoundingClientRect();
+  const list = screen.getByRole("listbox", { name: "Layout" }).element();
+  const menu = (list.closest("[popover]") as HTMLElement).getBoundingClientRect();
   expect(menu.top).toBeGreaterThanOrEqual(below.bottom);
   expect(menu.top - below.bottom).toBeLessThan(8);
   expect(Math.abs(menu.right - below.right)).toBeLessThan(1);

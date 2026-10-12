@@ -5,6 +5,15 @@ import type { GlyphName } from "./glyphs";
 
 type Option<T extends string> = { value: T; label: string; glyph?: GlyphName };
 
+/** The one act among the choices, after a rule at the menu's foot, as Clear Cover follows pictures. */
+type Act = { label: string; hint: string; glyph: GlyphName; onSelect: () => void };
+
+// Below each width the header can give, the button keeps its glyph and drops its word.
+const WORDS = {
+  roomy: "@max-header-roomy:sr-only",
+  narrow: "@max-header-narrow:sr-only",
+} as const;
+
 type Props<T extends string> = {
   /** What is being chosen; the button reads as this and then the choice made. */
   label: string;
@@ -15,6 +24,11 @@ type Props<T extends string> = {
   glyph?: GlyphName;
   /** The trigger's edge the menu lines up with. */
   align?: "start" | "end";
+  /** The tooltip, where the label alone does not say it. */
+  title?: string;
+  act?: Act;
+  /** In the grid's header, which of its widths the word gives way at. */
+  words?: keyof typeof WORDS;
 };
 
 /** One named choice among a few: a button showing it, opening a menu of all of them. DESIGN.md "Components". */
@@ -25,8 +39,12 @@ export function Dropdown<T extends string>({
   onChange,
   glyph,
   align = "start",
+  title,
+  act,
+  words,
 }: Props<T>) {
   const id = useId();
+  const listId = `${id}-list`;
   // The menu sits in the top layer, so nothing clips it; anchor positioning ties it to the button.
   const anchor = `--dropdown-${id.replace(/[^\w-]/g, "")}`;
   const trigger = useRef<HTMLButtonElement>(null);
@@ -34,18 +52,22 @@ export function Dropdown<T extends string>({
   const [open, setOpen] = useState(false);
   const chosen = options.find((option) => option.value === value) ?? options[0];
 
-  const optionElements = () => [
-    ...(menu.current?.querySelectorAll<HTMLElement>('[role="option"]') ?? []),
+  const targets = () => [
+    ...(menu.current?.querySelectorAll<HTMLElement>('[role="option"], [data-act]') ?? []),
   ];
 
-  const choose = (next: T) => {
+  const close = () => {
     menu.current?.hidePopover();
     trigger.current?.focus();
+  };
+
+  const choose = (next: T) => {
+    close();
     if (next !== value) onChange(next);
   };
 
   const onMenuKeyDown = (event: KeyboardEvent) => {
-    const list = optionElements();
+    const list = targets();
     const at = list.indexOf(document.activeElement as HTMLElement);
     const moves: Record<string, number> = {
       ArrowDown: at + 1,
@@ -67,8 +89,8 @@ export function Dropdown<T extends string>({
         popoverTarget={id}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-controls={id}
-        title={label}
+        aria-controls={listId}
+        title={title ?? label}
         onKeyDown={(event) => {
           if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
           event.preventDefault();
@@ -79,21 +101,18 @@ export function Dropdown<T extends string>({
       >
         <span className="sr-only">{label}: </span>
         {glyph && <Glyph name={glyph} className="text-glyph" />}
-        <span className="truncate">{chosen?.label}</span>
+        <span className={`truncate ${words ? WORDS[words] : ""}`}>{chosen?.label}</span>
         <Glyph name="chevronDown" className="text-fg-dim text-glyph-small" />
       </button>
       <div
         ref={menu}
         id={id}
         popover="auto"
-        role="listbox"
-        aria-label={label}
         onToggle={(event) => {
           const opened = event.newState === "open";
           setOpen(opened);
           if (opened) menu.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
         }}
-        onKeyDown={onMenuKeyDown}
         style={
           {
             positionAnchor: anchor,
@@ -104,30 +123,58 @@ export function Dropdown<T extends string>({
             positionTryFallbacks: "flip-block",
           } as CSSProperties
         }
-        className="inset-auto m-0 mt-1 flex-col gap-0.5 rounded-control border-0 bg-raised p-1 text-fg shadow-overlay inset-ring inset-ring-line-control-hi open:flex"
+        className="inset-auto m-0 mt-1 flex-col rounded-control border-0 bg-raised p-1 text-fg shadow-overlay inset-ring inset-ring-line-control-hi open:flex"
       >
-        {options.map((option) => {
-          const selected = option.value === value;
-          return (
+        <div
+          id={listId}
+          role="listbox"
+          aria-label={label}
+          onKeyDown={onMenuKeyDown}
+          className="flex flex-col gap-0.5"
+        >
+          {options.map((option) => {
+            const selected = option.value === value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={selected}
+                tabIndex={-1}
+                onClick={() => choose(option.value)}
+                className={`focus-ring-inset flex h-control w-full shrink-0 items-center gap-2 whitespace-nowrap rounded-nested px-2 text-left text-ui ${selected ? "hover-wash bg-plate text-on-plate" : "text-fg-mid hover:bg-wash hover:text-fg"}`}
+              >
+                {option.glyph && (
+                  <Glyph
+                    name={option.glyph}
+                    className={`text-glyph ${selected ? "" : "text-fg-dim"}`}
+                  />
+                )}
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+        {act && (
+          <>
+            <span className="mx-2 my-1 h-px shrink-0 bg-line" />
             <button
-              key={option.value}
               type="button"
-              role="option"
-              aria-selected={selected}
+              data-act
               tabIndex={-1}
-              onClick={() => choose(option.value)}
-              className={`focus-ring-inset flex h-control w-full shrink-0 items-center gap-2 whitespace-nowrap rounded-nested px-2 text-left text-ui ${selected ? "hover-wash bg-plate text-on-plate" : "text-fg-mid hover:bg-wash hover:text-fg"}`}
+              onKeyDown={onMenuKeyDown}
+              onClick={() => {
+                close();
+                act.onSelect();
+              }}
+              className="focus-ring-inset flex h-control w-full shrink-0 items-center gap-2 whitespace-nowrap rounded-nested px-2 text-left text-fg text-ui hover:bg-raised-hi"
             >
-              {option.glyph && (
-                <Glyph
-                  name={option.glyph}
-                  className={`text-glyph ${selected ? "" : "text-fg-dim"}`}
-                />
-              )}
-              {option.label}
+              <Glyph name={act.glyph} className="text-fg-dim text-glyph" />
+              <span className="flex-1">{act.label}</span>
+              <span className="text-fg-dim text-key">{act.hint}</span>
             </button>
-          );
-        })}
+          </>
+        )}
       </div>
     </>
   );

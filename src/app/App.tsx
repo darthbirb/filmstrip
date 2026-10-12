@@ -8,6 +8,7 @@ import { Grid } from "./grid/Grid";
 import { DEFAULT_LAYOUT } from "./grid/layout";
 import { Notices } from "./grid/Notices";
 import { SelectionBar } from "./grid/SelectionBar";
+import { SortOrder } from "./grid/SortOrder";
 import { TileSize } from "./grid/TileSize";
 import { useDestinationKeys } from "./keys";
 import { addFolder } from "./navigation/add-source";
@@ -63,6 +64,7 @@ export function App() {
           location={
             <>
               <Breadcrumb />
+              <SortOrder />
               <TileSize />
             </>
           }
