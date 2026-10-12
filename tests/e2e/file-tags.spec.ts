@@ -1,8 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
-test("a file takes a tag in the pane's details, the tag finds it, and it comes off again", async ({
-  page,
-}) => {
+async function openDetailsOfSphinx(page: Page) {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.setViewportSize({ width: 1440, height: 860 });
@@ -21,6 +19,13 @@ test("a file takes a tag in the pane's details, the tag finds it, and it comes o
   const row = pane.getByRole("button", { name: /×/ });
   if ((await row.getAttribute("aria-expanded")) === "false") await row.click();
   const details = pane.getByRole("region", { name: "Details" });
+  return { grid, details, errors };
+}
+
+test("a file takes a tag in the pane's details, the tag finds it, and it comes off again", async ({
+  page,
+}) => {
+  const { grid, details, errors } = await openDetailsOfSphinx(page);
 
   await details.getByRole("button", { name: "Add Tag…" }).click();
   await page.keyboard.type("Felucca");
@@ -44,24 +49,7 @@ test("a file takes a tag in the pane's details, the tag finds it, and it comes o
 test("a tag of several words is kept lowercase, one space apart, and its chip finds the file", async ({
   page,
 }) => {
-  const errors: string[] = [];
-  page.on("pageerror", (error) => errors.push(error.message));
-  await page.setViewportSize({ width: 1440, height: 860 });
-  await page.goto("/");
-
-  const tree = page.getByRole("tree", { name: "Places" });
-  await tree.getByRole("treeitem", { name: "Pictures 1 of 6" }).click();
-  await page.keyboard.press("ArrowRight");
-  await tree.getByRole("treeitem", { name: "Trips 2 of 5" }).click();
-  await page.keyboard.press("ArrowRight");
-  await tree.getByRole("treeitem", { name: "Cairo 3 of 3" }).click();
-
-  const grid = page.getByRole("main");
-  await grid.getByRole("button", { name: "sphinx.jpg" }).click();
-  const pane = page.getByRole("complementary", { name: "Pane" });
-  const row = pane.getByRole("button", { name: /×/ });
-  if ((await row.getAttribute("aria-expanded")) === "false") await row.click();
-  const details = pane.getByRole("region", { name: "Details" });
+  const { grid, details, errors } = await openDetailsOfSphinx(page);
 
   await details.getByRole("button", { name: "Add Tag…" }).click();
   await page.keyboard.type("New  York");
