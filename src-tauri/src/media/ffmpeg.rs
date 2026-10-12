@@ -1,6 +1,7 @@
 //! ffmpeg and ffprobe: **the only programs the app starts.** Found in `tools\` beside the app,
 //! else on PATH; nothing is installed. DECISIONS.md "Video and ffmpeg".
 
+use std::ffi::OsStr;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -26,10 +27,18 @@ pub struct Ffmpeg {
 impl Ffmpeg {
     /// Both programs from `tools`, else both from one directory on PATH; one alone is no use.
     pub fn discover(tools: &Path) -> Option<Ffmpeg> {
-        Self::pair_in(tools).or_else(|| {
-            let path = std::env::var_os("PATH")?;
-            std::env::split_paths(&path).find_map(|dir| Self::pair_in(&dir))
-        })
+        Self::discover_on(tools, std::env::var_os("PATH").as_deref())
+    }
+
+    fn discover_on(tools: &Path, path: Option<&OsStr>) -> Option<Ffmpeg> {
+        Self::pair_in(tools)
+            .or_else(|| std::env::split_paths(path?).find_map(|dir| Self::pair_in(&dir)))
+    }
+
+    /// The pinned build `scripts/fetch-ffmpeg.ps1` puts in `target/tools`, else one on PATH.
+    #[cfg(test)]
+    pub fn for_tests() -> Option<Ffmpeg> {
+        Self::discover(&Path::new(env!("CARGO_MANIFEST_DIR")).join("target/tools"))
     }
 
     fn pair_in(dir: &Path) -> Option<Ffmpeg> {
@@ -189,6 +198,29 @@ mod tests {
         std::fs::write(tools.join(executable("ffprobe")), "").unwrap();
         let found = Ffmpeg::pair_in(&tools).unwrap();
         assert_eq!(found.location(), tools.join(executable("ffmpeg")));
+    }
+
+    fn pair(name: &str) -> PathBuf {
+        let dir = scratch(name);
+        for stem in ["ffmpeg", "ffprobe"] {
+            std::fs::write(dir.join(executable(stem)), "").unwrap();
+        }
+        dir
+    }
+
+    #[test]
+    fn the_bundled_pair_comes_before_one_on_path() {
+        let (bundled, on_path) = (pair("bundled"), pair("on-path"));
+        let path = std::env::join_paths([scratch("empty"), on_path.clone()]).unwrap();
+
+        let found = Ffmpeg::discover_on(&bundled, Some(&path)).unwrap();
+        assert_eq!(found.location(), bundled.join(executable("ffmpeg")));
+
+        let missing = bundled.join("missing");
+        let found = Ffmpeg::discover_on(&missing, Some(&path)).unwrap();
+        assert_eq!(found.location(), on_path.join(executable("ffmpeg")));
+
+        assert!(Ffmpeg::discover_on(&missing, None).is_none());
     }
 
     /// The platform's shell, and the flag that hands it one line to run.

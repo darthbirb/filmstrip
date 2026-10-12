@@ -164,11 +164,10 @@ mod tests {
         assert!(error.to_string().contains("no scrub frame"), "{error}");
     }
 
-    /// CI has no ffmpeg; `cargo test -- --ignored` runs this where there is one.
     #[test]
-    #[ignore = "needs ffmpeg and ffprobe on PATH"]
+    #[ignore = "needs ffmpeg: scripts/fetch-ffmpeg.ps1, or on PATH"]
     fn a_video_gets_a_strip_of_frames_through_it() {
-        let ffmpeg = Ffmpeg::discover(Path::new("no-tools-here")).expect("ffmpeg on PATH");
+        let ffmpeg = Ffmpeg::for_tests().expect("ffmpeg in target/tools or on PATH");
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-scrub");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();

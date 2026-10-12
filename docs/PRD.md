@@ -21,8 +21,9 @@ and a keyboard, any display size and text scale.
   purging the trash, and it asks.
 - **Folders stay real.** A folder is a directory and an item is a file under its own name;
   removing a source forgets the index and never the files (PRODUCT.md "Folders and sources").
-- **Local and private.** No account, no network service, no telemetry. The release is one
-  portable `Filmstrip.exe`; its index, thumbnails and trash live in a `data` folder beside it.
+- **Local and private.** No account, no network service, no telemetry. The release is a
+  portable `Filmstrip.exe`, with the ffmpeg it uses in a `tools` folder beside it; its index,
+  thumbnails and trash live in a `data` folder beside it too.
 - **Scale.** A library of 100,000 items and a folder of 40,000 stay smooth: the grid scrolls at
   the display's frame rate and a folder opens in well under a second once indexed.
 - **Offline sources degrade, never break.** A drive that is away keeps its folders, tags and

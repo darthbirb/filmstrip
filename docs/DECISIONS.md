@@ -154,9 +154,18 @@ the price of never inventing one.
 
 **ffmpeg is found, never installed.** At launch the app looks for `ffmpeg.exe` and `ffprobe.exe`
 together in `tools\` beside the executable, then in any one directory on PATH. Reading PATH
-writes nothing, so "Nothing outside the app folder" holds. Bundling it, so that a release needs
-nothing downloaded, is under PRODUCT.md "Later". Without it videos are not queued at all, so no
-failures pile up, and the first launch that finds it picks them up.
+writes nothing, so "Nothing outside the app folder" holds. Found nowhere, videos are not queued
+at all, so no failures pile up, and the first launch that finds the pair picks them up.
+
+**The release carries its own**, so video needs nothing installed: `Filmstrip.zip` holds
+`Filmstrip.exe` and `tools\` beside it, rather than a Tauri sidecar, which would make every
+`cargo` build need the binaries present. The build is FFmpeg 9.0.2, the "essentials" build from
+gyan.dev, fetched from its GitHub mirror by `scripts/fetch-ffmpeg.ps1`, which pins the URL and
+SHA-256 and refuses anything else; CI's video tests run against the same download. It is GPLv3,
+which the app's own GPL-3.0-or-later already accepts, so an LGPL build would buy nothing; gyan.dev
+keeps every versioned release, where BtbN's builds are pruned, so the pin stays fetchable. Both
+programs are static, two files and no DLLs. Its licence, its build notes and a notice naming the
+source ship in `tools\` with it. A new version is a new pin: version, URL and checksum together.
 
 **`media::ffmpeg` is the only place the app starts another program.** Every run has a limit — 30
 seconds to probe, 60 to take a frame — and is killed past it, so one damaged file cannot hold a

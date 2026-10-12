@@ -19,7 +19,7 @@ jobs:
     timeout-minutes: 30
 
     # Actions are pinned to commit SHAs. Edge and Rust come with the runner image, so no browser
-    # or toolchain is downloaded.
+    # or toolchain is downloaded; ffmpeg is, pinned by version and SHA-256 in its script.
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -62,6 +62,13 @@ jobs:
 
       - name: Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+
+      - name: Fetch the ffmpeg the release carries
+        shell: pwsh
+        run: ./scripts/fetch-ffmpeg.ps1
+
+      - name: Rust tests that need ffmpeg
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked -- --ignored
 
       - name: Bindings are current
         shell: bash

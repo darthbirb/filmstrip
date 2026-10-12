@@ -32,9 +32,9 @@ drawn. **Not started** — neither.
 | Report progress | Built | the foot's indexing line |
 | Report per-file failures, and retry them | Built | the notices above the grid |
 | Thumbnails for pictures | Built | `thumb` jobs |
-| Thumbnails for video, through ffmpeg | Built where ffmpeg is at hand | ffmpeg is not bundled yet |
+| Thumbnails for video, through ffmpeg | Built | the ffmpeg in `tools\` beside the app, else one on PATH |
 | Read a file's shape, dates and length | Built | `probed_at`, `captured_at` |
-| Scrub frames for a video's tile | Built where ffmpeg is at hand | `scrub` jobs, the grid's video tiles |
+| Scrub frames for a video's tile | Built | `scrub` jobs, the grid's video tiles |
 
 ## Folders
 
