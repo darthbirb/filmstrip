@@ -232,6 +232,12 @@ test("on the picture, the plate sits across its foot, and while it plays it goes
   expect(opacity()).toBe("1");
   await expect.poll(() => opacity(), { timeout: 3000 }).toBe("0");
 
+  await userEvent.tab();
+  await expect.element(screen.getByRole("slider", { name: "Seek" })).toHaveFocus();
+  await expect.poll(() => opacity()).toBe("1");
+  (document.activeElement as HTMLElement).blur();
+  await expect.poll(() => opacity()).toBe("0");
+
   await userEvent.hover(plate);
   await expect.poll(() => opacity()).toBe("1");
   video.pause();

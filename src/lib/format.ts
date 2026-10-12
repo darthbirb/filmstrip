@@ -31,10 +31,13 @@ export function formatDuration(ms: number) {
     : `${minutes}:${seconds}`;
 }
 
-/** How far into a clip, in whole seconds gone and as many places as its length needs: 0:31, or 0:00:31 of 1:02:03. */
+/** How far into a clip, in whole seconds gone, its own length once over, and as many places as that length needs: 0:31, or 0:00:31 of 1:02:03. */
 export function formatElapsed(ms: number, lengthMs: number) {
+  const length = formatDuration(lengthMs);
+  if (lengthMs > 0 && ms >= lengthMs) return length;
   const clock = formatDuration(Math.floor(ms / 1000) * 1000);
-  return lengthMs >= 3_600_000 && ms < 3_600_000 ? `0:${clock.padStart(5, "0")}` : clock;
+  const places = (text: string) => text.split(":").length;
+  return places(clock) < places(length) ? `0:${clock.padStart(5, "0")}` : clock;
 }
 
 export function formatDimensions(width: number, height: number) {

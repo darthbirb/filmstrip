@@ -57,7 +57,7 @@ function usePlayback(video: HTMLVideoElement, knownMs: number | null) {
   return { ...state, seek, refresh };
 }
 
-type StageProps = {
+type VideoProps = {
   src: string;
   poster: string | undefined;
   durationMs: number | null;
@@ -69,7 +69,7 @@ type StageProps = {
 };
 
 /** A video in the pane, its plate over its own foot, as wide as the picture rather than the pane. */
-export function Video({ src, poster, durationMs, className, style, failed, onError }: StageProps) {
+export function Video({ src, poster, durationMs, className, style, failed, onError }: VideoProps) {
   const [video, setVideo] = useState<HTMLVideoElement | null>(null);
   const box = useBox(video);
   const near = useNear();

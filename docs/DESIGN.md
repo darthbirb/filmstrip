@@ -861,7 +861,9 @@ longer of the two, so the box settles before the fade finishes rather than under
 `--motion-quick` (120ms) is a colour, a chevron turning and a frame's opacity. All three take
 `--ease-out`, and all three go to zero under reduced motion. `--hold` (600ms) is a wait, not a
 motion: how long a dragged ghost rests on a closed row before the row opens, kept to drop targets
-that open to take a drop, and left as it is under reduced motion. Nothing else moves: the pane's
+that open to take a drop, and left as it is under reduced motion. `--linger` (1500ms) is the other
+wait: how long a playing video's plate stays up once the pointer has left the picture, also left
+as it is under reduced motion. Nothing else moves: the pane's
 contents are replaced without a transition, the grid never animates its layout, the strip never
 scrolls smoothly, the splitter follows the pointer exactly, and nothing animates on first paint.
 
