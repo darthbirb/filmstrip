@@ -47,7 +47,7 @@ Shuffle follow them, and the reverse button is disabled in place. Drawn at rest,
 pointer, reversed, focused, open, at the grid's least and on an empty folder. The Trash keeps
 its days and has no sort.
 
-## What the library holds · DRAWN
+## Library counts · DRAWN
 
 The foot counts items and sources, and nothing says how much the library weighs, what kind it
 is, or what waits and what is thrown away (#59).
