@@ -23,6 +23,7 @@ const items: ItemRow[] = Array.from({ length: 12 }, (_, n) => ({
   durationMs: null,
   favorite: false,
   thumb: null,
+  scrub: null,
 }));
 
 const side = () => Number.parseFloat(document.querySelector("figure")?.style.width ?? "0");

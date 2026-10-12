@@ -112,6 +112,7 @@ spacing:
   rail: 2.75rem
   foot: 2.25rem
   progress: 0.1875rem
+  track-gap: 0.25rem
   splitter: 0.25rem
   grip: 1.625rem
   grip-width: 0.125rem
@@ -287,6 +288,17 @@ components:
   tile-duration:
     backgroundColor: "{colors.veil}"
     textColor: "{colors.fg}"
+    typography: "{typography.small}"
+    rounded: "{rounded.badge}"
+    height: "{spacing.badge}"
+  tile-scrub-track:
+    backgroundColor: "{colors.track}"
+    height: "{spacing.progress}"
+  tile-scrub-fill:
+    backgroundColor: "{colors.in-pane}"
+  tile-no-preview:
+    backgroundColor: "{colors.veil}"
+    textColor: "{colors.fg-mid}"
     typography: "{typography.small}"
     rounded: "{rounded.badge}"
     height: "{spacing.badge}"
@@ -471,7 +483,7 @@ thing and is never decoration:** where the keyboard is, and close.
 | `wash` | White at 9%, laid over something already filled when the pointer is on it. |
 | `veil` | Dark glass over a picture, for what must read on any photograph: a video's length, the strip's steps. |
 | `scrim` | Behind the Settings dialog; the window stays legible under it. |
-| `track`, `track-ring` | A video's track still to play, and the ring its thumb wears while it is held. |
+| `track`, `track-ring` | A video's track still to play, and the ring its thumb wears while it is held; a scrubbed tile's line, and its dashes, `track-gap` apart, when it has no frames. |
 | `box`, `box-line`, `box-line-quiet` | A tile's selection box before it is checked: its glass, its ring under the pointer, and its quieter ring on the other tiles once one is checked. |
 | `danger`, `danger-press`, `on-danger` | The close button under the pointer; a destroying button under the pointer and pressed. |
 | `danger-tint` | A destroying button at rest: its ground, under a `line-danger` ring and `danger` ink. |
@@ -694,7 +706,12 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   exists. A `line-strong` ring under the pointer. The tile the pane shows carries an `in-pane`
   ring drawn inside its edge and an *In Pane* plate with an eye, which never wraps and drops its
   words on a tile narrower than `--container-badge`. A video's tile writes its length on `veil`
-  in the opposite corner. Keyboard focus is the `focus` ring outside, so both can show at once.
+  in the opposite corner, after a filled `glyph-small` play. Under the pointer a video scrubs:
+  the frame at the pointer's place in the clip, a `progress`-tall `track` along the tile's foot
+  filling with `in-pane` to the pointer, an `h-2` by `w-0.5` `in-pane` tick standing at it,
+  and the length plate reading the time there without its glyph. With no scrub frames the track
+  is `track-dashed` and a quiet plate says *No Preview* opposite the length, on a tile at least
+  `--container-note` wide and not holding the in-pane plate. Keyboard focus is the `focus` ring outside, so both can show at once.
   In the Trash a line goes under the tile, in the `tile-caption` room below it: the folder it came
   from in `small` `fg-mid`, and "· gone" after it in `fg-dim`. It ellipsises at the tile's width.
 - **Selection box.** A `badge` square at the `badge` corner, a `tile-inset` from the tile's
@@ -759,7 +776,8 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Plate.** A small fact laid over a picture: `badge`-tall at the `badge` corner on `veil`, `small`
   tabular figures in `fg`. A video's length on its tile and a zoom's figure in the pane are the same
   plate. A word that marks the picture, *Cover* or *First*, is the same plate in `eyebrow`
-  capitals. One that acts takes `hover-wash` under the pointer and the focus ring, never a new ground.
+  capitals; what the picture cannot do, *No Preview*, is the same plate in `small` `fg-mid`.
+  One that acts takes `hover-wash` under the pointer and the focus ring, never a new ground.
 - **Video plate.** A video's controls, over the picture's foot a `tile-gap` in from its edges and
   as wide as the picture rather than the pane: `control`-tall at the `control` corner on `veil`,
   holding play, the track, the time and the mute, `tile-gap` apart. Every glyph on it is `glyph`,
@@ -873,7 +891,7 @@ scrolls smoothly, the splitter follows the pointer exactly, and nothing animates
   for gets a name in `app.css` and here, in the same change as the feature that needs it.
 - **Don't** reach for Tailwind's own palette, radii, text sizes or shadows: they are cleared.
 - **Don't** give selection a hue, or use red for anything but focus and what destroys.
-- **Don't** write on a tile beyond the in-pane plate and a video's length.
+- **Don't** write on a tile beyond the in-pane plate, a video's length and its *No Preview*.
 - **Don't** animate what the keyboard does, or anything repeated all day.
 - **Don't** show sample data on a surface. A surface shows only what it knows.
 

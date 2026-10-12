@@ -25,6 +25,7 @@ function trashed(id: number, at: number, path: string[], gone = false): Trashed 
     durationMs: null,
     favorite: false,
     thumb: null,
+    scrub: null,
     trashedAt: at,
     from: { folderId: id, path, gone },
   };

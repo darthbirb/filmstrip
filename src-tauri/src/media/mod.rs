@@ -1,8 +1,9 @@
 //! Reading pictures and videos: decoding by what a file holds, learning what it says about itself,
-//! and making thumbnails from it.
+//! and making thumbnails and scrub frames from it.
 
 pub mod ffmpeg;
 pub mod probe;
+pub mod scrub;
 pub mod thumbs;
 
 use std::fs::File;

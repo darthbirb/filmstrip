@@ -34,6 +34,7 @@ const items: ItemRow[] = Array.from({ length: 12 }, (_, n) => {
     durationMs: null,
     favorite: false,
     thumb: null,
+    scrub: null,
   };
 });
 

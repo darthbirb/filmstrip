@@ -1,11 +1,13 @@
 //! What the queue can be asked to do, and in which order: a walk outranks everything, since
-//! nothing else is known until it runs, and thumbnails follow it.
+//! nothing else is known until it runs, thumbnails follow it, and scrub frames come last, the
+//! dearest per file and the least missed.
 
 use serde::{Deserialize, Serialize};
 
 pub const INDEX: &str = "index";
 pub const INDEX_FOLDER: &str = "index_folder";
 pub const THUMB: &str = "thumb";
+pub const SCRUB: &str = "scrub";
 
 /// The kinds that walk the disk. Only one runs at a time: each retires what it did not see, so a
 /// second walk alongside would retire what the first had just found.
@@ -13,6 +15,7 @@ pub const WALKS: [&str; 2] = [INDEX, INDEX_FOLDER];
 
 pub const PRIORITY_INDEX: i64 = 100;
 pub const PRIORITY_THUMB: i64 = 20;
+pub const PRIORITY_SCRUB: i64 = 1;
 
 /// A locked or half-written file rarely fails twice; one that fails twice will fail every time.
 pub const MAX_ATTEMPTS: i64 = 2;

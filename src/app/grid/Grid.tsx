@@ -36,6 +36,7 @@ import { EmptyPlace } from "./EmptyPlace";
 import { rowOf, step } from "./keys";
 import { type LayoutMode, rowAt } from "./layout";
 import { inTrash } from "./place-items";
+import { useScrub } from "./scrub";
 import {
   checkRange,
   keepChecked,
@@ -391,6 +392,7 @@ function Tile(props: TileProps) {
   const { left, top, width, height, origin, fromTrash, below } = props;
   // Opening it moves nothing: the pane keeps what it shows until a verb says otherwise.
   const context = useContextMenu();
+  const { scrub, handlers } = useScrub(item);
   return (
     <figure
       title={item.diskName}
@@ -405,6 +407,7 @@ function Tile(props: TileProps) {
         tabIndex={ringed ? 0 : -1}
         onFocus={() => onRing(item.id)}
         onPointerDown={onPress && ((event) => onPress(event, item))}
+        {...handlers}
         onKeyDown={onKeyDown}
         onContextMenu={(event) => {
           if (!checked) {
@@ -440,6 +443,7 @@ function Tile(props: TileProps) {
               ? formatDuration(item.durationMs)
               : undefined
           }
+          scrub={scrub}
         />
       </button>
       {/* Clicking the picture shows it; the box is the other target. Components › Selection checkbox. */}

@@ -152,6 +152,8 @@
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   /* A tile narrower than this shows the in-pane mark without its words. */
   --container-badge: 7rem;
+  /* A tile narrower than this leaves out what it cannot do, which would crowd its length. */
+  --container-note: 10rem;
   /* A filmstrip frame's shape, whatever the picture's own. */
   --aspect-strip: 4 / 3;
 
@@ -164,6 +166,8 @@
   /* The panel's baseline, which the indexing line grows above without moving it. */
   --spacing-foot: 2.25rem;
   --spacing-progress: 0.1875rem;
+  /* The space between the dashes of a track with nothing to run along. */
+  --spacing-track-gap: 0.25rem;
   --spacing-splitter: 0.25rem;
   --spacing-grip: 1.625rem;
   --spacing-grip-width: 0.125rem;
@@ -332,6 +336,16 @@
     135deg,
     var(--color-hatch) 0 var(--hatch-band),
     var(--color-hatch-alt) var(--hatch-band) calc(var(--hatch-band) * 2)
+  );
+}
+
+/* A track with nothing to run along, as a video without scrub frames has: square dashes, each as
+   long as the track is tall. DESIGN.md "Shapes". */
+@utility track-dashed {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-track) 0 var(--spacing-progress),
+    transparent var(--spacing-progress) calc(var(--spacing-progress) + var(--spacing-track-gap))
   );
 }
 
