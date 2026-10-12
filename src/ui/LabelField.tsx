@@ -13,6 +13,7 @@ import {
 import { formatCount } from "../lib/format";
 import { ChipButton } from "./ChipButton";
 import { anchorOf, OfferList, type OfferRow, useOffers } from "./OfferList";
+import { RefusalLine } from "./RefusalLine";
 import { fold, type Refusal } from "./TagField";
 
 export type LabelOffer = { text: string; folders: number };
@@ -200,9 +201,7 @@ function Field({
           className={`${HALF} min-w-18 bg-ground text-fg-hi`}
         />
       </fieldset>
-      {refused && (
-        <span className="w-full text-danger text-key leading-normal">{refused.line}</span>
-      )}
+      {refused && <RefusalLine>{refused.line}</RefusalLine>}
       <OfferList
         id={id}
         anchor={anchor}
@@ -274,11 +273,7 @@ export function LabelValueField({ tagKey, value, onCommit, onCancel }: ValueProp
           className={`${HALF} min-w-18 bg-ground text-fg-hi inset-ring ${empty ? "inset-ring-line-danger" : "inset-ring-line-control"}`}
         />
       </span>
-      {empty && (
-        <span className="w-full text-danger text-key leading-normal">
-          A label needs a value. Use × to remove it.
-        </span>
-      )}
+      {empty && <RefusalLine>A label needs a value. Use × to remove it.</RefusalLine>}
     </>
   );
 }

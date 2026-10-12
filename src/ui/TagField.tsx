@@ -11,6 +11,7 @@ import {
 import { formatCount } from "../lib/format";
 import { ChipButton } from "./ChipButton";
 import { anchorOf, OfferList, type OfferRow, useOffers } from "./OfferList";
+import { RefusalLine } from "./RefusalLine";
 
 export type Offer = { value: string; files: number };
 
@@ -147,9 +148,7 @@ function Field({
         style={{ anchorName: anchor } as CSSProperties}
         className={`focus-ring field-sizing-content h-chip min-w-24 max-w-full rounded-full bg-ground px-2.5 text-fg-hi text-small inset-ring placeholder:text-fg-faint ${refused ? "inset-ring-line-danger" : "inset-ring-line-control"}`}
       />
-      {refused && (
-        <span className="w-full text-danger text-key leading-normal">{refused.line}</span>
-      )}
+      {refused && <RefusalLine>{refused.line}</RefusalLine>}
       <OfferList
         id={id}
         anchor={anchor}
