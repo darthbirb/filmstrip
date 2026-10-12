@@ -1,7 +1,7 @@
 //! Tags, labels, and what an item carries once inheritance is resolved.
 //! PRODUCT.md "Tags and labels"; the rules the data keeps are in SCHEMA.md.
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
@@ -357,6 +357,99 @@ pub fn item_effective_tags(conn: &Connection, item_id: i64) -> Result<Vec<Effect
         carried.extend(level);
     }
     Ok(carried)
+}
+
+/// Folds every stored term again with `db::fold`, merges terms that then read the same into the
+/// oldest, and rebuilds whatever carried one. A data migration. SCHEMA.md "Migrations".
+pub fn refold(conn: &Connection) -> Result<()> {
+    let terms: Vec<(i64, Option<String>, String)> = {
+        let mut stmt = conn.prepare("SELECT id, key, value FROM tag ORDER BY id")?;
+        stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+            .collect::<rusqlite::Result<_>>()?
+    };
+    let mut kept: HashMap<(Option<String>, String), i64> = HashMap::new();
+    let mut refolded = Vec::new();
+    let mut touched = BTreeSet::new();
+    for (id, key, value) in terms {
+        let folded = (key.as_deref().map(fold), fold(&value));
+        if let Some(&into) = kept.get(&folded) {
+            merge_term(conn, id, into)?;
+            touched.insert(into);
+        } else {
+            if folded != (key, value) {
+                refolded.push((id, folded.clone()));
+                touched.insert(id);
+            }
+            kept.insert(folded, id);
+        }
+    }
+    for (id, (key, value)) in refolded {
+        conn.execute(
+            "UPDATE tag SET key = ?1, value = ?2 WHERE id = ?3",
+            params![key, value, id],
+        )?;
+    }
+
+    let mut folders = BTreeSet::new();
+    let mut items = BTreeSet::new();
+    for tag_id in touched {
+        folders.extend(ids(
+            conn,
+            "SELECT folder_id FROM folder_tag WHERE tag_id = ?1",
+            tag_id,
+        )?);
+        items.extend(ids(
+            conn,
+            "SELECT item_id FROM item_effective_tag WHERE tag_id = ?1
+             UNION SELECT item_id FROM item_tag WHERE tag_id = ?1",
+            tag_id,
+        )?);
+    }
+    conn.execute(
+        "DELETE FROM folder_tag WHERE rowid IN (
+           SELECT ft.rowid FROM folder_tag ft JOIN tag t ON t.id = ft.tag_id
+            WHERE t.key IS NOT NULL AND EXISTS (
+              SELECT 1 FROM folder_tag held JOIN tag h ON h.id = held.tag_id
+               WHERE held.folder_id = ft.folder_id AND h.key = t.key AND held.rowid < ft.rowid))",
+        [],
+    )?;
+    for folder_id in folders {
+        search::index_folder(conn, folder_id)?;
+    }
+    for item_id in items {
+        rebuild_item(conn, item_id)?;
+    }
+    Ok(())
+}
+
+/// Moves everything that carries one term onto another, then drops the first. A folder's name
+/// stays its name whichever of the two it was.
+fn merge_term(conn: &Connection, from: i64, into: i64) -> Result<()> {
+    conn.execute(
+        "UPDATE folder_tag SET source = 'title'
+          WHERE tag_id = ?2 AND folder_id IN
+                (SELECT folder_id FROM folder_tag WHERE tag_id = ?1 AND source = 'title')",
+        params![from, into],
+    )?;
+    for table in ["folder_tag", "item_tag", "item_effective_tag"] {
+        conn.execute(
+            &format!("UPDATE OR IGNORE {table} SET tag_id = ?2 WHERE tag_id = ?1"),
+            params![from, into],
+        )?;
+        conn.execute(
+            &format!("DELETE FROM {table} WHERE tag_id = ?1"),
+            params![from],
+        )?;
+    }
+    conn.execute("DELETE FROM tag WHERE id = ?1", params![from])?;
+    Ok(())
+}
+
+fn ids(conn: &Connection, sql: &str, tag_id: i64) -> Result<Vec<i64>> {
+    let mut stmt = conn.prepare(sql)?;
+    Ok(stmt
+        .query_map(params![tag_id], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?)
 }
 
 #[cfg(test)]
@@ -779,5 +872,145 @@ mod tests {
         assert_eq!(term, "tag:\"new york\"");
         assert_eq!(found_by(&conn, &term), [sphinx]);
         assert_eq!(found_by(&conn, "tag:\"New  York\""), [sphinx]);
+    }
+
+    fn refold_again(conn: &mut Connection) {
+        conn.execute("DELETE FROM data_version", []).unwrap();
+        db::migrate(conn).unwrap();
+    }
+
+    fn sorted(mut ids: Vec<i64>) -> Vec<i64> {
+        ids.sort();
+        ids
+    }
+
+    #[test]
+    fn terms_stored_before_whitespace_folded_are_found_by_their_chips_once_refolded() {
+        let (mut conn, root) = library();
+        let york = folders::create(&conn, root, "New  York").unwrap();
+        conn.execute(
+            "UPDATE tag SET value = 'new  york' WHERE value = 'new york'",
+            [],
+        )
+        .unwrap();
+        let stale: i64 = conn
+            .query_row("SELECT id FROM tag WHERE value = 'new  york'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        let inside = item(&conn, york, "inside.jpg");
+        let tagged = item(&conn, root, "tagged.jpg");
+        let fresh = item(&conn, root, "fresh.jpg");
+        let both = item(&conn, root, "both.jpg");
+        for id in [tagged, both] {
+            conn.execute(
+                "INSERT INTO item_tag (item_id, tag_id, added_at) VALUES (?1, ?2, 0)",
+                params![id, stale],
+            )
+            .unwrap();
+            rebuild_item(&conn, id).unwrap();
+        }
+        add_item_tag(&conn, fresh, "new york").unwrap();
+        add_item_tag(&conn, both, "new york").unwrap();
+
+        refold_again(&mut conn);
+
+        let term = crate::query::tag_term("new york");
+        assert_eq!(
+            sorted(found_by(&conn, &term)),
+            sorted(vec![inside, tagged, fresh, both])
+        );
+        let named: Vec<i64> = search::folders(&conn, &crate::query::parse(&term).unwrap())
+            .unwrap()
+            .into_iter()
+            .map(|found| found.id)
+            .collect();
+        assert_eq!(named, [york]);
+        for id in [inside, tagged, fresh, both] {
+            let york_chips: Vec<EffectiveTag> = item_effective_tags(&conn, id)
+                .unwrap()
+                .into_iter()
+                .filter(|tag| tag.value.contains("york"))
+                .collect();
+            assert_eq!(york_chips.len(), 1, "one chip on {id}: {york_chips:?}");
+            let chip = crate::query::tag_term(&york_chips[0].value);
+            assert!(found_by(&conn, &chip).contains(&id), "{chip} finds {id}");
+        }
+        assert_eq!(
+            carried_line(&conn, inside),
+            ["#library<Library", "#new york<New  York"]
+        );
+        let terms: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM tag WHERE value LIKE 'new%york'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(terms, 1, "the two became one term");
+    }
+
+    #[test]
+    fn a_folder_whose_label_keys_refold_together_keeps_the_one_it_had_first() {
+        let (mut conn, root) = library();
+        let trips = folders::create(&conn, root, "Trips").unwrap();
+        let id = item(&conn, trips, "a.jpg");
+        set_folder_label(&conn, trips, "Trip Leg", "One").unwrap();
+        conn.execute(
+            "INSERT INTO tag (key, value) VALUES ('trip  leg', 'two')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO folder_tag (folder_id, tag_id, source) VALUES (?1, ?2, 'manual')",
+            params![trips, conn.last_insert_rowid()],
+        )
+        .unwrap();
+        rebuild_item(&conn, id).unwrap();
+
+        refold_again(&mut conn);
+
+        assert_eq!(
+            carried_line(&conn, id),
+            ["#library<Library", "#trips<Trips", "trip leg:one<Trips"]
+        );
+    }
+
+    #[test]
+    fn a_folder_s_name_stays_its_name_when_its_term_merges_into_an_older_one() {
+        let (mut conn, root) = library();
+        let older = get_or_create_tag(&conn, None, "old town").unwrap();
+        let town = folders::create(&conn, root, "Old  Town").unwrap();
+        add_folder_tag(&conn, town, "old town").unwrap();
+        conn.execute(
+            "INSERT INTO tag (key, value) VALUES (NULL, 'old  town')",
+            [],
+        )
+        .unwrap();
+        let stale = conn.last_insert_rowid();
+        conn.execute(
+            "UPDATE folder_tag SET source = 'manual' WHERE folder_id = ?1 AND tag_id = ?2",
+            params![town, older],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO folder_tag (folder_id, tag_id, source) VALUES (?1, ?2, 'title')",
+            params![town, stale],
+        )
+        .unwrap();
+        let id = item(&conn, town, "a.jpg");
+
+        refold_again(&mut conn);
+
+        assert_eq!(
+            carried_line(&conn, id),
+            ["#library<Library", "#old town<Old  Town"]
+        );
+        remove_folder_tag(&conn, town, older).unwrap();
+        assert_eq!(
+            carried_line(&conn, id),
+            ["#library<Library", "#old town<Old  Town"],
+            "still the one it cannot lose"
+        );
     }
 }

@@ -31,6 +31,12 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (8, include_str!("migrations/008_indexed.sql")),
 ];
 
+type Rewrite = fn(&Connection) -> Result<()>;
+
+/// Rewrites of stored rows that SQL cannot express, applied in order after every SQL migration,
+/// so each runs against the latest schema. Never edited once shipped. SCHEMA.md "Migrations".
+const DATA_MIGRATIONS: &[(i64, Rewrite)] = &[(1, tags::refold)];
+
 /// A connection with the app's pragmas. One per thread: WAL allows one writer
 /// beside any number of readers.
 pub fn open(path: &Path) -> Result<Connection> {
@@ -74,6 +80,22 @@ fn migrate_inner(conn: &mut Connection) -> Result<()> {
         )?;
         tx.commit()?;
     }
+
+    conn.execute_batch("CREATE TABLE IF NOT EXISTS data_version (version INTEGER NOT NULL);")?;
+    let current: i64 = conn.query_row(
+        "SELECT COALESCE(MAX(version), 0) FROM data_version",
+        [],
+        |r| r.get(0),
+    )?;
+    for (version, rewrite) in DATA_MIGRATIONS {
+        if *version <= current {
+            continue;
+        }
+        let tx = conn.transaction()?;
+        rewrite(&tx)?;
+        tx.execute("INSERT INTO data_version (version) VALUES (?1)", [version])?;
+        tx.commit()?;
+    }
     Ok(())
 }
 
@@ -114,6 +136,10 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM schema_version", [], |r| r.get(0))
             .unwrap();
         assert_eq!(applied, MIGRATIONS.len() as i64);
+        let rewritten: i64 = conn
+            .query_row("SELECT COUNT(*) FROM data_version", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(rewritten, DATA_MIGRATIONS.len() as i64);
     }
 
     #[test]
