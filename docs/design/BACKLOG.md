@@ -34,3 +34,27 @@ Consider the old drawing's scrubber: a 16px channel at the grid's edge with a sq
 to jump anywhere; the position is the information. Investigate whether it replaces the
 scrollbar or sits beside it. The pass that drew it recommends building the other ten first, and
 only building this if the largest folders still feel unnavigable afterwards.
+
+## Sorting a place · DRAWN
+
+A place's grid shows its files in one order (#57). It is to be ordered by when each was taken,
+when it was added, its size or its length, either way, or at random until shuffled again.
+
+Drawn on Artboards › Sorting a place: a dropdown naming the key, its glyph the direction, and a
+glyph button that reverses it, both before the tile size in the grid's header of a folder, the
+Sorting Box and a search. The menu lists the five keys; while Random is the key a rule and
+Shuffle follow them, and the reverse button is disabled in place. Drawn at rest, under the
+pointer, reversed, focused, open, at the grid's least and on an empty folder. The Trash keeps
+its days and has no sort.
+
+## What the library holds · DRAWN
+
+The foot counts items and sources, and nothing says how much the library weighs, what kind it
+is, or what waits and what is thrown away (#59).
+
+Drawn on Artboards › Library counts: the foot's baseline becomes the items and their size, and
+a click on it opens the totals above it in the menu's shape, a row each for pictures, videos,
+in all, the Sorting Box and the Trash, then the sources, with any that is away named and
+counted from the index. Drawn at rest, under the pointer, focused, open, folded, with a source
+away, while a walk runs, with one item, empty and at the panel's least; the Sorting Box's
+header names a sorting source that is away.
