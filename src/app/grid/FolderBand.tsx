@@ -4,6 +4,7 @@ import { type CSSProperties, useRef, useState } from "react";
 import type { EffectiveTag } from "../../ipc/bindings/EffectiveTag";
 import type { FolderDetail } from "../../ipc/bindings/FolderDetail";
 import type { FolderStatus } from "../../ipc/bindings/FolderStatus";
+import type { KeyBelow } from "../../ipc/bindings/KeyBelow";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import {
   addFolderTag,
@@ -114,7 +115,13 @@ function Body({ place, detail, source }: BodyProps) {
   ];
   facts.push([
     "Labels",
-    <LabelsRow key="labels" folderId={detail.id} title={title} labels={labels} />,
+    <LabelsRow
+      key="labels"
+      folderId={detail.id}
+      title={title}
+      labels={labels}
+      keysBelow={detail.keysBelow}
+    />,
   ]);
   facts.push([
     "Tags",
@@ -264,24 +271,37 @@ type Where = { root: boolean; offline: boolean };
 /** What the folder's own terms changing means: everything below carries something new. */
 const changed = () => libraryChanged().then(detailChanged);
 
-type LabelsRowProps = { folderId: number; title: string; labels: EffectiveTag[] };
+type LabelsRowProps = {
+  folderId: number;
+  title: string;
+  labels: EffectiveTag[];
+  keysBelow: KeyBelow[];
+};
 
 /**
  * The folder's labels and Add Label…. A folder holds one value per key, so a key it has, its own
- * or from above, is refused; its own value is changed with a click on it instead.
+ * or from above, is refused, and so is one a folder below holds; its own value is changed with a
+ * click on it instead.
  */
-function LabelsRow({ folderId, title, labels }: LabelsRowProps) {
+function LabelsRow({ folderId, title, labels, keysBelow }: LabelsRowProps) {
   const row = useRef<HTMLSpanElement>(null);
   const [echo, setEcho] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
   const refuseKey = (key: string): Refusal | null => {
-    const had = labels.find((label) => label.key === key);
-    if (!had) return null;
     const article = /^[aeiou]/.test(key) ? "an" : "a";
-    const line = had.from
-      ? `${key} comes from ${had.from.title}.`
-      : `${title} already has ${article} ${key}. Click its value to change it.`;
-    return { line, tagId: had.tagId };
+    const had = labels.find((label) => label.key === key);
+    if (had) {
+      const line = had.from
+        ? `${key} comes from ${had.from.title}.`
+        : `${title} already has ${article} ${key}. Click its value to change it.`;
+      return { line, tagId: had.tagId };
+    }
+    const below = keysBelow.find((one) => one.key === key);
+    if (!below) return null;
+    return {
+      line: `${below.folder.title}, inside ${title}, already has ${article} ${key}.`,
+      tagId: null,
+    };
   };
 
   return (
