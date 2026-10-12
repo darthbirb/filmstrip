@@ -3,8 +3,20 @@
 The tables, and the rules the data keeps. Facts only: why a rule exists is in the
 migration's own comments and in [DECISIONS.md](DECISIONS.md).
 
-The schema lives in `src-tauri/src/db/migrations/`, numbered and applied in order. Each
-migration arrives with the feature that needs it and is never edited once shipped.
+## Migrations
+
+- SQL migrations are numbered in `src-tauri/src/db/migrations/`, applied in order and recorded
+  in `schema_version`. Rewrites of stored rows that SQL cannot express are Rust functions in
+  `db::DATA_MIGRATIONS`, numbered on their own and recorded in `data_version`. They run once
+  each, in order, after every SQL migration, so each sees the latest schema. Each rewrites the
+  index only, never a file on disk. Every migration of either kind arrives with the feature
+  that needs it and is never edited once shipped.
+- Data migration 1 (`tags::refold`) folds every stored `tag.key` and `tag.value` again with
+  `db::fold`, for libraries indexed when it only lowercased. Terms that then read the same
+  become the oldest of them: `folder_tag`, `item_tag` and `item_effective_tag` point at it
+  without repeating a row, and a folder whose name was either keeps it as its name. A folder
+  left holding two values of one key keeps the label it had first. Every folder and item that
+  carried a changed term is indexed again.
 
 ## Tables
 
@@ -51,8 +63,8 @@ migration arrives with the feature that needs it and is never edited once shippe
 
 ## Tags and labels
 
-- Keys and values are stored folded to lowercase. A folder's title keeps its case; the tag
-  derived from it is folded.
+- Keys and values are stored folded (`db::fold`): lowercase, trimmed, and one space between
+  their words. A folder's title keeps its case; the tag derived from it is folded.
 - **A label belongs to a folder only.** Items take tags, and `tags::add_item_tag` has no key
   parameter.
 - **A folder holds one value per key.** `tags::set_folder_label` gives a key the folder already

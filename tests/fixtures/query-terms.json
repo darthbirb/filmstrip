@@ -5,7 +5,7 @@
   { "fn": "quoteWord", "args": ["a\\"], "expected": "a\\\\" },
   { "fn": "quoteWord", "args": ["a b\\"], "expected": "\"a b\\\\\"" },
   { "fn": "quoteWord", "args": ["line\u0085break"], "expected": "\"line\u0085break\"" },
-  { "fn": "quoteWord", "args": ["bom﻿char"], "expected": "bom﻿char" },
+  { "fn": "quoteWord", "args": ["bom\ufeffchar"], "expected": "bom\ufeffchar" },
   { "fn": "quoteWord", "args": ["a(b)c"], "expected": "\"a(b)c\"" },
   { "fn": "quoteWord", "args": ["or"], "expected": "\"or\"" },
   { "fn": "quoteWord", "args": ["OR"], "expected": "\"OR\"" },
@@ -25,5 +25,11 @@
   { "fn": "labelTerm", "args": ["location", "a\\\"b"], "expected": "location:a\\\\\\\"b" },
   { "fn": "labelTerm", "args": ["location", "san diego"], "expected": "location:\"san diego\"" },
   { "fn": "tagTerm", "args": ["sphinx"], "expected": "tag:sphinx" },
-  { "fn": "tagTerm", "args": ["day off"], "expected": "tag:\"day off\"" }
+  { "fn": "tagTerm", "args": ["day off"], "expected": "tag:\"day off\"" },
+  { "fn": "fold", "args": ["Beach"], "expected": "beach" },
+  { "fn": "fold", "args": [" New  York "], "expected": "new york" },
+  { "fn": "fold", "args": ["Upper\t East\u3000Side\n"], "expected": "upper east side" },
+  { "fn": "fold", "args": ["line\u0085break"], "expected": "line break" },
+  { "fn": "fold", "args": ["\ufeffbom"], "expected": "\ufeffbom" },
+  { "fn": "fold", "args": ["   "], "expected": "" }
 ]

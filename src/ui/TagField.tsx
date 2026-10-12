@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import { formatCount } from "../lib/format";
+import { fold } from "../lib/queryTerm";
 import { ChipButton } from "./ChipButton";
 import { anchorOf, OfferList, type OfferRow, useOffers } from "./OfferList";
 import { RefusalLine } from "./RefusalLine";
@@ -31,8 +32,6 @@ type Props = {
   /** Backspace in an empty field: the keyboard goes to the last tag that can be removed. */
   onBackOut: () => void;
 };
-
-export const fold = (text: string) => text.trim().toLowerCase();
 
 /**
  * Add Tag…, and the chip-shaped field it becomes, with the library's tags offered under it. It

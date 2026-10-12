@@ -94,6 +94,20 @@ test("Add Tag… is the band's field: it offers the library's tags and stays ope
   await expect.element(screen.getByRole("button", { name: "Add Tag…" })).toBeVisible();
 });
 
+test("a tag of several words is kept lowercase with one space between them, and refused so", async () => {
+  const screen = await renderPane();
+  await screen.getByRole("button", { name: "Add Tag…" }).click();
+  const field = screen.getByRole("combobox", { name: "Add Tag to sphinx.jpg" });
+  await userEvent.keyboard("  New  York ");
+  await expect.element(screen.getByRole("option", { name: "New tag “new york”" })).toBeVisible();
+  await userEvent.keyboard("{Enter}");
+  await expect.poll(() => chipTexts("Tags")).toEqual(["new york", ...PATH_ORDER]);
+  expect(await itemTags(sphinx)).toContainEqual(expect.objectContaining({ value: "new york" }));
+
+  await userEvent.type(field, "NEW   york");
+  await expect.element(screen.getByText("sphinx.jpg already has new york.")).toBeVisible();
+});
+
 test("the offers for a file's first tag stay inside the window when the pane is at its right edge", async () => {
   const screen = await renderPane({ position: "fixed", top: 0, right: 0, width: 320 });
   expect(removable()).toEqual([]);

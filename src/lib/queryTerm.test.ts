@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 
 import fixture from "../../tests/fixtures/query-terms.json?raw";
-import { bareTerm, labelTerm, pathTerm, quoteWord, tagTerm } from "./queryTerm";
+import { bareTerm, fold, labelTerm, pathTerm, quoteWord, tagTerm } from "./queryTerm";
 
 type Case = { fn: string; args: unknown[]; expected: string };
 const cases = JSON.parse(fixture) as Case[];
@@ -12,6 +12,7 @@ const writers: Record<string, (args: unknown[]) => string> = {
   bareTerm: ([value]) => bareTerm(value as string),
   labelTerm: ([key, value]) => labelTerm(key as string, value as string),
   tagTerm: ([value]) => tagTerm(value as string),
+  fold: ([value]) => fold(value as string),
 };
 
 test("each writer writes what the Rust writer does, case for case", () => {

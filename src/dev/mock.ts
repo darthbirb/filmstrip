@@ -32,6 +32,7 @@ import type { Trashed } from "../ipc/bindings/Trashed";
 import type { TrashSummary } from "../ipc/bindings/TrashSummary";
 import type { UndoReport } from "../ipc/bindings/UndoReport";
 import type { AppError } from "../ipc/commands";
+import { fold } from "../lib/queryTerm";
 
 // A small library for the dev server and component tests, typed by the Rust bindings so it
 // cannot drift from them. DEVELOPMENT.md "Seeing the app".
@@ -461,16 +462,30 @@ function live(folderId: number) {
 
 const invalid = (message: string) => Promise.reject<AppError>({ kind: "invalid", message });
 
+/** Where the first `(` outside quotes is, else the `"` left open, else -1. */
+function openedAt(text: string) {
+  let quote = -1;
+  for (let at = 0; at < text.length; at++) {
+    if (text[at] === "\\") at++;
+    else if (text[at] === '"') quote = quote < 0 ? at : -1;
+    else if (text[at] === "(" && quote < 0) return at;
+  }
+  return quote;
+}
+
+const unquote = (word: string) =>
+  word.replace(/\\(.)|"/g, (_, kept: string | undefined) => kept ?? "");
+
 /**
  * The query language, as far as the mock library needs it: space-separated words, each a path,
- * a place, a tag, a label or a word; an unclosed `(` or `"` is the fault. `query::read` is the
- * real reader.
+ * a place, a tag, a label or a word, and a quoted run one word; an unclosed `(` or `"` is the
+ * fault. `query::read` is the real reader.
  */
 function readQuery(text: string): Reading {
   const terms: QueryTerm[] = [];
-  const opened = [...text].findIndex((char) => char === "(" || char === '"');
+  const opened = openedAt(text);
   const readable = opened < 0 ? text : text.slice(0, opened);
-  for (const match of readable.matchAll(/\S+/g)) {
+  for (const match of readable.matchAll(/(?:[^\s"\\]|\\.|"(?:[^"\\]|\\.)*")+/g)) {
     const word = match[0];
     terms.push({
       text: word,
@@ -490,7 +505,7 @@ function readQuery(text: string): Reading {
 }
 
 function shapeOf(word: string): Shape {
-  const [key, value] = word.includes(":") ? word.split(/:(.*)/, 2) : ["", word];
+  const [key, value] = word.includes(":") ? unquote(word).split(/:(.*)/, 2) : ["", word];
   if (key === "path") return { kind: "path", titles: (value ?? "").split("/"), exact: false };
   if (word === "is:sorting") return { kind: "place", place: "sorting" };
   if (word === "is:trashed") return { kind: "place", place: "trash" };
@@ -523,7 +538,7 @@ function searchFor(query: string): SearchOutcome {
         if (shape.kind === "path") return within(path, shape);
         if (shape.kind === "place") return shape.place === "trash" || hit.folderId === 2;
         if (shape.kind === "tag") {
-          const value = shape.value.toLowerCase();
+          const value = fold(shape.value);
           // A file carries every tag its folders do, a band's as well as their names.
           const above = trashed.get(hit.id)?.folders ?? crumbs(hit.folderId).folders;
           const added = above.some((crumb) =>
@@ -532,7 +547,7 @@ function searchFor(query: string): SearchOutcome {
           return path.includes(value) || added || !!ITEM_TAGS.get(hit.id)?.includes(value);
         }
         if (shape.kind === "label") return false;
-        const word = text.toLowerCase();
+        const word = unquote(text).toLowerCase();
         return hit.diskName.toLowerCase().includes(word) || path.includes(word);
       }),
     )
@@ -543,7 +558,7 @@ function searchFor(query: string): SearchOutcome {
       const path = lower(crumbs(id).folders.map((crumb) => crumb.title));
       return (
         words.length > 0 &&
-        words.every((word) => title.toLowerCase().includes(word.text.toLowerCase())) &&
+        words.every((word) => title.toLowerCase().includes(unquote(word.text).toLowerCase())) &&
         terms.every(
           ({ shape }) =>
             shape.kind !== "path" || (within(path, shape) && path.length > shape.titles.length),
@@ -677,7 +692,7 @@ function coverChoices(folderId: number) {
 
 /** A label's keys or one key's values that begin with what was typed, by how many folders use them. */
 function labelOffers(text: (label: { key: string; value: string }) => string, typed: string) {
-  const word = typed.trim().toLowerCase();
+  const word = fold(typed);
   const used = new Map<string, number>();
   for (const own of OWN.values()) {
     for (const tag of own.tags) {
@@ -944,7 +959,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     return null;
   },
   tag_offers: ({ typed }) => {
-    const word = String(typed).trim().toLowerCase();
+    const word = fold(String(typed));
     const carried = new Map<string, number>();
     const places = [...SOURCES.map((one) => one.rootFolderId), ...parents().keys()];
     for (const id of places) {
@@ -965,7 +980,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   },
   add_folder_tag: ({ folderId, value }) => {
     const own = ownOf(folderId as number);
-    const folded = String(value).trim().toLowerCase();
+    const folded = fold(String(value));
     if (!own.tags.some((tag) => tag.key === null && tag.value === folded)) {
       own.tags.push({ key: null, value: folded });
     }
@@ -978,15 +993,12 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   },
   label_key_offers: ({ typed }) => labelOffers((label) => label.key, String(typed)),
   label_value_offers: ({ key, typed }) =>
-    labelOffers(
-      (label) => (label.key === String(key).trim().toLowerCase() ? label.value : ""),
-      String(typed),
-    ),
+    labelOffers((label) => (label.key === fold(String(key)) ? label.value : ""), String(typed)),
   set_folder_label: ({ folderId, key, value }) => {
     const own = ownOf(folderId as number);
     const label = {
-      key: String(key).trim().toLowerCase(),
-      value: String(value).trim().toLowerCase(),
+      key: fold(String(key)),
+      value: fold(String(value)),
     };
     const held = own.tags.findIndex((tag) => tag.key === label.key);
     if (held >= 0) own.tags[held] = label;
@@ -1108,7 +1120,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   item_tags: ({ itemId }) => itemTags(itemId as number),
   add_item_tag: ({ itemId, value }) => {
     const own = ITEM_TAGS.get(itemId as number) ?? [];
-    const folded = String(value).trim().toLowerCase();
+    const folded = fold(String(value));
     if (!own.includes(folded)) ITEM_TAGS.set(itemId as number, [...own, folded]);
     return null;
   },

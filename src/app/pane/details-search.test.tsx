@@ -66,6 +66,18 @@ test("a click asks anew from everywhere, with that term alone", async () => {
   expect(getPlace()).toMatchObject({ query: "tag:egypt", back: CAIRO });
 });
 
+test("a tag of several words searches for itself as one quoted term", async () => {
+  const several: EffectiveTag = { tagId: 9, key: null, value: "new york", from: null, name: false };
+  await render(
+    <div style={{ width: 380 }}>
+      <Details item={await sphinx()} tags={[...TAGS, several]} />
+    </div>,
+  );
+  await expect.element(chip("new york")).toHaveAttribute("title", "Search new york");
+  await chip("new york").click();
+  expect(getPlace()).toEqual({ kind: "search", query: 'tag:"new york"', back: CAIRO });
+});
+
 test("Ctrl+Click adds the term and keeps the query, scope and all, but never twice", async () => {
   setPlace({ kind: "search", query: "path:Pictures/Trips/Cairo dawn", back: CAIRO });
   await details();

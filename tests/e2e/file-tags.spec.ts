@@ -1,8 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 
-test("a file takes a tag in the pane's details, the tag finds it, and it comes off again", async ({
-  page,
-}) => {
+async function openDetailsOfSphinx(page: Page) {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.setViewportSize({ width: 1440, height: 860 });
@@ -21,6 +19,13 @@ test("a file takes a tag in the pane's details, the tag finds it, and it comes o
   const row = pane.getByRole("button", { name: /×/ });
   if ((await row.getAttribute("aria-expanded")) === "false") await row.click();
   const details = pane.getByRole("region", { name: "Details" });
+  return { grid, details, errors };
+}
+
+test("a file takes a tag in the pane's details, the tag finds it, and it comes off again", async ({
+  page,
+}) => {
+  const { grid, details, errors } = await openDetailsOfSphinx(page);
 
   await details.getByRole("button", { name: "Add Tag…" }).click();
   await page.keyboard.type("Felucca");
@@ -38,5 +43,24 @@ test("a file takes a tag in the pane's details, the tag finds it, and it comes o
   await page.keyboard.press("Delete");
   await expect(felucca).toHaveCount(0);
   await expect(details.getByRole("button", { name: "egypt", exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("a tag of several words is kept lowercase, one space apart, and its chip finds the file", async ({
+  page,
+}) => {
+  const { grid, details, errors } = await openDetailsOfSphinx(page);
+
+  await details.getByRole("button", { name: "Add Tag…" }).click();
+  await page.keyboard.type("New  York");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Escape");
+  const tag = details.getByRole("button", { name: "new york", exact: true });
+  await expect(tag).toBeVisible();
+
+  await tag.click();
+  await expect(grid.getByRole("heading", { name: "new york 1 file" })).toBeVisible();
+  await expect(grid.getByRole("button", { name: "sphinx.jpg" })).toBeVisible();
+  await expect(grid.getByRole("button", { name: "pyramid.jpg" })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
