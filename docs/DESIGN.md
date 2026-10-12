@@ -760,7 +760,8 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   the chip's own shape, a pill on `ground` in a `line-control` ring, `fg-hi` text with "tag" for its
   placeholder. The library's tags are offered under it in the menu's shape, the most carried
   first, each with "on 4 files" in `key` `fg-dim`, the lit one on `raised-hi`, and a last row "New
-  tag “…”" for exactly what was typed. A value the folder or file already carries turns the ring
+  tag “…”" for exactly what was typed. They flip above the field when there is no room below, and
+  end at its right edge when there is none to the right. A value the folder or file already carries turns the ring
   `line-danger`, outlines the chip it repeats in `line-strong`, and says whose it is underneath in
   `key` `danger`. Its own tags, never a folder's name or what it inherits, show an × under the
   pointer or the keyboard, a `chip-remove` circle that takes a `wash`. A file's Labels row has no

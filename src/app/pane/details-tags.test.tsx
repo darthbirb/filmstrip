@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
@@ -36,10 +37,10 @@ beforeEach(async () => {
   await page.viewport(1200, 800);
 });
 
-async function renderPane() {
+async function renderPane(edge: CSSProperties = {}) {
   const screen = await render(
     <PaneDetailProvider>
-      <div style={{ display: "flex", flexDirection: "column", width: 400, height: 760 }}>
+      <div style={{ display: "flex", flexDirection: "column", width: 400, height: 760, ...edge }}>
         <Pane />
       </div>
     </PaneDetailProvider>,
@@ -91,6 +92,20 @@ test("Add Tag… is the band's field: it offers the library's tags and stays ope
 
   await userEvent.keyboard("{Escape}");
   await expect.element(screen.getByRole("button", { name: "Add Tag…" })).toBeVisible();
+});
+
+test("the offers for a file's first tag stay inside the window when the pane is at its right edge", async () => {
+  const screen = await renderPane({ position: "fixed", top: 0, right: 0, width: 320 });
+  expect(removable()).toEqual([]);
+  await screen.getByRole("button", { name: "Add Tag…" }).click();
+  await userEvent.keyboard("p");
+  const offers = screen.getByRole("listbox", { name: "Tags to add to sphinx.jpg" });
+  await expect.element(offers).toBeVisible();
+  const field = screen.getByRole("combobox", { name: "Add Tag to sphinx.jpg" }).element();
+  const list = offers.element().getBoundingClientRect();
+  expect(field.getBoundingClientRect().left + list.width).toBeGreaterThan(window.innerWidth);
+  expect(list.right).toBeLessThanOrEqual(window.innerWidth);
+  expect(list.left).toBeGreaterThanOrEqual(0);
 });
 
 test("a tag the file already carries is refused where it is typed, saying whose it is", async () => {

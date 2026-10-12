@@ -65,7 +65,7 @@ type TagsRowProps = {
   /** Its tags, never its labels: its own first, then what it inherits. */
   tags: EffectiveTag[];
   nameTitle?: string;
-  /** Resolve once what the owner carries has been read again. */
+  /** Resolve once the change is made; what the owner carries is read again after, unawaited. */
   onAdd: (value: string) => Promise<void>;
   onRemove: (tagId: number) => Promise<void>;
 };
