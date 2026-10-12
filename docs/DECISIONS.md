@@ -461,12 +461,14 @@ plain header, having none of these.
   folder is also refused a key while a folder below it holds one, and the line names that folder,
   the nearest first, where it can be taken off. `tags::set_folder_label` refuses both as the band
   does; a folder changing the value of a key it already holds is not refused. `add_folder_tag`
-  takes no key, so has none to refuse.
+  takes no key, so has none to refuse. A deleted folder below refuses nothing: holding the live
+  tree to a label in the Trash would leave a key nobody can see blocking the one being given.
 - **Where two values of a key do meet, the nearest wins.** Moving a labelled folder under
-  another can still bring the two together, and a move is not refused for it: Cairo moved under
-  Trips keeps `location: cairo` for its files while the rest of Trips' carry Egypt, and Cairo's
-  band shows only its own. Resolving it where an item's tags are built holds however the folders
-  arrived there. Taking Cairo's off lets Trips' reach its files.
+  another can still bring the two together, as can undoing the delete of a folder below that held
+  the key while one above took it, and neither is refused for it: Cairo moved under Trips keeps
+  `location: cairo` for its files while the rest of Trips' carry Egypt, and Cairo's band shows
+  only its own. Resolving it where an item's tags are built holds however the folders arrived
+  there. Taking Cairo's off lets Trips' reach its files.
 - **Libraries indexed before the nearest value won are not rebuilt**, as the owner decided on
   12 October 2026: Filmstrip had not been used on a real library yet, so no migration rewrites
   `item_effective_tag`. A file that still carried both values would lose one the next time its

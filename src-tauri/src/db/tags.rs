@@ -115,9 +115,9 @@ fn refuse_key_held_elsewhere(conn: &Connection, folder_id: i64, key: &str) -> Re
             .unwrap_or_default();
         return Err(AppError::invalid(format!("{key} comes from {from}")));
     }
-    if let Some(below) = keys_below(conn, folder_id)?
+    if let Some(below) = holding_below(conn, folder_id, Some(key))?
         .into_iter()
-        .find(|one| one.key == key)
+        .next()
     {
         return Err(AppError::invalid(format!(
             "{} below already holds {key}",
@@ -139,6 +139,15 @@ pub struct KeyBelow {
 /// Each key the live folders below one hold, once, with the nearest holding it; of two as near,
 /// the first by name.
 pub fn keys_below(conn: &Connection, folder_id: i64) -> Result<Vec<KeyBelow>> {
+    let mut keys = HashSet::new();
+    Ok(holding_below(conn, folder_id, None)?
+        .into_iter()
+        .filter(|one| keys.insert(one.key.clone()))
+        .collect())
+}
+
+/// Every label the live folders below one hold, of one key or of all, the nearest first.
+fn holding_below(conn: &Connection, folder_id: i64, key: Option<&str>) -> Result<Vec<KeyBelow>> {
     let mut stmt = conn.prepare(
         "WITH RECURSIVE below(id, title, depth) AS (
              SELECT id, title, 1 FROM folder WHERE parent_id = ?1 AND deleted_at IS NULL
@@ -149,11 +158,11 @@ pub fn keys_below(conn: &Connection, folder_id: i64) -> Result<Vec<KeyBelow>> {
          SELECT t.key, b.id, b.title FROM below b
            JOIN folder_tag ft ON ft.folder_id = b.id
            JOIN tag t ON t.id = ft.tag_id
-          WHERE t.key IS NOT NULL
+          WHERE t.key IS NOT NULL AND (?2 IS NULL OR t.key = ?2)
           ORDER BY b.depth, b.title COLLATE NOCASE, b.id",
     )?;
     let rows = stmt
-        .query_map(params![folder_id], |r| {
+        .query_map(params![folder_id, key], |r| {
             Ok(KeyBelow {
                 key: r.get(0)?,
                 folder: Crumb {
@@ -163,11 +172,7 @@ pub fn keys_below(conn: &Connection, folder_id: i64) -> Result<Vec<KeyBelow>> {
             })
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
-    let mut keys = HashSet::new();
-    Ok(rows
-        .into_iter()
-        .filter(|one| keys.insert(one.key.clone()))
-        .collect())
+    Ok(rows)
 }
 
 /// A label's key or a value of one the library already has, with how many folders carry it.
@@ -799,6 +804,11 @@ mod tests {
             ]
         );
         assert_eq!(keys_below(&conn, giza).unwrap(), []);
+        let refused = set_folder_label(&conn, trips, "Location", "Norway").unwrap_err();
+        assert!(
+            matches!(&refused, AppError::Invalid(line) if line.starts_with("cairo below")),
+            "names the nearest, then the first by name: {refused}"
+        );
     }
 
     #[test]
