@@ -1,12 +1,18 @@
-import { type CSSProperties, useId, useLayoutEffect, useRef } from "react";
+import { type CSSProperties, useId, useLayoutEffect, useRef, useState } from "react";
 
-import { formatCount } from "../../lib/format";
+import type { LibraryTotals } from "../../ipc/bindings/LibraryTotals";
+import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
+import type { Tally } from "../../ipc/bindings/Tally";
+import { formatBytes, formatCount, formatShortDay } from "../../lib/format";
 import { Band } from "../../ui/Band";
 import { Button } from "../../ui/Button";
+import { FirstFit } from "../../ui/FirstFit";
 import { Glyph } from "../../ui/Glyph";
 import { GlyphButton } from "../../ui/GlyphButton";
 import { Line } from "../../ui/Line";
+import { SURFACE } from "../../ui/Menu";
 import { PushDown } from "../../ui/PushDown";
+import { Tallies, type TallyRow } from "../../ui/Tallies";
 import { undo } from "../undo/undo";
 import { refusalSentence } from "./add-source";
 import { type FootNews, setNews, useNews } from "./foot-slot";
@@ -15,14 +21,11 @@ import { useWork } from "./work-store";
 
 /** The panel's baseline and, above it, the walk in progress. DECISIONS.md "Background work". */
 export function Foot({ rail = false }: { rail?: boolean }) {
-  const { sources } = useIndex();
   const { progress } = useWork();
   const news = useNews();
+  const anchor = `--foot-${useId().replace(/[^\w-]/g, "")}`;
   // Folded, a line that has been answered leaves: the grid is what shows the files are back.
   const shown = news !== null && !(rail && news.kind === "undone");
-  const held = (sources ?? []).reduce((sum, source) => sum + source.itemCount, 0);
-  const count = sources?.length ?? 0;
-  const totals = `${formatCount(held)} items · ${formatCount(count)} ${count === 1 ? "source" : "sources"}`;
 
   const left = progress ? progress.pending + progress.running : 0;
   const busy = progress !== null && progress.phase !== "idle";
@@ -31,7 +34,7 @@ export function Foot({ rail = false }: { rail?: boolean }) {
 
   return (
     // Ordered by permanence from the bottom: the count, the walk, then what waits to be read.
-    <div className="shrink-0">
+    <div className="shrink-0" style={{ anchorName: anchor } as CSSProperties}>
       <PushDown open={shown}>{shown && <News news={news} rail={rail} />}</PushDown>
       <PushDown open={busy}>
         {rail ? (
@@ -50,15 +53,135 @@ export function Foot({ rail = false }: { rail?: boolean }) {
           </div>
         )}
       </PushDown>
-      <div
-        title={rail ? totals : undefined}
-        className={`flex h-foot items-center border-line border-t text-fg-dim text-small ${rail ? "justify-center" : "gap-2 px-2.5"}`}
-      >
-        <Glyph name="source" className="text-glyph" />
-        {!rail && <span className="min-w-0 flex-1 truncate tabular-nums">{totals}</span>}
-      </div>
+      <Baseline rail={rail} anchor={anchor} />
     </div>
   );
+}
+
+const NONE: Tally = { count: 0, bytes: 0 };
+const NOTHING: LibraryTotals = {
+  pictures: NONE,
+  videos: NONE,
+  other: NONE,
+  all: NONE,
+  sorting: NONE,
+  trash: NONE,
+};
+
+/** The library's line, each wording giving up a whole part: "items", then the size. */
+function wordings({ count, bytes }: Tally) {
+  const figure = formatCount(count);
+  const items = `${figure} ${count === 1 ? "item" : "items"}`;
+  if (count === 0) return [items, figure];
+  const size = formatBytes(bytes);
+  return [`${items} · ${size}`, `${figure} · ${size}`, figure];
+}
+
+/**
+ * What the library holds and weighs, opening its totals above the foot, or beside the rail when
+ * folded. DECISIONS.md "Navigation".
+ */
+function Baseline({ rail, anchor }: { rail: boolean; anchor: string }) {
+  const { sources, totals } = useIndex();
+  const id = useId();
+  const own = `--baseline-${id.replace(/[^\w-]/g, "")}`;
+  const trigger = useRef<HTMLButtonElement>(null);
+  const surface = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [fit, setFit] = useState(0);
+  const texts = wordings((totals ?? NOTHING).all);
+  const whole = texts[0] ?? "";
+
+  return (
+    <>
+      <button
+        ref={trigger}
+        type="button"
+        popoverTarget={id}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={whole}
+        title={rail || fit > 0 ? whole : "Library · what it holds"}
+        style={rail ? ({ anchorName: own } as CSSProperties) : undefined}
+        className={`focus-ring-inset flex h-foot w-full items-center border-line border-t text-small transition-colors duration-(--motion-quick) motion-reduce:transition-none ${rail ? "justify-center" : "gap-2 px-2.5 text-left"} ${open ? "bg-raised text-fg-mid" : "text-fg-dim hover:bg-wash hover:text-fg-mid"}`}
+      >
+        <Glyph name="source" className="text-glyph" />
+        {!rail && <FirstFit texts={texts} onFit={setFit} className="flex-1 tabular-nums" />}
+      </button>
+      <div
+        ref={surface}
+        id={id}
+        popover="auto"
+        role="dialog"
+        aria-label="Library"
+        tabIndex={-1}
+        onToggle={(event) => {
+          const opened = event.newState === "open";
+          setOpen(opened);
+          if (opened) surface.current?.focus();
+          else if (
+            surface.current?.contains(document.activeElement) ||
+            document.activeElement === document.body
+          )
+            trigger.current?.focus();
+        }}
+        // Escape closes the totals and nothing else: full screen listens on the window.
+        onKeyDown={(event) => {
+          if (event.key === "Escape") event.stopPropagation();
+        }}
+        style={
+          (rail
+            ? { positionAnchor: own, left: "anchor(right)", bottom: "anchor(bottom)" }
+            : {
+                positionAnchor: anchor,
+                left: "anchor(left)",
+                bottom: "anchor(top)",
+                positionTryFallbacks: "flip-block",
+              }) as CSSProperties
+        }
+        className={`${rail ? "ml-1.5" : "mb-1.5"} outline-none ${SURFACE}`}
+      >
+        {open && <Totals totals={totals ?? NOTHING} sources={sources ?? []} />}
+      </div>
+    </>
+  );
+}
+
+/** By kind, then what waits and what is thrown away, then the sources, any that is away named. */
+function Totals({ totals, sources }: { totals: LibraryTotals; sources: readonly SourceSummary[] }) {
+  const size = (tally: Tally) => (tally.count > 0 ? formatBytes(tally.bytes) : undefined);
+  const row = (label: string, tally: Tally, sum = false): TallyRow => ({
+    label,
+    count: tally.count,
+    trail: size(tally),
+    sum,
+  });
+  const away = sources.filter((source) => !source.reachable);
+  const groups: TallyRow[][] = [
+    [
+      row("Pictures", totals.pictures),
+      row("Videos", totals.videos),
+      ...(totals.other.count > 0 ? [row("Other", totals.other)] : []),
+      row("In All", totals.all, true),
+    ],
+    [row("Sorting Box", totals.sorting), row("Trash", totals.trash)],
+    [
+      {
+        label: "Sources",
+        count: sources.length,
+        trail: away.length > 0 ? `${formatCount(away.length)} offline` : undefined,
+      },
+    ],
+  ];
+  return <Tallies heading="Library" groups={groups} notes={away.map(offlineNote)} />;
+}
+
+/** A source that is away is still counted, from what the index last read of it. */
+function offlineNote(source: SourceSummary) {
+  const held = source.itemCount;
+  if (held === 0) return `${source.title} is offline`;
+  const when = source.indexedAt === null ? "" : `, ${formatShortDay(source.indexedAt)}`;
+  return `${source.title} is offline · its ${formatCount(held)} ${held === 1 ? "is" : "are"} counted from the last walk${when}`;
 }
 
 /** The slot's one piece of news: a refusal, or what an act or an undo did. DECISIONS.md "Undo". */

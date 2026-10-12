@@ -20,6 +20,7 @@ import type { ItemsMoved } from "./bindings/ItemsMoved";
 import type { ItemsRestored } from "./bindings/ItemsRestored";
 import type { ItemsTrashed } from "./bindings/ItemsTrashed";
 import type { LabelOffer } from "./bindings/LabelOffer";
+import type { LibraryTotals } from "./bindings/LibraryTotals";
 import type { Progress } from "./bindings/Progress";
 import type { Reading } from "./bindings/Reading";
 import type { Reason } from "./bindings/Reason";
@@ -30,7 +31,6 @@ import type { SourceSummary } from "./bindings/SourceSummary";
 import type { Suggestions } from "./bindings/Suggestions";
 import type { TagOffer } from "./bindings/TagOffer";
 import type { Trashed } from "./bindings/Trashed";
-import type { TrashSummary } from "./bindings/TrashSummary";
 import type { UndoReport } from "./bindings/UndoReport";
 import { FIRST_SORT } from "./sort";
 
@@ -175,7 +175,7 @@ export const sortingItems = (sort: Sort = FIRST_SORT) =>
 
 export const trashListing = () => invoke<Trashed[]>("trash_listing");
 
-export const trashSummary = () => invoke<TrashSummary>("trash_summary");
+export const libraryTotals = () => invoke<LibraryTotals>("library_totals");
 
 export const readQuery = (text: string) => invoke<Reading>("read_query", { text });
 

@@ -7,6 +7,7 @@ import {
   formatDimensions,
   formatDuration,
   formatElapsed,
+  formatShortDay,
   formatWhen,
 } from "./format";
 
@@ -56,4 +57,11 @@ test("a day reads as Today, Yesterday, then its date, with a year only when it i
   expect(formatDay(at(earlier), now)).toBe(date.format(earlier));
   expect(formatDay(at(new Date(2025, 8, 12, 12)), now)).toMatch(/2025/);
   expect(formatWhen(at(new Date(2026, 8, 24, 14, 2)), now)).toMatch(/^Today, \S/);
+});
+
+test("a day in short leaves out its year when it is this one", () => {
+  const now = new Date(2026, 9, 13, 9, 30);
+  const at = (date: Date) => date.getTime() / 1000;
+  expect(formatShortDay(at(new Date(2026, 9, 3, 12)), now)).toBe("3 Oct");
+  expect(formatShortDay(at(new Date(2025, 9, 3, 12)), now)).toBe("3 Oct 2025");
 });

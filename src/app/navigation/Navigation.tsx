@@ -57,7 +57,7 @@ import {
 
 /** The Sorting Box and the Trash, then each library source with its folders opening in place. DECISIONS.md "Navigation". */
 export function Navigation() {
-  const { sources, children, trash, favourites, keys } = useIndex();
+  const { sources, children, totals, favourites, keys } = useIndex();
   const [keying, setKeying] = useState<Keying | null>(null);
   const place = usePlace();
   const expanded = useOpenFolders();
@@ -81,7 +81,10 @@ export function Navigation() {
   if (!sources) return null;
   if (sources.length === 0) return <NoSources onAdd={() => void addFolder("library")} />;
 
-  const rows: TreeRow[] = [sortingRow(sources, () => void addFolder("sorting")), trashRow(trash)];
+  const rows: TreeRow[] = [
+    sortingRow(sources, () => void addFolder("sorting")),
+    trashRow(totals?.trash),
+  ];
   const places = new Map<string, Place>([
     [SORTING_ID, { kind: "sorting" }],
     [TRASH_ID, { kind: "trash" }],

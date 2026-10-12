@@ -44,15 +44,6 @@ pub struct Origin {
     pub gone: bool,
 }
 
-/// How much the trash holds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export)]
-pub struct TrashSummary {
-    pub count: u32,
-    pub bytes: i64,
-}
-
 /// Everything in the trash, the most recent first.
 pub fn listing(conn: &Connection) -> Result<Vec<Trashed>> {
     items::in_trash(conn)?
@@ -77,11 +68,6 @@ pub fn origin(conn: &Connection, folder_id: i64) -> Result<Origin> {
             .collect(),
         gone: folders::live_at(conn, folder_id)?.is_none(),
     })
-}
-
-pub fn summary(conn: &Connection) -> Result<TrashSummary> {
-    let (count, bytes) = items::trash_totals(conn)?;
-    Ok(TrashSummary { count, bytes })
 }
 
 /// Sends each item to the trash under one batch, so one undo brings the whole selection back.
@@ -378,7 +364,10 @@ mod tests {
         assert_eq!(ids, [sphinx, pyramid]);
         assert_eq!(held[0].from.path, ["Library", "Trips", "Cairo"]);
         assert!(!held[0].from.gone);
-        assert_eq!(summary(&conn).unwrap(), TrashSummary { count: 2, bytes: 2 });
+        assert_eq!(
+            items::totals(&conn).unwrap().trash,
+            items::Tally { count: 2, bytes: 2 }
+        );
 
         // Its folder gone, the file says so; made again under the same name, it is not.
         std::fs::remove_dir_all(root.join("Trips/Cairo")).unwrap();

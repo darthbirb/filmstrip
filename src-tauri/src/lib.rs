@@ -110,7 +110,7 @@ pub fn run() {
             commands::folder_branch_files,
             commands::sorting_items,
             commands::trash_listing,
-            commands::trash_summary,
+            commands::library_totals,
             commands::read_query,
             commands::search,
             commands::search_suggestions,

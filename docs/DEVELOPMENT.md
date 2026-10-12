@@ -203,6 +203,7 @@ Its interface is never read for the look, which comes from Claude Design (DECISI
 | Copying a file, or its path, to the clipboard | `fs/clipboard.rs`, `commands/items.rs` `copy_item_path` | the pane |
 | Moving, renaming, undo | `fs/relocate.rs`, `fs/undo.rs`, `db/journal.rs`, `commands/triage.rs` | selection and moving |
 | Trash | `fs/trash.rs` | selection and moving |
+| The library's counts and totals | `commands/items.rs` `unsorted_count`, `trashed_count`, `library_totals`; `db/items.rs` `counts_by_kind` | the foot's totals |
 | Destination hotkeys | `db/hotkeys.rs`, `state/hotkeys.ts` | selection and moving |
 | Watching the disk | `fs/watch.rs` | selection and moving |
 | Search and the query language | `query/`, `db/search.rs`, `commands/search.rs`, `lib/queryTerm.ts` | search |
