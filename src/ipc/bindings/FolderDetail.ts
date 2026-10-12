@@ -2,6 +2,7 @@
 import type { Crumb } from "./Crumb";
 import type { EffectiveTag } from "./EffectiveTag";
 import type { FolderStatus } from "./FolderStatus";
+import type { KeyBelow } from "./KeyBelow";
 
 /**
  * A folder as its band shows it.
@@ -26,4 +27,8 @@ ownCount: number, allCount: number,
 /**
  * Its own first, its name leading, then what it inherits, the source's first.
  */
-tags: Array<EffectiveTag>, };
+tags: Array<EffectiveTag>, 
+/**
+ * The keys folders below it hold, which it cannot take while they do.
+ */
+keysBelow: Array<KeyBelow>, };

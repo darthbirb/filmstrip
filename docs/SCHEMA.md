@@ -69,6 +69,9 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   parameter.
 - **A folder holds one value per key.** `tags::set_folder_label` gives a key the folder already
   has its new value in the same row, so the label keeps its place among the folder's own.
+- **A key is given once down a branch.** `tags::set_folder_label` refuses a key the folder does
+  not hold while a folder above it or a live one below it does (`tags::keys_below`). A move can
+  still bring two together; the next rule settles them.
 - Every folder carries a tag derived from its title (`folder_tag.source = 'title'`), kept in
   step with the title. It is the one tag `tags::remove_folder_tag` never takes off.
 - An item carries its own tags plus every tag and label on its folder and on each ancestor,

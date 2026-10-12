@@ -17,6 +17,7 @@ import type { ItemDetail } from "../ipc/bindings/ItemDetail";
 import type { ItemRow } from "../ipc/bindings/ItemRow";
 import type { ItemsMoved } from "../ipc/bindings/ItemsMoved";
 import type { ItemsTrashed } from "../ipc/bindings/ItemsTrashed";
+import type { KeyBelow } from "../ipc/bindings/KeyBelow";
 import type { Progress } from "../ipc/bindings/Progress";
 import type { QueryTerm } from "../ipc/bindings/QueryTerm";
 import type { Reading } from "../ipc/bindings/Reading";
@@ -734,6 +735,35 @@ function nearest(levels: EffectiveTag[][]) {
   );
 }
 
+/** Each key the folders below one hold, once, the nearest first, as `tags::keys_below` answers. */
+function keysBelow(folderId: number): KeyBelow[] {
+  const found: KeyBelow[] = [];
+  let level = FOLDERS[folderId] ?? [];
+  while (level.length > 0) {
+    const sorted = [...level].sort((a, b) => a.title.localeCompare(b.title) || a.id - b.id);
+    for (const child of sorted) {
+      for (const tag of ownOf(child.id).tags) {
+        if (tag.key !== null && !found.some((one) => one.key === tag.key)) {
+          found.push({ key: tag.key, folder: { id: child.id, title: child.title } });
+        }
+      }
+    }
+    level = sorted.flatMap((child) => FOLDERS[child.id] ?? []);
+  }
+  return found;
+}
+
+/** Why a folder cannot take a key it does not hold, as `tags::set_folder_label` refuses it. */
+function keyHeldElsewhere(folderId: number, key: string) {
+  const above = crumbs(folderId)
+    .folders.slice(0, -1)
+    .reverse()
+    .find((crumb) => ownOf(crumb.id).tags.some((tag) => tag.key === key));
+  if (above) return `${key} comes from ${above.title}`;
+  const below = keysBelow(folderId).find((one) => one.key === key);
+  return below ? `${below.folder.title} below already holds ${key}` : null;
+}
+
 /** Each file's own tags, in the order they were added. */
 const ITEM_TAGS = new Map<number, string[]>();
 
@@ -774,6 +804,7 @@ function folderDetail(folderId: number): FolderDetail | null {
     ownCount: ITEMS[folderId]?.length ?? 0,
     allCount: under(folderId).length,
     tags: [...self, ...above.reverse().flat()],
+    keysBelow: keysBelow(folderId),
   };
 }
 
@@ -1002,7 +1033,11 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     };
     const held = own.tags.findIndex((tag) => tag.key === label.key);
     if (held >= 0) own.tags[held] = label;
-    else own.tags.push(label);
+    else {
+      const refused = keyHeldElsewhere(folderId as number, label.key);
+      if (refused) return invalid(refused);
+      own.tags.push(label);
+    }
     return null;
   },
   folder_cover_choices: ({ folderId }) =>
