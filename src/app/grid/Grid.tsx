@@ -89,7 +89,7 @@ export function Grid({ mode }: { mode: LayoutMode }) {
   const setOf = () => setMenu(checkedRows, checkedRows.every(inTrash));
   // A checked tile carries the set, any other itself alone; a trashed file only goes by Restore.
   const press = (event: PointerEvent, item: ItemRow) =>
-    pressTile(event, () => (checked.has(item.id) ? checkedRows : [item]));
+    pressTile(event, item, () => (checked.has(item.id) ? checkedRows : [item]));
   const order = useMemo(() => (items ?? []).map((item) => item.id), [items]);
   const indexOf = useMemo(() => new Map(order.map((id, index) => [id, index])), [order]);
   useSelectionKeys(order);

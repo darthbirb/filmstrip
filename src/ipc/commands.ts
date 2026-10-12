@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AddOutcome } from "./bindings/AddOutcome";
 import type { Batch } from "./bindings/Batch";
+import type { BranchFile } from "./bindings/BranchFile";
 import type { Contents } from "./bindings/Contents";
 import type { CoverChoice } from "./bindings/CoverChoice";
 import type { DestinationKey } from "./bindings/DestinationKey";
@@ -147,6 +148,12 @@ export const removeDestinationKey = (key: string) =>
   invoke<void>("remove_destination_key", { key });
 
 export const folderItems = (folderId: number) => invoke<ItemRow[]>("folder_items", { folderId });
+
+export const folderItemIds = (folderId: number, deep: boolean) =>
+  invoke<number[]>("folder_item_ids", { folderId, deep });
+
+export const folderBranchFiles = (folderId: number) =>
+  invoke<BranchFile[]>("folder_branch_files", { folderId });
 
 export const itemTags = (itemId: number) => invoke<EffectiveTag[]>("item_tags", { itemId });
 

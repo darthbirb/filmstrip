@@ -417,6 +417,25 @@ pub async fn folder_items(state: State<'_, AppState>, folder_id: i64) -> Result<
     .await
 }
 
+/// Every file at or below a folder with only what the selection bar reads, since none is drawn.
+#[tauri::command]
+pub async fn folder_branch_files(
+    state: State<'_, AppState>,
+    folder_id: i64,
+) -> Result<Vec<items::BranchFile>> {
+    run(&state, move |conn| items::branch_files(conn, folder_id)).await
+}
+
+/// A folder's own ids, or with `deep` its whole branch's, in the order a folder lists them.
+#[tauri::command]
+pub async fn folder_item_ids(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    deep: bool,
+) -> Result<Vec<i64>> {
+    run(&state, move |conn| items::branch_ids(conn, folder_id, deep)).await
+}
+
 #[tauri::command]
 pub async fn sorting_items(state: State<'_, AppState>) -> Result<Vec<ItemRow>> {
     let thumbs = state.thumbs.clone();

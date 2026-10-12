@@ -1,6 +1,7 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import type { Act } from "../ipc/bindings/Act";
 import type { Batch } from "../ipc/bindings/Batch";
+import type { BranchFile } from "../ipc/bindings/BranchFile";
 import type { Contents } from "../ipc/bindings/Contents";
 import type { Crumb } from "../ipc/bindings/Crumb";
 import type { DestinationKey } from "../ipc/bindings/DestinationKey";
@@ -173,6 +174,14 @@ function under(folderId: number): ItemRow[] {
     ...(ITEMS[folderId] ?? []),
     ...(FOLDERS[folderId] ?? []).flatMap((child) => under(child.id)),
   ];
+}
+
+/** Every file in a folder's branch, by name whatever the case and then by id, as SQLite orders them. */
+function branch(folderId: number): ItemRow[] {
+  const name = (row: ItemRow) => row.diskName.toLowerCase();
+  return under(folderId).sort((a, b) =>
+    name(a) === name(b) ? a.id - b.id : name(a) < name(b) ? -1 : 1,
+  );
 }
 
 /** From the source's own folder down to this one, and the source it is in. */
@@ -1133,6 +1142,15 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     })),
   ],
   folder_items: ({ folderId }) => ITEMS[folderId as number] ?? [],
+  folder_item_ids: ({ folderId, deep }) =>
+    (deep ? branch(folderId as number) : (ITEMS[folderId as number] ?? [])).map((item) => item.id),
+  folder_branch_files: ({ folderId }): BranchFile[] =>
+    branch(folderId as number).map(({ id, folderId, sizeBytes, favorite }) => ({
+      id,
+      folderId,
+      sizeBytes,
+      favorite,
+    })),
   trash_listing: (): Trashed[] =>
     (ITEMS[TRASH] ?? [])
       .map((item) => {

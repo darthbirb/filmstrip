@@ -4,8 +4,8 @@ import type { Place } from "../place";
 import { runSearch } from "../search/results";
 
 /** A file in the Trash, wherever it is listed: the Trash's own rows, or a search's that asked. */
-export function inTrash(row: ItemRow) {
-  return (row as { trashedAt?: number | null }).trashedAt != null;
+export function inTrash(row: { id: number; trashedAt?: number | null }) {
+  return row.trashedAt != null;
 }
 
 /**

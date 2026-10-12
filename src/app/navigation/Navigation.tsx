@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { DestinationKey } from "../../ipc/bindings/DestinationKey";
-import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import {
   createFolder,
@@ -24,6 +23,7 @@ import {
 } from "../../ui/Menu";
 import { Tree, type TreeRow } from "../../ui/Tree";
 import { type Landing, type Resolver, setDropResolver, useDrag } from "../grid/drag";
+import { type CheckedFile, checkBranch } from "../grid/selection";
 import { DIGITS } from "../keys";
 import { libraryChanged } from "../library";
 import { openMovePicker } from "../pane/move-picker";
@@ -136,7 +136,7 @@ export function Navigation() {
    * not the files' own folder, not the Trash, not a drive that is away, and the Sorting Box only
    * when it is one folder. Artboards › Dragging onto a folder.
    */
-  const landingFor = (id: string, carried: readonly ItemRow[]): Landing | null => {
+  const landingFor = (id: string, carried: readonly CheckedFile[]): Landing | null => {
     const refuse = (why: string): Landing => ({ kind: "refuse", why });
     const into = (folder: number, title: string, source: SourceSummary): Landing => {
       if (!source.reachable) return refuse(`${source.title} is offline`);
@@ -216,15 +216,26 @@ export function Navigation() {
       glyph: "search",
       onSelect: () => searchIn(pathTerm(titles)),
     });
+    const inside: MenuAction = {
+      id: "select-inside",
+      label: "Select Everything Inside",
+      glyph: "checkAll",
+      onSelect: () => {
+        const at = places.get(id);
+        if (!at) return;
+        setPlace(at);
+        void checkBranch().catch(() => undefined);
+      },
+    };
     if (folder === source.rootFolderId) {
       const search = searchHere("Search in Source");
       return {
         heading: "Source",
-        groups: sourceMenu(source, rename, newFolder, star, assign, search),
+        groups: sourceMenu(source, rename, { newFolder, star, assign, search, inside }),
       };
     }
     // A folder whose drive is away keeps what only the index holds, as its source's row does.
-    if (!source.reachable) return { groups: [[star, assign]] };
+    if (!source.reachable) return { groups: [[star, assign], [inside]] };
     const moveTo: MenuAction = {
       id: "move",
       label: "Move to…",
@@ -250,6 +261,7 @@ export function Navigation() {
         [newFolder, star, assign, moveTo],
         [
           searchHere("Search in Folder"),
+          inside,
           revealFolderRow(folder),
           renameRow(rename),
           readAgainRow(folder),
@@ -382,11 +394,9 @@ function keyGroups(keys: readonly DestinationKey[], folder: number): MenuGroups 
 function sourceMenu(
   source: SourceSummary,
   rename: () => void,
-  newFolder: MenuAction,
-  star: MenuAction,
-  assign: MenuAction,
-  search: MenuAction,
+  rows: Record<"newFolder" | "star" | "assign" | "search" | "inside", MenuAction>,
 ): MenuGroups {
+  const { newFolder, star, assign, search, inside } = rows;
   const folder = source.rootFolderId;
   const reveal: MenuAction = {
     id: "reveal",
@@ -398,7 +408,7 @@ function sourceMenu(
   // New Folder is on it because a source's row is the only row that stands for its top level.
   return [
     source.reachable ? [newFolder, star, assign] : [star, assign],
-    source.reachable ? [search, reveal, naming, readAgainRow(folder)] : [naming],
+    source.reachable ? [search, inside, reveal, naming, readAgainRow(folder)] : [inside, naming],
     [
       {
         id: "manage",
