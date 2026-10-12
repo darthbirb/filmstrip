@@ -16,17 +16,6 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
-## Tagging a file · DRAWN
-
-The pane's details show a file's tags, its own and those inherited from its folders, and offer
-no way to change them. In ggallery a file's tags were added and removed by hand.
-
-A file takes tags only, never a label. Inherited tags belong to a folder and cannot be removed from
-the file.
-
-Draw adding and removing a file's own tags in the pane's details. It is the same act as the folder
-band's Add Tag…, so the two should be one control.
-
 ## Scrubbing a video's tile · DRAWN
 
 A video's tile shows one frame. In ggallery, running the pointer across a video's tile scrubbed

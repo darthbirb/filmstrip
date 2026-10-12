@@ -424,6 +424,12 @@ plain header, having none of these.
   which is where it can be taken off. A folder's name is a tag only a rename changes, so it has no
   ×. Tags come several at a time, so the field stays open after each until Escape or a click away,
   which drop what was half typed.
+- **A file's tags are the band's control in the pane's details**, as the Pane sheet's Tagging a
+  file draws it: adding a tag to a folder and to a file is one act on a different thing, so one
+  row serves both and only whose name its refusals use differs. A file takes tags, never a label,
+  since a label is a fact about a place. What a file inherits is its folder's, and comes off
+  there, so it shows sunk with no ×. Its own come first in the order they were added, then each
+  folder's from the source down, that folder's name first.
 - **A label is one fact with two parts**, so Add Label… closes once it is added, where Add Tag…
   stays open. A folder holds one value per key, as ggallery's did: a label answers a question,
   where or which trip, and a folder with two answers answers twice. A key it has is refused where

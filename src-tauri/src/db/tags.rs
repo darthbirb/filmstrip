@@ -7,6 +7,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 use ts_rs::TS;
 
+use crate::db::folders::{self, Crumb};
 use crate::db::{fold, now, search};
 use crate::error::Result;
 
@@ -289,40 +290,73 @@ pub fn rebuild_subtree(conn: &Connection, folder_id: i64) -> Result<()> {
     Ok(())
 }
 
-#[derive(Debug, Clone, Serialize, TS)]
+/// A tag or a label something carries: its own, or one a folder above it holds, which says whose.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct EffectiveTag {
     pub tag_id: i64,
     pub key: Option<String>,
     pub value: String,
-    /// The folder it came from, or `None` when the item carries it itself.
-    pub origin_id: Option<i64>,
-    pub origin_title: Option<String>,
+    /// The folder above that carries it, or `None` when it is its own.
+    pub from: Option<Crumb>,
+    /// A folder's name, which only renaming that folder changes.
+    pub name: bool,
 }
 
-/// What an item carries, and where each part came from — a result can say it
-/// matched the label `Location: Cairo` rather than only that it matched.
+/// What an item carries and where each part came from: its own in the order they were added, then
+/// each folder's from the source down, that folder's name first. DECISIONS.md "A folder's details".
 pub fn item_effective_tags(conn: &Connection, item_id: i64) -> Result<Vec<EffectiveTag>> {
-    let mut stmt = conn.prepare(
-        "SELECT t.id, t.key, t.value, e.origin_id, f.title
-           FROM item_effective_tag e
+    let mut own = conn.prepare(
+        "SELECT t.id, t.key, t.value FROM item_effective_tag e
            JOIN tag t ON t.id = e.tag_id
-           LEFT JOIN folder f ON f.id = e.origin_id
-          WHERE e.item_id = ?1
-          ORDER BY t.key IS NULL DESC, t.key, t.value",
+           JOIN item_tag it ON it.item_id = e.item_id AND it.tag_id = e.tag_id
+          WHERE e.item_id = ?1 AND e.origin_id IS NULL
+          ORDER BY it.added_at, it.rowid",
     )?;
-    Ok(stmt
+    let mut carried = own
         .query_map(params![item_id], |r| {
             Ok(EffectiveTag {
                 tag_id: r.get(0)?,
                 key: r.get(1)?,
                 value: r.get(2)?,
-                origin_id: r.get(3)?,
-                origin_title: r.get(4)?,
+                from: None,
+                name: false,
             })
         })?
-        .collect::<rusqlite::Result<_>>()?)
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let folder_id: Option<i64> = conn
+        .query_row(
+            "SELECT folder_id FROM item WHERE id = ?1",
+            params![item_id],
+            |r| r.get(0),
+        )
+        .optional()?;
+    let Some(folder_id) = folder_id else {
+        return Ok(carried);
+    };
+    let mut held = conn.prepare(
+        "SELECT t.id, t.key, t.value, ft.source = 'title' FROM item_effective_tag e
+           JOIN tag t ON t.id = e.tag_id
+           JOIN folder_tag ft ON ft.folder_id = e.origin_id AND ft.tag_id = e.tag_id
+          WHERE e.item_id = ?1 AND e.origin_id = ?2
+          ORDER BY ft.source = 'title' DESC, ft.rowid",
+    )?;
+    for crumb in folders::ancestry(conn, folder_id)? {
+        let level = held
+            .query_map(params![item_id, crumb.id], |r| {
+                Ok(EffectiveTag {
+                    tag_id: r.get(0)?,
+                    key: r.get(1)?,
+                    value: r.get(2)?,
+                    from: Some(crumb.clone()),
+                    name: r.get(3)?,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        carried.extend(level);
+    }
+    Ok(carried)
 }
 
 #[cfg(test)]
@@ -409,16 +443,16 @@ mod tests {
             (Some("location"), "egypt")
         );
         assert_eq!(
-            label.origin_title.as_deref(),
+            label.from.as_ref().map(|from| from.title.as_str()),
             Some("Trips"),
             "the folder it came from"
         );
 
         let own = carried.iter().find(|t| t.value == "favourite").unwrap();
-        assert!(own.origin_id.is_none(), "the item carries this one itself");
+        assert!(own.from.is_none(), "the item carries this one itself");
 
         let inherited = carried.iter().find(|t| t.value == "film").unwrap();
-        assert_eq!(inherited.origin_id, Some(cairo));
+        assert_eq!(inherited.from.as_ref().map(|from| from.id), Some(cairo));
     }
 
     #[test]
@@ -429,9 +463,9 @@ mod tests {
 
         let carried = item_effective_tags(&conn, id).unwrap();
         assert!(
-            carried
-                .iter()
-                .any(|t| t.value == "cairo" && t.origin_id == Some(cairo)),
+            carried.iter().any(|t| t.value == "cairo"
+                && t.name
+                && t.from.as_ref().map(|from| from.id) == Some(cairo)),
             "the title tag is folded and inherited: {carried:?}"
         );
     }
@@ -520,7 +554,7 @@ mod tests {
                 .unwrap()
                 .into_iter()
                 .filter(|t| t.key.as_deref() == Some("location"))
-                .map(|t| (t.value, t.origin_id))
+                .map(|t| (t.value, t.from.map(|from| from.id)))
                 .collect()
         };
         assert_eq!(locations(sphinx), [("cairo".into(), Some(cairo))]);
@@ -604,6 +638,105 @@ mod tests {
                 .unwrap()
                 .iter()
                 .any(|t| t.value == "holiday")
+        );
+    }
+
+    fn carried_line(conn: &Connection, item_id: i64) -> Vec<String> {
+        item_effective_tags(conn, item_id)
+            .unwrap()
+            .into_iter()
+            .map(|tag| {
+                let text = match &tag.key {
+                    Some(key) => format!("{key}:{}", tag.value),
+                    None => tag.value.clone(),
+                };
+                let mark = if tag.name { "#" } else { "" };
+                match &tag.from {
+                    Some(from) => format!("{mark}{text}<{}", from.title),
+                    None => format!("{mark}{text}"),
+                }
+            })
+            .collect()
+    }
+
+    fn found_by(conn: &Connection, query: &str) -> Vec<i64> {
+        let expr = crate::query::parse(query).unwrap();
+        search::items(conn, &expr)
+            .unwrap()
+            .into_iter()
+            .map(|(row, _)| row.id)
+            .collect()
+    }
+
+    #[test]
+    fn a_file_lists_its_own_tags_as_added_then_each_folder_s_from_the_source_down() {
+        let (conn, root) = library();
+        let trips = folders::create(&conn, root, "Trips").unwrap();
+        let cairo = folders::create(&conn, trips, "Cairo").unwrap();
+        let sphinx = item(&conn, cairo, "sphinx.jpg");
+        add_folder_tag(&conn, trips, "travel").unwrap();
+        add_folder_tag(&conn, cairo, "egypt").unwrap();
+        set_folder_label(&conn, cairo, "Location", "Cairo").unwrap();
+        add_item_tag(&conn, sphinx, "Sphinx").unwrap();
+        add_item_tag(&conn, sphinx, "dawn").unwrap();
+
+        assert_eq!(
+            carried_line(&conn, sphinx),
+            [
+                "sphinx",
+                "dawn",
+                "#library<Library",
+                "#trips<Trips",
+                "travel<Trips",
+                "#cairo<Cairo",
+                "egypt<Cairo",
+                "location:cairo<Cairo",
+            ]
+        );
+    }
+
+    #[test]
+    fn a_file_s_own_tag_comes_off_and_one_it_inherits_stays_with_its_folder() {
+        let (conn, root) = library();
+        let cairo = folders::create(&conn, root, "Cairo").unwrap();
+        let sphinx = item(&conn, cairo, "sphinx.jpg");
+        add_folder_tag(&conn, cairo, "egypt").unwrap();
+        add_item_tag(&conn, sphinx, "dawn").unwrap();
+        assert_eq!(found_by(&conn, "tag:dawn"), [sphinx]);
+
+        let dawn = get_or_create_tag(&conn, None, "dawn").unwrap();
+        let egypt = get_or_create_tag(&conn, None, "egypt").unwrap();
+        remove_item_tag(&conn, sphinx, dawn).unwrap();
+        remove_item_tag(&conn, sphinx, egypt).unwrap();
+        assert_eq!(
+            carried_line(&conn, sphinx),
+            ["#library<Library", "#cairo<Cairo", "egypt<Cairo"]
+        );
+        assert!(
+            found_by(&conn, "tag:dawn").is_empty(),
+            "search forgets it too"
+        );
+        assert_eq!(found_by(&conn, "tag:egypt"), [sphinx]);
+    }
+
+    #[test]
+    fn a_tag_a_file_and_its_folder_both_hold_is_listed_once_as_the_folder_s() {
+        let (conn, root) = library();
+        let cairo = folders::create(&conn, root, "Cairo").unwrap();
+        let sphinx = item(&conn, cairo, "sphinx.jpg");
+        add_item_tag(&conn, sphinx, "dawn").unwrap();
+        add_folder_tag(&conn, cairo, "dawn").unwrap();
+        assert_eq!(
+            carried_line(&conn, sphinx),
+            ["#library<Library", "#cairo<Cairo", "dawn<Cairo"]
+        );
+
+        let dawn = get_or_create_tag(&conn, None, "dawn").unwrap();
+        remove_folder_tag(&conn, cairo, dawn).unwrap();
+        assert_eq!(
+            carried_line(&conn, sphinx),
+            ["dawn", "#library<Library", "#cairo<Cairo"],
+            "the file's own is still there once the folder's goes"
         );
     }
 }

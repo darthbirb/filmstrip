@@ -2,6 +2,7 @@ import { Fragment, type ReactNode, useState } from "react";
 
 import type { EffectiveTag } from "../../ipc/bindings/EffectiveTag";
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
+import { addItemTag, removeItemTag } from "../../ipc/commands";
 import {
   formatBytes,
   formatDate,
@@ -9,13 +10,13 @@ import {
   formatDuration,
   formatWhen,
 } from "../../lib/format";
-import { labelTerm, tagTerm } from "../../lib/queryTerm";
-import { Chip, Stat } from "../../ui/Chip";
+import { Stat } from "../../ui/Chip";
 import { type Fact, Facts } from "../../ui/Facts";
 import { Glyph } from "../../ui/Glyph";
 import { NameField } from "../../ui/NameField";
+import { libraryChanged } from "../library";
 import { setPlace } from "../place";
-import { addToSearch, searchFor } from "../search/search";
+import { Chips, TagsRow } from "../tags/TagsRow";
 import { renameFile, startRename, stopRename, useRenaming } from "./rename";
 
 /** Where the item is, its file, its dates, its labels and tags, and the name it has on disk. */
@@ -43,10 +44,25 @@ export function Details({ item, tags }: { item: ItemDetail; tags: EffectiveTag[]
     ["File", <File key="file" item={item} />],
     ["Dates", <Dates key="dates" item={item} />],
   ];
-  const labels = tags.filter((tag) => tag.key);
-  const plain = tags.filter((tag) => !tag.key);
-  if (labels.length > 0) facts.push(["Labels", <Tags key="labels" tags={labels} />]);
-  if (plain.length > 0) facts.push(["Tags", <Tags key="tags" tags={plain} />]);
+  const labels = tags.filter((tag) => tag.key !== null);
+  if (labels.length > 0) {
+    facts.push([
+      "Labels",
+      <span key="labels" className="flex flex-wrap gap-1.5 py-px">
+        <Chips tags={labels} />
+      </span>,
+    ]);
+  }
+  facts.push([
+    "Tags",
+    <TagsRow
+      key={item.id}
+      owner={item.diskName}
+      tags={tags.filter((tag) => tag.key === null)}
+      onAdd={(value) => addItemTag(item.id, value).then(libraryChanged)}
+      onRemove={(tagId) => removeItemTag(item.id, tagId).then(libraryChanged)}
+    />,
+  ]);
   facts.push(["Name", <Name key="name" item={item} />]);
   return <Facts facts={facts} />;
 }
@@ -173,30 +189,6 @@ function Dates({ item }: { item: ItemDetail }) {
           {what} <span className={index === 0 ? "text-fg" : ""}>{when}</span>
         </span>
       ))}
-    </span>
-  );
-}
-
-/**
- * A label is never shown without its key. Each chip searches for itself: a click asks anew, from
- * everywhere, and Ctrl+Click adds it to the query. DECISIONS.md "Search".
- */
-function Tags({ tags }: { tags: EffectiveTag[] }) {
-  return (
-    <span className="flex flex-wrap gap-1.5 py-px">
-      {tags.map((tag) => {
-        const term = tag.key ? labelTerm(tag.key, tag.value) : tagTerm(tag.value);
-        return (
-          <Chip
-            key={`${tag.tagId}-${tag.originId ?? "own"}`}
-            value={tag.value}
-            tagKey={tag.key}
-            inherited={tag.originId !== null}
-            title={tag.key ? `Search ${tag.key}: ${tag.value}` : `Search ${tag.value}`}
-            onSearch={(adding) => void (adding ? addToSearch(term) : searchFor(term))}
-          />
-        );
-      })}
     </span>
   );
 }

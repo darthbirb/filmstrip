@@ -1,9 +1,9 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { type CSSProperties, useRef, useState } from "react";
 
+import type { EffectiveTag } from "../../ipc/bindings/EffectiveTag";
 import type { FolderDetail } from "../../ipc/bindings/FolderDetail";
 import type { FolderStatus } from "../../ipc/bindings/FolderStatus";
-import type { FolderTag } from "../../ipc/bindings/FolderTag";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import {
   addFolderTag,
@@ -14,10 +14,9 @@ import {
   setFolderLabel,
   setFolderNote,
   setFolderStatus,
-  tagOffers,
 } from "../../ipc/commands";
 import { formatDay, formatShortDate } from "../../lib/format";
-import { labelTerm, tagTerm } from "../../lib/queryTerm";
+import { labelTerm } from "../../lib/queryTerm";
 import { Chip } from "../../ui/Chip";
 import { ChipButton } from "../../ui/ChipButton";
 import { type Fact, Facts } from "../../ui/Facts";
@@ -27,11 +26,12 @@ import { NoteField } from "../../ui/NoteField";
 import { Plate } from "../../ui/Plate";
 import { PushDown } from "../../ui/PushDown";
 import { Segmented } from "../../ui/Segmented";
-import { type Refusal, TagField } from "../../ui/TagField";
+import type { Refusal } from "../../ui/TagField";
 import { libraryChanged } from "../library";
 import { refreshIndex, useIndex } from "../navigation/index-store";
 import { type Place, setPlace, usePlace } from "../place";
 import { addToSearch, searchFor } from "../search/search";
+import { stopsIn, TagsRow, takeOff, titleOf } from "../tags/TagsRow";
 import { CoverPicker } from "./CoverPicker";
 import { detailChanged, useBandOpen, useFolderDetail } from "./folder-detail";
 
@@ -114,11 +114,18 @@ function Body({ place, detail, source }: BodyProps) {
   ];
   facts.push([
     "Labels",
-    <LabelsRow key="labels" folderId={detail.id} title={title} labels={labels} where={where} />,
+    <LabelsRow key="labels" folderId={detail.id} title={title} labels={labels} />,
   ]);
   facts.push([
     "Tags",
-    <TagsRow key="tags" folderId={detail.id} title={title} tags={tags} where={where} />,
+    <TagsRow
+      key="tags"
+      owner={title}
+      tags={tags}
+      nameTitle={nameTitle(where)}
+      onAdd={(value) => addFolderTag(detail.id, value).then(changed)}
+      onRemove={(tagId) => removeFolderTag(detail.id, tagId).then(changed)}
+    />,
   ]);
   facts.push([
     "Note",
@@ -254,63 +261,19 @@ function lastIndexed(seconds: number) {
 
 type Where = { root: boolean; offline: boolean };
 
-type ChipsProps = {
-  tags: FolderTag[];
-  where: Where;
-  /** Takes off one of the folder's own; a name and what it inherits are never offered. */
-  onRemove?: (tag: FolderTag) => void;
-  /** The tag a value being typed repeats. */
-  echo?: number | null;
-};
-
-/** Its own first, its name leading, then what it inherits; each searches for itself on a click. */
-function Chips({ tags, where, onRemove, echo = null }: ChipsProps) {
-  return tags.map((tag) => {
-    const term = tag.key ? labelTerm(tag.key, tag.value) : tagTerm(tag.value);
-    const own = tag.from === null && !tag.name;
-    return (
-      <Chip
-        key={`${tag.tagId}-${tag.from?.id ?? "own"}`}
-        value={tag.value}
-        tagKey={tag.key}
-        inherited={tag.from !== null}
-        name={tag.name}
-        echoed={tag.tagId === echo}
-        title={titleOf(tag, where)}
-        onSearch={(adding) => void (adding ? addToSearch(term) : searchFor(term))}
-        onRemove={own && onRemove ? () => onRemove(tag) : undefined}
-      />
-    );
-  });
-}
-
 /** What the folder's own terms changing means: everything below carries something new. */
 const changed = () => libraryChanged().then(detailChanged);
 
-/** Takes a tag or a label off; one taken off with the keyboard hands the focus to the next. */
-function takeOff(folderId: number, tag: FolderTag, stops: () => HTMLElement[]) {
-  const at = stops().indexOf(document.activeElement as HTMLElement);
-  void removeFolderTag(folderId, tag.tagId)
-    .then(changed)
-    // What was after it now stands where it stood.
-    .then(() => at >= 0 && requestAnimationFrame(() => stops()[at]?.focus()))
-    .catch(() => undefined);
-}
-
-type LabelsRowProps = { folderId: number; title: string; labels: FolderTag[]; where: Where };
+type LabelsRowProps = { folderId: number; title: string; labels: EffectiveTag[] };
 
 /**
  * The folder's labels and Add Label…. A folder holds one value per key, so a key it has, its own
  * or from above, is refused; its own value is changed with a click on it instead.
  */
-function LabelsRow({ folderId, title, labels, where }: LabelsRowProps) {
+function LabelsRow({ folderId, title, labels }: LabelsRowProps) {
   const row = useRef<HTMLSpanElement>(null);
   const [echo, setEcho] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
-  const stops = () => [
-    ...(row.current?.querySelectorAll<HTMLElement>("button:not([tabindex='-1'])") ?? []),
-  ];
-
   const refuseKey = (key: string): Refusal | null => {
     const had = labels.find((label) => label.key === key);
     if (!had) return null;
@@ -350,9 +313,17 @@ function LabelsRow({ folderId, title, labels, where }: LabelsRowProps) {
             tagKey={key}
             inherited={!own}
             echoed={label.tagId === echo}
-            title={titleOf(label, where)}
+            title={titleOf(label)}
             onSearch={(adding) => void (adding ? addToSearch(term) : searchFor(term))}
-            onRemove={own ? () => takeOff(folderId, label, stops) : undefined}
+            onRemove={
+              own
+                ? () =>
+                    takeOff(
+                      () => removeFolderTag(folderId, label.tagId).then(changed),
+                      () => stopsIn(row.current),
+                    )
+                : undefined
+            }
             onEdit={own ? () => setEditing(label.tagId) : undefined}
           />
         );
@@ -373,57 +344,8 @@ function LabelsRow({ folderId, title, labels, where }: LabelsRowProps) {
   );
 }
 
-type TagsRowProps = { folderId: number; title: string; tags: FolderTag[]; where: Where };
-
-/**
- * The folder's tags and Add Tag…. A tag it carries already, its own or from above, is refused
- * where it is typed; one taken off with the keyboard hands the focus to the next.
- */
-function TagsRow({ folderId, title, tags, where }: TagsRowProps) {
-  const row = useRef<HTMLSpanElement>(null);
-  const [echo, setEcho] = useState<number | null>(null);
-  const stops = () => [
-    ...(row.current?.querySelectorAll<HTMLElement>("button:not([tabindex='-1'])") ?? []),
-  ];
-
-  const refuse = (value: string): Refusal | null => {
-    const had = tags.find((tag) => tag.value === value);
-    if (!had) return null;
-    const line = had.from
-      ? `${title} already has ${value}, ${had.name ? "the name of" : "from"} ${had.from.title}.`
-      : had.name
-        ? `${value} is this folder’s name.`
-        : `${title} already has ${value}.`;
-    return { line, tagId: had.tagId };
-  };
-  const remove = (tag: FolderTag) => takeOff(folderId, tag, stops);
-  const backOut = () => {
-    const own = row.current?.querySelectorAll<HTMLElement>("button[data-removable]");
-    own?.[own.length - 1]?.focus();
-  };
-
-  return (
-    <span ref={row} className="flex flex-wrap items-center gap-1.5 py-px">
-      <Chips tags={tags} where={where} onRemove={remove} echo={echo} />
-      <TagField
-        of={title}
-        offers={tagOffers}
-        refuse={refuse}
-        onAdd={(value) =>
-          addFolderTag(folderId, value)
-            .then(changed)
-            .catch(() => undefined)
-        }
-        onEcho={setEcho}
-        onBackOut={backOut}
-      />
-    </span>
-  );
-}
-
-function titleOf(tag: FolderTag, where: Where) {
-  if (tag.from) return tag.name ? `The name of ${tag.from.title}` : `From ${tag.from.title}`;
-  if (!tag.name) return tag.key ? `Search ${tag.key}: ${tag.value}` : `Search ${tag.value}`;
+/** What a folder's own name says under the pointer: only a rename changes it. */
+function nameTitle(where: Where) {
   if (where.root) {
     return "The source’s name · changes when the source is renamed in Settings or on its row";
   }

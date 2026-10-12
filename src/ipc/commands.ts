@@ -150,6 +150,12 @@ export const folderItems = (folderId: number) => invoke<ItemRow[]>("folder_items
 
 export const itemTags = (itemId: number) => invoke<EffectiveTag[]>("item_tags", { itemId });
 
+export const addItemTag = (itemId: number, value: string) =>
+  invoke<void>("add_item_tag", { itemId, value });
+
+export const removeItemTag = (itemId: number, tagId: number) =>
+  invoke<void>("remove_item_tag", { itemId, tagId });
+
 export const itemDetail = (itemId: number) => invoke<ItemDetail | null>("item_detail", { itemId });
 
 export const itemPath = (itemId: number) => invoke<string | null>("item_path", { itemId });

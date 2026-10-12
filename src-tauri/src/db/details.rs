@@ -9,6 +9,7 @@ use ts_rs::TS;
 
 use crate::db::folders::{self, Crumb};
 use crate::db::now;
+use crate::db::tags::EffectiveTag;
 use crate::error::{AppError, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -59,21 +60,7 @@ pub struct FolderDetail {
     pub own_count: i64,
     pub all_count: i64,
     /// Its own first, its name leading, then what it inherits, the source's first.
-    pub tags: Vec<FolderTag>,
-}
-
-/// A tag or a label on a folder: a label has a key.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export)]
-pub struct FolderTag {
-    pub tag_id: i64,
-    pub key: Option<String>,
-    pub value: String,
-    /// The folder above that carries it, or `None` when this folder does.
-    pub from: Option<Crumb>,
-    /// A folder's name, which only renaming it changes.
-    pub name: bool,
+    pub tags: Vec<EffectiveTag>,
 }
 
 /// Everything the band shows for a live folder; `None` once it has gone.
@@ -122,21 +109,21 @@ pub fn detail(conn: &Connection, folder_id: i64) -> Result<Option<FolderDetail>>
 
 /// The folder's own tags, then each folder's above it from the source down. A tag carried twice
 /// is shown once, where it is nearest, and so is a label's key, as `item_effective_tag` keeps them.
-fn tags_of(conn: &Connection, path: &[Crumb]) -> Result<Vec<FolderTag>> {
+fn tags_of(conn: &Connection, path: &[Crumb]) -> Result<Vec<EffectiveTag>> {
     let mut stmt = conn.prepare(
         "SELECT t.id, t.key, t.value, ft.source = 'title' FROM folder_tag ft
            JOIN tag t ON t.id = ft.tag_id
           WHERE ft.folder_id = ?1
           ORDER BY ft.source = 'title' DESC, ft.rowid",
     )?;
-    let mut levels: Vec<Vec<FolderTag>> = Vec::new();
+    let mut levels: Vec<Vec<EffectiveTag>> = Vec::new();
     let mut seen = HashSet::new();
     let mut keys = HashSet::new();
     for (depth, crumb) in path.iter().rev().enumerate() {
         let from = (depth > 0).then(|| crumb.clone());
         let level = stmt
             .query_map(params![crumb.id], |r| {
-                Ok(FolderTag {
+                Ok(EffectiveTag {
                     tag_id: r.get(0)?,
                     key: r.get(1)?,
                     value: r.get(2)?,
