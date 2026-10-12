@@ -32,7 +32,7 @@ and the sheet the subject lives on.
 ## Close the loop
 
 - Never draw for an issue labelled `blocked`. Label each issue the pass takes `in-progress` as
-  it starts, so no other pass or build picks it up.
+  it starts, so no other pass or build picks it up, and take the label off any it leaves undrawn.
 - Mark each drawn entry **DRAWN** in the backlog. Leave the issue's `design` label: it moves to
   `ready` when the pass merges (the `queue` skill, step 6), never before.
 - One pull request per pass, titled `docs(design): …`, through the usual review; the reviewer

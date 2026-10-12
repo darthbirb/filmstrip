@@ -24,6 +24,11 @@ the issues and pull requests; "continue the queue" picks up where it left off.
 
    A Dependabot major is checked against its release notes and the gates; if it breaks
    something, label it `needs-human` with one comment on what breaks.
+
+   Then an open issue labelled `in-progress` that no open pull request names with `Closes` or
+   `Refs`: a run stopped before its pull request. A `ready` one goes to step 3, told to continue
+   from its branch if one was pushed; a `design` one gets step 2's design-pass subagent, named
+   for that issue and told the same.
 2. **Pick.** The open issue labelled `ready` and none of `in-progress`, `blocked` or
    `needs-human`, earliest milestone, lowest number first. None ready but some labelled `design`
    and none of `in-progress`, `blocked` or `needs-human`: start a `general-purpose` subagent:
@@ -44,7 +49,7 @@ the issues and pull requests; "continue the queue" picks up where it left off.
    `needs-human`, comment with what remains in dispute, and go on to the next issue.
 6. **Land.** `gh pr merge <n> --squash --auto`, then `gh pr checks <n> --watch --required`. A red
    check is a fix round like any other (step 5), then Review again. Merged: take `in-progress`
-   off, and close only an issue the pull request names with `Closes #n` that is still open. A
+   off every issue the pull request names, and close only one it names with `Closes #n`. A
    design pass names the features it drew with `Refs #n`: move each from `design` to `ready`,
    so it is built only once its drawing has landed.
 7. **Log.** Append one line to `.queue/log.md` (git-ignored): the time, the issue, the pull
