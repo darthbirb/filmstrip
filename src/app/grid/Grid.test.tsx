@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
+import { withoutGlyphs } from "../../dev/words";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { getFullScreen, setFullScreen } from "../pane/full-screen";
 import { getPaneItem, showInPane } from "../pane/pane-store";
@@ -35,6 +36,7 @@ function rows(count: number): ItemRow[] {
       durationMs: null,
       favorite: false,
       thumb: null,
+      scrub: null,
     };
   });
 }
@@ -193,7 +195,7 @@ test("while a place is read, stand-ins fill the rows, and its tiles replace them
   expect(document.querySelector('[aria-busy="true"]')).toBeNull();
 });
 
-test("a video's tile writes its length in the corner, and a picture's writes nothing", async () => {
+test("a video's tile writes its length after a play glyph, and a picture's writes nothing", async () => {
   const [picture, other] = rows(2) as [ItemRow, ItemRow];
   const clip: ItemRow = { ...other, diskName: "clip.mp4", ext: "mp4", kind: "video" };
   mockIPC(
@@ -201,7 +203,10 @@ test("a video's tile writes its length in the corner, and a picture's writes not
     { shouldMockEvents: true },
   );
   const screen = await renderGrid("justified");
-  await expect.element(screen.getByRole("button", { name: "clip.mp4" })).toHaveTextContent("0:12");
+  const clipTile = screen.getByRole("button", { name: "clip.mp4" });
+  await expect.element(clipTile).toBeVisible();
+  expect(withoutGlyphs(clipTile.element().textContent)).toBe("0:12");
+  expect(clipTile.element().textContent).not.toBe("0:12");
   expect(screen.getByRole("button", { name: picture.diskName }).element().textContent).toBe("");
 });
 

@@ -13,7 +13,7 @@ use ts_rs::TS;
 
 use crate::db::details::{self, FolderDetail};
 use crate::db::folders::{self, FolderEntry, FolderNode};
-use crate::db::items::{self, ItemDetail, ItemRow};
+use crate::db::items::{self, ItemDetail, ItemRow, Scrub};
 use crate::db::jobs::{self as job_table, Failure};
 use crate::db::journal;
 use crate::db::keys;
@@ -29,6 +29,7 @@ use crate::fs::paths;
 use crate::fs::trash::{self, Origin, RestoreReport, TrashReport, TrashSummary, Trashed};
 use crate::fs::undo::{self, UndoReport};
 use crate::jobs::{self, JobQueue, Progress};
+use crate::media::scrub;
 use crate::query::{self, QueryFault, QueryTerm, Reading};
 
 pub struct AppState {
@@ -706,7 +707,7 @@ pub async fn trash_listing(state: State<'_, AppState>) -> Result<Vec<Trashed>> {
     run(&state, move |conn| {
         let mut held = trash::listing(conn)?;
         for one in &mut held {
-            one.row.thumb = thumb_of(&one.row.uuid, &thumbs);
+            with_cached(&mut one.row, &thumbs);
         }
         Ok(held)
     })
@@ -770,7 +771,7 @@ pub fn search_with(conn: &Connection, text: &str, thumbs: &Path) -> Result<Searc
                 at
             }
         };
-        row.thumb = thumb_of(&row.uuid, thumbs);
+        with_cached(&mut row, thumbs);
         items.push(Hit {
             row,
             at,
@@ -964,12 +965,24 @@ fn in_transaction<T>(conn: &Connection, work: impl FnOnce(&Connection) -> Result
     Ok(out)
 }
 
-/// Fills in the thumbnail path on each row whose thumbnail has been made.
+/// Fills in each row's thumbnail, and a video's scrub frames, wherever they have been made.
 pub fn with_thumbnails(mut rows: Vec<ItemRow>, thumbs: &Path) -> Vec<ItemRow> {
     for row in &mut rows {
-        row.thumb = thumb_of(&row.uuid, thumbs);
+        with_cached(row, thumbs);
     }
     rows
+}
+
+/// A row's thumbnail, and a video's scrub frames, each once it has been made.
+fn with_cached(row: &mut ItemRow, thumbs: &Path) {
+    row.thumb = thumb_of(&row.uuid, thumbs);
+    row.scrub = (row.kind == "video")
+        .then(|| thumbs.join(paths::frames_rel(&row.uuid)))
+        .filter(|path| path.is_file())
+        .map(|path| Scrub {
+            path: path.to_string_lossy().into_owned(),
+            frames: scrub::FRAMES,
+        });
 }
 
 fn thumb_of(uuid: &str, thumbs: &Path) -> Option<String> {
@@ -1013,7 +1026,7 @@ pub fn detail_of(conn: &Connection, item_id: i64, thumbs: &Path) -> Result<Optio
         paths::item_path(conn, detail.row.folder_id, &detail.row.disk_name)?
     };
     detail.path = file.to_string_lossy().into_owned();
-    detail.row.thumb = thumb_of(&detail.row.uuid, thumbs);
+    with_cached(&mut detail.row, thumbs);
     Ok(Some(detail))
 }
 
@@ -1613,6 +1626,7 @@ mod tests {
             duration_ms: None,
             favorite: false,
             thumb: None,
+            scrub: None,
         };
         let made = thumbs.join(paths::thumb_rel("abcdef12"));
         std::fs::create_dir_all(made.parent().unwrap()).unwrap();
@@ -1624,6 +1638,51 @@ mod tests {
             Some(made.to_string_lossy().as_ref())
         );
         assert_eq!(rows[1].thumb, None);
+    }
+
+    #[test]
+    fn a_video_row_carries_its_scrub_frames_only_once_they_have_been_made() {
+        let thumbs = scratch("scrub-frames").join("thumbs");
+        let row = |uuid: &str, kind: &str| ItemRow {
+            id: 1,
+            uuid: uuid.into(),
+            folder_id: 1,
+            disk_name: "a.mp4".into(),
+            ext: "mp4".into(),
+            kind: kind.into(),
+            size_bytes: 1,
+            mtime: 0,
+            width: None,
+            height: None,
+            duration_ms: Some(12_000),
+            favorite: false,
+            thumb: None,
+            scrub: None,
+        };
+        for uuid in ["abcdef12", "a1b2c3d4"] {
+            let made = thumbs.join(paths::frames_rel(uuid));
+            std::fs::create_dir_all(made.parent().unwrap()).unwrap();
+            std::fs::write(&made, "webp").unwrap();
+        }
+
+        let rows = with_thumbnails(
+            vec![
+                row("abcdef12", "video"),
+                row("99887766", "video"),
+                row("a1b2c3d4", "image"),
+            ],
+            &thumbs,
+        );
+        let made = thumbs.join(paths::frames_rel("abcdef12"));
+        assert_eq!(
+            rows[0].scrub,
+            Some(Scrub {
+                path: made.to_string_lossy().into_owned(),
+                frames: scrub::FRAMES,
+            })
+        );
+        assert_eq!(rows[1].scrub, None, "not made yet");
+        assert_eq!(rows[2].scrub, None, "only a video scrubs");
     }
 
     #[test]

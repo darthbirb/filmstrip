@@ -34,7 +34,7 @@ drawn. **Not started** — neither.
 | Thumbnails for pictures | Built | `thumb` jobs |
 | Thumbnails for video, through ffmpeg | Built where ffmpeg is at hand | ffmpeg is not bundled yet |
 | Read a file's shape, dates and length | Built | `probed_at`, `captured_at` |
-| Scrub frames for a video's tile | Backlogged | "Scrubbing a video's tile" |
+| Scrub frames for a video's tile | Built where ffmpeg is at hand | `scrub` jobs, the grid's video tiles |
 
 ## Folders
 

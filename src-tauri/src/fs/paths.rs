@@ -69,6 +69,13 @@ pub fn thumb_rel(uuid: &str) -> String {
     format!("{a}/{b}/{uuid}.webp")
 }
 
+/// A video's scrub frames, beside its thumbnail: `<uuid>` → `ab/cd/<uuid>.frames.webp`.
+pub fn frames_rel(uuid: &str) -> String {
+    let thumb = thumb_rel(uuid);
+    let stem = thumb.strip_suffix(".webp").unwrap_or(&thumb);
+    format!("{stem}.frames.webp")
+}
+
 /// Where a trashed item's file waits: `<uuid>` → `ab/cd/<uuid>.<ext>` under the trash, sharded as
 /// the thumbnails are, and keeping its extension so Explorer still knows what it is.
 pub fn trash_path(uuid: &str, disk_name: &str) -> Result<PathBuf> {
@@ -203,6 +210,11 @@ mod tests {
     #[test]
     fn thumbnails_shard_by_the_first_four_characters() {
         assert_eq!(thumb_rel("abcdef12"), "ab/cd/abcdef12.webp");
+    }
+
+    #[test]
+    fn scrub_frames_sit_beside_the_thumbnail_under_their_own_name() {
+        assert_eq!(frames_rel("abcdef12"), "ab/cd/abcdef12.frames.webp");
     }
 
     #[test]

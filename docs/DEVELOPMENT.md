@@ -195,7 +195,7 @@ Its interface is never read for the look, which comes from Claude Design (DECISI
 | Grid layout | `features/grid/useGridLayout.ts`, `layoutWorker.ts` | grid and tiles |
 | Performance fixture | `bin/synth_library.rs` | grid and tiles |
 | Probing video and capture dates | `media/probe.rs`, `sidecar/` | the pane |
-| Scrub sprites | `media/sprites.rs`, `sidecar/ffmpeg.rs` `frames` | not yet scheduled: nothing shows one yet |
+| Scrub sprites | `media/sprites.rs`, `sidecar/ffmpeg.rs` `frames` | scrubbing a video's tile |
 | Show in Explorer, Open with Default App | `commands/items.rs`, `tauri-plugin-opener` | the pane |
 | Copying a file to the clipboard | `fs/clipboard.rs` | the pane |
 | Moving, renaming, undo | `fs/relocate.rs`, `fs/undo.rs`, `db/journal.rs`, `commands/triage.rs` | selection and moving |

@@ -26,6 +26,7 @@ function rows(count: number, folderId = 1): ItemRow[] {
     durationMs: null,
     favorite: false,
     thumb: null,
+    scrub: null,
   }));
 }
 

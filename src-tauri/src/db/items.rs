@@ -149,6 +149,16 @@ pub struct ItemRow {
     pub favorite: bool,
     /// The thumbnail's path, once one has been made.
     pub thumb: Option<String>,
+    /// A video's scrub frames, once they have been made.
+    pub scrub: Option<Scrub>,
+}
+
+/// A strip of frames through a video, side by side, left to right through the clip.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[ts(export)]
+pub struct Scrub {
+    pub path: String,
+    pub frames: u32,
 }
 
 /// The columns [`row`] reads, in its order, from `item` named `i`.
@@ -174,6 +184,7 @@ pub(crate) fn row(r: &rusqlite::Row) -> rusqlite::Result<ItemRow> {
         duration_ms: r.get(10)?,
         favorite: r.get(11)?,
         thumb: None,
+        scrub: None,
     })
 }
 
@@ -473,12 +484,13 @@ pub struct ItemFile {
     pub disk_name: String,
     pub uuid: String,
     pub kind: String,
+    pub duration_ms: Option<i64>,
 }
 
 pub fn file_of(conn: &Connection, id: i64) -> Result<Option<ItemFile>> {
     Ok(conn
         .query_row(
-            "SELECT folder_id, disk_name, uuid, kind FROM item WHERE id = ?1",
+            "SELECT folder_id, disk_name, uuid, kind, duration_ms FROM item WHERE id = ?1",
             params![id],
             |r| {
                 Ok(ItemFile {
@@ -486,6 +498,7 @@ pub fn file_of(conn: &Connection, id: i64) -> Result<Option<ItemFile>> {
                     disk_name: r.get(1)?,
                     uuid: r.get(2)?,
                     kind: r.get(3)?,
+                    duration_ms: r.get(4)?,
                 })
             },
         )
@@ -519,12 +532,14 @@ pub struct LiveMedia {
     pub id: i64,
     pub uuid: String,
     pub read: bool,
+    /// A video with a length, which gets scrub frames.
+    pub scrubs: bool,
 }
 
 /// Every live picture, and every live video too when `videos` is set.
 pub fn live_media(conn: &Connection, videos: bool) -> Result<Vec<LiveMedia>> {
     let mut stmt = conn.prepare(
-        "SELECT id, uuid, probed_at IS NOT NULL FROM item
+        "SELECT id, uuid, probed_at IS NOT NULL, kind = 'video' AND COALESCE(duration_ms, 0) > 0 FROM item
           WHERE deleted_at IS NULL AND (kind = 'image' OR (?1 AND kind = 'video'))
           ORDER BY id",
     )?;
@@ -534,6 +549,7 @@ pub fn live_media(conn: &Connection, videos: bool) -> Result<Vec<LiveMedia>> {
                 id: r.get(0)?,
                 uuid: r.get(1)?,
                 read: r.get(2)?,
+                scrubs: r.get(3)?,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;

@@ -230,6 +230,15 @@ pub fn enqueue_thumb(conn: &Connection, item_id: i64) -> Result<()> {
     Ok(())
 }
 
+/// Queues a video's scrub frames, unless they are already waiting.
+pub fn enqueue_scrub(conn: &Connection, item_id: i64) -> Result<()> {
+    let payload = serde_json::to_string(&kinds::ItemPayload { item_id })?;
+    if !table::is_pending(conn, kinds::SCRUB, &payload)? {
+        table::enqueue(conn, kinds::SCRUB, &payload, kinds::PRIORITY_SCRUB)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

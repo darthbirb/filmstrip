@@ -168,8 +168,19 @@ it, and ffmpeg draws the frames upright, so the width and height the index keeps
 match. ggallery kept them unturned, and portrait videos laid out as landscape.
 
 **The window plays what WebView2 plays**: H.264 MP4 and WebM, but not HEVC without its extension,
-MKV or AVI. A video it cannot play keeps its poster and says so. Scrub strips wait for a surface
-that shows them.
+MKV or AVI. A video it cannot play keeps its poster and says so.
+
+**A video's scrub frames are ten cells in one WebP**, each fitted to the thumbnail's 320px and
+taken at the middle of its tenth of the clip, so a pointer anywhere in a slice shows the frame
+that stands for it. They sit beside the thumbnail as `<uuid>.frames.webp`, under the cache the
+window may already read. A `scrub` job makes them after a video's thumbnail, last in priority:
+the dearest work per file and the least missed. Each cell is its own seek, where ggallery
+decoded the whole clip in one pass; a seek costs the same in a two-hour film as in a short, so
+no video can run past the frame limit, and a length that overstates the file only repeats the
+last cell taken. Any other failure part-way fails the job like any other and writes nothing,
+rather than leave a strip of repeats that is never remade. A strip always has ten cells and the
+row says how many, from the constant, not the file: changing the count means remaking every
+strip already made, since one that exists is never queued again.
 
 ## The window
 
@@ -322,7 +333,12 @@ named step says where the size is without a click, which two nudge buttons and a
 did. A size saved before the steps existed lands on the nearest.
 
 **A video's tile writes its length** in the corner opposite the in-pane plate, decided on 14
-September 2026, so a clip and a photograph no longer draw the same cell. Nothing else is written
+September 2026, so a clip and a photograph no longer draw the same cell, after a filled play
+glyph, as the component sheet draws it. **The pointer across it scrubs it**: the tile's width is
+the clip's length, a line along its foot says where, and the length plate drops its glyph to
+read the time under the pointer instead. Its frames are asked for only while the pointer is on
+it. A video without them draws the line dashed and says *No Preview* opposite the length, unless
+the in-pane plate holds that corner or the tile is too narrow for both. Nothing else is written
 on a tile.
 
 **Only the rows near the view are drawn**, a screen's height above and below, so a folder of

@@ -75,6 +75,8 @@ function folder(id: number, title: string, childCount: number, itemCount: number
   return { id, title, childCount, itemCount, allCount: itemCount, favorite: false };
 }
 
+const SCRUB_FRAMES = 10;
+
 function items(folderId: number, names: string[]): ItemRow[] {
   return names.map((diskName) => {
     const id = nextItemId++;
@@ -95,6 +97,11 @@ function items(folderId: number, names: string[]): ItemRow[] {
       durationMs: video ? 12_000 : null,
       favorite: false,
       thumb: `thumbs\\mock-${id}.webp`,
+      // One clip has no scrub frames, as a video whose frames are not made yet.
+      scrub:
+        video && diskName !== "clip.mp4"
+          ? { path: `thumbs\\mock-${id}.frames.webp`, frames: SCRUB_FRAMES }
+          : null,
     };
   });
 }
@@ -210,6 +217,8 @@ function detail(itemId: number): ItemDetail | null {
 
 /** The mock has no files, so every path it hands out is drawn: a wash in the item's own shape. */
 function drawn(path: string) {
+  const strip = allItems().find((row) => row.scrub?.path === path);
+  if (strip) return drawnFrames(strip);
   const item = allItems().find((row) => row.thumb === path || path.endsWith(`\\${row.diskName}`));
   const [full, tall] = [item?.width ?? 4, item?.height ?? 3];
   // A thumbnail is drawn at its real size, 320px on the longest edge, as the app makes them.
@@ -217,6 +226,20 @@ function drawn(path: string) {
   const [width, height] = [Math.round(full * shrink), Math.round(tall * shrink)];
   const hue = ((item?.id ?? 0) * 47) % 360;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}"><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue} 45% 55%)"/><stop offset="1" stop-color="hsl(${(hue + 60) % 360} 45% 25%)"/></linearGradient><rect width="100%" height="100%" fill="url(#g)"/></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+/** A video's scrub frames, side by side as the app makes them, each cell its own wash and number. */
+function drawnFrames(item: ItemRow) {
+  const [full, tall] = [item.width ?? 16, item.height ?? 9];
+  const shrink = Math.min(1, 320 / Math.max(full, tall));
+  const [width, height] = [Math.round(full * shrink), Math.round(tall * shrink)];
+  const cells = Array.from({ length: SCRUB_FRAMES }, (_, cell) => {
+    const hue = (item.id * 47 + cell * 24) % 360;
+    const x = cell * width;
+    return `<rect x="${x}" width="${width}" height="${height}" fill="hsl(${hue} 45% 40%)"/><text x="${x + width / 2}" y="${height / 2}" fill="white" font-size="${height / 3}" font-family="sans-serif" text-anchor="middle" dominant-baseline="middle">${cell + 1}</text>`;
+  });
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width * SCRUB_FRAMES} ${height}" width="${width * SCRUB_FRAMES}" height="${height}">${cells.join("")}</svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
