@@ -22,8 +22,8 @@ queue, with the owner stepping in only where a pull request asks. The `queue` sk
   Dependabot's grouped patch and minor updates excepted, which the gates review. It merges by
   squash once Gates, Title and Review pass; `needs-human` holds it for the owner. See the
   `steward` skill.
-- **`main` is always releasable.** A Nightly `Filmstrip.exe` is built from it each day it moves;
-  `scripts/update-latest.ps1` puts it in `latest\`, where the owner tries the app.
+- **`main` is always releasable.** A Nightly `Filmstrip.zip` is built from it each day it moves;
+  `scripts/update-latest.ps1` unpacks it in `latest\`, where the owner tries the app.
 
 ## Commands
 

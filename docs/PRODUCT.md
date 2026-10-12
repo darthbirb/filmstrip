@@ -75,4 +75,4 @@ selection somewhere. Destination hotkeys exist for the folders used most.
 
 Built on the finished interface, not alongside it: compression with review before anything is
 replaced, duplicate detection, a storage screen, a tags screen, trash limits and purging, a
-blur toggle, and bundling ffmpeg and HandBrake so a release needs nothing downloaded.
+blur toggle, and bundling HandBrake as ffmpeg already is, so a release needs nothing downloaded.

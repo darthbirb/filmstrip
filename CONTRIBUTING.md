@@ -84,8 +84,8 @@ Optional body, wrapped at 72 columns: why, when neither the diff nor docs/DECISI
 
 ### Releases
 
-Each day `main` has moved, the **Nightly** pre-release is replaced with a fresh portable
-`Filmstrip.exe`; run the Release workflow by hand for one sooner. A release proper is a tag on `main`, `vMAJOR.MINOR.PATCH`, built the same way
+Each day `main` has moved, the **Nightly** pre-release is replaced with a fresh
+`Filmstrip.zip`: the portable `Filmstrip.exe`, with ffmpeg in `tools\` beside it. Run the Release workflow by hand for one sooner. A release proper is a tag on `main`, `vMAJOR.MINOR.PATCH`, built the same way
 with notes drawn from the pull requests since the last tag. The version stays below 1.0 until
 every capability in [docs/FEATURES.md](docs/FEATURES.md) is built.
 

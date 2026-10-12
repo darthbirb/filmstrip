@@ -1,4 +1,4 @@
-# Puts the newest Nightly Filmstrip.exe in latest\, beside the data\ folder it keeps there,
+# Unpacks the newest Nightly Filmstrip.zip into latest\, beside the data\ folder it keeps there,
 # so the index, thumbnails and trash carry over from build to build.
 #
 #   pwsh scripts/update-latest.ps1            # Nightly
@@ -12,5 +12,11 @@ New-Item -ItemType Directory -Force -Path $latest | Out-Null
 if (Get-Process -Name Filmstrip -ErrorAction SilentlyContinue) {
   throw 'Filmstrip is running; close it first.'
 }
-gh release download $Tag --repo darthbirb/filmstrip --pattern Filmstrip.exe --dir $latest --clobber
-Write-Host "latest\Filmstrip.exe is now $Tag."
+gh release download $Tag --repo darthbirb/filmstrip --pattern Filmstrip.zip --dir $latest --clobber
+$zip = Join-Path $latest 'Filmstrip.zip'
+try {
+  Expand-Archive -Path $zip -DestinationPath $latest -Force
+} finally {
+  Remove-Item -LiteralPath $zip -ErrorAction SilentlyContinue
+}
+Write-Host "latest\Filmstrip.exe and its tools\ are now $Tag."

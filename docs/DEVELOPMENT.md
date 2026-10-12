@@ -70,9 +70,12 @@ Three ways, cheapest first.
   the test that reproduces it. CI runs every suite below on each pull request.
 - **Rust** is tested beside the code, in `#[cfg(test)]` modules. A test that needs real files
   writes them under `src-tauri/target/`, never outside the repository.
-- **A test that needs ffmpeg is `#[ignore]`d**, because CI has none. Where ffmpeg is on PATH,
-  `cargo test --manifest-path src-tauri/Cargo.toml -- --ignored` runs them; run it after touching
-  video.
+- **A test that needs ffmpeg is `#[ignore]`d**, so a plain `cargo test` needs nothing
+  downloaded. `pwsh scripts/fetch-ffmpeg.ps1` puts the build the release carries in
+  `src-tauri/target/tools`, where those tests look before PATH, and
+  `cargo test --manifest-path src-tauri/Cargo.toml -- --ignored` runs them; CI does both on every
+  pull request. Run them after touching video. For video in `tauri dev`, fetch it beside the
+  debug build: `pwsh scripts/fetch-ffmpeg.ps1 -Into src-tauri/target/debug/tools`.
 - **Component tests** run in Vitest's browser mode over `src/**/*.test.tsx`, on Edge under
   Windows and Chromium elsewhere, in the `en-GB` locale (`tests/browser.ts`). **Never jsdom** —
   see DECISIONS.md "Testing in a real browser, never jsdom".

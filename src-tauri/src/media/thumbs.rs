@@ -186,11 +186,10 @@ mod tests {
         assert!(!error.to_string().is_empty());
     }
 
-    /// CI has no ffmpeg; `cargo test -- --ignored` runs this where there is one.
     #[test]
-    #[ignore = "needs ffmpeg and ffprobe on PATH"]
+    #[ignore = "needs ffmpeg: scripts/fetch-ffmpeg.ps1, or on PATH"]
     fn a_video_recorded_sideways_gets_an_upright_poster_and_its_turned_shape() {
-        let ffmpeg = Ffmpeg::discover(Path::new("no-tools-here")).expect("ffmpeg on PATH");
+        let ffmpeg = Ffmpeg::for_tests().expect("ffmpeg in target/tools or on PATH");
         let dir = scratch("video");
         let (plain, turned) = (dir.join("plain.mp4"), dir.join("turned.mp4"));
         let make = |args: &[&str]| {

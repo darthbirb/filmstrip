@@ -1,7 +1,8 @@
 name: Release
 
 # Nightly: main's latest commit, built once a day when it has moved. A vX.Y.Z tag: a release.
-# Both carry the portable Filmstrip.exe. CONTRIBUTING.md "Releases".
+# Both carry Filmstrip.zip: the portable Filmstrip.exe, with ffmpeg in tools\ beside it.
+# CONTRIBUTING.md "Releases".
 on:
   schedule:
     - cron: "17 3 * * *"
@@ -62,19 +63,34 @@ jobs:
         if: steps.moved.outputs.skip != 'true'
         run: npx --yes pnpm@12.4.1 tauri build
 
+      - name: Package with ffmpeg
+        if: steps.moved.outputs.skip != 'true'
+        shell: pwsh
+        run: |
+          $folder = 'package/Filmstrip'
+          New-Item -ItemType Directory -Force -Path $folder | Out-Null
+          Copy-Item src-tauri/target/release/Filmstrip.exe $folder
+          ./scripts/fetch-ffmpeg.ps1 -Into "$folder/tools"
+          Compress-Archive -Path "$folder/*" -DestinationPath package/Filmstrip.zip
+          $unpacked = (Get-ChildItem -Recurse -File $folder | Measure-Object Length -Sum).Sum
+          $zipped = (Get-Item package/Filmstrip.zip).Length
+          $size = 'Filmstrip.zip is {0:N0} MB, {1:N0} MB unpacked.' -f ($zipped / 1MB), ($unpacked / 1MB)
+          Write-Host $size
+          Add-Content $env:GITHUB_STEP_SUMMARY $size
+
       - name: Publish
         if: steps.moved.outputs.skip != 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          exe=src-tauri/target/release/Filmstrip.exe
+          zip=package/Filmstrip.zip
           if [ "$GITHUB_REF_TYPE" = tag ]; then
-            gh release create "$GITHUB_REF_NAME" "$exe" --repo "$GITHUB_REPOSITORY" \
+            gh release create "$GITHUB_REF_NAME" "$zip" --repo "$GITHUB_REPOSITORY" \
               --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
           else
             notes="The latest build of main, at ${GITHUB_SHA::7}. Rebuilt daily when main moves."
             gh release delete nightly --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes || true
-            gh release create nightly "$exe" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            gh release create nightly "$zip" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
               --title "Nightly" --notes "$notes" --prerelease --latest=false
           fi
