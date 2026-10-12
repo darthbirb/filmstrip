@@ -170,6 +170,22 @@ test("held on a closed folder for the hold, the ghost opens it", async () => {
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 });
 
+test("a set dragged by a later-checked tile wears the pressed tile's picture", async () => {
+  await renderBoth();
+  await userEvent.click(page.getByRole("checkbox", { name: "Check pyramid.jpg" }));
+  await userEvent.click(page.getByRole("checkbox", { name: "Check sphinx.jpg" }));
+  const pictureOf = (name: string) =>
+    tile(name).element().querySelector("img")?.getAttribute("src");
+  const sphinx = pictureOf("sphinx.jpg");
+  expect(sphinx).toBeTruthy();
+  expect(pictureOf("pyramid.jpg")).not.toBe(sphinx);
+
+  await dragOnto("sphinx.jpg", "People 0 of 0");
+  expect(ghost()?.textContent).toBe("Move 2 files to People");
+  expect(ghost()?.querySelector("img")?.getAttribute("src")).toBe(sphinx);
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+});
+
 test("a branch dragged by a tile it lists wears that tile's picture", async () => {
   await renderBoth();
   await row("Pictures 1 of 6").click({ button: "right" });

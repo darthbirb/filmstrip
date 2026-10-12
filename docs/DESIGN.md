@@ -675,10 +675,11 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   before the files, which then take one of their own.
 - **Drag ghost.** One `control`-tall line following the pointer, `--ghost-x` and `--ghost-y` from
   its tip: `veil` glass at the `control` corner in a `line-control-hi` ring, with the overlay
-  shadow. It holds the top file's picture as a `ghost-thumb` square at the `badge` corner, the
-  rest stacked `--ghost-stack` behind it in `line-strong`, then its words in `ui` `fg`: the count,
-  the act, or after a `danger` prohibit the reason. A tree row that will take the drop lifts to
-  the `wash` inside a 2px `plate` ring, its glyph in `fg`; one that refuses does not change.
+  shadow. It holds the pressed file's picture, or the first carried one's that has one, as a
+  `ghost-thumb` square at the `badge` corner, the rest stacked `--ghost-stack` behind it in
+  `line-strong`, then its words in `ui` `fg`: the count, the act, or after a `danger` prohibit the
+  reason. A tree row that will take the drop lifts to the `wash` inside a 2px `plate` ring, its
+  glyph in `fg`; one that refuses does not change.
 - **Checkbox.** A `badge` square at the `badge` corner on `raised` in a `line-control` ring,
   filled with `plate` and a check in `on-plate` when ticked; its sentence beside it in `fg-mid`,
   `fg` under the pointer or ticked. The ring the keyboard sees is on the square.
