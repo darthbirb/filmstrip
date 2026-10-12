@@ -4,12 +4,15 @@ import { render } from "vitest-browser-react";
 
 import { withoutGlyphs } from "../../dev/words";
 import {
+  createFolder,
   folderCoverChoices,
   folderDetail,
+  moveFolder,
   removeFolderTag,
   setFolderCover,
   setFolderLabel,
   setFolderStatus,
+  undoLast,
 } from "../../ipc/commands";
 import { Breadcrumb } from "../navigation/Breadcrumb";
 import { loadIndex, resetIndex } from "../navigation/index-store";
@@ -113,17 +116,54 @@ test("the band reads in the pane's rhythm: status, labels, then tags, its own na
   await expect.element(screen.getByTitle("From Trips").first()).toBeVisible();
 });
 
-test("a key Cairo holds hides the same key from Trips: the nearest value is the one shown", async () => {
+test("a key Cairo holds hides the same key from a folder it is moved into", async () => {
+  const { folderId: egypt } = await createFolder(1, "Egypt");
+  await setFolderLabel(egypt, "location", "egypt");
+  await moveFolder(6, egypt);
+  try {
+    const screen = await renderHeader(
+      folderAt(1, PICTURES, { id: egypt, title: "Egypt" }, { id: 6, title: "Cairo" }),
+    );
+    await details(screen).click();
+    await expect.poll(() => chipTexts(row(screen.container, "Labels"))).toEqual(["locationcairo"]);
+  } finally {
+    await undoLast();
+    await undoLast();
+  }
+});
+
+test("a key a folder below holds is refused, naming it, and so is one from above", async () => {
+  const screen = await renderHeader(folderAt(1, PICTURES, TRIPS));
+  await details(screen).click();
+  await screen.getByRole("button", { name: "Add Label…" }).click();
+  const key = screen.getByRole("combobox", { name: "Key" });
+  await userEvent.keyboard("Location");
+  await expect
+    .element(screen.getByText("Cairo, inside Trips, already has a location."))
+    .toBeVisible();
+  await expect.element(key).toHaveAttribute("aria-invalid", "true");
+  await userEvent.keyboard("{Enter}");
+  await expect.element(key).toHaveFocus();
+  await expect(setFolderLabel(4, "location", "egypt")).rejects.toMatchObject({
+    kind: "invalid",
+  });
+
+  const cairo = (await folderDetail(6))?.tags.find((one) => one.key === "location");
+  if (cairo) await removeFolderTag(6, cairo.tagId);
   await setFolderLabel(4, "location", "egypt");
   try {
-    const screen = await renderHeader(CAIRO);
-    await details(screen).click();
-    await expect
-      .poll(() => chipTexts(row(screen.container, "Labels")))
-      .toEqual(["locationcairo", "tripegypt 2024"]);
+    setPlace(CAIRO);
+    await expect.element(screen.getByText("3 here · 3 in all")).toBeVisible();
+    await screen.getByRole("button", { name: "Add Label…" }).click();
+    await userEvent.keyboard("location");
+    await expect.element(screen.getByText("location comes from Trips.")).toBeVisible();
+    await expect(setFolderLabel(6, "location", "cairo")).rejects.toMatchObject({
+      kind: "invalid",
+    });
   } finally {
-    const label = (await folderDetail(4))?.tags.find((one) => one.key === "location");
-    if (label) await removeFolderTag(4, label.tagId);
+    const trips = (await folderDetail(4))?.tags.find((one) => one.key === "location");
+    if (trips) await removeFolderTag(4, trips.tagId);
+    await setFolderLabel(6, "location", "cairo");
   }
 });
 

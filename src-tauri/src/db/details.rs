@@ -9,7 +9,7 @@ use ts_rs::TS;
 
 use crate::db::folders::{self, Crumb};
 use crate::db::now;
-use crate::db::tags::EffectiveTag;
+use crate::db::tags::{self, EffectiveTag, KeyBelow};
 use crate::error::{AppError, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -61,6 +61,8 @@ pub struct FolderDetail {
     pub all_count: i64,
     /// Its own first, its name leading, then what it inherits, the source's first.
     pub tags: Vec<EffectiveTag>,
+    /// The keys folders below it hold, which it cannot take while they do.
+    pub keys_below: Vec<KeyBelow>,
 }
 
 /// Everything the band shows for a live folder; `None` once it has gone.
@@ -103,6 +105,7 @@ pub fn detail(conn: &Connection, folder_id: i64) -> Result<Option<FolderDetail>>
         own_count: folders::own_count(conn, folder_id)?,
         all_count: folders::subtree_count(conn, folder_id)?,
         tags: tags_of(conn, &path)?,
+        keys_below: tags::keys_below(conn, folder_id)?,
         path,
     }))
 }
@@ -259,9 +262,9 @@ pub fn cover(conn: &Connection, folder_id: i64) -> Result<Option<(i64, String)>>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db;
     use crate::db::items::{self, NewItem};
     use crate::db::sources::{self, SourceKind};
-    use crate::db::{self, tags};
     use std::path::Path;
 
     fn library() -> (Connection, i64) {
@@ -373,10 +376,11 @@ mod tests {
     fn a_key_held_below_hides_the_same_key_from_above() {
         let (conn, root) = library();
         let trips = folders::create(&conn, root, "Trips").unwrap();
-        let cairo = folders::create(&conn, trips, "Cairo").unwrap();
+        let cairo = folders::create(&conn, root, "Cairo").unwrap();
         tags::set_folder_label(&conn, cairo, "Location", "Cairo").unwrap();
         tags::set_folder_label(&conn, trips, "Location", "Egypt").unwrap();
         tags::set_folder_label(&conn, trips, "Trip", "Egypt 2024").unwrap();
+        folders::set_parent(&conn, cairo, trips).unwrap();
 
         let detail = detail(&conn, cairo).unwrap().unwrap();
         assert_eq!(
@@ -389,6 +393,26 @@ mod tests {
                 "trip:egypt 2024<Trips",
             ]
         );
+    }
+
+    #[test]
+    fn it_names_each_key_a_folder_below_holds_which_it_cannot_take() {
+        let (conn, root) = library();
+        let trips = folders::create(&conn, root, "Trips").unwrap();
+        let cairo = folders::create(&conn, trips, "Cairo").unwrap();
+        tags::set_folder_label(&conn, cairo, "Location", "Cairo").unwrap();
+
+        assert_eq!(
+            detail(&conn, trips).unwrap().unwrap().keys_below,
+            [KeyBelow {
+                key: "location".into(),
+                folder: Crumb {
+                    id: cairo,
+                    title: "Cairo".into()
+                }
+            }]
+        );
+        assert_eq!(detail(&conn, cairo).unwrap().unwrap().keys_below, []);
     }
 
     #[test]

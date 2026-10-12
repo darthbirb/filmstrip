@@ -9,7 +9,7 @@ use ts_rs::TS;
 
 use crate::db::folders::{self, Crumb};
 use crate::db::{fold, now, search};
-use crate::error::Result;
+use crate::error::{AppError, Result};
 
 pub fn get_or_create_tag(conn: &Connection, key: Option<&str>, value: &str) -> Result<i64> {
     let key = key.map(fold);
@@ -57,17 +57,22 @@ pub fn sync_title_tag(conn: &Connection, folder_id: i64, title: &str) -> Result<
 }
 
 /// Gives a folder a label, or a new value for the key it has: a folder holds one value per key,
-/// and a changed one keeps its place among the folder's labels. SCHEMA.md "Tags and labels".
+/// and a changed one keeps its place among the folder's labels. A key it does not have yet is
+/// refused while a folder above or below holds it. SCHEMA.md "Tags and labels".
 pub fn set_folder_label(conn: &Connection, folder_id: i64, key: &str, value: &str) -> Result<()> {
-    let tag_id = get_or_create_tag(conn, Some(key), value)?;
+    let key = fold(key);
     let held: Option<i64> = conn
         .query_row(
             "SELECT ft.rowid FROM folder_tag ft JOIN tag t ON t.id = ft.tag_id
               WHERE ft.folder_id = ?1 AND t.key = ?2",
-            params![folder_id, fold(key)],
+            params![folder_id, key],
             |r| r.get(0),
         )
         .optional()?;
+    if held.is_none() {
+        refuse_key_held_elsewhere(conn, folder_id, &key)?;
+    }
+    let tag_id = get_or_create_tag(conn, Some(&key), value)?;
     match held {
         Some(rowid) => conn.execute(
             "UPDATE folder_tag SET tag_id = ?1 WHERE rowid = ?2",
@@ -80,6 +85,94 @@ pub fn set_folder_label(conn: &Connection, folder_id: i64, key: &str, value: &st
     };
     search::index_folder(conn, folder_id)?;
     rebuild_subtree(conn, folder_id)
+}
+
+/// A folder may not take a key one above it gives it, nor one a folder below it already holds.
+/// DECISIONS.md "A folder's details".
+fn refuse_key_held_elsewhere(conn: &Connection, folder_id: i64, key: &str) -> Result<()> {
+    let above: Option<i64> = conn
+        .query_row(
+            "WITH RECURSIVE above(id, depth) AS (
+                 SELECT parent_id, 1 FROM folder WHERE id = ?1 AND parent_id IS NOT NULL
+               UNION ALL
+                 SELECT f.parent_id, a.depth + 1 FROM folder f JOIN above a ON f.id = a.id
+                  WHERE f.parent_id IS NOT NULL
+             )
+             SELECT a.id FROM above a
+               JOIN folder_tag ft ON ft.folder_id = a.id
+               JOIN tag t ON t.id = ft.tag_id
+              WHERE t.key = ?2
+              ORDER BY a.depth LIMIT 1",
+            params![folder_id, key],
+            |r| r.get(0),
+        )
+        .optional()?;
+    if let Some(above) = above {
+        let from = folders::ancestry(conn, folder_id)?
+            .into_iter()
+            .find(|crumb| crumb.id == above)
+            .map(|crumb| crumb.title)
+            .unwrap_or_default();
+        return Err(AppError::invalid(format!("{key} comes from {from}")));
+    }
+    if let Some(below) = holding_below(conn, folder_id, Some(key))?
+        .into_iter()
+        .next()
+    {
+        return Err(AppError::invalid(format!(
+            "{} below already holds {key}",
+            below.folder.title
+        )));
+    }
+    Ok(())
+}
+
+/// A label's key a folder below holds, and the nearest folder that holds it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct KeyBelow {
+    pub key: String,
+    pub folder: Crumb,
+}
+
+/// Each key the live folders below one hold, once, with the nearest holding it; of two as near,
+/// the first by name.
+pub fn keys_below(conn: &Connection, folder_id: i64) -> Result<Vec<KeyBelow>> {
+    let mut keys = HashSet::new();
+    Ok(holding_below(conn, folder_id, None)?
+        .into_iter()
+        .filter(|one| keys.insert(one.key.clone()))
+        .collect())
+}
+
+/// Every label the live folders below one hold, of one key or of all, the nearest first.
+fn holding_below(conn: &Connection, folder_id: i64, key: Option<&str>) -> Result<Vec<KeyBelow>> {
+    let mut stmt = conn.prepare(
+        "WITH RECURSIVE below(id, title, depth) AS (
+             SELECT id, title, 1 FROM folder WHERE parent_id = ?1 AND deleted_at IS NULL
+           UNION ALL
+             SELECT f.id, f.title, b.depth + 1 FROM folder f JOIN below b ON f.parent_id = b.id
+              WHERE f.deleted_at IS NULL
+         )
+         SELECT t.key, b.id, b.title FROM below b
+           JOIN folder_tag ft ON ft.folder_id = b.id
+           JOIN tag t ON t.id = ft.tag_id
+          WHERE t.key IS NOT NULL AND (?2 IS NULL OR t.key = ?2)
+          ORDER BY b.depth, b.title COLLATE NOCASE, b.id",
+    )?;
+    let rows = stmt
+        .query_map(params![folder_id, key], |r| {
+            Ok(KeyBelow {
+                key: r.get(0)?,
+                folder: Crumb {
+                    id: r.get(1)?,
+                    title: r.get(2)?,
+                },
+            })
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    Ok(rows)
 }
 
 /// A label's key or a value of one the library already has, with how many folders carry it.
@@ -606,20 +699,8 @@ mod tests {
         set_folder_label(&conn, cairo, "Season", "Winter").unwrap();
         set_folder_label(&conn, cairo, "location", "Cairo").unwrap();
 
-        let labels: Vec<(String, String)> = {
-            let mut stmt = conn
-                .prepare(
-                    "SELECT t.key, t.value FROM folder_tag ft JOIN tag t ON t.id = ft.tag_id
-                      WHERE ft.folder_id = ?1 AND t.key IS NOT NULL ORDER BY ft.rowid",
-                )
-                .unwrap();
-            stmt.query_map(params![cairo], |r| Ok((r.get(0)?, r.get(1)?)))
-                .unwrap()
-                .collect::<rusqlite::Result<_>>()
-                .unwrap()
-        };
         assert_eq!(
-            labels,
+            labels_of(&conn, cairo),
             [
                 ("location".into(), "cairo".into()),
                 ("season".into(), "winter".into())
@@ -632,15 +713,115 @@ mod tests {
         );
     }
 
+    fn labels_of(conn: &Connection, folder_id: i64) -> Vec<(String, String)> {
+        let mut stmt = conn
+            .prepare(
+                "SELECT t.key, t.value FROM folder_tag ft JOIN tag t ON t.id = ft.tag_id
+                  WHERE ft.folder_id = ?1 AND t.key IS NOT NULL ORDER BY ft.rowid",
+            )
+            .unwrap();
+        stmt.query_map(params![folder_id], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap()
+    }
+
+    #[test]
+    fn a_key_is_refused_while_a_folder_above_or_below_holds_it_whichever_came_first() {
+        let (conn, root) = library();
+        let trips = folders::create(&conn, root, "Trips").unwrap();
+        let cairo = folders::create(&conn, trips, "Cairo").unwrap();
+        let giza = folders::create(&conn, cairo, "Giza").unwrap();
+        let sphinx = item(&conn, giza, "sphinx.jpg");
+        set_folder_label(&conn, giza, "Location", "Giza").unwrap();
+
+        let refused = set_folder_label(&conn, trips, "location", "Egypt").unwrap_err();
+        assert!(
+            matches!(&refused, AppError::Invalid(line) if line.contains("Giza")),
+            "names the folder below: {refused}"
+        );
+        assert!(set_folder_label(&conn, cairo, "LOCATION", "Cairo").is_err());
+        assert_eq!(labels_of(&conn, trips), []);
+        assert_eq!(labels_of(&conn, cairo), []);
+        assert!(
+            !carried_line(&conn, sphinx)
+                .iter()
+                .any(|t| t.contains("egypt")),
+            "nothing below changed"
+        );
+
+        set_folder_label(&conn, giza, "Location", "Pyramids").unwrap();
+        let giza_label = get_or_create_tag(&conn, Some("location"), "pyramids").unwrap();
+        remove_folder_tag(&conn, giza, giza_label).unwrap();
+        set_folder_label(&conn, trips, "Location", "Egypt").unwrap();
+        let refused = set_folder_label(&conn, giza, "Location", "Giza").unwrap_err();
+        assert!(
+            matches!(&refused, AppError::Invalid(line) if line.contains("Trips")),
+            "names the folder above: {refused}"
+        );
+        set_folder_label(&conn, trips, "Location", "Nile").unwrap();
+        assert_eq!(
+            labels_of(&conn, trips),
+            [("location".into(), "nile".into())]
+        );
+    }
+
+    #[test]
+    fn a_key_held_only_in_a_trashed_folder_below_refuses_nothing() {
+        let (conn, root) = library();
+        let trips = folders::create(&conn, root, "Trips").unwrap();
+        let cairo = folders::create(&conn, trips, "Cairo").unwrap();
+        set_folder_label(&conn, cairo, "Location", "Cairo").unwrap();
+        folders::trash_subtree(&conn, cairo).unwrap();
+        set_folder_label(&conn, trips, "Location", "Egypt").unwrap();
+        assert_eq!(
+            labels_of(&conn, trips),
+            [("location".into(), "egypt".into())]
+        );
+    }
+
+    #[test]
+    fn keys_below_name_the_nearest_folder_holding_each_then_the_first_by_name() {
+        let (conn, root) = library();
+        let trips = folders::create(&conn, root, "Trips").unwrap();
+        let oslo = folders::create(&conn, trips, "Oslo").unwrap();
+        let cairo = folders::create(&conn, trips, "cairo").unwrap();
+        let giza = folders::create(&conn, cairo, "Giza").unwrap();
+        set_folder_label(&conn, giza, "Season", "Winter").unwrap();
+        set_folder_label(&conn, oslo, "Location", "Oslo").unwrap();
+        set_folder_label(&conn, cairo, "Location", "Cairo").unwrap();
+
+        let below: Vec<(String, String)> = keys_below(&conn, trips)
+            .unwrap()
+            .into_iter()
+            .map(|one| (one.key, one.folder.title))
+            .collect();
+        assert_eq!(
+            below,
+            [
+                ("location".into(), "cairo".into()),
+                ("season".into(), "Giza".into())
+            ]
+        );
+        assert_eq!(keys_below(&conn, giza).unwrap(), []);
+        let refused = set_folder_label(&conn, trips, "Location", "Norway").unwrap_err();
+        assert!(
+            matches!(&refused, AppError::Invalid(line) if line.starts_with("cairo below")),
+            "names the nearest, then the first by name: {refused}"
+        );
+    }
+
     #[test]
     fn an_item_carries_one_value_per_key_the_nearest_folder_s() {
         let (conn, root) = library();
         let trips = folders::create(&conn, root, "Trips").unwrap();
-        let cairo = folders::create(&conn, trips, "Cairo").unwrap();
+        let cairo = folders::create(&conn, root, "Cairo").unwrap();
         let sphinx = item(&conn, cairo, "sphinx.jpg");
         let ticket = item(&conn, trips, "ticket.jpg");
         set_folder_label(&conn, cairo, "Location", "Cairo").unwrap();
         set_folder_label(&conn, trips, "Location", "Egypt").unwrap();
+        folders::set_parent(&conn, cairo, trips).unwrap();
+        rebuild_subtree(&conn, cairo).unwrap();
 
         let locations = |id| -> Vec<(String, Option<i64>)> {
             item_effective_tags(&conn, id)

@@ -465,12 +465,23 @@ plain header, having none of these.
   where or which trip, and a folder with two answers answers twice. A key it has is refused where
   it is typed and its value is changed with a click on it instead; one from above names the
   folder it comes from.
-- **Down the tree, the nearest value of a key wins.** Trips can take `location: egypt` while
-  Cairo, under it, holds `location: cairo`: Cairo's files carry Cairo's, the rest of Trips' carry
-  Egypt, and Cairo's band shows only its own. Refusing the key on Trips instead would not hold,
-  because moving a labelled folder under another brings the two together all the same; resolving
-  it where an item's tags are built holds however the folders arrived there. Taking Cairo's off
-  lets Trips' reach its files.
+- **A key is given once down a branch**, as the owner decided on 12 October 2026: a folder may
+  not override a key it inherits. So that the order they were added in no longer matters, a
+  folder is also refused a key while a folder below it holds one, and the line names that folder,
+  the nearest first, where it can be taken off. `tags::set_folder_label` refuses both as the band
+  does; a folder changing the value of a key it already holds is not refused. `add_folder_tag`
+  takes no key, so has none to refuse. A deleted folder below refuses nothing: holding the live
+  tree to a label in the Trash would leave a key nobody can see blocking the one being given.
+- **Where two values of a key do meet, the nearest wins.** Moving a labelled folder under
+  another can still bring the two together, as can undoing the delete of a folder below that held
+  the key while one above took it, and neither is refused for it: Cairo moved under Trips keeps
+  `location: cairo` for its files while the rest of Trips' carry Egypt, and Cairo's band shows
+  only its own. Resolving it where an item's tags are built holds however the folders arrived
+  there. Taking Cairo's off lets Trips' reach its files.
+- **Libraries indexed before the nearest value won are not rebuilt**, as the owner decided on
+  12 October 2026: Filmstrip had not been used on a real library yet, so no migration rewrites
+  `item_effective_tag`. A file that still carried both values would lose one the next time its
+  folder, or one above it, had a tag or label changed.
 - **The header's counts are the tree's, in words**: its own files here, then everything at or
   below it, the same two figures a pill shows. An offline source says `offline` instead.
 - **A folder that holds anything always has a picture.** Its chosen cover while that file is live
