@@ -63,14 +63,18 @@ export function ThumbFace({ src, current = false, badge = true, duration, scrub 
       )}
       {scrub && (
         <span
+          data-scrub-track
           aria-hidden="true"
           className={`pointer-events-none absolute inset-x-0 bottom-0 h-progress ${frames ? "bg-track" : "track-dashed"}`}
         >
-          {frames && <span className="block h-full bg-in-pane" style={{ width: position }} />}
+          {frames && (
+            <span data-scrub-fill className="block h-full bg-in-pane" style={{ width: position }} />
+          )}
         </span>
       )}
       {frames && (
         <span
+          data-scrub-tick
           aria-hidden="true"
           className="pointer-events-none absolute bottom-0 h-2 w-0.5 -translate-x-1/2 bg-in-pane"
           style={{ left: position }}

@@ -965,7 +965,7 @@ fn in_transaction<T>(conn: &Connection, work: impl FnOnce(&Connection) -> Result
     Ok(out)
 }
 
-/// Fills in the thumbnail path on each row whose thumbnail has been made.
+/// Fills in each row's thumbnail, and a video's scrub frames, wherever they have been made.
 pub fn with_thumbnails(mut rows: Vec<ItemRow>, thumbs: &Path) -> Vec<ItemRow> {
     for row in &mut rows {
         with_cached(row, thumbs);

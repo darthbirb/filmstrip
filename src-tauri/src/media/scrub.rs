@@ -29,19 +29,31 @@ pub fn make(ffmpeg: &Ffmpeg, source: &Path, duration_ms: i64, out: &Path) -> Res
             "a video without a length has no scrub frames".into(),
         ));
     }
+    let pngs = taken(moments(duration_ms), |at| {
+        ffmpeg.frame_if_any(source, at, EDGE)
+    })?;
+    let frames = pngs
+        .iter()
+        .map(|png| Ok(image::load_from_memory_with_format(png, ImageFormat::Png)?))
+        .collect::<Result<Vec<_>>>()?;
+    thumbs::write_webp(&strip(&frames)?, out)
+}
+
+/// What `take` gives at each moment in turn, up to the first that finds nothing: a length that
+/// overstates the file seeks past its end, and every later moment would too. Any failure is the
+/// whole strip's, so a strip is never written from frames cut short by a passing fault.
+fn taken<T>(
+    moments: impl IntoIterator<Item = f64>,
+    mut take: impl FnMut(f64) -> Result<Option<T>>,
+) -> Result<Vec<T>> {
     let mut frames = Vec::with_capacity(FRAMES as usize);
-    for at in moments(duration_ms) {
-        let frame = ffmpeg
-            .frame(source, at, EDGE)
-            .and_then(|png| Ok(image::load_from_memory_with_format(&png, ImageFormat::Png)?));
-        match frame {
-            Ok(frame) => frames.push(frame),
-            // A length that overstates the file seeks past its end, and every later cell would too.
-            Err(_) if !frames.is_empty() => break,
-            Err(error) => return Err(error),
+    for at in moments {
+        match take(at)? {
+            Some(frame) => frames.push(frame),
+            None => break,
         }
     }
-    thumbs::write_webp(&strip(&frames)?, out)
+    Ok(frames)
 }
 
 /// The frames side by side, each at the first one's size, the last repeated to fill the strip.
@@ -116,6 +128,34 @@ mod tests {
         let strip = strip(&[solid(20, 10, 40), solid(40, 20, 90)]).unwrap();
         assert_eq!((strip.width(), strip.height()), (20 * FRAMES, 10));
         assert_eq!(shade_of(&strip, 1, 20), 90);
+    }
+
+    #[test]
+    fn frames_stop_at_the_first_moment_past_the_end_of_the_file() {
+        let mut calls = 0;
+        let frames = taken(moments(20_000), |at| {
+            calls += 1;
+            Ok((at < 5.0).then_some(at))
+        })
+        .unwrap();
+        assert_eq!(frames, [1.0, 3.0]);
+        assert_eq!(calls, 3);
+    }
+
+    #[test]
+    fn a_failure_part_way_through_fails_the_strip_rather_than_cutting_it_short() {
+        let mut calls = 0;
+        let error = taken(moments(20_000), |at| {
+            calls += 1;
+            if calls == 3 {
+                Err(AppError::Io(std::io::Error::other("the drive went away")))
+            } else {
+                Ok(Some(at))
+            }
+        })
+        .unwrap_err();
+        assert!(crate::jobs::worker::is_transient(&error), "{error}");
+        assert_eq!(calls, 3);
     }
 
     #[test]

@@ -711,7 +711,8 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   filling with `in-pane` to the pointer, an `h-2` by `w-0.5` `in-pane` tick standing at it,
   and the length plate reading the time there without its glyph. With no scrub frames the track
   is `track-dashed` and a quiet plate says *No Preview* opposite the length, on a tile at least
-  `--container-note` wide and not holding the in-pane plate. Keyboard focus is the `focus` ring outside, so both can show at once.
+  `--container-note` wide and not holding the in-pane plate. Keyboard focus is the `focus` ring
+  outside, so both can show at once.
   In the Trash a line goes under the tile, in the `tile-caption` room below it: the folder it came
   from in `small` `fg-mid`, and "· gone" after it in `fg-dim`. It ellipsises at the tile's width.
 - **Selection box.** A `badge` square at the `badge` corner, a `tile-inset` from the tile's

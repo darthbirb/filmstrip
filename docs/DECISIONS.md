@@ -177,8 +177,10 @@ window may already read. A `scrub` job makes them after a video's thumbnail, las
 the dearest work per file and the least missed. Each cell is its own seek, where ggallery
 decoded the whole clip in one pass; a seek costs the same in a two-hour film as in a short, so
 no video can run past the frame limit, and a length that overstates the file only repeats the
-last cell taken. A strip always has ten cells, and the row says how many, so the count can move
-without the window guessing it.
+last cell taken. Any other failure part-way fails the job like any other and writes nothing,
+rather than leave a strip of repeats that is never remade. A strip always has ten cells and the
+row says how many, from the constant, not the file: changing the count means remaking every
+strip already made, since one that exists is never queued again.
 
 ## The window
 

@@ -394,82 +394,85 @@ function Tile(props: TileProps) {
   const context = useContextMenu();
   const { scrub, handlers } = useScrub(item);
   return (
-    <figure
-      title={item.diskName}
-      className="group/tile absolute m-0"
-      style={{ left, top, width, height: height + below }}
-    >
+    <>
+      {/* Outside the figure, so moving over the menu does not scrub the tile under it. */}
       {context.menu}
-      <button
-        type="button"
-        aria-label={item.diskName}
-        data-item={item.id}
-        tabIndex={ringed ? 0 : -1}
-        onFocus={() => onRing(item.id)}
-        onPointerDown={onPress && ((event) => onPress(event, item))}
+      <figure
+        title={item.diskName}
+        className="group/tile absolute m-0"
+        style={{ left, top, width, height: height + below }}
         {...handlers}
-        onKeyDown={onKeyDown}
-        onContextMenu={(event) => {
-          if (!checked) {
-            context.open(
-              event,
-              item.diskName,
-              itemMenu(item, () => showInPane(item.id, from)),
-            );
-            return;
-          }
-          const set = setOf();
-          context.open(event, set.heading ?? item.diskName, set.groups, set.heading);
-        }}
-        aria-current={shown || undefined}
-        onClick={(event) => {
-          if (event.ctrlKey || event.shiftKey) onCheck(event, item.id);
-          else showInPane(item.id, from);
-        }}
-        // Folded or hidden, the pane has no header to hold the control, so the tile is the way in.
-        onDoubleClick={(event) => {
-          if (event.ctrlKey || event.shiftKey) return;
-          showInPane(item.id, from);
-          setFullScreen(true);
-        }}
-        className={`focus-ring block w-full ${THUMB_FRAME}`}
-        style={{ height }}
       >
-        <ThumbFace
-          src={item.thumb ? convertFileSrc(item.thumb) : undefined}
-          current={shown}
-          duration={
-            item.kind === "video" && item.durationMs !== null
-              ? formatDuration(item.durationMs)
-              : undefined
-          }
-          scrub={scrub}
-        />
-      </button>
-      {/* Clicking the picture shows it; the box is the other target. Components › Selection checkbox. */}
-      <SelectBox
-        label={`Check ${item.diskName}`}
-        checked={checked}
-        shown={boxes}
-        onClick={(event) => onCheck(event, item.id)}
-      />
-      {origin && (
-        // The folder's name only; its whole path is the tooltip, and the pane's From row.
-        <figcaption
-          title={origin.path.join(" › ")}
-          className="flex h-tile-caption items-end gap-1 px-0.5 text-small"
+        <button
+          type="button"
+          aria-label={item.diskName}
+          data-item={item.id}
+          tabIndex={ringed ? 0 : -1}
+          onFocus={() => onRing(item.id)}
+          onPointerDown={onPress && ((event) => onPress(event, item))}
+          onKeyDown={onKeyDown}
+          onContextMenu={(event) => {
+            if (!checked) {
+              context.open(
+                event,
+                item.diskName,
+                itemMenu(item, () => showInPane(item.id, from)),
+              );
+              return;
+            }
+            const set = setOf();
+            context.open(event, set.heading ?? item.diskName, set.groups, set.heading);
+          }}
+          aria-current={shown || undefined}
+          onClick={(event) => {
+            if (event.ctrlKey || event.shiftKey) onCheck(event, item.id);
+            else showInPane(item.id, from);
+          }}
+          // Folded or hidden, the pane has no header to hold the control, so the tile is the way in.
+          onDoubleClick={(event) => {
+            if (event.ctrlKey || event.shiftKey) return;
+            showInPane(item.id, from);
+            setFullScreen(true);
+          }}
+          className={`focus-ring block w-full ${THUMB_FRAME}`}
+          style={{ height }}
         >
-          {fromTrash && (
-            <Glyph name="trash" className="shrink-0 pb-0.5 text-fg-dim text-glyph-small" />
-          )}
-          <span className="truncate text-fg-mid">
-            {fromTrash && "from "}
-            {origin.path.at(-1)}
-            {origin.gone && <span className="text-fg-dim"> · gone</span>}
-          </span>
-        </figcaption>
-      )}
-    </figure>
+          <ThumbFace
+            src={item.thumb ? convertFileSrc(item.thumb) : undefined}
+            current={shown}
+            duration={
+              item.kind === "video" && item.durationMs !== null
+                ? formatDuration(item.durationMs)
+                : undefined
+            }
+            scrub={scrub}
+          />
+        </button>
+        {/* Clicking the picture shows it; the box is the other target. Components › Selection checkbox. */}
+        <SelectBox
+          label={`Check ${item.diskName}`}
+          checked={checked}
+          shown={boxes}
+          onClick={(event) => onCheck(event, item.id)}
+        />
+        {origin && (
+          // The folder's name only; its whole path is the tooltip, and the pane's From row.
+          <figcaption
+            title={origin.path.join(" › ")}
+            className="flex h-tile-caption items-end gap-1 px-0.5 text-small"
+          >
+            {fromTrash && (
+              <Glyph name="trash" className="shrink-0 pb-0.5 text-fg-dim text-glyph-small" />
+            )}
+            <span className="truncate text-fg-mid">
+              {fromTrash && "from "}
+              {origin.path.at(-1)}
+              {origin.gone && <span className="text-fg-dim"> · gone</span>}
+            </span>
+          </figcaption>
+        )}
+      </figure>
+    </>
   );
 }
 

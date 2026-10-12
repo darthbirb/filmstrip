@@ -8,7 +8,7 @@ import { showInPane } from "../pane/pane-store";
 import { setPlace } from "../place";
 import { Grid } from "./Grid";
 
-function video(id: number, frames: boolean): ItemRow {
+function video(id: number, frames: boolean, shape = { width: 1600, height: 900 }): ItemRow {
   return {
     id,
     uuid: `clip-${id}`,
@@ -18,8 +18,7 @@ function video(id: number, frames: boolean): ItemRow {
     kind: "video",
     sizeBytes: 1,
     mtime: 0,
-    width: 1600,
-    height: 900,
+    ...shape,
     durationMs: 72_000,
     favorite: false,
     thumb: `thumbs\\clip-${id}.webp`,
@@ -38,6 +37,8 @@ async function renderGrid(rows: ItemRow[]) {
 }
 
 const strips = () => [...document.querySelectorAll<HTMLImageElement>("[data-scrub-frames]")];
+const part = (name: string) => document.querySelector<HTMLElement>(`[data-scrub-${name}]`);
+const rem = () => Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
 
 /** Puts the pointer `at` the way across a tile, from 0 at its left edge to 1 at its right. */
 async function across(tile: HTMLElement, at: number) {
@@ -126,4 +127,76 @@ test("frames are asked for by the tile under the pointer and no other", async ()
   await across(tile.element() as HTMLElement, 0.2);
   await expect.poll(() => strips().length).toBe(1);
   expect(strips()[0]?.src).toContain("clip-3.frames.webp");
+});
+
+test("a thin line along the tile's foot fills to the pointer, with a tick standing at it", async () => {
+  const screen = await renderGrid([video(1, true)]);
+  const tile = screen.getByRole("button", { name: "clip-1.mp4" });
+  await expect.element(tile).toBeVisible();
+  expect(part("track")).toBeNull();
+
+  await across(tile.element() as HTMLElement, 0.38);
+  await expect.poll(() => part("tick")).not.toBeNull();
+  const box = tile.element().getBoundingClientRect();
+  const track = part("track")?.getBoundingClientRect();
+  const fill = part("fill")?.getBoundingClientRect();
+  const tick = part("tick")?.getBoundingClientRect();
+  expect(track?.bottom).toBeCloseTo(box.bottom, 0);
+  expect(track?.width).toBeCloseTo(box.width, 0);
+  expect(track?.height).toBeGreaterThan(0);
+  expect(track?.height).toBeLessThan(box.height / 20);
+  expect(getComputedStyle(part("track") as HTMLElement).backgroundImage).toBe("none");
+  expect(fill?.width).toBeCloseTo(box.width * 0.38, 0);
+  expect(((tick?.left ?? 0) + (tick?.right ?? 0)) / 2 - box.left).toBeCloseTo(box.width * 0.38, 0);
+  expect(tick?.bottom).toBeCloseTo(box.bottom, 0);
+  expect(tick?.height).toBeGreaterThan(track?.height ?? 0);
+});
+
+test("a video without scrub frames draws a dashed track with nothing filling it", async () => {
+  const screen = await renderGrid([video(1, false)]);
+  const tile = screen.getByRole("button", { name: "clip-1.mp4" });
+  await expect.element(tile).toBeVisible();
+  await across(tile.element() as HTMLElement, 0.6);
+
+  await expect.poll(() => part("track")).not.toBeNull();
+  expect(getComputedStyle(part("track") as HTMLElement).backgroundImage).toContain("gradient");
+  expect(part("fill")).toBeNull();
+  expect(part("tick")).toBeNull();
+});
+
+test("a tile too narrow for No Preview leaves it out and keeps the length", async () => {
+  const screen = await renderGrid([video(1, false, { width: 300, height: 1600 })]);
+  const tile = screen.getByRole("button", { name: "clip-1.mp4" });
+  await expect.element(tile).toBeVisible();
+  expect(tile.element().getBoundingClientRect().width).toBeLessThan(10 * rem());
+  await across(tile.element() as HTMLElement, 0.6);
+
+  await expect.poll(() => part("track")).not.toBeNull();
+  await expect.element(screen.getByText("No Preview")).not.toBeVisible();
+  await expect.element(screen.getByText(/1:12$/)).toBeVisible();
+});
+
+test("moving onto the selection box goes on scrubbing the tile", async () => {
+  const screen = await renderGrid([video(1, true)]);
+  const tile = screen.getByRole("button", { name: "clip-1.mp4" });
+  await expect.element(tile).toBeVisible();
+  await across(tile.element() as HTMLElement, 0.5);
+  await expect.poll(() => strips().length).toBe(1);
+
+  await userEvent.hover(screen.getByRole("checkbox", { name: "Check clip-1.mp4" }));
+  expect(strips()).toHaveLength(1);
+  expect(withoutGlyphs(tile.element().textContent)).not.toBe("1:12");
+});
+
+test("moving onto the tile's menu stops scrubbing it", async () => {
+  const screen = await renderGrid([video(1, true)]);
+  const tile = screen.getByRole("button", { name: "clip-1.mp4" });
+  await expect.element(tile).toBeVisible();
+  await across(tile.element() as HTMLElement, 0.3);
+  await userEvent.click(tile, { button: "right", position: { x: 40, y: 40 } });
+  const row = screen.getByRole("menuitem").first();
+  await expect.element(row).toBeVisible();
+
+  await userEvent.hover(row);
+  await expect.poll(() => strips().length).toBe(0);
 });

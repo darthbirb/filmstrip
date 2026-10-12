@@ -63,6 +63,12 @@ impl Ffmpeg {
 
     /// One frame at `at_secs`, upright, within `edge` on its longest side, as PNG.
     pub fn frame(&self, file: &Path, at_secs: f64, edge: u32) -> Result<Vec<u8>> {
+        self.frame_if_any(file, at_secs, edge)?
+            .ok_or_else(|| AppError::Media(format!("ffmpeg found no frame at {at_secs:.3}s")))
+    }
+
+    /// As `frame`, but a moment past the file's end, where ffmpeg finds no frame, is nothing.
+    pub fn frame_if_any(&self, file: &Path, at_secs: f64, edge: u32) -> Result<Option<Vec<u8>>> {
         let input = input(file);
         let at = format!("{at_secs:.3}");
         let scale = format!("scale={edge}:{edge}:force_original_aspect_ratio=decrease");
@@ -85,10 +91,7 @@ impl Ffmpeg {
             "-",
         ];
         let png = run(&self.ffmpeg, &args, FRAME_LIMIT)?;
-        if png.is_empty() {
-            return Err(AppError::Media(format!("ffmpeg found no frame at {at}s")));
-        }
-        Ok(png)
+        Ok((!png.is_empty()).then_some(png))
     }
 }
 
