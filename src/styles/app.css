@@ -30,6 +30,8 @@
   --motion-swap: 220ms;
   /* A wait, not a motion: how long a dragged ghost rests on a closed row before it opens. */
   --hold: 600ms;
+  /* How long a playing video's plate stays up once the pointer has left the picture. */
+  --linger: 1500ms;
   /* How far a filmstrip frame other than the one shown sits back. */
   --strip-rest: 0.5;
   --focus-width: 2px;
@@ -126,6 +128,9 @@
   /* Dark glass over a picture, for what has to read on any photograph. */
   --color-veil: rgb(10 10 10 / 0.82);
   --color-scrim: rgb(10 10 10 / 0.55);
+  /* A video's track still to play, and the ring its thumb wears while held. */
+  --color-track: rgb(242 242 242 / 0.28);
+  --color-track-ring: rgb(242 242 242 / 0.18);
   /* The selection box before it is checked, over whatever the picture is, and its ring. */
   --color-box: rgb(10 10 10 / 0.5);
   --color-box-line: rgb(242 242 242 / 0.9);
@@ -137,6 +142,8 @@
 
   /* A count riding the corner of a glyph, too small to take the badge corner. */
   --radius-mark-badge: 5px;
+  /* The thumb on a video's track. */
+  --radius-thumb: 3px;
   --radius-badge: 6px;
   --radius-nested: 8px;
   --radius-control: 10px;

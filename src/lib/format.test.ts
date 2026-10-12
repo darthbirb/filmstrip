@@ -6,6 +6,7 @@ import {
   formatDay,
   formatDimensions,
   formatDuration,
+  formatElapsed,
   formatWhen,
 } from "./format";
 
@@ -20,6 +21,19 @@ test("lengths read as a clock does", () => {
   expect(formatDuration(12_000)).toBe("0:12");
   expect(formatDuration(245_000)).toBe("4:05");
   expect(formatDuration(3_723_000)).toBe("1:02:03");
+});
+
+test("how far into a clip is written in the places its length takes", () => {
+  expect(formatElapsed(31_000, 72_000)).toBe("0:31");
+  expect(formatElapsed(31_000, 3_723_000)).toBe("0:00:31");
+  expect(formatElapsed(754_000, 3_723_000)).toBe("0:12:34");
+  expect(formatElapsed(3_661_000, 3_723_000)).toBe("1:01:01");
+  expect(formatElapsed(11_600, 12_000)).toBe("0:11");
+  expect(formatElapsed(72_500, 72_600)).toBe("1:12");
+  expect(formatElapsed(72_600, 72_600)).toBe(formatDuration(72_600));
+  expect(formatElapsed(72_600, 72_600)).toBe("1:13");
+  expect(formatElapsed(3_599_600, 3_599_600)).toBe("1:00:00");
+  expect(formatElapsed(3_000_000, 3_599_600)).toBe("0:50:00");
 });
 
 test("a shape is its width by its height", () => {

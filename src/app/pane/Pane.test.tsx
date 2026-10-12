@@ -166,7 +166,8 @@ test("a video plays in the pane over its poster, and the header says how long it
 
   await expect.element(pane.getByRole("button", { name: /0:12/ })).toBeVisible();
   const video = document.querySelector("aside video") as HTMLVideoElement;
-  expect(video.controls).toBe(true);
+  // Played on a plate of the app's own, never the furniture the window brings with it.
+  expect(video.controls).toBe(false);
   expect(video.poster).toMatch(/^data:image\/svg/);
 });
 
@@ -181,6 +182,7 @@ test("a clip the window cannot play names its format, and nothing else", async (
   const caption = screen.getByText(".mp4");
   await expect.element(caption).toBeVisible();
   expect(caption.element().tagName).toBe("FIGCAPTION");
+  expect(screen.getByRole("toolbar", { name: "Playback" }).elements()).toHaveLength(0);
   expect(getComputedStyle(caption.element()).fontFamily).toMatch(/^"?IBM Plex Mono/);
 });
 

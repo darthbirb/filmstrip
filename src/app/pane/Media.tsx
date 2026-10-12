@@ -5,6 +5,7 @@ import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import { useContextMenu } from "../../ui/Menu";
 import { itemMenu } from "../menus/item-menu";
 import { useZoom, ZoomPlate } from "./useZoom";
+import { Video } from "./VideoPlate";
 import type { Size } from "./zoom";
 
 type Props = {
@@ -31,14 +32,13 @@ export function Media({ item, fill = false }: Props) {
   let body: ReactNode;
   if (item.kind === "video") {
     body = (
-      // biome-ignore lint/a11y/useMediaCaption: the user's own recordings come with no captions to offer
-      <video
+      <Video
         className={PICTURE}
         style={{ aspectRatio: aspect(item) }}
         src={convertFileSrc(item.path)}
         poster={thumb}
-        controls
-        preload="metadata"
+        durationMs={item.durationMs}
+        failed={state === "failed"}
         onError={() => setState("failed")}
       />
     );
