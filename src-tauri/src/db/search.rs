@@ -965,6 +965,18 @@ mod tests {
     #[test]
     fn results_take_the_order_chosen_with_the_trashed_still_first() {
         let l = library();
+        let (lib, small): (i64, i64) = l
+            .conn
+            .query_row(
+                "SELECT source_id, id FROM item WHERE disk_name = 'old_trashed.jpg'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        let big = file(&l.conn, lib, l.bob, "big_trashed.jpg", plain(20 * MB, 2019));
+        items::send_to_trash(&l.conn, big).unwrap();
+        items::set_trashed_at(&l.conn, big, seconds(2025, 3, 1)).unwrap();
+        items::set_trashed_at(&l.conn, small, seconds(2025, 3, 2)).unwrap();
         let by = |key, dir| -> Vec<String> {
             items(
                 &l.conn,
@@ -980,6 +992,7 @@ mod tests {
             by(SortKey::Size, SortDir::Asc),
             [
                 "old_trashed.jpg",
+                "big_trashed.jpg",
                 "old_portrait.jpg",
                 "ana_clip.mp4",
                 "bob_at_beach.jpg",
@@ -989,6 +1002,7 @@ mod tests {
         assert_eq!(
             by(SortKey::Size, SortDir::Desc),
             [
+                "big_trashed.jpg",
                 "old_trashed.jpg",
                 "sunset_at_beach.jpg",
                 "bob_at_beach.jpg",

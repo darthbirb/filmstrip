@@ -246,7 +246,6 @@ impl Sort {
     /// Each item's place in the shuffle the seed draws.
     fn shuffled(&self) -> String {
         let p = SHUFFLE_PRIME;
-        // Each half of the seed enters a round of its own, since 2^32 seeds do not fit in one residue.
         let (low, high) = (self.seed & 0xFFFF, self.seed >> 16);
         let spread = format!("((i.id * 48271 + {low}) % {p})");
         let once = format!("(({spread} * {spread} + {high}) % {p})");

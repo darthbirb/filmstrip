@@ -2,6 +2,7 @@ import { useEffect, useSyncExternalStore } from "react";
 
 import type { Sort } from "../ipc/bindings/Sort";
 import { setUiPreferences, uiPreferences } from "../ipc/commands";
+import { isSortKey } from "../ipc/sort";
 import type { LayoutMode } from "./grid/layout";
 
 // The interface's own preferences, kept in filmstrip.config.json. DECISIONS.md "The interface size".
@@ -111,8 +112,6 @@ function validated(value: unknown): Partial<Preferences> {
   return valid;
 }
 
-const SORT_KEYS: readonly unknown[] = ["taken", "added", "size", "length", "random"];
-
 /** Each kind of place's saved order that reads as one; a malformed one falls back to the first. */
 function sortsOf(value: unknown) {
   if (typeof value !== "object" || value === null) return undefined;
@@ -122,10 +121,10 @@ function sortsOf(value: unknown) {
       string,
       unknown
     >;
-    if (!SORT_KEYS.includes(key) || (dir !== "asc" && dir !== "desc")) continue;
+    if (!isSortKey(key) || (dir !== "asc" && dir !== "desc")) continue;
     if (typeof seed !== "number" || !Number.isInteger(seed) || seed < 0 || seed >= 2 ** 32)
       continue;
-    sorts[place] = { key: key as Sort["key"], dir, seed };
+    sorts[place] = { key, dir, seed };
   }
   return sorts;
 }

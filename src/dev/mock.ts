@@ -34,7 +34,8 @@ import type { Suggestions } from "../ipc/bindings/Suggestions";
 import type { Trashed } from "../ipc/bindings/Trashed";
 import type { TrashSummary } from "../ipc/bindings/TrashSummary";
 import type { UndoReport } from "../ipc/bindings/UndoReport";
-import { type AppError, FIRST_SORT } from "../ipc/commands";
+import type { AppError } from "../ipc/commands";
+import { FIRST_SORT, isSortKey } from "../ipc/sort";
 import { fold } from "../lib/queryTerm";
 
 // A small library for the dev server and component tests, typed by the Rust bindings so it
@@ -192,13 +193,15 @@ const ADDED_AT = 1_750_000_000;
 /** A sort as sent, or the first one where it does not read as one. */
 function readSort(value: unknown): Sort {
   const sort = (value ?? {}) as Partial<Sort>;
-  const keys = ["taken", "added", "size", "length", "random"];
-  return keys.includes(sort.key as string) && (sort.dir === "asc" || sort.dir === "desc")
-    ? { key: sort.key as Sort["key"], dir: sort.dir, seed: Number(sort.seed) || 0 }
+  return isSortKey(sort.key) && (sort.dir === "asc" || sort.dir === "desc")
+    ? { key: sort.key, dir: sort.dir, seed: Number(sort.seed) || 0 }
     : FIRST_SORT;
 }
 
-/** Rows in a sort's order, as the Rust side's `ORDER BY` puts them: a tie by id, the same way. */
+/**
+ * Rows in a sort's order, as the Rust side's `ORDER BY` puts them: a tie by id, the same way.
+ * Random uses a hash of its own, alike only in being fixed for a seed.
+ */
 function sorted<T extends ItemRow>(rows: readonly T[], value: unknown): T[] {
   const { key, dir, seed } = readSort(value);
   if (key === "random") {

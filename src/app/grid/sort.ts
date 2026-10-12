@@ -1,6 +1,6 @@
 import type { Sort } from "../../ipc/bindings/Sort";
 import type { SortKey } from "../../ipc/bindings/SortKey";
-import { FIRST_SORT } from "../../ipc/commands";
+import { FIRST_SORT } from "../../ipc/sort";
 import type { Place } from "../place";
 import {
   getPreferences,

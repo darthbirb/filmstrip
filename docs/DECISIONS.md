@@ -450,8 +450,8 @@ turns the videos over, not the pictures to the front. **A random order is a seed
 `RANDOM()`**, so a walk finishing, a scroll or coming back to the folder never reshuffles it;
 only Shuffle draws a new seed. ggallery added the seed to one multiplication, which made every
 new seed the old order rotated; here the id is spread over a prime and squared twice, each half
-of the seed entering a round of its own, so every seed draws an order of its own. Reverse is
-disabled in place while Random is the key, since a shuffle has no direction.
+of the seed entering a round of its own, so a new seed draws a new order, not the old one
+rotated. Reverse is disabled in place while Random is the key, since a shuffle has no direction.
 
 **Each kind of place keeps its own order**, in the interface's preferences: going from Cairo to
 Trips keeps the folder's, and the Sorting Box can run oldest added first while folders run

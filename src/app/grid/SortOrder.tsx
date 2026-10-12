@@ -1,17 +1,19 @@
 import type { SortKey } from "../../ipc/bindings/SortKey";
+import { SORT_KEYS } from "../../ipc/sort";
 import { Dropdown } from "../../ui/Dropdown";
 import { GlyphButton } from "../../ui/GlyphButton";
 import { usePlace } from "../place";
 import { chooseKey, reverse, shuffle, sortPlace, useSort } from "./sort";
 
 // The five keys and what each reads at first and reversed. DECISIONS.md "Sorting a place".
-const KEYS: readonly { value: SortKey; label: string; first?: string; reversed?: string }[] = [
-  { value: "taken", label: "Date Taken", first: "Newest First", reversed: "Oldest First" },
-  { value: "added", label: "Date Added", first: "Newest First", reversed: "Oldest First" },
-  { value: "size", label: "Size", first: "Largest First", reversed: "Smallest First" },
-  { value: "length", label: "Length", first: "Longest First", reversed: "Shortest First" },
-  { value: "random", label: "Random" },
-];
+const WORDS: Record<SortKey, { label: string; first?: string; reversed?: string }> = {
+  taken: { label: "Date Taken", first: "Newest First", reversed: "Oldest First" },
+  added: { label: "Date Added", first: "Newest First", reversed: "Oldest First" },
+  size: { label: "Size", first: "Largest First", reversed: "Smallest First" },
+  length: { label: "Length", first: "Longest First", reversed: "Shortest First" },
+  random: { label: "Random" },
+};
+const KEYS = SORT_KEYS.map((value) => ({ value, ...WORDS[value] }));
 
 /** The order a place's grid runs in, and the button that turns it over, in the grid's header. */
 export function SortOrder() {

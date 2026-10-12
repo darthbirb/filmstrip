@@ -32,6 +32,7 @@ import type { TagOffer } from "./bindings/TagOffer";
 import type { Trashed } from "./bindings/Trashed";
 import type { TrashSummary } from "./bindings/TrashSummary";
 import type { UndoReport } from "./bindings/UndoReport";
+import { FIRST_SORT } from "./sort";
 
 // One wrapper per Rust command, each typed invoke on one line: a Rust test reads this file.
 // DEVELOPMENT.md "The command boundary".
@@ -43,9 +44,6 @@ export type AppError = {
   /** Why, for a refusal, in terms the interface words itself. */
   reason?: Reason;
 };
-
-/** The order every place starts in, newest taken first, as `Sort::default` is. */
-export const FIRST_SORT: Sort = { key: "taken", dir: "desc", seed: 0 };
 
 export const listSources = () => invoke<SourceSummary[]>("list_sources");
 
