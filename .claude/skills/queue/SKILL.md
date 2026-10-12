@@ -25,12 +25,14 @@ the issues and pull requests; "continue the queue" picks up where it left off.
    A Dependabot major is checked against its release notes and the gates; if it breaks
    something, label it `needs-human` with one comment on what breaks.
 
-   Then an open issue labelled `in-progress`, and none of `blocked` or `needs-human`, that no
-   open pull request, nor one closed unmerged, names with `Closes` or `Refs`: a run stopped
-   before its pull request. A `ready` one goes to step 3, told to continue from its branch if one
-   was pushed. The `design` ones go together to one step 2 design-pass subagent, named for all
-   of them and told the same, so a pass that drew several on one branch resumes as one pull
-   request.
+   Then each open issue labelled `in-progress` and none of `blocked` or `needs-human`, judged by
+   the pull requests that name it with `Closes` or `Refs` and were opened after it was last
+   labelled `in-progress` (its timeline has the time). A merged one means step 6 stopped before
+   its bookkeeping: do it now for that pull request. An open one, or one closed unmerged, leaves
+   the issue as it is. None: a run stopped before its pull request. A `ready` one goes to step
+   3, told to continue from its branch if one was pushed. The `design` ones go together to one
+   step 2 design-pass subagent, named for all of them and told the same, so a pass that drew
+   several on one branch resumes as one pull request.
 2. **Pick.** The open issue labelled `ready` and none of `in-progress`, `blocked` or
    `needs-human`, earliest milestone, lowest number first. None ready but some labelled `design`
    and none of `in-progress`, `blocked` or `needs-human`: start a `general-purpose` subagent:
