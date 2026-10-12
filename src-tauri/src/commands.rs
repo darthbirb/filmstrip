@@ -841,6 +841,24 @@ pub async fn item_tags(state: State<'_, AppState>, item_id: i64) -> Result<Vec<E
     run(&state, move |conn| tags::item_effective_tags(conn, item_id)).await
 }
 
+/// A file takes a tag of its own, never a label; only the index changes, so its drive may be away.
+#[tauri::command]
+pub async fn add_item_tag(state: State<'_, AppState>, item_id: i64, value: String) -> Result<()> {
+    run(&state, move |conn| {
+        in_transaction(conn, |tx| tags::add_item_tag(tx, item_id, &value))
+    })
+    .await
+}
+
+/// Takes one of a file's own tags off; what it inherits stays with the folder that holds it.
+#[tauri::command]
+pub async fn remove_item_tag(state: State<'_, AppState>, item_id: i64, tag_id: i64) -> Result<()> {
+    run(&state, move |conn| {
+        in_transaction(conn, |tx| tags::remove_item_tag(tx, item_id, tag_id))
+    })
+    .await
+}
+
 /// One item in full for the pane, or nothing once it is gone.
 #[tauri::command]
 pub async fn item_detail(state: State<'_, AppState>, item_id: i64) -> Result<Option<ItemDetail>> {
@@ -1543,6 +1561,39 @@ mod tests {
         let [summary] = source_summaries(&conn).unwrap().try_into().unwrap();
         assert!(!summary.reachable);
         assert_eq!(summary.item_count, 1, "what it held is still indexed");
+    }
+
+    #[test]
+    fn a_file_on_an_unplugged_source_still_takes_and_loses_a_tag() {
+        let base = scratch("unplugged-tags");
+        let app = app_dir(&base);
+        let drive = base.join("drive");
+        std::fs::create_dir_all(&drive).unwrap();
+        std::fs::write(drive.join("a.jpg"), "a").unwrap();
+        let conn = conn();
+        register(&conn, &drive, &app).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let [summary] = source_summaries(&conn).unwrap().try_into().unwrap();
+        let [file] = items::in_folder(&conn, summary.root_folder_id)
+            .unwrap()
+            .try_into()
+            .unwrap();
+        std::fs::remove_dir_all(&drive).unwrap();
+        walk::reconcile(&conn).unwrap();
+
+        let own = |conn: &Connection| -> Vec<String> {
+            tags::item_effective_tags(conn, file.id)
+                .unwrap()
+                .into_iter()
+                .filter(|tag| tag.from.is_none())
+                .map(|tag| tag.value)
+                .collect()
+        };
+        in_transaction(&conn, |tx| tags::add_item_tag(tx, file.id, "Dawn")).unwrap();
+        assert_eq!(own(&conn), ["dawn"]);
+        let dawn = tags::get_or_create_tag(&conn, None, "dawn").unwrap();
+        in_transaction(&conn, |tx| tags::remove_item_tag(tx, file.id, dawn)).unwrap();
+        assert_eq!(own(&conn), [] as [String; 0]);
     }
 
     #[test]

@@ -22,9 +22,9 @@ const CAIRO: Place = {
 };
 
 const TAGS: EffectiveTag[] = [
-  { tagId: 1, key: "location", value: "cairo", originId: null, originTitle: null },
-  { tagId: 2, key: null, value: "sphinx", originId: null, originTitle: null },
-  { tagId: 3, key: null, value: "egypt", originId: 4, originTitle: "Trips" },
+  { tagId: 1, key: "location", value: "cairo", from: null, name: false },
+  { tagId: 2, key: null, value: "sphinx", from: null, name: false },
+  { tagId: 3, key: null, value: "egypt", from: { id: 4, title: "Trips" }, name: false },
 ];
 
 async function sphinx() {
@@ -47,11 +47,11 @@ beforeEach(() => {
   setPlace(CAIRO);
 });
 
-test("each label and tag says what a click will search for", async () => {
+test("each label and tag says what a click will search for, and an inherited one whose it is", async () => {
   await details();
   await expect.element(chip("location cairo")).toHaveAttribute("title", "Search location: cairo");
   await expect.element(chip("sphinx")).toHaveAttribute("title", "Search sphinx");
-  await expect.element(chip("egypt")).toHaveAttribute("title", "Search egypt");
+  await expect.element(chip("egypt")).toHaveAttribute("title", "From Trips");
 });
 
 test("a click asks anew from everywhere, with that term alone", async () => {

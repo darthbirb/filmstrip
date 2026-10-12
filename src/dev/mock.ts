@@ -4,6 +4,7 @@ import type { Batch } from "../ipc/bindings/Batch";
 import type { Contents } from "../ipc/bindings/Contents";
 import type { Crumb } from "../ipc/bindings/Crumb";
 import type { DestinationKey } from "../ipc/bindings/DestinationKey";
+import type { EffectiveTag } from "../ipc/bindings/EffectiveTag";
 import type { Fault } from "../ipc/bindings/Fault";
 import type { FavouritePlace } from "../ipc/bindings/FavouritePlace";
 import type { FolderDetail } from "../ipc/bindings/FolderDetail";
@@ -11,7 +12,6 @@ import type { FolderEntry } from "../ipc/bindings/FolderEntry";
 import type { FolderMatch } from "../ipc/bindings/FolderMatch";
 import type { FolderNode } from "../ipc/bindings/FolderNode";
 import type { FolderStatus } from "../ipc/bindings/FolderStatus";
-import type { FolderTag } from "../ipc/bindings/FolderTag";
 import type { Hit } from "../ipc/bindings/Hit";
 import type { ItemDetail } from "../ipc/bindings/ItemDetail";
 import type { ItemRow } from "../ipc/bindings/ItemRow";
@@ -506,7 +506,7 @@ function searchFor(query: string): SearchOutcome {
           const added = above.some((crumb) =>
             ownOf(crumb.id).tags.some((tag) => tag.key === null && tag.value === value),
           );
-          return path.includes(value) || added;
+          return path.includes(value) || added || !!ITEM_TAGS.get(hit.id)?.includes(value);
         }
         if (shape.kind === "label") return false;
         const word = text.toLowerCase();
@@ -668,23 +668,25 @@ function labelOffers(text: (label: { key: string; value: string }) => string, ty
     .map(([offer, folders]) => ({ text: offer, folders }));
 }
 
-/** A folder's band, as `folder_detail` answers: its own tags, then each folder's above it. */
-function folderDetail(folderId: number): FolderDetail | null {
-  const isRoot = SOURCES.some((one) => one.rootFolderId === folderId);
-  if (!isRoot && !parents().has(folderId)) return null;
-  const { folders, home } = crumbs(folderId);
-  if (!home) return null;
-  const levels = folders.map((crumb) => {
-    const from = crumb.id === folderId ? null : crumb;
-    const name = { key: null, value: crumb.title.toLowerCase() };
-    return [name, ...ownOf(crumb.id).tags].map(
-      (tag, at): FolderTag => ({ tagId: tagId(tag.key, tag.value), ...tag, from, name: at === 0 }),
-    );
-  });
-  // A tag carried at two levels shows once, where it is nearest, and so does a label's key.
+/** Each folder's tags from the source's own down to this one, its name first, each saying whose. */
+function heldDown(folderId: number) {
+  return crumbs(folderId).folders.map((crumb) =>
+    [{ key: null, value: crumb.title.toLowerCase() }, ...ownOf(crumb.id).tags].map(
+      (tag, at): EffectiveTag => ({
+        tagId: tagId(tag.key, tag.value),
+        ...tag,
+        from: crumb,
+        name: at === 0,
+      }),
+    ),
+  );
+}
+
+/** Levels nearest first, each tag kept once where it is nearest, and so is a label's key. */
+function nearest(levels: EffectiveTag[][]) {
   const seen = new Set<number>();
   const keys = new Set<string>();
-  const [self = [], ...above] = levels.reverse().map((level) =>
+  return levels.map((level) =>
     level.filter((tag) => {
       if (seen.has(tag.tagId) || (tag.key !== null && keys.has(tag.key))) return false;
       seen.add(tag.tagId);
@@ -692,6 +694,32 @@ function folderDetail(folderId: number): FolderDetail | null {
       return true;
     }),
   );
+}
+
+/** Each file's own tags, in the order they were added. */
+const ITEM_TAGS = new Map<number, string[]>();
+
+/** What a file carries, as `item_tags` answers: its own, then each folder's from the source down. */
+function itemTags(itemId: number): EffectiveTag[] {
+  const row = everyItem().find((item) => item.id === itemId);
+  if (!row) return [];
+  const inherited = nearest(heldDown(row.folderId).reverse()).reverse().flat();
+  const own = (ITEM_TAGS.get(itemId) ?? [])
+    .filter((value) => !inherited.some((tag) => tag.key === null && tag.value === value))
+    .map((value) => ({ tagId: tagId(null, value), key: null, value, from: null, name: false }));
+  return [...own, ...inherited];
+}
+
+/** A folder's band, as `folder_detail` answers: its own tags, then each folder's above it. */
+function folderDetail(folderId: number): FolderDetail | null {
+  const isRoot = SOURCES.some((one) => one.rootFolderId === folderId);
+  if (!isRoot && !parents().has(folderId)) return null;
+  const { folders, home } = crumbs(folderId);
+  if (!home) return null;
+  const levels = heldDown(folderId).map((level) =>
+    level.map((tag) => (tag.from?.id === folderId ? { ...tag, from: null } : tag)),
+  );
+  const [self = [], ...above] = nearest(levels.reverse());
   const own = ownOf(folderId);
   const pictures = coverChoices(folderId);
   const standing = pictures.find((item) => item.id === own.cover) ?? pictures[0];
@@ -903,6 +931,9 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
         carried.set(value, (carried.get(value) ?? 0) + under(id).length);
       }
     }
+    for (const values of ITEM_TAGS.values()) {
+      for (const value of values) carried.set(value, (carried.get(value) ?? 0) + 1);
+    }
     return [...carried]
       .filter(([value]) => value !== "" && value.startsWith(word))
       .sort(([a, one], [b, two]) => two - one || a.localeCompare(b))
@@ -1051,7 +1082,21 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   read_query: ({ text }) => readQuery(text as string),
   search: ({ query }) => searchFor(query as string),
   search_suggestions: ({ scope, text }) => suggestionsFor(scope as string | null, text as string),
-  item_tags: () => [],
+  item_tags: ({ itemId }) => itemTags(itemId as number),
+  add_item_tag: ({ itemId, value }) => {
+    const own = ITEM_TAGS.get(itemId as number) ?? [];
+    const folded = String(value).trim().toLowerCase();
+    if (!own.includes(folded)) ITEM_TAGS.set(itemId as number, [...own, folded]);
+    return null;
+  },
+  remove_item_tag: ({ itemId, tagId: id }) => {
+    const own = ITEM_TAGS.get(itemId as number) ?? [];
+    ITEM_TAGS.set(
+      itemId as number,
+      own.filter((value) => tagId(null, value) !== id),
+    );
+    return null;
+  },
   item_detail: ({ itemId }) => detail(itemId as number),
   item_path: ({ itemId }) => detail(itemId as number)?.path ?? null,
   sorting_items: () => ITEMS[2] ?? [],

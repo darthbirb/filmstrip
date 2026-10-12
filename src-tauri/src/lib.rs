@@ -130,6 +130,8 @@ pub fn run() {
             commands::set_destination_key,
             commands::remove_destination_key,
             commands::item_tags,
+            commands::add_item_tag,
+            commands::remove_item_tag,
             commands::item_detail,
             commands::item_path,
             commands::set_item_favorite,

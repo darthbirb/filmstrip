@@ -42,7 +42,7 @@ export function OfferList({ id, anchor, label, rows, lit, onPick }: Props) {
           positionAnchor: anchor,
           top: "anchor(bottom)",
           left: "anchor(left)",
-          positionTryFallbacks: "flip-block",
+          positionTryFallbacks: "flip-block, flip-inline, flip-block flip-inline",
         } as CSSProperties
       }
       className={`${SURFACE} mt-1.5 w-52`}
