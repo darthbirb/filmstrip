@@ -41,8 +41,9 @@ the issues and pull requests; "continue the queue" picks up where it left off.
    commit." Then **Review** again. Still failing after the third review: label the pull request
    `needs-human`, comment with what remains in dispute, and go on to the next issue.
 6. **Land.** `gh pr merge <n> --squash --auto`, then `gh pr checks <n> --watch --required`. A red
-   check is a fix round like any other (step 5), then Review again. Merged: if the issue is still
-   open, close it naming the pull request, and take `in-progress` off.
+   check is a fix round like any other (step 5), then Review again. Merged: take `in-progress`
+   off, and close only an issue the pull request names with `Closes #n` that is still open. A
+   design pass names its feature with `Refs #n`, so the feature stays open, `ready` to build.
 7. **Log.** Append one line to `.queue/log.md` (git-ignored): the time, the issue, the pull
    request, the outcome (merged, needs-human, stopped), the review rounds, and anything the next
    run should know. Then the next turn.
