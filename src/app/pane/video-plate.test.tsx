@@ -152,6 +152,32 @@ test("the mute silences the clip and comes to full ink while it does", async () 
 
 /** A short clip the browser can play, drawn here rather than kept as a file. */
 async function recordClip() {
+  // Under load the recorder can stop before the encoder has written a frame, leaving a header alone.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const clip = URL.createObjectURL(await record());
+    if (await opens(clip)) {
+      clips.push(clip);
+      return clip;
+    }
+    URL.revokeObjectURL(clip);
+  }
+  throw new Error("the browser recorded no clip it could open");
+}
+
+function opens(clip: string) {
+  const probe = document.createElement("video");
+  return new Promise<boolean>((resolve) => {
+    probe.onloadeddata = () => resolve(true);
+    probe.onerror = () => resolve(false);
+    probe.preload = "auto";
+    probe.src = clip;
+  }).finally(() => {
+    probe.removeAttribute("src");
+    probe.load();
+  });
+}
+
+async function record() {
   const canvas = document.createElement("canvas");
   canvas.width = 160;
   canvas.height = 90;
@@ -174,9 +200,7 @@ async function recordClip() {
   recorder.stop();
   await stopped;
   clearInterval(draw);
-  const clip = URL.createObjectURL(new Blob(chunks, { type: "video/webm" }));
-  clips.push(clip);
-  return clip;
+  return new Blob(chunks, { type: "video/webm" });
 }
 
 function Stage({ src }: { src: string }) {
