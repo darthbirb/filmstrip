@@ -20,3 +20,6 @@ coverage/
 CLAUDE.local.md
 .claude/settings.local.json
 Thumbs.db
+
+# The queue's run log, local to this machine. DEVELOPMENT.md "Running the queue".
+/.queue/

@@ -1,6 +1,6 @@
 ---
 name: deliver
-description: Take one Filmstrip issue from the queue to merged — pick it, port and build it, verify it, open the pull request, get it independently reviewed, and drive it to an automatic merge. Use when asked to work the next issue, a named issue, or to keep working the queue; scripts/agent.ps1 starts every session here.
+description: Build one Filmstrip issue up to an open pull request — pick it, port and build it, verify it, self-review it, and open the pull request; or address the latest review on one. Review and merging are the queue skill's. Use when asked to work the next issue or a named issue, and inside the queue skill's builder subagents.
 ---
 
 # Deliver an issue
@@ -12,8 +12,10 @@ there and in the pull requests: never keep progress only in the conversation.
 
 - `git fetch --prune origin`, then work from `origin/main`. GitHub is reached with the `gh` CLI.
 - ggallery sits at `../ggallery`. It is a reference: never edit, install or run anything in it.
-- Open pull requests come first (`gh pr list --author @me`). If one is red, conflicted or has
-  review findings, finish it before taking new work.
+- `git status` clean before switching branches; work in a dirty checkout is someone else's, so
+  stop and say so.
+- Run on its own, open pull requests come first (`gh pr list --author @me`): one that is red,
+  conflicted or has review findings is finished before new work.
 
 ## 2. Pick the issue
 
@@ -49,28 +51,27 @@ for you, never a substitute for the gates.
 1. Self-review with the `review` skill against `origin/main...HEAD`; fix what it finds.
 2. Push, and open the pull request: the title is the squash commit's subject, the body follows
    `.github/pull_request_template.md` and says `Closes #n`.
-3. Independent review: run the `reviewer` agent with the pull request number. Post its body
-   unchanged: `gh pr review <n> --comment --body-file <file>`. A fail: fix every blocking and
-   should-fix finding, push, and run the reviewer again, until it passes on the head commit.
-   Nits that are plainly right ride along in the next push.
+3. Stop there and return the pull request number and its head commit. The independent review,
+   the fix rounds and the merge are the `queue` skill's, steps 4 to 6; a session working one
+   issue on its own follows them for its pull request.
 
-## 7. Land it
+## 7. Address a review
 
-The Auto-merge workflow arms the pull request as it opens; it merges itself, by squash, once
-Gates, Title and Review are green. Watch it with `gh pr checks <n> --watch --required`: a
-failure is yours to root-cause and fix, never to skip; then review and watch again. The
-session ends when `gh pr view <n> --json state` says MERGED. The issue closes itself; take the
-`in-progress` label off if it is still there.
+Asked to address the latest review on a pull request: check out its branch, fix every blocking
+and should-fix finding and the nits that are plainly right, each fix with the test that fails
+without it; run every gate, push, and return the new head commit. A finding you judge wrong is
+answered in one comment on the pull request with the evidence, not silently skipped. A red
+check is root-caused and fixed the same way, never skipped.
 
 ## When the owner decides
 
-Label the pull request `needs-human`, say in one comment exactly what is being asked, and move
-on to the next issue. Only for: a change that deletes or moves the user's files in a way the
-app did not before, a migration that rewrites existing data, a new visual direction the sheets
-do not settle, or a requirement the PRD contradicts or leaves open. Everything else decides
-itself by the PRD, the sheets and `DECISIONS.md`.
+Label the pull request `needs-human`, say in one comment exactly what is being asked, and
+return; the queue goes on to the next issue. Only for: a change that deletes or moves the user's
+files in a way the app did not before, a migration that rewrites existing data, a new visual
+direction the sheets do not settle, or a requirement the PRD contradicts or leaves open.
+Everything else decides itself by the PRD, the sheets and `DECISIONS.md`.
 
 ## Keeping the queue going
 
-`scripts/agent.ps1` runs one session per issue until the queue is empty. Usage limits pause a
-session, not the work: the next one resumes from the issues and pull requests.
+The `queue` skill runs this skill in a fresh subagent per issue until the queue is empty. Usage
+limits pause a run, not the work: the next one resumes from the issues and pull requests.

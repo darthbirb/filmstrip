@@ -31,9 +31,14 @@ and the sheet the subject lives on.
 
 ## Close the loop
 
-- Mark each drawn entry **DRAWN** in the backlog, and move its issue from `design` to `ready`.
+- Never draw for an issue labelled `blocked`. Label each issue the pass takes `in-progress` as
+  it starts, so no other pass or build picks it up, and take the label off any it leaves undrawn.
+- Mark each drawn entry **DRAWN** in the backlog. Leave the issue's `design` label: it moves to
+  `ready` when the pass merges (the `queue` skill, step 6), never before.
 - One pull request per pass, titled `docs(design): …`, through the usual review; the reviewer
-  holds it to the backlog entries and the token sheet.
+  holds it to the backlog entries and the token sheet. It names a feature it drew with
+  `Refs #n`, never `Closes #n`, so the feature stays open to be built; only an issue that asks
+  for drawing alone is closed by it.
 - A new visual direction, rather than a surface drawn in the existing one, is the owner's call:
   label the pull request `needs-human`.
 - A Claude Design canvas may be used to draw or to show the owner, if one is to hand; what is

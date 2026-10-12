@@ -70,7 +70,7 @@ Rank findings **blocking** (wrong, unsafe, untested, or off the design system), 
 (the owner would ask for it before merging), **nit** (optional). The verdict is **pass** only
 with no blocking and no should-fix findings.
 
-Return the review body in this shape; the last line is read by the Review check:
+Return the review body in this shape; the last line is the verdict the Review status follows:
 
 ```markdown
 **Verdict: pass** — one line on what was checked.
