@@ -26,6 +26,17 @@ version through `npx`:
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | Rust lint |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | Rust tests; also writes `src/ipc/bindings` |
 
+### Where pnpm cannot run
+
+Every script is in `package.json`, and the tools they call are in `node_modules/.bin`, so where
+`npx --yes pnpm@12.4.1` cannot run, npm runs the same scripts from what is already installed:
+`npm run lint`, `check`, `check:docs`, `test`, `test:e2e`, `dev` and `tauri`. Flags for the
+script go after `--`: `npm run dev -- --port 1422 --strictPort`, `npm run tauri -- dev`.
+
+Only `install` needs pnpm, and only when `pnpm-lock.yaml` has changed; never install with npm,
+which ignores the lockfile. CI installs fresh from the lockfile on every pull request, so a
+change that needs a new install is still checked there.
+
 ## Ports
 
 **1420 belongs to `tauri dev`** and is pinned with `strictPort` in `vite.config.ts`, because

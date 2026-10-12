@@ -36,7 +36,8 @@ queue, with the owner stepping in only where a pull request asks. The `queue` sk
 - `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and `cargo test`, each with
   `--manifest-path src-tauri/Cargo.toml` — the Rust gates
 
-CI runs the same gates on Windows. GitHub is reached with the `gh` CLI.
+CI runs the same gates on Windows. GitHub is reached with the `gh` CLI. Where pnpm cannot run,
+`npm run <script>` runs them instead: DEVELOPMENT.md "Where pnpm cannot run".
 
 ## Rules
 
