@@ -84,10 +84,13 @@ pub fn checkpoint(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
-/// Folds a tag or label term. **Folder titles never go through this** — a
-/// title keeps the case it was typed in.
+/// Folds a tag or label term: lowercase, trimmed, one space between its words. **Folder titles
+/// never go through this** — a title keeps the case it was typed in. SCHEMA.md "Tags and labels".
 pub fn fold(text: &str) -> String {
     text.to_lowercase()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 pub fn now() -> i64 {

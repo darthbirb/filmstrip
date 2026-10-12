@@ -90,7 +90,7 @@ drawn. **Not started** — neither.
 | Capability | Filmstrip | Where |
 | --- | --- | --- |
 | An item's effective tags, inherited live | Built | `item_tags`: its own as added, then each folder's from the source down |
-| Add or remove a tag on an item | Built | `add_item_tag`, `remove_item_tag`, Add Tag… in the pane's details, the band's own control; an item owns tags only, never a label, and what it inherits comes off only at its folder |
+| Add or remove a tag on an item | Built | `add_item_tag`, `remove_item_tag`, Add Tag… in the pane's details, the band's own control; an item owns tags only, never a label, and what it inherits comes off only at its folder; a tag may be several words, kept lowercase with one space between them |
 | A folder's inherited tags | Built | `folder_detail`, in path order in the band, each where it is nearest |
 | What a selection's tags cover | Not started | |
 | The vocabulary, with counts; rename and delete a tag | Not started | |

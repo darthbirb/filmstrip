@@ -446,6 +446,11 @@ plain header, having none of these.
   since a label is a fact about a place. What a file inherits is its folder's, and comes off
   there, so it shows sunk with no ×. Its own come first in the order they were added, then each
   folder's from the source down, that folder's name first.
+- **A tag may be several words**, such as `new york`, as the owner decided on 12 October 2026. A
+  place is often named in two, and splitting it would leave `new` and `york`, each true of far
+  more than New York. It is kept folded, lowercase with one space between its words however it
+  was typed, so `New  York` is the tag `new york`; a search folds what it reads the same way, and
+  the chip's `tag:"new york"` finds what carries it.
 - **A label is one fact with two parts**, so Add Label… closes once it is added, where Add Tag…
   stays open. A folder holds one value per key, as ggallery's did: a label answers a question,
   where or which trip, and a folder with two answers answers twice. A key it has is refused where

@@ -40,8 +40,8 @@ recycle bin, or deletion — is not settled yet.
 
 ## Tags and labels
 
-**Tags** are single words and belong to items and folders. **Labels** are a key and a value,
-and belong to folders only.
+**Tags** are lowercase, may be several words such as `new york`, and belong to items and
+folders. **Labels** are a key and a value, and belong to folders only.
 
 An item carries its own tags and inherits tags and labels from every folder above it; a folder
 inherits from its ancestors too. **A value is never shown without its key** — a result matching

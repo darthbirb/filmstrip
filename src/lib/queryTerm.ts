@@ -5,6 +5,12 @@
 const WHITESPACE =
   "\\t\\n\\v\\f\\r \\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000";
 const NEEDS_QUOTES = new RegExp(`[${WHITESPACE}()]`);
+const SPACES = new RegExp(`[${WHITESPACE}]+`);
+
+/** A tag or a label as Rust's `db::fold` keeps it: lowercase, one space between its words. */
+export function fold(text: string) {
+  return text.toLowerCase().split(SPACES).filter(Boolean).join(" ");
+}
 
 /** Quotes what would not read back as one word; every `\` is doubled before any `"` is escaped. */
 export function quoteWord(value: string) {

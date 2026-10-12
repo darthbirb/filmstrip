@@ -739,4 +739,45 @@ mod tests {
             "the file's own is still there once the folder's goes"
         );
     }
+
+    #[test]
+    fn a_tag_of_several_words_is_kept_lowercase_with_one_space_between_them() {
+        let (conn, root) = library();
+        let trips = folders::create(&conn, root, "Trips").unwrap();
+        let sphinx = item(&conn, trips, "sphinx.jpg");
+        add_item_tag(&conn, sphinx, " New  York ").unwrap();
+        add_folder_tag(&conn, trips, "Upper\t East\u{3000}Side").unwrap();
+
+        assert_eq!(
+            carried_line(&conn, sphinx),
+            [
+                "new york",
+                "#library<Library",
+                "#trips<Trips",
+                "upper east side<Trips"
+            ]
+        );
+        assert_eq!(
+            get_or_create_tag(&conn, None, "new york").unwrap(),
+            get_or_create_tag(&conn, None, "NEW   YORK").unwrap(),
+            "one term however it was spaced"
+        );
+    }
+
+    #[test]
+    fn a_tag_of_several_words_reads_back_through_the_term_its_chip_searches() {
+        let (conn, root) = library();
+        let trips = folders::create(&conn, root, "Trips").unwrap();
+        let sphinx = item(&conn, trips, "sphinx.jpg");
+        let other = item(&conn, trips, "york.jpg");
+        add_item_tag(&conn, sphinx, "New  York").unwrap();
+        add_item_tag(&conn, other, "york").unwrap();
+
+        let carried = item_effective_tags(&conn, sphinx).unwrap();
+        let tag = carried.iter().find(|tag| tag.from.is_none()).unwrap();
+        let term = crate::query::tag_term(&tag.value);
+        assert_eq!(term, "tag:\"new york\"");
+        assert_eq!(found_by(&conn, &term), [sphinx]);
+        assert_eq!(found_by(&conn, "tag:\"New  York\""), [sphinx]);
+    }
 }

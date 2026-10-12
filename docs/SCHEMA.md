@@ -51,8 +51,8 @@ migration arrives with the feature that needs it and is never edited once shippe
 
 ## Tags and labels
 
-- Keys and values are stored folded to lowercase. A folder's title keeps its case; the tag
-  derived from it is folded.
+- Keys and values are stored folded (`db::fold`): lowercase, trimmed, and one space between
+  their words. A folder's title keeps its case; the tag derived from it is folded.
 - **A label belongs to a folder only.** Items take tags, and `tags::add_item_tag` has no key
   parameter.
 - **A folder holds one value per key.** `tags::set_folder_label` gives a key the folder already

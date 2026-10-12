@@ -11,10 +11,11 @@ import {
 } from "react";
 
 import { formatCount } from "../lib/format";
+import { fold } from "../lib/queryTerm";
 import { ChipButton } from "./ChipButton";
 import { anchorOf, OfferList, type OfferRow, useOffers } from "./OfferList";
 import { RefusalLine } from "./RefusalLine";
-import { fold, type Refusal } from "./TagField";
+import type { Refusal } from "./TagField";
 
 export type LabelOffer = { text: string; folders: number };
 

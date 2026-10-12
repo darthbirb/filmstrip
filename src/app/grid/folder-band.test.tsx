@@ -297,6 +297,22 @@ test("Add Tag… becomes a field that adds what is typed and stays open for the 
   await untag("felucca");
 });
 
+test("a folder's tag of several words is kept lowercase with one space between them", async () => {
+  const screen = await renderHeader(CAIRO);
+  await details(screen).click();
+  await screen.getByRole("button", { name: "Add Tag…" }).click();
+  await userEvent.keyboard("New  York");
+  await expect.element(screen.getByRole("option", { name: "New tag “new york”" })).toBeVisible();
+  await userEvent.keyboard("{Enter}");
+  await expect
+    .poll(() => chipTexts(row(screen.container, "Tags")))
+    .toEqual(["cairo", "egypt", "new york", "pictures", "trips", "travel"]);
+  expect((await folderDetail(6))?.tags).toContainEqual(
+    expect.objectContaining({ value: "new york", from: null }),
+  );
+  await untag("new york");
+});
+
 test("a tag the folder already carries is refused where it is typed, saying whose it is", async () => {
   const screen = await renderHeader(CAIRO);
   await details(screen).click();
