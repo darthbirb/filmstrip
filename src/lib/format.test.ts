@@ -6,6 +6,7 @@ import {
   formatDay,
   formatDimensions,
   formatDuration,
+  formatElapsed,
   formatWhen,
 } from "./format";
 
@@ -20,6 +21,15 @@ test("lengths read as a clock does", () => {
   expect(formatDuration(12_000)).toBe("0:12");
   expect(formatDuration(245_000)).toBe("4:05");
   expect(formatDuration(3_723_000)).toBe("1:02:03");
+});
+
+test("how far into a clip is written in the places its length takes", () => {
+  expect(formatElapsed(31_000, 72_000)).toBe("0:31");
+  expect(formatElapsed(31_000, 3_723_000)).toBe("0:00:31");
+  expect(formatElapsed(754_000, 3_723_000)).toBe("0:12:34");
+  expect(formatElapsed(3_661_000, 3_723_000)).toBe("1:01:01");
+  // A second is not reached until it has passed, so the end is only read at the end.
+  expect(formatElapsed(11_600, 12_000)).toBe("0:11");
 });
 
 test("a shape is its width by its height", () => {

@@ -79,7 +79,7 @@ drawn. **Not started** — neither.
 | A filmstrip of the place it came from | Built | |
 | Full screen | Built | |
 | Zoom and pan a picture | Built | DECISIONS.md "The pane" |
-| Video playback | Built, on the browser's own controls | a plate of its own is drawn, and volume is not yet kept between items |
+| Video playback | Built, on a plate of its own | DECISIONS.md "The pane"; the mute is not yet kept between items |
 | Frame steps and a named speed set | Backlogged | "The video plate…" |
 | Several items at once, scaled to fit together | Not started | dragging items onto the pane, PRODUCT.md "The three panels" |
 | A folder shown in the pane rather than an item | Not started | its own thing, not a second mode |

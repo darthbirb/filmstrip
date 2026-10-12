@@ -31,6 +31,12 @@ export function formatDuration(ms: number) {
     : `${minutes}:${seconds}`;
 }
 
+/** How far into a clip, in whole seconds gone and as many places as its length needs: 0:31, or 0:00:31 of 1:02:03. */
+export function formatElapsed(ms: number, lengthMs: number) {
+  const clock = formatDuration(Math.floor(ms / 1000) * 1000);
+  return lengthMs >= 3_600_000 && ms < 3_600_000 ? `0:${clock.padStart(5, "0")}` : clock;
+}
+
 export function formatDimensions(width: number, height: number) {
   return `${width} × ${height}`;
 }

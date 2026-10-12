@@ -507,6 +507,18 @@ of them are absent rather than greyed. Nothing purges: emptying the Trash is und
 details say where it came from and when it went, in place of where it is, and the Name row is
 only its name. Restored from the Trash, the pane moves on as it does after a delete.
 
+**A video plays on a plate of the app's own**, drawn by Claude Design and built on 12 October
+2026, in place of the controls the window brings with it: play, the track, the time and the mute
+on the one dark glass, over the picture's foot and as wide as the picture. **Its glyphs are one
+size, the scale's `glyph`**: the drawing had the steps and the mute at two sizes the scale does
+not name, and play is told apart by being the one filled and in white, not by a size of its own.
+**What fits is measured, as in the action bar.** The total leaves first, its slash with it,
+because the header row above already reads the same length; then the mute. The elapsed is on
+screen nowhere else, so it never leaves, nor do play and the track, which holds a least width of
+its own. Paused, the plate stays up; playing, it goes a moment after the pointer leaves the
+picture, and comes back for the keyboard. Frame steps and a set of speeds are drawn and wait for
+a frame rate the probe does not record yet.
+
 **Full screen is a state of the pane, not a place you go**, drawn on 15 September 2026 and built
 the day after. The pane takes the frame below the bar and keeps every part it has; the bar stays,
 because native decorations are off and it is the only way left to close or minimise the window.

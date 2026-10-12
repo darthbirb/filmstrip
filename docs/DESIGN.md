@@ -34,6 +34,8 @@ colors:
   wash: "rgb(255 255 255 / 0.09)"
   veil: "rgb(10 10 10 / 0.82)"
   scrim: "rgb(10 10 10 / 0.55)"
+  track: "rgb(242 242 242 / 0.28)"
+  track-ring: "rgb(242 242 242 / 0.18)"
   box: "rgb(10 10 10 / 0.5)"
   box-line: "rgb(242 242 242 / 0.9)"
   box-line-quiet: "rgb(242 242 242 / 0.55)"
@@ -98,6 +100,7 @@ typography:
     lineHeight: "1"
 rounded:
   mark-badge: 5px
+  thumb: 3px
   badge: 6px
   nested: 8px
   control: 10px
@@ -289,6 +292,21 @@ components:
     height: "{spacing.badge}"
   pane-picture:
     rounded: "{rounded.control}"
+  video-plate:
+    backgroundColor: "{colors.veil}"
+    textColor: "{colors.in-pane}"
+    typography: "{typography.small}"
+    rounded: "{rounded.control}"
+    height: "{spacing.control}"
+  video-plate-glyph:
+    textColor: "{colors.fg-mid}"
+    typography: "{typography.glyph}"
+  video-plate-track:
+    backgroundColor: "{colors.track}"
+    height: "{spacing.progress}"
+  video-plate-thumb:
+    backgroundColor: "{colors.in-pane}"
+    rounded: "{rounded.thumb}"
   pane-disclosure:
     textColor: "{colors.fg-mid}"
     typography: "{typography.ui}"
@@ -453,6 +471,7 @@ thing and is never decoration:** where the keyboard is, and close.
 | `wash` | White at 9%, laid over something already filled when the pointer is on it. |
 | `veil` | Dark glass over a picture, for what must read on any photograph: a video's length, the strip's steps. |
 | `scrim` | Behind the Settings dialog; the window stays legible under it. |
+| `track`, `track-ring` | A video's track still to play, and the ring its thumb wears while it is held. |
 | `box`, `box-line`, `box-line-quiet` | A tile's selection box before it is checked: its glass, its ring under the pointer, and its quieter ring on the other tiles once one is checked. |
 | `danger`, `danger-press`, `on-danger` | The close button under the pointer; a destroying button under the pointer and pressed. |
 | `danger-tint` | A destroying button at rest: its ground, under a `line-danger` ring and `danger` ink. |
@@ -478,7 +497,7 @@ names an action. All three ship inside the app and are never fetched.
 | `small` | 12 on 16 | A count, a chip, a video's length. |
 | `eyebrow` | 11 on 16, semibold, spaced, capitals | A panel's caption, a fact's term, a group of settings, a menu's heading, the in-pane plate. |
 | `wordmark` | 14 on 20, extra bold, tight | The name beside the mark in the bar. |
-| `glyph-small`, `glyph`, `icon` | 12, 15 and 18 | The maximise square, the in-pane eye, a dropdown's caret. Caption glyphs, chevrons, a strip step, a menu option. A control's or a row's glyph. |
+| `glyph-small`, `glyph`, `icon` | 12, 15 and 18 | The maximise square, the in-pane eye, a dropdown's caret. Caption glyphs, chevrons, a strip step, a menu option, every glyph on the video plate. A control's or a row's glyph. |
 | `glyph-large` | 32 | The glyph that stands in an empty pane or an empty place. |
 
 ### Words
@@ -741,6 +760,19 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   tabular figures in `fg`. A video's length on its tile and a zoom's figure in the pane are the same
   plate. A word that marks the picture, *Cover* or *First*, is the same plate in `eyebrow`
   capitals. One that acts takes `hover-wash` under the pointer and the focus ring, never a new ground.
+- **Video plate.** A video's controls, over the picture's foot a `tile-gap` in from its edges and
+  as wide as the picture rather than the pane: `control`-tall at the `control` corner on `veil`,
+  holding play, the track, the time and the mute, `tile-gap` apart. Every glyph on it is `glyph`,
+  play included; play is the one filled and in `in-pane`, and the mute is `fg-mid`, `fg` under the
+  pointer and `in-pane` while muted. The track is a `progress`-tall pill of `track` filling with
+  `in-pane`, at least `1.5rem` wide; under the pointer or the keyboard's focus it thickens and a
+  `thumb`-cornered thumb stands at the position, taller and ringed in `track-ring` while held. Its
+  target is the plate's whole height across the track. The time is `small` tabular figures in
+  `in-pane`, the elapsed then a slash and the total. **As the plate narrows the total leaves
+  first, its slash with it, then the mute**; play, the track and the elapsed never leave. Each
+  goes when what is left would squeeze the track below its least, measured, never at a width
+  written down. Paused, the plate is always up; playing, it is up while the pointer is on the
+  picture, for `--linger` after it leaves, and while the keyboard's focus is in it.
 - **Zoom.** Nothing on the picture at fit. Off fit, a plate a `tile-inset` inside the media area's
   bottom-left states the scale, and is the way back: under the pointer the figure becomes the `fit`
   glyph and **Fit**. The media area clips the picture at its `control` corner at every scale. The

@@ -34,23 +34,3 @@ Consider the old drawing's scrubber: a 16px channel at the grid's edge with a sq
 to jump anywhere; the position is the information. Investigate whether it replaces the
 scrollbar or sits beside it. The pass that drew it recommends building the other ten first, and
 only building this if the largest folders still feel unnavigable afterwards.
-
-## The video plate draws its glyphs at two sizes, and neither is in the scale · DRAWN
-
-The frame steps and the mute are `0.8125rem` in the plate drawn at the pane's own width and
-`0.875rem` in the wide rows beside it — the same two controls, drawn at two sizes. Neither size is
-in the glyph scale, which names `0.75`, `0.9375` and `1.125rem`. The empty states were redrawn at
-named sizes this pass, but glyphs at `0.875rem` still appear about thirty times across the pane and
-artboard sheets, and `0.8125rem` about seven, including in the controls this pass drew.
-
-Pick one size for the plate's glyphs, and either move every glyph onto a size the scale names or
-add the missing sizes to the token sheet and say which surfaces use them.
-
-## The narrow video plate drops the total time, and no rule says it may · DRAWN
-
-The plate at the pane's own width reads `0:03`; every wider plate reads `0:03 / 0:12`. The block
-gives the order things leave — the speed first, then the frame steps, then the mute — and says play,
-the track and the time never leave. Losing half the time is not in that order, so either it is an
-oversight or the time abbreviates and the rule has to say so.
-
-Say what the time does as the plate narrows.

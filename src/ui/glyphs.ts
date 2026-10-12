@@ -56,6 +56,10 @@ export const GLYPHS = {
   folderName: { icon: "folder-simple", code: 0xe25a },
   noCover: { icon: "image-square", code: 0xe2cc },
   pencil: { icon: "pencil-simple", code: 0xe3b4 },
+  play: { icon: "play", code: 0xe3d0 },
+  pause: { icon: "pause", code: 0xe39e },
+  sound: { icon: "speaker-high", code: 0xe44a },
+  muted: { icon: "speaker-slash", code: 0xe45a },
 } as const;
 
 export type GlyphName = keyof typeof GLYPHS;
