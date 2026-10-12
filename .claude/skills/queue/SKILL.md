@@ -25,9 +25,11 @@ the issues and pull requests; "continue the queue" picks up where it left off.
    A Dependabot major is checked against its release notes and the gates; if it breaks
    something, label it `needs-human` with one comment on what breaks.
 2. **Pick.** The open issue labelled `ready` and none of `in-progress`, `blocked` or
-   `needs-human`, earliest milestone, lowest number first. None ready but some labelled `design`:
-   start a `general-purpose` subagent: "Use the design-pass skill, up to and including opening
-   its pull request; return the pull request number and its head commit", then steps 4 to 7.
+   `needs-human`, earliest milestone, lowest number first. None ready but some labelled `design`
+   and none of `in-progress`, `blocked` or `needs-human`: start a `general-purpose` subagent:
+   "Use the design-pass skill on those issues only, never one labelled `blocked`, up to and
+   including opening its pull request; return the pull request number and its head commit".
+   If it labelled the pull request `needs-human`, log it and go on; otherwise steps 4 to 7.
    Neither: stop, and say the queue is empty.
 3. **Build.** Start a `general-purpose` subagent in the foreground: "Use the deliver skill on
    issue #n, up to and including opening its pull request. Return the pull request number, its
@@ -43,7 +45,8 @@ the issues and pull requests; "continue the queue" picks up where it left off.
 6. **Land.** `gh pr merge <n> --squash --auto`, then `gh pr checks <n> --watch --required`. A red
    check is a fix round like any other (step 5), then Review again. Merged: take `in-progress`
    off, and close only an issue the pull request names with `Closes #n` that is still open. A
-   design pass names its feature with `Refs #n`, so the feature stays open, `ready` to build.
+   design pass names the features it drew with `Refs #n`: move each from `design` to `ready`,
+   so it is built only once its drawing has landed.
 7. **Log.** Append one line to `.queue/log.md` (git-ignored): the time, the issue, the pull
    request, the outcome (merged, needs-human, stopped), the review rounds, and anything the next
    run should know. Then the next turn.
