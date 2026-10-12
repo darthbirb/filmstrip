@@ -154,6 +154,10 @@
   --container-badge: 7rem;
   /* A tile narrower than this leaves out what it cannot do, which would crowd its length. */
   --container-note: 10rem;
+  /* A grid header narrower than this keeps the tile size's glyph without its word. */
+  --container-header-roomy: 32rem;
+  /* Narrower than this, the sort's glyph goes without its word too. */
+  --container-header-narrow: 24rem;
   /* A filmstrip frame's shape, whatever the picture's own. */
   --aspect-strip: 4 / 3;
 

@@ -13,7 +13,7 @@ use ts_rs::TS;
 
 use crate::db::details::{self, FolderDetail};
 use crate::db::folders::{self, FolderEntry, FolderNode};
-use crate::db::items::{self, ItemDetail, ItemRow, Scrub};
+use crate::db::items::{self, ItemDetail, ItemRow, Scrub, Sort};
 use crate::db::jobs::{self as job_table, Failure};
 use crate::db::journal;
 use crate::db::keys;
@@ -409,10 +409,17 @@ pub async fn list_folders(state: State<'_, AppState>) -> Result<Vec<FolderEntry>
 }
 
 #[tauri::command]
-pub async fn folder_items(state: State<'_, AppState>, folder_id: i64) -> Result<Vec<ItemRow>> {
+pub async fn folder_items(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    sort: Sort,
+) -> Result<Vec<ItemRow>> {
     let thumbs = state.thumbs.clone();
     run(&state, move |conn| {
-        Ok(with_thumbnails(items::in_folder(conn, folder_id)?, &thumbs))
+        Ok(with_thumbnails(
+            items::in_folder_sorted(conn, folder_id, &sort)?,
+            &thumbs,
+        ))
     })
     .await
 }
@@ -426,7 +433,7 @@ pub async fn folder_branch_files(
     run(&state, move |conn| items::branch_files(conn, folder_id)).await
 }
 
-/// A folder's own ids, or with `deep` its whole branch's, in the order a folder lists them.
+/// A folder's own ids, or with `deep` its whole branch's, by name.
 #[tauri::command]
 pub async fn folder_item_ids(
     state: State<'_, AppState>,
@@ -437,10 +444,10 @@ pub async fn folder_item_ids(
 }
 
 #[tauri::command]
-pub async fn sorting_items(state: State<'_, AppState>) -> Result<Vec<ItemRow>> {
+pub async fn sorting_items(state: State<'_, AppState>, sort: Sort) -> Result<Vec<ItemRow>> {
     let thumbs = state.thumbs.clone();
     run(&state, move |conn| {
-        Ok(with_thumbnails(items::in_sorting(conn)?, &thumbs))
+        Ok(with_thumbnails(items::in_sorting(conn, &sort)?, &thumbs))
     })
     .await
 }
@@ -767,12 +774,24 @@ pub enum SearchOutcome {
 }
 
 #[tauri::command]
-pub async fn search(state: State<'_, AppState>, query: String) -> Result<SearchOutcome> {
+pub async fn search(
+    state: State<'_, AppState>,
+    query: String,
+    sort: Sort,
+) -> Result<SearchOutcome> {
     let thumbs = state.thumbs.clone();
-    run(&state, move |conn| search_with(conn, &query, &thumbs)).await
+    run(&state, move |conn| {
+        search_with(conn, &query, &sort, &thumbs)
+    })
+    .await
 }
 
-pub fn search_with(conn: &Connection, text: &str, thumbs: &Path) -> Result<SearchOutcome> {
+pub fn search_with(
+    conn: &Connection,
+    text: &str,
+    sort: &Sort,
+    thumbs: &Path,
+) -> Result<SearchOutcome> {
     let reading = query::read(text);
     if let Some(fault) = reading.fault {
         return Ok(SearchOutcome::Unparsed { fault });
@@ -781,7 +800,7 @@ pub fn search_with(conn: &Connection, text: &str, thumbs: &Path) -> Result<Searc
     // Results crowd into few folders, so each folder is named once.
     let mut named: HashMap<i64, Origin> = HashMap::new();
     let mut items = Vec::new();
-    for (mut row, trashed_at) in search::items(conn, &expr)? {
+    for (mut row, trashed_at) in search::items(conn, &expr, sort)? {
         let at = match named.get(&row.folder_id) {
             Some(at) => at.clone(),
             None => {
@@ -1331,7 +1350,7 @@ mod tests {
         register(&conn, &library, &app).unwrap();
         walk::reconcile(&conn).unwrap();
 
-        let outcome = search_with(&conn, "cairo", &base.join("thumbs")).unwrap();
+        let outcome = search_with(&conn, "cairo", &Sort::default(), &base.join("thumbs")).unwrap();
         let json = serde_json::to_value(&outcome).unwrap();
         assert_eq!(json["kind"], "found");
         assert_eq!(json["terms"][0]["shape"]["kind"], "text");
@@ -1359,13 +1378,15 @@ mod tests {
             serde_json::json!(["library", "Trips", "Cairo"])
         );
 
-        let by_name = search_with(&conn, "ticket", &base.join("thumbs")).unwrap();
+        let by_name = search_with(&conn, "ticket", &Sort::default(), &base.join("thumbs")).unwrap();
         let SearchOutcome::Found { items, .. } = by_name else {
             panic!("it reads")
         };
         assert_eq!(items[0].row.disk_name, "ticket.png");
 
-        let unread = serde_json::to_value(search_with(&conn, "(", &base).unwrap()).unwrap();
+        let unread =
+            serde_json::to_value(search_with(&conn, "(", &Sort::default(), &base).unwrap())
+                .unwrap();
         assert_eq!(
             unread,
             serde_json::json!({

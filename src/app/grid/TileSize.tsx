@@ -44,6 +44,7 @@ export function TileSize() {
       options={STEPS}
       value={tileStep(tile)}
       onChange={(step) => updatePreferences({ tile: rem(step) })}
+      words="roomy"
     />
   );
 }

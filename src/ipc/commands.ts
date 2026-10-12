@@ -24,6 +24,7 @@ import type { Progress } from "./bindings/Progress";
 import type { Reading } from "./bindings/Reading";
 import type { Reason } from "./bindings/Reason";
 import type { SearchOutcome } from "./bindings/SearchOutcome";
+import type { Sort } from "./bindings/Sort";
 import type { SourceKind } from "./bindings/SourceKind";
 import type { SourceSummary } from "./bindings/SourceSummary";
 import type { Suggestions } from "./bindings/Suggestions";
@@ -31,6 +32,7 @@ import type { TagOffer } from "./bindings/TagOffer";
 import type { Trashed } from "./bindings/Trashed";
 import type { TrashSummary } from "./bindings/TrashSummary";
 import type { UndoReport } from "./bindings/UndoReport";
+import { FIRST_SORT } from "./sort";
 
 // One wrapper per Rust command, each typed invoke on one line: a Rust test reads this file.
 // DEVELOPMENT.md "The command boundary".
@@ -147,7 +149,8 @@ export const setDestinationKey = (key: string, folderId: number) =>
 export const removeDestinationKey = (key: string) =>
   invoke<void>("remove_destination_key", { key });
 
-export const folderItems = (folderId: number) => invoke<ItemRow[]>("folder_items", { folderId });
+export const folderItems = (folderId: number, sort: Sort = FIRST_SORT) =>
+  invoke<ItemRow[]>("folder_items", { folderId, sort });
 
 export const folderItemIds = (folderId: number, deep: boolean) =>
   invoke<number[]>("folder_item_ids", { folderId, deep });
@@ -167,7 +170,8 @@ export const itemDetail = (itemId: number) => invoke<ItemDetail | null>("item_de
 
 export const itemPath = (itemId: number) => invoke<string | null>("item_path", { itemId });
 
-export const sortingItems = () => invoke<ItemRow[]>("sorting_items");
+export const sortingItems = (sort: Sort = FIRST_SORT) =>
+  invoke<ItemRow[]>("sorting_items", { sort });
 
 export const trashListing = () => invoke<Trashed[]>("trash_listing");
 
@@ -175,7 +179,8 @@ export const trashSummary = () => invoke<TrashSummary>("trash_summary");
 
 export const readQuery = (text: string) => invoke<Reading>("read_query", { text });
 
-export const search = (query: string) => invoke<SearchOutcome>("search", { query });
+export const search = (query: string, sort: Sort = FIRST_SORT) =>
+  invoke<SearchOutcome>("search", { query, sort });
 
 export const searchSuggestions = (scope: string | null, text: string) =>
   invoke<Suggestions>("search_suggestions", { scope, text });

@@ -35,18 +35,6 @@ to jump anywhere; the position is the information. Investigate whether it replac
 scrollbar or sits beside it. The pass that drew it recommends building the other ten first, and
 only building this if the largest folders still feel unnavigable afterwards.
 
-## Sorting a place · DRAWN
-
-A place's grid shows its files in one order (#57). It is to be ordered by when each was taken,
-when it was added, its size or its length, either way, or at random until shuffled again.
-
-Drawn on Artboards › Sorting a place: a dropdown naming the key, its glyph the direction, and a
-glyph button that reverses it, both before the tile size in the grid's header of a folder, the
-Sorting Box and a search. The menu lists the five keys; while Random is the key a rule and
-Shuffle follow them, and the reverse button is disabled in place. Drawn at rest, under the
-pointer, reversed, focused, open, at the grid's least and on an empty folder. The Trash keeps
-its days and has no sort.
-
 ## Library counts · DRAWN
 
 The foot counts items and sources, and nothing says how much the library weighs, what kind it

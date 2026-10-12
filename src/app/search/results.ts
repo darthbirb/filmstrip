@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 
 import type { SearchOutcome } from "../../ipc/bindings/SearchOutcome";
+import type { Sort } from "../../ipc/bindings/Sort";
 import { search } from "../../ipc/commands";
 
 /** The last answer each query had: the header counts it, the grid draws its folders. */
@@ -8,8 +9,8 @@ let answers = new Map<string, SearchOutcome>();
 const listeners = new Set<() => void>();
 
 /** Runs a query and keeps its answer; the files it found, for the grid and the pane. */
-export async function runSearch(query: string) {
-  const outcome = await search(query);
+export async function runSearch(query: string, sort?: Sort) {
+  const outcome = await search(query, sort);
   answers = new Map(answers).set(query, outcome);
   for (const listener of listeners) listener();
   return outcome.kind === "found" ? outcome.items : [];

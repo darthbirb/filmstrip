@@ -702,7 +702,17 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Dropdown.** One named choice: a `control`-tall button on `raised` naming what it is on, a
   caret after it, opening a menu of every choice beneath it on `raised` with the overlay shadow.
   The chosen option wears the `plate`. The keyboard opens it with the arrows and Escape puts it
-  away. The tile size is one, with the grid glyph before its step.
+  away. One act among the choices follows them after a `line` rule, its glyph in `fg-dim` and a
+  hint at its end in `key` `fg-dim`, as Clear Cover follows the cover picker's pictures. The tile
+  size is one, with the grid glyph before its step; in a grid header narrower than
+  `--container-header-roomy` it keeps the glyph and drops the word.
+- **Sort order.** In the grid's header of a folder, the Sorting Box and a search, before the tile
+  size: a dropdown naming the key, Date Taken, Date Added, Size, Length or Random, its glyph the
+  direction, `sort-descending`, `sort-ascending` or `shuffle`, and its tooltip saying it in words,
+  "Sort · Date Taken, Newest First". Beside it Reverse, a glyph button holding `arrows-down-up`
+  whose tooltip names what a click gives, "Reverse · Oldest First"; while Random is the key it is
+  disabled in place, and Shuffle, "a new order", follows the keys in the menu. Narrower than
+  `--container-header-narrow` the dropdown keeps its glyph alone too. The Trash has none.
 - **Tile.** The picture cropped to a `control`-cornered cell, over the hatch until its thumbnail
   exists. A `line-strong` ring under the pointer. The tile the pane shows carries an `in-pane`
   ring drawn inside its edge and an *In Pane* plate with an eye, which never wraps and drops its

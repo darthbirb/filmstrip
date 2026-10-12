@@ -83,3 +83,23 @@ test("a size saved under older steps lands on the nearest step there is now", as
   await loadPreferences();
   expect(getPreferences().scale).toBe(2);
 });
+
+test("each kind of place's order comes back, and one that does not read falls back to the first", async () => {
+  stored = {
+    sort: {
+      folder: { key: "size", dir: "asc", seed: 0 },
+      sorting: { key: "random", dir: "desc", seed: 4_000_000_000 },
+      search: { key: "name", dir: "asc", seed: 0 },
+      trash: { key: "size", dir: "asc", seed: 0 },
+    },
+  };
+  await loadPreferences();
+  expect(getPreferences().sort).toEqual({
+    folder: { key: "size", dir: "asc", seed: 0 },
+    sorting: { key: "random", dir: "desc", seed: 4_000_000_000 },
+  });
+
+  stored = { sort: { folder: { key: "taken", dir: "up", seed: 0 }, sorting: { key: "added" } } };
+  await loadPreferences();
+  expect(getPreferences().sort).toEqual({});
+});

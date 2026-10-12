@@ -2,7 +2,7 @@
 //! a description of something on disk.
 
 use rusqlite::{Connection, OptionalExtension, params};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::db::folders::{self, Crumb};
@@ -186,6 +186,85 @@ pub(crate) fn row(r: &rusqlite::Row) -> rusqlite::Result<ItemRow> {
         thumb: None,
         scrub: None,
     })
+}
+
+/// What a place's grid is ordered by. DECISIONS.md "Sorting a place".
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum SortKey {
+    /// When it was taken, or else when it was modified, as `year:` reads it.
+    #[default]
+    Taken,
+    Added,
+    Size,
+    /// A video's running time; whatever has none comes after, either way.
+    Length,
+    /// A shuffle drawn from the seed, which has no direction.
+    Random,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum SortDir {
+    Asc,
+    #[default]
+    Desc,
+}
+
+/// A key, its direction, and the seed a random order is drawn from, so it holds until shuffled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Sort {
+    pub key: SortKey,
+    pub dir: SortDir,
+    pub seed: u32,
+}
+
+/// 2^31 - 1, a prime, so each step of the shuffle's hash stays inside SQLite's 64-bit integers.
+const SHUFFLE_PRIME: i64 = 2_147_483_647;
+
+impl Sort {
+    /// The `ORDER BY` terms for `item` named `i`. Every key ends on the id, so a tie holds still.
+    pub(crate) fn order(&self) -> String {
+        let dir = match self.dir {
+            SortDir::Asc => "ASC",
+            SortDir::Desc => "DESC",
+        };
+        match self.key {
+            SortKey::Taken => format!("COALESCE(i.captured_at, i.mtime) {dir}, i.id {dir}"),
+            SortKey::Added => format!("i.added_at {dir}, i.id {dir}"),
+            SortKey::Size => format!("i.size_bytes {dir}, i.id {dir}"),
+            SortKey::Length => {
+                format!("i.duration_ms IS NULL, i.duration_ms {dir}, i.id {dir}")
+            }
+            SortKey::Random => format!("{}, i.id", self.shuffled()),
+        }
+    }
+
+    /// Each item's place in the shuffle the seed draws.
+    fn shuffled(&self) -> String {
+        let p = SHUFFLE_PRIME;
+        let (low, high) = (self.seed & 0xFFFF, self.seed >> 16);
+        let spread = format!("((i.id * 48271 + {low}) % {p})");
+        let once = format!("(({spread} * {spread} + {high}) % {p})");
+        format!("(({once} * {once} + {}) % {p})", low + high + 1)
+    }
+}
+
+/// The live items directly in a folder, in the order the grid shows them.
+pub fn in_folder_sorted(conn: &Connection, folder_id: i64, sort: &Sort) -> Result<Vec<ItemRow>> {
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {ROW} FROM item i
+          WHERE i.folder_id = ?1 AND i.deleted_at IS NULL
+          ORDER BY {}",
+        sort.order()
+    ))?;
+    let rows = stmt
+        .query_map(params![folder_id], row)?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(rows)
 }
 
 /// The live items directly in a folder, by name whatever the case.
@@ -444,12 +523,13 @@ pub fn finish_sweep(conn: &Connection, source_id: i64) -> Result<usize> {
 }
 
 /// The live items in every sorting source, which the Sorting Box shows as one place.
-pub fn in_sorting(conn: &Connection) -> Result<Vec<ItemRow>> {
+pub fn in_sorting(conn: &Connection, sort: &Sort) -> Result<Vec<ItemRow>> {
     let mut stmt = conn.prepare(&format!(
         "SELECT {ROW} FROM item i
            JOIN source s ON s.id = i.source_id
           WHERE s.kind = 'sorting' AND i.deleted_at IS NULL
-          ORDER BY i.disk_name COLLATE NOCASE"
+          ORDER BY {}",
+        sort.order()
     ))?;
     let rows = stmt.query_map([], row)?.collect::<rusqlite::Result<_>>()?;
     Ok(rows)
@@ -620,6 +700,7 @@ mod tests {
     use super::*;
     use crate::db;
     use crate::db::sources::{self, SourceKind};
+    use std::collections::BTreeSet;
     use std::path::Path;
 
     fn sample(source_id: i64, folder_id: i64, disk_name: &str) -> NewItem {
@@ -855,6 +936,226 @@ mod tests {
         assert_eq!(names, ["A.jpg", "b.jpg"]);
     }
 
+    fn sorted(conn: &Connection, folder_id: i64, key: SortKey, dir: SortDir) -> Vec<String> {
+        in_folder_sorted(conn, folder_id, &Sort { key, dir, seed: 0 })
+            .unwrap()
+            .into_iter()
+            .map(|item| item.disk_name)
+            .collect()
+    }
+
+    /// a and b were taken at the same moment, a and c weigh the same, a and d arrived together.
+    fn four_to_sort(conn: &Connection, root: i64) {
+        let one = |name: &str, kind: &str, taken, mtime, size, length, added: i64| {
+            let item = NewItem {
+                kind: kind.into(),
+                captured_at: taken,
+                mtime,
+                size_bytes: size,
+                duration_ms: length,
+                ..sample(1, root, name)
+            };
+            let id = upsert(conn, &item).unwrap();
+            conn.execute(
+                "UPDATE item SET added_at = ?1 WHERE id = ?2",
+                params![added, id],
+            )
+            .unwrap();
+        };
+        one("a.jpg", "image", Some(300), 10, 50, None, 1000);
+        one("b.mp4", "video", None, 300, 20, Some(5000), 3000);
+        one("c.mp4", "video", Some(100), 999, 50, Some(9000), 2000);
+        one("d.jpg", "image", Some(200), 10, 10, None, 1000);
+        let gone = upsert(conn, &sample(1, root, "gone.jpg")).unwrap();
+        retire(conn, gone).unwrap();
+    }
+
+    #[test]
+    fn each_key_orders_a_folder_either_way_and_a_tie_falls_to_the_id_run_the_same_way() {
+        let (conn, root) = library();
+        four_to_sort(&conn, root);
+
+        for (key, newest_first) in [
+            (SortKey::Taken, ["b.mp4", "a.jpg", "d.jpg", "c.mp4"]),
+            (SortKey::Added, ["b.mp4", "c.mp4", "d.jpg", "a.jpg"]),
+            (SortKey::Size, ["c.mp4", "a.jpg", "b.mp4", "d.jpg"]),
+        ] {
+            assert_eq!(
+                sorted(&conn, root, key, SortDir::Desc),
+                newest_first,
+                "{key:?}"
+            );
+            let mut reversed = newest_first.to_vec();
+            reversed.reverse();
+            assert_eq!(
+                sorted(&conn, root, key, SortDir::Asc),
+                reversed,
+                "{key:?} reversed is the first order read backwards"
+            );
+        }
+    }
+
+    #[test]
+    fn by_length_whatever_has_none_comes_last_either_way() {
+        let (conn, root) = library();
+        four_to_sort(&conn, root);
+
+        assert_eq!(
+            sorted(&conn, root, SortKey::Length, SortDir::Desc),
+            ["c.mp4", "b.mp4", "d.jpg", "a.jpg"]
+        );
+        assert_eq!(
+            sorted(&conn, root, SortKey::Length, SortDir::Asc),
+            ["b.mp4", "c.mp4", "a.jpg", "d.jpg"]
+        );
+    }
+
+    #[test]
+    fn a_random_order_holds_for_its_seed_and_a_new_seed_draws_another() {
+        let (conn, root) = library();
+        let tx = conn.unchecked_transaction().unwrap();
+        for n in 0..300 {
+            upsert(&tx, &sample(1, root, &format!("{n:03}.jpg"))).unwrap();
+        }
+        tx.commit().unwrap();
+        let shuffle = |seed, dir| -> Vec<i64> {
+            in_folder_sorted(
+                &conn,
+                root,
+                &Sort {
+                    key: SortKey::Random,
+                    dir,
+                    seed,
+                },
+            )
+            .unwrap()
+            .into_iter()
+            .map(|item| item.id)
+            .collect()
+        };
+        let first = shuffle(1, SortDir::Desc);
+        let mut ids = first.clone();
+        ids.sort_unstable();
+
+        assert_eq!(first.len(), 300);
+        assert_eq!(
+            shuffle(1, SortDir::Desc),
+            first,
+            "the same seed, the same order"
+        );
+        assert_eq!(
+            shuffle(1, SortDir::Asc),
+            first,
+            "a random order has no direction"
+        );
+        assert_ne!(first, ids, "not the order the files arrived in");
+        let pairs = |order: &[i64]| -> BTreeSet<(i64, i64)> {
+            order.windows(2).map(|pair| (pair[0], pair[1])).collect()
+        };
+        for seed in [2, 3, u32::MAX] {
+            let next = shuffle(seed, SortDir::Desc);
+            assert_ne!(next, first, "seed {seed}");
+            let kept = pairs(&first).intersection(&pairs(&next)).count();
+            assert!(
+                kept < 30,
+                "seed {seed} keeps {kept} of the first order's neighbours, so it is not a new order"
+            );
+        }
+    }
+
+    #[test]
+    fn a_sort_reads_as_the_interface_writes_it() {
+        let sort: Sort =
+            serde_json::from_value(serde_json::json!({ "key": "length", "dir": "asc", "seed": 7 }))
+                .unwrap();
+        assert_eq!(
+            sort,
+            Sort {
+                key: SortKey::Length,
+                dir: SortDir::Asc,
+                seed: 7
+            }
+        );
+        assert_eq!(
+            Sort::default(),
+            Sort {
+                key: SortKey::Taken,
+                dir: SortDir::Desc,
+                seed: 0
+            },
+            "newest taken first, for every kind of place"
+        );
+    }
+
+    #[test]
+    fn forty_thousand_in_one_folder_reorder_by_every_key_well_inside_a_second() {
+        let (conn, root) = library();
+        let tx = conn.unchecked_transaction().unwrap();
+        for n in 0..40_000_i64 {
+            let item = NewItem {
+                captured_at: (n % 3 != 0).then_some(n * 7 % 40_000),
+                size_bytes: n * 31 % 9_973,
+                duration_ms: (n % 5 == 0).then_some(n % 600_000),
+                ..sample(1, root, &format!("IMG_{n:05}.jpg"))
+            };
+            upsert(&tx, &item).unwrap();
+        }
+        tx.commit().unwrap();
+
+        for key in [
+            SortKey::Taken,
+            SortKey::Added,
+            SortKey::Size,
+            SortKey::Length,
+            SortKey::Random,
+        ] {
+            for dir in [SortDir::Desc, SortDir::Asc] {
+                let started = std::time::Instant::now();
+                let rows = in_folder_sorted(&conn, root, &Sort { key, dir, seed: 9 }).unwrap();
+                let took = started.elapsed();
+                assert_eq!(rows.len(), 40_000);
+                assert!(
+                    took < std::time::Duration::from_millis(500),
+                    "{key:?} {dir:?} took {took:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_sorting_box_takes_the_order_chosen() {
+        let (conn, _) = library();
+        for (root, name, size) in [
+            ("D:/incoming", "small.jpg", 5),
+            ("D:/camera", "large.jpg", 900),
+        ] {
+            let source = sources::add(&conn, Path::new(root), root, SourceKind::Sorting).unwrap();
+            let folder = folders::source_root_folder(&conn, source.id).unwrap();
+            let item = NewItem {
+                size_bytes: size,
+                ..sample(source.id, folder, name)
+            };
+            upsert(&conn, &item).unwrap();
+        }
+        let names = |dir| -> Vec<String> {
+            in_sorting(
+                &conn,
+                &Sort {
+                    key: SortKey::Size,
+                    dir,
+                    seed: 0,
+                },
+            )
+            .unwrap()
+            .into_iter()
+            .map(|item| item.disk_name)
+            .collect()
+        };
+
+        assert_eq!(names(SortDir::Desc), ["large.jpg", "small.jpg"]);
+        assert_eq!(names(SortDir::Asc), ["small.jpg", "large.jpg"]);
+    }
+
     #[test]
     fn a_move_recomputes_which_source_the_item_belongs_to() {
         let (conn, library_root) = library();
@@ -891,7 +1192,7 @@ mod tests {
             upsert(&conn, &sample(source.id, folder, name)).unwrap();
         }
 
-        let names: Vec<_> = in_sorting(&conn)
+        let names: Vec<_> = in_sorting(&conn, &Sort::default())
             .unwrap()
             .into_iter()
             .map(|item| item.disk_name)

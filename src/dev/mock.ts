@@ -25,6 +25,7 @@ import type { Reading } from "../ipc/bindings/Reading";
 import type { Reason } from "../ipc/bindings/Reason";
 import type { SearchOutcome } from "../ipc/bindings/SearchOutcome";
 import type { Shape } from "../ipc/bindings/Shape";
+import type { Sort } from "../ipc/bindings/Sort";
 import type { SourceKind } from "../ipc/bindings/SourceKind";
 import type { SourceSummary } from "../ipc/bindings/SourceSummary";
 import type { Stayed } from "../ipc/bindings/Stayed";
@@ -34,6 +35,7 @@ import type { Trashed } from "../ipc/bindings/Trashed";
 import type { TrashSummary } from "../ipc/bindings/TrashSummary";
 import type { UndoReport } from "../ipc/bindings/UndoReport";
 import type { AppError } from "../ipc/commands";
+import { FIRST_SORT, isSortKey } from "../ipc/sort";
 import { fold } from "../lib/queryTerm";
 
 // A small library for the dev server and component tests, typed by the Rust bindings so it
@@ -184,6 +186,43 @@ function branch(folderId: number): ItemRow[] {
   );
 }
 
+/** When a file was taken: a minute apart, the first to arrive the newest. PNGs, as screenshots, carry none. */
+const takenAt = (row: ItemRow) => (row.ext === "png" ? null : 1_718_188_401 - row.id * 60);
+const ADDED_AT = 1_750_000_000;
+
+/** A sort as sent, or the first one where it does not read as one. */
+function readSort(value: unknown): Sort {
+  const sort = (value ?? {}) as Partial<Sort>;
+  return isSortKey(sort.key) && (sort.dir === "asc" || sort.dir === "desc")
+    ? { key: sort.key, dir: sort.dir, seed: Number(sort.seed) || 0 }
+    : FIRST_SORT;
+}
+
+/**
+ * Rows in a sort's order, as the Rust side's `ORDER BY` puts them: a tie by id, the same way.
+ * Random uses a hash of its own, alike only in being fixed for a seed.
+ */
+function sorted<T extends ItemRow>(rows: readonly T[], value: unknown): T[] {
+  const { key, dir, seed } = readSort(value);
+  if (key === "random") {
+    const place = (row: ItemRow) => Math.imul(row.id ^ seed, 0x9e3779b1) >>> 0;
+    return [...rows].sort((a, b) => place(a) - place(b) || a.id - b.id);
+  }
+  const by = (row: ItemRow) =>
+    key === "taken"
+      ? (takenAt(row) ?? row.mtime)
+      : key === "added"
+        ? ADDED_AT
+        : key === "size"
+          ? row.sizeBytes
+          : (row.durationMs ?? 0);
+  const way = dir === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) => {
+    const none = key === "length" ? Number(a.durationMs == null) - Number(b.durationMs == null) : 0;
+    return none || way * (by(a) - by(b)) || way * (a.id - b.id);
+  });
+}
+
 /** From the source's own folder down to this one, and the source it is in. */
 function crumbs(folderId: number) {
   const PARENTS = parents();
@@ -213,9 +252,9 @@ function detail(itemId: number): ItemDetail | null {
     ...row,
     codec: video ? "h264" : null,
     bitrate: video ? 8_000_000 : null,
-    capturedAt: dated ? 1_718_188_401 : null,
+    capturedAt: takenAt(row),
     capturedSrc: dated ? (video ? "container" : "exif") : null,
-    addedAt: 1_750_000_000,
+    addedAt: ADDED_AT,
     trashedAt: gone?.at ?? null,
     sourceId: home.id,
     sourceKind: home.kind,
@@ -525,7 +564,7 @@ function shapeOf(word: string): Shape {
 }
 
 /** Every file and folder each term finds: a word by name or by a folder's title. */
-function searchFor(query: string): SearchOutcome {
+function searchFor(query: string, sort?: unknown): SearchOutcome {
   const { terms, fault } = readQuery(query);
   if (fault) return { kind: "unparsed", fault };
   const lower = (words: string[]) => words.map((word) => word.toLowerCase());
@@ -560,8 +599,7 @@ function searchFor(query: string): SearchOutcome {
         const word = unquote(text).toLowerCase();
         return hit.diskName.toLowerCase().includes(word) || path.includes(word);
       }),
-    )
-    .sort((a, b) => a.diskName.localeCompare(b.diskName));
+    );
   const words = terms.filter((term) => term.shape.kind === "text");
   const found: FolderMatch[] = [...parents()]
     .filter(([id, { title }]) => {
@@ -585,7 +623,7 @@ function searchFor(query: string): SearchOutcome {
       cover: under(id)[0]?.thumb ?? null,
       matched: { kind: "name", value: title },
     }));
-  return { kind: "found", terms, folders: found, items: files };
+  return { kind: "found", terms, folders: found, items: sorted(files, sort) };
 }
 
 // The mock library carries no tags of its own, so the list has these to offer.
@@ -1141,7 +1179,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       allCount: under(id).length,
     })),
   ],
-  folder_items: ({ folderId }) => ITEMS[folderId as number] ?? [],
+  folder_items: ({ folderId, sort }) => sorted(ITEMS[folderId as number] ?? [], sort),
   folder_item_ids: ({ folderId, deep }) =>
     (deep ? branch(folderId as number) : (ITEMS[folderId as number] ?? [])).map((item) => item.id),
   folder_branch_files: ({ folderId }): BranchFile[] =>
@@ -1168,7 +1206,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     return { count: held.length, bytes: held.reduce((sum, item) => sum + item.sizeBytes, 0) };
   },
   read_query: ({ text }) => readQuery(text as string),
-  search: ({ query }) => searchFor(query as string),
+  search: ({ query, sort }) => searchFor(query as string, sort),
   search_suggestions: ({ scope, text }) => suggestionsFor(scope as string | null, text as string),
   item_tags: ({ itemId }) => itemTags(itemId as number),
   add_item_tag: ({ itemId, value }) => {
@@ -1187,7 +1225,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   },
   item_detail: ({ itemId }) => detail(itemId as number),
   item_path: ({ itemId }) => detail(itemId as number)?.path ?? null,
-  sorting_items: () => ITEMS[2] ?? [],
+  sorting_items: ({ sort }) => sorted(ITEMS[2] ?? [], sort),
   // The bar acts on the mock library as it would on a real one, so the dev window shows the state.
   set_item_favorite: ({ itemIds, favorite }) => {
     const wanted = new Set(itemIds as number[]);
