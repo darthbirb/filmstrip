@@ -33,7 +33,7 @@ function rows(count: number, folderId = 1): ItemRow[] {
 let held: Record<number, ItemRow[]> = {};
 
 function serve() {
-  held = { 1: rows(6, 1), 2: rows(3, 2) };
+  held = { 1: rows(6, 1), 2: rows(3, 2), 3: rows(400, 3) };
   mockIPC(
     (cmd, args) =>
       cmd === "folder_items" ? held[(args as { folderId: number }).folderId] : undefined,
@@ -190,6 +190,16 @@ test("Ctrl+A checks the whole place and Escape clears it", async () => {
   expect(getSelection().ids).toEqual([101, 102, 103, 104, 105, 106]);
   await userEvent.keyboard("{Escape}");
   expect(getSelection().ids).toEqual([]);
+});
+
+test("Ctrl+A checks the tiles not yet scrolled into view too", async () => {
+  await renderGrid();
+  inFolder(3);
+  await expect.element(tile(0)).toBeVisible();
+  expect(page.getByRole("button", { name: "item-399.png" }).elements()).toHaveLength(0);
+  (tile(0).element() as HTMLElement).focus();
+  await userEvent.keyboard("{Control>}a{/Control}");
+  expect(getSelection().ids).toEqual(rows(400, 3).map((row) => row.id));
 });
 
 function LeavesFullScreen() {

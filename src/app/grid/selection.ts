@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
+import { folderItemIds, folderItems } from "../../ipc/commands";
+import { whenLibraryChanges } from "../library";
 import { getFullScreen } from "../pane/full-screen";
 import { getPaneItem } from "../pane/pane-store";
-import { getPlace, placeKey, whenPlaceChanges } from "../place";
+import { getPlace, placeFolder, placeKey, whenPlaceChanges } from "../place";
 import { dragging } from "./drag";
 
 /** The files checked, in the order they were checked, and the one a range runs from. */
@@ -53,18 +55,34 @@ export function pruned(selection: Selection, present: ReadonlySet<number>): Sele
 // A selection belongs to the place it was made in and clears when you leave it. A folder renamed
 // or moved under you is the same place. Artboards › Selecting.
 
-// The place's files as the grid last listed them, which the bar reads its count and size from.
-let held: { key: string; selection: Selection; listed: readonly ItemRow[] } = {
+/** A folder's whole branch as it was last read: its own files and every file below them. */
+type Branch = { folderId: number; rows: readonly ItemRow[] };
+
+// The place's files as the grid last listed them, which the bar reads its count and size from, and
+// the folder's branch while it is what was checked.
+let held: {
+  key: string;
+  selection: Selection;
+  listed: readonly ItemRow[];
+  branch: Branch | null;
+} = {
   key: placeKey(getPlace()),
   selection: NOTHING,
   listed: [],
+  branch: null,
 };
 const listeners = new Set<() => void>();
 
-function set(selection: Selection, listed = held.listed) {
-  if (selection === held.selection && listed === held.listed) return;
-  held = { ...held, selection, listed };
+function set(selection: Selection, listed = held.listed, branch = held.branch) {
+  const kept = selection.ids.length === 0 ? null : branch;
+  if (selection === held.selection && listed === held.listed && kept === held.branch) return;
+  held = { ...held, selection, listed, branch: kept };
   for (const listener of listeners) listener();
+}
+
+/** Every file the set can hold: what the grid lists, and the branch below it once that was checked. */
+function known(listed: readonly ItemRow[], branch: Branch | null) {
+  return new Map([...(branch?.rows ?? []), ...listed].map((row) => [row.id, row]));
 }
 
 whenPlaceChanges(() => {
@@ -99,14 +117,29 @@ export function checkRange(
   set(ranged(held.selection, order, id, adds, from));
 }
 
-/** Every file in the place, the ones scrolled out of sight too. */
+/** Every file in the place, the ones scrolled out of sight too; a checked branch stays checked. */
 export function checkAll(order: readonly number[] = held.listed.map((row) => row.id)) {
-  set({ ids: [...order], anchor: held.selection.anchor });
+  const listed = new Set(order);
+  const below = held.branch ? held.selection.ids.filter((id) => !listed.has(id)) : [];
+  set({ ids: [...order, ...below], anchor: held.selection.anchor });
+}
+
+/**
+ * Every file at or below the folder being shown, in its subfolders too, which the grid does not
+ * list and the bar counts. DECISIONS.md "The grid".
+ */
+export async function checkBranch() {
+  const { key } = held;
+  const folder = placeFolder(getPlace());
+  if (!folder) return;
+  const rows = await folderItems(folder.id, true);
+  if (held.key !== key) return;
+  set({ ids: rows.map((row) => row.id), anchor: null }, held.listed, { folderId: folder.id, rows });
 }
 
 /** The checked files as the grid lists them, and the grid's whole list. */
 export function getChecked() {
-  const byId = new Map(held.listed.map((row) => [row.id, row]));
+  const byId = known(held.listed, held.branch);
   return {
     checked: held.selection.ids.flatMap((id) => byId.get(id) ?? []),
     listed: held.listed,
@@ -117,7 +150,7 @@ export function getChecked() {
 export function useChecked(): readonly ItemRow[] {
   const now = useSyncExternalStore(subscribe, () => held);
   return useMemo(() => {
-    const byId = new Map(now.listed.map((row) => [row.id, row]));
+    const byId = known(now.listed, now.branch);
     return now.selection.ids.flatMap((id) => byId.get(id) ?? []);
   }, [now]);
 }
@@ -134,8 +167,41 @@ export function oneFolder(rows: readonly { folderId: number }[]) {
 
 /** What the grid now lists; whatever is checked and no longer in it is dropped. */
 export function keepChecked(listed: readonly ItemRow[]) {
-  set(pruned(held.selection, new Set(listed.map((row) => row.id))), listed);
+  set(pruned(held.selection, new Set(known(listed, held.branch).keys())), listed);
+  readBranchAgain();
 }
+
+let reading: "idle" | "busy" | "again" = "idle";
+
+/** A checked branch's ids read again, so a file that has left it leaves the set as well. */
+function readBranchAgain() {
+  const { key, branch } = held;
+  if (!branch) return;
+  if (reading !== "idle") {
+    reading = "again";
+    return;
+  }
+  reading = "busy";
+  folderItemIds(branch.folderId, true)
+    .then(
+      (ids) => {
+        if (held.key !== key || held.branch !== branch) return;
+        const still = new Set(ids);
+        const rows = branch.rows.filter((row) => still.has(row.id));
+        if (rows.length === branch.rows.length) return;
+        const fresh = { folderId: branch.folderId, rows };
+        set(pruned(held.selection, new Set(known(held.listed, fresh).keys())), held.listed, fresh);
+      },
+      () => undefined,
+    )
+    .finally(() => {
+      const more = reading === "again";
+      reading = "idle";
+      if (more) readBranchAgain();
+    });
+}
+
+whenLibraryChanges(readBranchAgain);
 
 /**
  * Ctrl+A takes the whole place and Escape clears it, from anywhere but a field or Settings. What

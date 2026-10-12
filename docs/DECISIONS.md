@@ -385,6 +385,15 @@ a move or a delete could not carry stays checked**, so the bar counts what the b
 the next act takes exactly them, and after a delete the pane shows the tile after the last one
 gone.
 
+**Select Everything Inside checks a folder's whole branch**, built on 12 October 2026 from a
+folder's menu and a source's. It opens the folder and checks every file at or below it, in the
+place's order; the grid goes on listing the folder's own files, checked, and the bar counts the
+rest with them, so its count is what Move to…, Delete and the others take. Listing the branch in
+the grid instead would be a view no sheet draws. The branch is read again whenever the library
+or the grid's list changes, so a file that leaves it leaves the set; Select All and Ctrl+A add
+the grid's files and keep the branch, and going elsewhere clears it, as it clears any set. A
+drive that is away keeps the row, since checking reads only the index.
+
 **The grid is one tab stop, and the keyboard reaches all of it.** Tab lands on the tile in the
 pane, or the first; the arrows move the ring and nothing else, up and down keeping the column as
 near as the rows allow, and Home, End and the page keys go further. Space is the box, Shift with a
@@ -590,8 +599,9 @@ Shift+F10 did nothing at all.
   between two groups that both hold rows, so an absent verb leaves no stray line, and a menu with
   nothing in it opens nothing.
 - **What a drive that is away cannot do is absent too.** An offline source keeps Rename, Manage
-  Sources and Remove Source, which touch only the index; its folders keep Favourite and Assign
-  Key…, as their band keeps what the index holds, and lose every verb that needs the folder on disk.
+  Sources and Remove Source, which touch only the index; it and its folders keep Favourite, Assign
+  Key… and Select Everything Inside, as their band keeps what the index holds, and lose every verb
+  that needs the folder on disk.
 - **Favourite is on a folder's and a source's menu**, reading Remove Favourite when on, from
   either of the place's rows. It changes nothing on disk, so it is not journalled and a source
   that is away keeps it.
@@ -603,6 +613,8 @@ Shift+F10 did nothing at all.
   taken, for a place you are not standing in: it writes the place as the field's scope, replacing
   any scope it held and keeping its other terms, and leaves the caret in the field without running
   anything. A source that is away has none, as it has no Show in Explorer.
+- **Select Everything Inside follows them**, on a folder's row and a source's, and on an offline
+  one's too, since a set changes nothing until a verb acts on it. See "The grid".
 - **Remove Source goes through the question Settings already asks.** It opens Sources with that
   source's row asking, Cancel focused. Forgetting a source drops the tags and notes on its files;
   a menu row must not do that in one press when the section that owns it asks first.

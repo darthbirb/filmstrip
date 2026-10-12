@@ -220,6 +220,7 @@ test("a folder's row holds every verb a place has; a source's adds the Sources s
     "Favourite",
     "Assign Key…",
     "Search in Source",
+    "Select Everything Inside",
     "Show in Explorer",
     "Rename",
     "Refresh",
@@ -242,6 +243,7 @@ test("a folder's row holds every verb a place has; a source's adds the Sources s
     "Assign Key…",
     "Move to…",
     "Search in Folder",
+    "Select Everything Inside",
     "Show in Explorer",
     "Rename",
     "Refresh",
@@ -292,6 +294,7 @@ test("an offline source and its folders keep what needs no drive", async () => {
       expect(labels(menu)).toEqual([
         "Favourite",
         "Assign Key…",
+        "Select Everything Inside",
         "Rename",
         "Manage Sources",
         "Remove Source",
@@ -301,9 +304,13 @@ test("an offline source and its folders keep what needs no drive", async () => {
       await archive.click();
       await userEvent.keyboard("{ArrowRight}");
       // A folder of an offline source keeps its row, and its count with it.
-      // Favourite and a key are the index's, as the folder's band offers them too.
+      // Favourite, a key and a set are the index's, as the folder's band offers the first two too.
       const folder = screen.getByRole("treeitem", { name: "Old 0 of 0" });
-      expect(labels(await menuOn(screen, folder, "Old"))).toEqual(["Favourite", "Assign Key…"]);
+      expect(labels(await menuOn(screen, folder, "Old"))).toEqual([
+        "Favourite",
+        "Assign Key…",
+        "Select Everything Inside",
+      ]);
     },
     (cmd, args) =>
       cmd === "folder_children" && (args as { folderId: number }).folderId === 3
