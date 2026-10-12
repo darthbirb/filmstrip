@@ -18,6 +18,7 @@ export type Resolver = (rowId: string, carried: readonly CheckedFile[]) => Landi
 
 type Drag = {
   carried: readonly CheckedFile[];
+  pressed: CheckedFile;
   x: number;
   y: number;
   over: { rowId: string; landing: Landing } | null;
@@ -71,8 +72,13 @@ function treeScroller() {
 /**
  * A press on a tile, which becomes a drag once it has moved a tile-gap; less than that is a click.
  * `carry` is what the drag takes when it starts: the set when the tile is checked, else the tile.
+ * The ghost wears the pressed tile's picture, or the first carried file's that has one.
  */
-export function pressTile(event: ReactPointerEvent, carry: () => readonly CheckedFile[]) {
+export function pressTile(
+  event: ReactPointerEvent,
+  pressed: CheckedFile,
+  carry: () => readonly CheckedFile[],
+) {
   if (event.button !== 0 || event.ctrlKey || event.shiftKey || event.altKey) return;
   const start = { x: event.clientX, y: event.clientY };
   const slop = token("--spacing-tile-gap");
@@ -112,7 +118,7 @@ export function pressTile(event: ReactPointerEvent, carry: () => readonly Checke
     at = { x: next.clientX, y: next.clientY };
     if (!drag) {
       if (Math.hypot(at.x - start.x, at.y - start.y) < slop) return;
-      set({ carried: carry(), x: at.x, y: at.y, over: null });
+      set({ carried: carry(), pressed, x: at.x, y: at.y, over: null });
       scroller = treeScroller();
       frame = requestAnimationFrame(scroll);
     }
@@ -170,7 +176,7 @@ export function pressTile(event: ReactPointerEvent, carry: () => readonly Checke
 export function Dragging() {
   const now = useDrag();
   if (!now) return null;
-  const [top] = now.carried;
+  const top = [now.pressed, ...now.carried].find((row) => row.thumb);
   const landing = now.over?.landing;
   const count = files(now.carried.length);
   const label =

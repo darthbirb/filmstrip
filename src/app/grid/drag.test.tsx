@@ -169,3 +169,18 @@ test("held on a closed folder for the hold, the ghost opens it", async () => {
   await expect.element(row("Trips 2 of 5")).toHaveAttribute("aria-expanded", "true");
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 });
+
+test("a branch dragged by a tile it lists wears that tile's picture", async () => {
+  await renderBoth();
+  await row("Pictures 1 of 6").click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Select Everything Inside" }).click();
+  await expect.element(tile("cover.jpg")).toBeVisible();
+  await expect.poll(() => getSelection().ids).toHaveLength(6);
+  const picture = tile("cover.jpg").element().querySelector("img")?.getAttribute("src");
+  expect(picture).toBeTruthy();
+
+  await dragOnto("cover.jpg", "People 0 of 0");
+  expect(ghost()?.textContent).toBe("Move 6 files to People");
+  expect(ghost()?.querySelector("img")?.getAttribute("src")).toBe(picture);
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+});
