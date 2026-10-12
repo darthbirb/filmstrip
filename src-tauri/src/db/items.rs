@@ -212,6 +212,36 @@ pub fn branch_ids(conn: &Connection, folder_id: i64, deep: bool) -> Result<Vec<i
     Ok(ids)
 }
 
+/// A file of a checked branch, as the selection bar counts it and its verbs take it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct BranchFile {
+    pub id: i64,
+    pub folder_id: i64,
+    pub size_bytes: i64,
+    pub favorite: bool,
+}
+
+/// Every live file at or below a folder, in [`in_branch`]'s order, with only what the bar reads.
+pub fn branch_files(conn: &Connection, folder_id: i64) -> Result<Vec<BranchFile>> {
+    let mut stmt = conn.prepare(&branch_query(
+        "i.id, i.folder_id, i.size_bytes, i.favorite",
+        true,
+    ))?;
+    let files = stmt
+        .query_map(params![folder_id], |r| {
+            Ok(BranchFile {
+                id: r.get(0)?,
+                folder_id: r.get(1)?,
+                size_bytes: r.get(2)?,
+                favorite: r.get(3)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(files)
+}
+
 /// By name whatever the case, then by id where two folders of a branch share a name.
 fn branch_query(columns: &str, deep: bool) -> String {
     let (subtree, within) = if deep {
@@ -714,6 +744,21 @@ mod tests {
             .map(|row| row.id)
             .collect();
         assert_eq!(rows, branch_ids(&conn, trips, true).unwrap());
+        let files: Vec<(i64, i64)> = branch_files(&conn, trips)
+            .unwrap()
+            .into_iter()
+            .map(|file| (file.id, file.folder_id))
+            .collect();
+        assert_eq!(
+            files,
+            [
+                (map, trips),
+                (nile, egypt),
+                (pyramid, cairo),
+                (ticket, trips),
+                (ticket_too, cairo)
+            ]
+        );
     }
 
     #[test]
@@ -745,9 +790,8 @@ mod tests {
         assert_eq!(branch_ids(&conn, root, true).unwrap(), [a, b]);
     }
 
-    #[test]
-    fn forty_thousand_ids_come_back_well_inside_a_second() {
-        let (conn, root) = library();
+    /// An eight-level branch of 40,000 files, five side folders at each level; its top folder.
+    fn forty_thousand_deep(conn: &Connection, root: i64) -> i64 {
         let tx = conn.unchecked_transaction().unwrap();
         let mut parent = root;
         let mut at = Vec::new();
@@ -763,13 +807,37 @@ mod tests {
             upsert(&tx, &sample(1, folder, &format!("IMG_{n:05}.jpg"))).unwrap();
         }
         tx.commit().unwrap();
-        let top = folders::child_id(&conn, root, "level 0").unwrap().unwrap();
+        folders::child_id(conn, root, "level 0").unwrap().unwrap()
+    }
+
+    #[test]
+    fn forty_thousand_ids_come_back_well_inside_a_second() {
+        let (conn, root) = library();
+        let top = forty_thousand_deep(&conn, root);
 
         let started = std::time::Instant::now();
         let ids = branch_ids(&conn, top, true).unwrap();
         let took = started.elapsed();
 
         assert_eq!(ids.len(), 40_000);
+        assert!(
+            took < std::time::Duration::from_millis(500),
+            "took {took:?}"
+        );
+    }
+
+    #[test]
+    fn forty_thousand_branch_files_are_read_and_written_out_well_inside_a_second() {
+        let (conn, root) = library();
+        let top = forty_thousand_deep(&conn, root);
+
+        let started = std::time::Instant::now();
+        let files = branch_files(&conn, top).unwrap();
+        let json = serde_json::to_vec(&files).unwrap();
+        let took = started.elapsed();
+
+        assert_eq!(files.len(), 40_000);
+        assert!(json.len() < 4_000_000, "{} bytes", json.len());
         assert!(
             took < std::time::Duration::from_millis(500),
             "took {took:?}"

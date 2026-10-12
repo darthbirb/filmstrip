@@ -1,6 +1,5 @@
 import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from "react";
 
-import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { copyItems } from "../../ipc/commands";
 import { formatBytes, formatCount } from "../../lib/format";
 import { Button } from "../../ui/Button";
@@ -12,7 +11,7 @@ import { deleteFiles } from "../pane/delete";
 import { openMovePicker } from "../pane/move-picker";
 import { restoreFiles } from "../pane/restore";
 import { inTrash } from "./place-items";
-import { checkAll, clearChecked, oneFolder, useChecked } from "./selection";
+import { type CheckedFile, checkAll, clearChecked, oneFolder, useChecked } from "./selection";
 
 /**
  * What acts on the files checked in the grid: a row of the grid's own column, under the pictures
@@ -38,7 +37,7 @@ type Piece = { id: string; node: ReactNode; action?: MenuAction; group?: number 
 
 const files = (count: number) => `${formatCount(count)} ${count === 1 ? "File" : "Files"}`;
 
-function InLibrary({ rows }: { rows: readonly ItemRow[] }) {
+function InLibrary({ rows }: { rows: readonly CheckedFile[] }) {
   const ids = rows.map((row) => row.id);
   const favourite = useEveryFavourite(rows);
   const star = favourite ? "Remove Favourite" : "Favourite";
@@ -114,7 +113,7 @@ function InLibrary({ rows }: { rows: readonly ItemRow[] }) {
 }
 
 /** In the Trash the way back is all a set can do, as its pane's bar has it. */
-function InTrash({ rows }: { rows: readonly ItemRow[] }) {
+function InTrash({ rows }: { rows: readonly CheckedFile[] }) {
   const ids = rows.map((row) => row.id);
   const pieces: Piece[] = [
     {
@@ -146,7 +145,7 @@ function InTrash({ rows }: { rows: readonly ItemRow[] }) {
   return <Bar rows={rows} pieces={pieces} sheds={["size", "selectAll"]} />;
 }
 
-type BarProps = { rows: readonly ItemRow[]; pieces: Piece[]; sheds: string[] };
+type BarProps = { rows: readonly CheckedFile[]; pieces: Piece[]; sheds: string[] };
 
 /**
  * The count and its size, Select All, the set's verbs, and the clear. What has no room leaves for

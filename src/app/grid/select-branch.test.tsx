@@ -5,14 +5,14 @@ import { render } from "vitest-browser-react";
 import { recording } from "../../dev/recording";
 import type { FolderNode } from "../../ipc/bindings/FolderNode";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
-import { folderItems, moveItems, undoLast } from "../../ipc/commands";
+import { folderItemIds, folderItems, moveItems, undoLast } from "../../ipc/commands";
 import { libraryChanged } from "../library";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { Navigation } from "../navigation/Navigation";
 import { getPlace, type Place, setPlace } from "../place";
 import { Grid } from "./Grid";
 import { SelectionBar } from "./SelectionBar";
-import { clearChecked, getSelection } from "./selection";
+import { clearChecked, getChecked, getSelection, oneFolder } from "./selection";
 
 // Against the dev mock: Pictures holds People, empty, and Trips, which holds two files of its own
 // and Cairo's three below it; Archive cannot be reached.
@@ -74,7 +74,7 @@ test("Select Everything Inside opens the folder and checks its whole branch, cou
 
   expect(where()).toBe("Pictures/Trips");
   await expect.element(count("5 Files")).toBeVisible();
-  const branch = (await folderItems(4, true)).map((row) => row.id);
+  const branch = await folderItemIds(4, true);
   expect(branch).toHaveLength(5);
   expect(getSelection().ids).toEqual(branch);
   // The grid still lists Trips' own two, and both are checked; Cairo's three are counted.
@@ -122,6 +122,23 @@ test("a file that leaves the branch leaves the set, and going elsewhere clears i
   expect(getSelection().ids).toEqual([]);
 });
 
+test("a file moved within the branch stays checked, and is counted in its new folder", async () => {
+  const screen = await render(<Harness />);
+  await openPictures(screen);
+  await selectInside(screen, "Trips 2 of 5", "Trips");
+  await expect.element(count("5 Files")).toBeVisible();
+  expect(oneFolder(getChecked().checked)).toBeNull();
+
+  const own = await folderItems(4);
+  await moveItems(
+    own.map((row) => row.id),
+    6,
+  );
+  await libraryChanged();
+  await expect.poll(() => oneFolder(getChecked().checked)).toBe(6);
+  await expect.element(count("5 Files")).toBeVisible();
+});
+
 test("a folder on a drive that is away is checked from what the index holds", async () => {
   const old: FolderNode = {
     id: 99,
@@ -145,11 +162,10 @@ test("a folder on a drive that is away is checked from what the index holds", as
       await expect.element(count("3 Files")).toBeVisible();
     },
     (cmd, args) => {
-      const { folderId, deep } = (args ?? {}) as { folderId?: number; deep?: boolean };
+      const { folderId } = (args ?? {}) as { folderId?: number };
       if (cmd === "folder_children" && folderId === 3) return [old];
-      if (cmd === "folder_items" && folderId === 99) return deep ? kept : [];
-      if (cmd === "folder_item_ids" && folderId === 99)
-        return deep ? kept.map((row) => row.id) : [];
+      if (cmd === "folder_items" && folderId === 99) return [];
+      if (cmd === "folder_branch_files" && folderId === 99) return kept;
       return undefined;
     },
   );

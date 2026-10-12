@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 
+import type { BranchFile } from "../../ipc/bindings/BranchFile";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
-import { folderItemIds, folderItems } from "../../ipc/commands";
+import { folderBranchFiles } from "../../ipc/commands";
 import { whenLibraryChanges } from "../library";
 import { getFullScreen } from "../pane/full-screen";
 import { getPaneItem } from "../pane/pane-store";
@@ -55,8 +56,11 @@ export function pruned(selection: Selection, present: ReadonlySet<number>): Sele
 // A selection belongs to the place it was made in and clears when you leave it. A folder renamed
 // or moved under you is the same place. Artboards › Selecting.
 
+/** A checked file: a row the grid lists, or one of a checked branch's that it does not. */
+export type CheckedFile = BranchFile & { thumb?: string | null; trashedAt?: number | null };
+
 /** A folder's whole branch as it was last read: its own files and every file below them. */
-type Branch = { folderId: number; rows: readonly ItemRow[] };
+type Branch = { folderId: number; rows: readonly BranchFile[] };
 
 // The place's files as the grid last listed them, which the bar reads its count and size from, and
 // the folder's branch while it is what was checked.
@@ -82,7 +86,9 @@ function set(selection: Selection, listed = held.listed, branch = held.branch) {
 
 /** Every file the set can hold: what the grid lists, and the branch below it once that was checked. */
 function known(listed: readonly ItemRow[], branch: Branch | null) {
-  return new Map([...(branch?.rows ?? []), ...listed].map((row) => [row.id, row]));
+  return new Map<number, CheckedFile>(
+    [...(branch?.rows ?? []), ...listed].map((row) => [row.id, row]),
+  );
 }
 
 whenPlaceChanges(() => {
@@ -132,7 +138,7 @@ export async function checkBranch() {
   const { key } = held;
   const folder = placeFolder(getPlace());
   if (!folder) return;
-  const rows = await folderItems(folder.id, true);
+  const rows = await folderBranchFiles(folder.id);
   if (held.key !== key) return;
   set({ ids: rows.map((row) => row.id), anchor: null }, held.listed, { folderId: folder.id, rows });
 }
@@ -147,7 +153,7 @@ export function getChecked() {
 }
 
 /** The checked files as the grid lists them, in the order they were checked. */
-export function useChecked(): readonly ItemRow[] {
+export function useChecked(): readonly CheckedFile[] {
   const now = useSyncExternalStore(subscribe, () => held);
   return useMemo(() => {
     const byId = known(now.listed, now.branch);
@@ -173,7 +179,10 @@ export function keepChecked(listed: readonly ItemRow[]) {
 
 let reading: "idle" | "busy" | "again" = "idle";
 
-/** A checked branch's ids read again, so a file that has left it leaves the set as well. */
+/**
+ * A checked branch read again, so a file that has left it leaves the set as well, and one moved
+ * within it is in its new folder.
+ */
 function readBranchAgain() {
   const { key, branch } = held;
   if (!branch) return;
@@ -182,13 +191,10 @@ function readBranchAgain() {
     return;
   }
   reading = "busy";
-  folderItemIds(branch.folderId, true)
+  folderBranchFiles(branch.folderId)
     .then(
-      (ids) => {
-        if (held.key !== key || held.branch !== branch) return;
-        const still = new Set(ids);
-        const rows = branch.rows.filter((row) => still.has(row.id));
-        if (rows.length === branch.rows.length) return;
+      (rows) => {
+        if (held.key !== key || held.branch !== branch || same(rows, branch.rows)) return;
         const fresh = { folderId: branch.folderId, rows };
         set(pruned(held.selection, new Set(known(held.listed, fresh).keys())), held.listed, fresh);
       },
@@ -199,6 +205,21 @@ function readBranchAgain() {
       reading = "idle";
       if (more) readBranchAgain();
     });
+}
+
+function same(a: readonly BranchFile[], b: readonly BranchFile[]) {
+  return (
+    a.length === b.length &&
+    a.every((one, at) => {
+      const other = b[at];
+      return (
+        other?.id === one.id &&
+        other.folderId === one.folderId &&
+        other.sizeBytes === one.sizeBytes &&
+        other.favorite === one.favorite
+      );
+    })
+  );
 }
 
 whenLibraryChanges(readBranchAgain);

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { DestinationKey } from "../../ipc/bindings/DestinationKey";
-import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import {
   createFolder,
@@ -24,7 +23,7 @@ import {
 } from "../../ui/Menu";
 import { Tree, type TreeRow } from "../../ui/Tree";
 import { type Landing, type Resolver, setDropResolver, useDrag } from "../grid/drag";
-import { checkBranch } from "../grid/selection";
+import { type CheckedFile, checkBranch } from "../grid/selection";
 import { DIGITS } from "../keys";
 import { libraryChanged } from "../library";
 import { openMovePicker } from "../pane/move-picker";
@@ -137,7 +136,7 @@ export function Navigation() {
    * not the files' own folder, not the Trash, not a drive that is away, and the Sorting Box only
    * when it is one folder. Artboards › Dragging onto a folder.
    */
-  const landingFor = (id: string, carried: readonly ItemRow[]): Landing | null => {
+  const landingFor = (id: string, carried: readonly CheckedFile[]): Landing | null => {
     const refuse = (why: string): Landing => ({ kind: "refuse", why });
     const into = (folder: number, title: string, source: SourceSummary): Landing => {
       if (!source.reachable) return refuse(`${source.title} is offline`);

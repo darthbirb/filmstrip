@@ -1,6 +1,7 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import type { Act } from "../ipc/bindings/Act";
 import type { Batch } from "../ipc/bindings/Batch";
+import type { BranchFile } from "../ipc/bindings/BranchFile";
 import type { Contents } from "../ipc/bindings/Contents";
 import type { Crumb } from "../ipc/bindings/Crumb";
 import type { DestinationKey } from "../ipc/bindings/DestinationKey";
@@ -1105,10 +1106,16 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       allCount: under(id).length,
     })),
   ],
-  folder_items: ({ folderId, deep }) =>
-    deep ? branch(folderId as number) : (ITEMS[folderId as number] ?? []),
+  folder_items: ({ folderId }) => ITEMS[folderId as number] ?? [],
   folder_item_ids: ({ folderId, deep }) =>
     (deep ? branch(folderId as number) : (ITEMS[folderId as number] ?? [])).map((item) => item.id),
+  folder_branch_files: ({ folderId }): BranchFile[] =>
+    branch(folderId as number).map(({ id, folderId, sizeBytes, favorite }) => ({
+      id,
+      folderId,
+      sizeBytes,
+      favorite,
+    })),
   trash_listing: (): Trashed[] =>
     (ITEMS[TRASH] ?? [])
       .map((item) => {
