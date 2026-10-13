@@ -1,7 +1,7 @@
 import type { FavouritePlace } from "../../ipc/bindings/FavouritePlace";
 import type { FolderNode } from "../../ipc/bindings/FolderNode";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
-import type { TrashSummary } from "../../ipc/bindings/TrashSummary";
+import type { Tally } from "../../ipc/bindings/Tally";
 import { Button } from "../../ui/Button";
 import { EmptyState } from "../../ui/EmptyState";
 import type { TreeRow } from "../../ui/Tree";
@@ -44,7 +44,7 @@ export function sortingRow(sources: SourceSummary[], onNominate?: () => void): T
 }
 
 /** The Trash, with the number of files waiting in it. */
-export function trashRow(trash: TrashSummary | null = null): TreeRow {
+export function trashRow(trash: Tally | null = null): TreeRow {
   const held = trash?.count ?? 0;
   return {
     id: TRASH_ID,

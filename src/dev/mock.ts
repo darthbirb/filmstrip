@@ -19,6 +19,7 @@ import type { ItemRow } from "../ipc/bindings/ItemRow";
 import type { ItemsMoved } from "../ipc/bindings/ItemsMoved";
 import type { ItemsTrashed } from "../ipc/bindings/ItemsTrashed";
 import type { KeyBelow } from "../ipc/bindings/KeyBelow";
+import type { LibraryTotals } from "../ipc/bindings/LibraryTotals";
 import type { Progress } from "../ipc/bindings/Progress";
 import type { QueryTerm } from "../ipc/bindings/QueryTerm";
 import type { Reading } from "../ipc/bindings/Reading";
@@ -31,8 +32,8 @@ import type { SourceSummary } from "../ipc/bindings/SourceSummary";
 import type { Stayed } from "../ipc/bindings/Stayed";
 import type { Suggestion } from "../ipc/bindings/Suggestion";
 import type { Suggestions } from "../ipc/bindings/Suggestions";
+import type { Tally } from "../ipc/bindings/Tally";
 import type { Trashed } from "../ipc/bindings/Trashed";
-import type { TrashSummary } from "../ipc/bindings/TrashSummary";
 import type { UndoReport } from "../ipc/bindings/UndoReport";
 import type { AppError } from "../ipc/commands";
 import { FIRST_SORT, isSortKey } from "../ipc/sort";
@@ -1201,9 +1202,23 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
         return { ...item, trashedAt: gone?.at ?? 0, from };
       })
       .sort((a, b) => b.trashedAt - a.trashedAt || b.id - a.id),
-  trash_summary: (): TrashSummary => {
-    const held = ITEMS[TRASH] ?? [];
-    return { count: held.length, bytes: held.reduce((sum, item) => sum + item.sizeBytes, 0) };
+  library_totals: (): LibraryTotals => {
+    const tally = (rows: readonly ItemRow[]): Tally => ({
+      count: rows.length,
+      bytes: rows.reduce((sum, item) => sum + item.sizeBytes, 0),
+    });
+    const held = (kind: SourceKind) =>
+      SOURCES.filter((one) => one.kind === kind).flatMap((one) => under(one.rootFolderId));
+    const library = held("library");
+    const of = (kind: string) => library.filter((item) => item.kind === kind);
+    return {
+      pictures: tally(of("image")),
+      videos: tally(of("video")),
+      other: tally(library.filter((item) => item.kind !== "image" && item.kind !== "video")),
+      all: tally(library),
+      sorting: tally(held("sorting")),
+      trash: tally(ITEMS[TRASH] ?? []),
+    };
   },
   read_query: ({ text }) => readQuery(text as string),
   search: ({ query, sort }) => searchFor(query as string, sort),

@@ -56,6 +56,13 @@ export function formatDay(seconds: number, now = new Date()) {
   return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "long", year }).format(day);
 }
 
+/** A day in short, its year only when it is not this one: 3 Oct, or 3 Oct 2025. */
+export function formatShortDay(seconds: number, now = new Date()) {
+  const day = new Date(seconds * 1000);
+  const year = day.getFullYear() === now.getFullYear() ? undefined : "numeric";
+  return new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year }).format(day);
+}
+
 /** A day in short, the year always: 14 Jun 2025. */
 export function formatShortDate(seconds: number) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(

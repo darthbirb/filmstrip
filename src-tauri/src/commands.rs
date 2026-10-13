@@ -26,7 +26,7 @@ use crate::fs::acts::{self, Batch};
 use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
 use crate::fs::items::{self as fs_items, MoveReport};
 use crate::fs::paths;
-use crate::fs::trash::{self, Origin, RestoreReport, TrashReport, TrashSummary, Trashed};
+use crate::fs::trash::{self, Origin, RestoreReport, TrashReport, Trashed};
 use crate::fs::undo::{self, UndoReport};
 use crate::jobs::{self, JobQueue, Progress};
 use crate::media::scrub;
@@ -869,10 +869,10 @@ pub fn suggestions_with(conn: &Connection, scope: Option<&str>, text: &str) -> R
     })
 }
 
-/// How many files the trash holds, and their size.
+/// What the library holds by kind, what waits in the Sorting Box and what the trash holds.
 #[tauri::command]
-pub async fn trash_summary(state: State<'_, AppState>) -> Result<TrashSummary> {
-    run(&state, trash::summary).await
+pub async fn library_totals(state: State<'_, AppState>) -> Result<items::LibraryTotals> {
+    run(&state, items::totals).await
 }
 
 #[tauri::command]

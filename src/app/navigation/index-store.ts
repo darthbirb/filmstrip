@@ -4,29 +4,29 @@ import type { DestinationKey } from "../../ipc/bindings/DestinationKey";
 import type { FavouritePlace } from "../../ipc/bindings/FavouritePlace";
 import type { FolderEntry } from "../../ipc/bindings/FolderEntry";
 import type { FolderNode } from "../../ipc/bindings/FolderNode";
+import type { LibraryTotals } from "../../ipc/bindings/LibraryTotals";
 import type { Progress } from "../../ipc/bindings/Progress";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
-import type { TrashSummary } from "../../ipc/bindings/TrashSummary";
 import {
   destinationKeys,
   favouritePlaces,
   folderChildren,
+  libraryTotals,
   listFolders,
   listSources,
-  trashSummary,
 } from "../../ipc/commands";
 import { getPaneOrigin, movePaneOrigin, showInPane } from "../pane/pane-store";
 import { type Crumb, getPlace, type Place, setPlace } from "../place";
 import { openFolders, setOpenFolders } from "./open-folders";
 
 /**
- * The index as navigation reads it: the sources, each folder's children once asked for, how much
- * the Trash holds, the favourite places, and the destination keys.
+ * The index as navigation reads it: the sources, each folder's children once asked for, the
+ * library's totals, the favourite places, and the destination keys.
  */
 type Snapshot = {
   sources: SourceSummary[] | null;
   children: ReadonlyMap<number, FolderNode[]>;
-  trash: TrashSummary | null;
+  totals: LibraryTotals | null;
   favourites: FavouritePlace[];
   keys: DestinationKey[];
 };
@@ -34,7 +34,7 @@ type Snapshot = {
 const EMPTY: Snapshot = {
   sources: null,
   children: new Map(),
-  trash: null,
+  totals: null,
   favourites: [],
   keys: [],
 };
@@ -44,13 +44,13 @@ const listeners = new Set<() => void>();
 
 /** Reads the sources and their top-level folders, then settles where the window is looking. */
 export async function loadIndex() {
-  const [sources, trash, favourites, keys] = await Promise.all([
+  const [sources, totals, favourites, keys] = await Promise.all([
     listSources(),
-    trashSummary().catch(() => null),
+    libraryTotals().catch(() => null),
     favouritePlaces().catch(() => []),
     destinationKeys().catch(() => []),
   ]);
-  publish({ sources, children: new Map(), trash, favourites, keys });
+  publish({ sources, children: new Map(), totals, favourites, keys });
   ensureChildren(sources.map((source) => source.rootFolderId));
   await settle(sources);
 }
@@ -112,10 +112,10 @@ export function useIndex() {
  */
 export async function refreshIndex() {
   const known = [...snapshot.children.keys()];
-  const [sources, lists, trash, favourites, keys] = await Promise.all([
+  const [sources, lists, totals, favourites, keys] = await Promise.all([
     listSources(),
     Promise.all(known.map((id) => folderChildren(id).catch(() => null))),
-    trashSummary().catch(() => null),
+    libraryTotals().catch(() => null),
     favouritePlaces().catch(() => []),
     destinationKeys().catch(() => []),
   ]);
@@ -124,7 +124,7 @@ export async function refreshIndex() {
     const list = lists[at];
     if (list) children.set(id, list);
   });
-  publish({ sources, children, trash, favourites, keys });
+  publish({ sources, children, totals, favourites, keys });
   await settle(sources);
 }
 

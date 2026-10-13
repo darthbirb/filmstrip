@@ -68,7 +68,7 @@ drawn. **Not started** — neither.
 | Rename a file, on disk | Built | `rename_item`, the pane's Name row; not in ggallery; a name already taken is refused |
 | Paste files in, and take an OS drop | Not started | |
 | Copy an item's path | Built | `copy_item_paths`, Copy Path in a file's menu, a set's and the pane's ⋯; one path to a line |
-| Counts: unsorted, trashed, totals, arrival duplicates | Partly | the foot counts items and sources, the Trash its files and their size |
+| Counts: unsorted, trashed, totals, arrival duplicates | Partly | `library_totals`, one query: the foot says what the library holds and weighs, and opens its totals by kind with the Sorting Box, the Trash and the sources, any offline named; arrival duplicates wait for duplicate detection |
 
 ## The pane
 
@@ -110,7 +110,7 @@ drawn. **Not started** — neither.
 | Select in a grid, and act on the selection | Built | a box on each tile, Ctrl and Shift with a click, the keyboard; a bar at the grid's foot with Favourite, Move to…, Copy and Delete, or Restore in the Trash |
 | Move a selection somewhere | Built | the bar's Move to…, or dragged onto a row in navigation; one batch undone as one |
 | Destination hotkeys | Built | `destination_keys`, `set_destination_key`, `remove_destination_key`; the digits 1 to 0, bound from a folder's menu or Settings, shown on its row, a press moving the set or the pane's file |
-| The trash as a place, with its own limits | Partly | `trash_listing`, `trash_summary`: newest first under a heading per day, each tile saying where it came from, counted on its row and header; there are no limits yet |
+| The trash as a place, with its own limits | Partly | `trash_listing`, `library_totals`: newest first under a heading per day, each tile saying where it came from, counted on its row and header; there are no limits yet |
 | Restore from the trash, or restore to another folder | Built | `restore_items`, journalled; Restore and Restore to… on a trashed file's bar and menu, refused into the banner |
 | Purge the trash, the one irreversible act | Not started | |
 

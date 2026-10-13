@@ -34,15 +34,3 @@ Consider the old drawing's scrubber: a 16px channel at the grid's edge with a sq
 to jump anywhere; the position is the information. Investigate whether it replaces the
 scrollbar or sits beside it. The pass that drew it recommends building the other ten first, and
 only building this if the largest folders still feel unnavigable afterwards.
-
-## Library counts · DRAWN
-
-The foot counts items and sources, and nothing says how much the library weighs, what kind it
-is, or what waits and what is thrown away (#59).
-
-Drawn on Artboards › Library counts: the foot's baseline becomes the items and their size, and
-a click on it opens the totals above it in the menu's shape, a row each for pictures, videos,
-in all, the Sorting Box and the Trash, then the sources, with any that is away named and
-counted from the index. Drawn at rest, under the pointer, focused, open, folded, with a source
-away, while a walk runs, with one item, empty and at the panel's least; the Sorting Box's
-header names a sorting source that is away.

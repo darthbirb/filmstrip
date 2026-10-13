@@ -548,13 +548,63 @@ pub fn in_trash(conn: &Connection) -> Result<Vec<(ItemRow, i64)>> {
     Ok(rows)
 }
 
-/// How many items the trash holds, and their bytes together.
-pub fn trash_totals(conn: &Connection) -> Result<(u32, i64)> {
-    Ok(conn.query_row(
-        "SELECT COUNT(*), COALESCE(SUM(size_bytes), 0) FROM item WHERE trashed_at IS NOT NULL",
-        [],
-        |r| Ok((r.get(0)?, r.get(1)?)),
-    )?)
+/// How many files, and their bytes together.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, TS)]
+#[ts(export)]
+pub struct Tally {
+    pub count: i64,
+    pub bytes: i64,
+}
+
+impl Tally {
+    fn add(&mut self, count: i64, bytes: i64) {
+        self.count += count;
+        self.bytes += bytes;
+    }
+}
+
+/// What the library sources hold by kind and in all, what waits in the Sorting Box and what the
+/// trash holds, read off the index, a source that is away included. DECISIONS.md "Navigation".
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, TS)]
+#[ts(export)]
+pub struct LibraryTotals {
+    pub pictures: Tally,
+    pub videos: Tally,
+    /// Files the walk keeps that are neither.
+    pub other: Tally,
+    pub all: Tally,
+    pub sorting: Tally,
+    pub trash: Tally,
+}
+
+pub fn totals(conn: &Connection) -> Result<LibraryTotals> {
+    let mut stmt = conn.prepare(
+        "SELECT i.trashed_at IS NOT NULL, s.kind, i.kind, COUNT(*), COALESCE(SUM(i.size_bytes), 0)
+           FROM item i
+           JOIN source s ON s.id = i.source_id
+          WHERE i.deleted_at IS NULL OR i.trashed_at IS NOT NULL
+          GROUP BY 1, 2, 3",
+    )?;
+    let mut totals = LibraryTotals::default();
+    let mut rows = stmt.query([])?;
+    while let Some(r) = rows.next()? {
+        let (trashed, source, kind): (bool, String, String) = (r.get(0)?, r.get(1)?, r.get(2)?);
+        let (count, bytes) = (r.get(3)?, r.get(4)?);
+        let tally = if trashed {
+            &mut totals.trash
+        } else if SourceKind::parse(&source) == SourceKind::Sorting {
+            &mut totals.sorting
+        } else {
+            totals.all.add(count, bytes);
+            match kind.as_str() {
+                "image" => &mut totals.pictures,
+                "video" => &mut totals.videos,
+                _ => &mut totals.other,
+            }
+        };
+        tally.add(count, bytes);
+    }
+    Ok(totals)
 }
 
 /// One item in full, as the pane shows it.
@@ -1291,5 +1341,91 @@ mod tests {
             [picture],
             "a refreshed row forgets it was read"
         );
+    }
+
+    #[test]
+    fn the_totals_count_the_library_by_kind_apart_from_what_waits_and_what_is_thrown_away() {
+        let (conn, root) = library();
+        let sorting = sources::add(
+            &conn,
+            Path::new("D:/incoming"),
+            "Incoming",
+            SourceKind::Sorting,
+        )
+        .unwrap();
+        let waiting = folders::source_root_folder(&conn, sorting.id).unwrap();
+        let one = |source: i64, folder: i64, name: &str, kind: &str, size: i64| {
+            let item = NewItem {
+                kind: kind.into(),
+                size_bytes: size,
+                ..sample(source, folder, name)
+            };
+            upsert(&conn, &item).unwrap()
+        };
+        one(1, root, "a.jpg", "image", 10);
+        one(1, root, "b.jpg", "image", 20);
+        one(1, root, "c.mp4", "video", 300);
+        one(1, root, "notes.txt", "other", 4);
+        let thrown = one(1, root, "d.jpg", "image", 50);
+        send_to_trash(&conn, thrown).unwrap();
+        let gone = one(1, root, "e.jpg", "image", 70);
+        retire(&conn, gone).unwrap();
+        one(sorting.id, waiting, "f.jpg", "image", 5);
+        let tossed = one(sorting.id, waiting, "g.mp4", "video", 6);
+        send_to_trash(&conn, tossed).unwrap();
+
+        assert_eq!(
+            totals(&conn).unwrap(),
+            LibraryTotals {
+                pictures: Tally {
+                    count: 2,
+                    bytes: 30
+                },
+                videos: Tally {
+                    count: 1,
+                    bytes: 300
+                },
+                other: Tally { count: 1, bytes: 4 },
+                all: Tally {
+                    count: 4,
+                    bytes: 334
+                },
+                sorting: Tally { count: 1, bytes: 5 },
+                trash: Tally {
+                    count: 2,
+                    bytes: 56
+                },
+            },
+            "a retired file is counted nowhere"
+        );
+    }
+
+    #[test]
+    fn an_empty_library_totals_nothing() {
+        let (conn, _) = library();
+        assert_eq!(totals(&conn).unwrap(), LibraryTotals::default());
+    }
+
+    #[test]
+    fn the_totals_of_a_hundred_thousand_files_come_back_in_one_quick_read() {
+        let (conn, root) = library();
+        conn.execute(
+            "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 100000)
+             INSERT INTO item (uuid, source_id, folder_id, disk_name, ext, size_bytes, mtime, kind,
+                               added_at)
+             SELECT 'u' || i, 1, ?1, i || '.jpg', 'jpg', 1000, 1,
+                    CASE WHEN i % 10 = 0 THEN 'video' ELSE 'image' END, 1
+               FROM n",
+            params![root],
+        )
+        .unwrap();
+
+        let started = std::time::Instant::now();
+        let read = totals(&conn).unwrap();
+        let took = started.elapsed();
+        assert_eq!(read.pictures.count, 90_000);
+        assert_eq!(read.videos.count, 10_000);
+        assert_eq!(read.all.bytes, 100_000_000);
+        assert!(took.as_millis() < 1000, "took {took:?}");
     }
 }

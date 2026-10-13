@@ -17,12 +17,17 @@ export function Breadcrumb() {
   return <PlainHeader place={place} />;
 }
 
-/** The Sorting Box says what waits in it, the Trash what it holds and its size. */
+/**
+ * The Sorting Box says what waits in it, and names a sorting source that is away; the Trash says
+ * what it holds and its size.
+ */
 function PlainHeader({ place }: { place: Place & { kind: "sorting" | "trash" } }) {
-  const { sources, trash } = useIndex();
-  const waiting = (sources ?? [])
-    .filter((source) => source.kind === "sorting")
-    .reduce((sum, source) => sum + source.itemCount, 0);
+  const { sources, totals } = useIndex();
+  const sorting = (sources ?? []).filter((source) => source.kind === "sorting");
+  const waiting = sorting.reduce((sum, source) => sum + source.itemCount, 0);
+  const trash = totals?.trash;
+  const away = sorting.filter((source) => !source.reachable).map((source) => source.title);
+  const offline = place.kind === "sorting" && away.length > 0 && `${away.join(", ")} offline`;
   const count =
     place.kind === "trash"
       ? trash && trash.count > 0 && `${formatCount(trash.count)} · ${formatBytes(trash.bytes)}`
@@ -32,9 +37,11 @@ function PlainHeader({ place }: { place: Place & { kind: "sorting" | "trash" } }
       <span aria-current="location" className="truncate text-fg-hi text-title">
         {place.kind === "trash" ? "Trash" : "Sorting Box"}
       </span>
-      {count && (
+      {(count || offline) && (
         <span className="shrink-0 whitespace-nowrap text-fg-dim text-small tabular-nums">
           {count}
+          {count && offline && " · "}
+          {offline && <span className="font-mono text-key">{offline}</span>}
         </span>
       )}
     </nav>

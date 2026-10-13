@@ -14,7 +14,7 @@ test("dragging from navigation into the grid selects no text", async ({ page }) 
   await page.setViewportSize({ width: 1500, height: 860 });
   await page.goto("/");
   const caption = await page.getByText("Library", { exact: true }).boundingBox();
-  const foot = await page.getByText(/items · \d+ sources/).boundingBox();
+  const foot = await page.getByRole("button", { name: /items · / }).boundingBox();
   const title = await page.getByRole("main").getByText("Pictures").first().boundingBox();
   if (!caption || !foot || !title) throw new Error("navigation and the grid should be on screen");
 
