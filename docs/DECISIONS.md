@@ -915,6 +915,22 @@ it.
 - **The journal keeps everything for now.** Its rows are small, and what to prune is settled with
   the trash's limits.
 
+## Expiry goes to the Recycle Bin
+
+**An item that expires from the trash goes to the Windows Recycle Bin**, as the owner decided on
+13 October 2026. Expiry is the trash keeping its own limits, not an act the person made, so
+it may end what the app can take back, but it may not destroy: an item that outlives the time to
+live, or goes while the trash is over its total size, gets one more chance outside the app. The
+other answer, deleting it outright, would have made the trash the last chance and its limits a
+promise the person has to keep in mind.
+
+- **Restore and undo end at expiry.** From the Recycle Bin a file is Windows' to give back, and
+  the app no longer holds it.
+- **Purge stays the one irreversible act**, as PRD.md "What must always hold" has it: emptying the
+  trash deletes outright, and it asks first.
+- **An item over the per-item size goes where an expiry would**: refused by the trash, the delete
+  offers to send it to the Recycle Bin instead.
+
 ## Settings
 
 **A dialog over the window**, drawn by Claude Design and built on 14 September 2026. The frame is
