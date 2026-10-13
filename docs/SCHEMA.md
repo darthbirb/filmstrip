@@ -116,6 +116,9 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 - A set tagged at once is one row, `items_tag` or `items_untag`, naming every file it changed;
   an untag keeps each file's `added_at`, so an undo puts the tag back in its place. One file's
   tag is not journalled.
+- An act on the tags screen is one row, `retag`: the terms it reworded, made or forgot, and
+  every `folder_tag` and `item_tag` row it moved onto another term or took away, each with its
+  `rowid`, so an undo puts it back in its place.
 - Nothing prunes the journal yet.
 
 ## Destination keys

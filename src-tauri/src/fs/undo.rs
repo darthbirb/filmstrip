@@ -11,7 +11,7 @@ use crate::db::journal::{
     self, Entry, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, ItemMoved, ItemRenamed,
     ItemRestored, ItemTrashed, ItemsTagged,
 };
-use crate::db::tags;
+use crate::db::{tags, vocabulary};
 use crate::error::{AppError, Result};
 use crate::fs::acts::{self, Batch};
 use crate::fs::stayed::{self, Stayed};
@@ -92,7 +92,10 @@ fn stayed_of(conn: &Connection, entry: &Entry, err: &AppError) -> Result<Stayed>
 
 /// A tag's row names no one file or folder that stayed: it comes back whole or not at all.
 fn tagging(entry: &Entry) -> bool {
-    matches!(entry.op.as_str(), journal::ITEMS_TAG | journal::ITEMS_UNTAG)
+    matches!(
+        entry.op.as_str(),
+        journal::ITEMS_TAG | journal::ITEMS_UNTAG | journal::RETAG
+    )
 }
 
 fn reverse(conn: &Connection, entry: &Entry) -> Result<()> {
@@ -131,6 +134,7 @@ fn reverse(conn: &Connection, entry: &Entry) -> Result<()> {
             tags::untag_items(conn, back.tag_id, &back.item_ids)
         }
         journal::ITEMS_UNTAG => tags::retag_items(conn, &inverse(entry)?),
+        journal::RETAG => vocabulary::reverse(conn, &inverse(entry)?),
         other => Err(AppError::invalid(format!("{other} cannot be undone"))),
     }
 }

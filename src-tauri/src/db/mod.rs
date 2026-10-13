@@ -11,6 +11,7 @@ pub mod search;
 pub mod sources;
 pub mod suggest;
 pub mod tags;
+pub mod vocabulary;
 
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};

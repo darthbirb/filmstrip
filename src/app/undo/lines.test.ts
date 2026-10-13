@@ -182,3 +182,55 @@ test("Restore's line, its undo, and its refusal read as Artboards › Trash word
   expect(restoredBannerLine(2, 4, "Cairo", true)).toBe("2 of 4 files are back in Cairo");
   expect(restoredBannerLine(0, 1, "People", false, "a.jpg")).toBe("a.jpg could not go to People");
 });
+
+test("an act on the tags screen says what it touched, and undoing it puts the term back", () => {
+  const retag = (change: Extract<Act, { kind: "retag" }>["change"]): Act => ({
+    kind: "retag",
+    change,
+  });
+  const rows: [Act, number, number, string, string][] = [
+    [
+      retag({ kind: "mergeTags", from: "dawn", into: "golden hour" }),
+      38,
+      2,
+      "Merged dawn into golden hour, on 38 files and 2 folders.",
+      "dawn is back on 38 files and 2 folders.",
+    ],
+    [
+      retag({ kind: "renameTag", from: "dawn", to: "first light" }),
+      38,
+      0,
+      "Renamed dawn to first light, on 38 files.",
+      "first light is dawn again.",
+    ],
+    [retag({ kind: "deleteTag", tag: "winter" }), 0, 0, "Deleted winter.", "winter is back."],
+    [
+      retag({ kind: "deleteKey", key: "place" }),
+      640,
+      2,
+      "Deleted place, from 640 files and 2 folders.",
+      "place is back on 640 files and 2 folders.",
+    ],
+    [
+      retag({ kind: "mergeValues", key: "trip", from: "nile 2019", into: "egypt 2024" }),
+      310,
+      1,
+      "Merged trip: nile 2019 into trip: egypt 2024, on 310 files and 1 folder.",
+      "trip: nile 2019 is back on 310 files and 1 folder.",
+    ],
+    [
+      retag({ kind: "renameValue", key: "trip", from: "nile 2019", to: "nile 2020" }),
+      310,
+      1,
+      "Renamed trip: nile 2019 to trip: nile 2020, on 310 files and 1 folder.",
+      "trip: nile 2020 is trip: nile 2019 again.",
+    ],
+  ];
+  for (const [act, files, folders, line, back] of rows) {
+    const done = batch(act, files, folders);
+    expect(actLine(done)).toBe(line);
+    expect(undoneLine({ batch: done, filesBack: files, foldersBack: folders, stayed: [] })).toBe(
+      back,
+    );
+  }
+});

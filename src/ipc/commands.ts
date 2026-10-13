@@ -20,6 +20,7 @@ import type { ItemRow } from "./bindings/ItemRow";
 import type { ItemsMoved } from "./bindings/ItemsMoved";
 import type { ItemsRestored } from "./bindings/ItemsRestored";
 import type { ItemsTrashed } from "./bindings/ItemsTrashed";
+import type { KeyClash } from "./bindings/KeyClash";
 import type { LabelOffer } from "./bindings/LabelOffer";
 import type { LibraryTotals } from "./bindings/LibraryTotals";
 import type { Progress } from "./bindings/Progress";
@@ -33,6 +34,7 @@ import type { Suggestions } from "./bindings/Suggestions";
 import type { TagOffer } from "./bindings/TagOffer";
 import type { Trashed } from "./bindings/Trashed";
 import type { UndoReport } from "./bindings/UndoReport";
+import type { Vocabulary } from "./bindings/Vocabulary";
 import { FIRST_SORT } from "./sort";
 
 // One wrapper per Rust command, each typed invoke on one line: a Rust test reads this file.
@@ -175,6 +177,36 @@ export const addItemsTag = (itemIds: number[], value: string) =>
 
 export const removeItemsTag = (itemIds: number[], tagId: number) =>
   invoke<Batch | null>("remove_items_tag", { itemIds, tagId });
+
+export const listTags = () => invoke<Vocabulary>("list_tags");
+
+export const renameTag = (tagId: number, value: string) =>
+  invoke<Batch | null>("rename_tag", { tagId, value });
+
+export const mergeTags = (fromId: number, intoId: number) =>
+  invoke<Batch | null>("merge_tags", { fromId, intoId });
+
+export const deleteTag = (tagId: number) => invoke<Batch | null>("delete_tag", { tagId });
+
+export const labelKeyClash = (key: string, into: string) =>
+  invoke<KeyClash | null>("label_key_clash", { key, into });
+
+export const renameLabelKey = (key: string, to: string) =>
+  invoke<Batch | null>("rename_label_key", { key, to });
+
+export const mergeLabelKeys = (key: string, into: string) =>
+  invoke<Batch | null>("merge_label_keys", { key, into });
+
+export const deleteLabelKey = (key: string) => invoke<Batch | null>("delete_label_key", { key });
+
+export const renameLabelValue = (tagId: number, value: string) =>
+  invoke<Batch | null>("rename_label_value", { tagId, value });
+
+export const mergeLabelValues = (fromId: number, intoId: number) =>
+  invoke<Batch | null>("merge_label_values", { fromId, intoId });
+
+export const deleteLabelValue = (tagId: number) =>
+  invoke<Batch | null>("delete_label_value", { tagId });
 
 export const itemDetail = (itemId: number) => invoke<ItemDetail | null>("item_detail", { itemId });
 

@@ -1,4 +1,5 @@
 import type { Batch } from "../../ipc/bindings/Batch";
+import type { Change } from "../../ipc/bindings/Change";
 import type { Reason } from "../../ipc/bindings/Reason";
 import type { Stayed } from "../../ipc/bindings/Stayed";
 import type { UndoReport } from "../../ipc/bindings/UndoReport";
@@ -13,7 +14,8 @@ const are = (n: number) => (n === 1 ? "is" : "are");
 const whose = (name: string) => (name.endsWith("s") ? `${name}’` : `${name}’s`);
 
 /** The line at the foot after an act. `stayed` counts what the act could not carry. */
-export function actLine({ act, files: carried }: Batch, stayed = 0): string {
+export function actLine(batch: Batch, stayed = 0): string {
+  const { act, files: carried } = batch;
   const whole = carried + stayed;
   const rest = `The other ${formatCount(stayed)} ${are(stayed)} in the banner.`;
   switch (act.kind) {
@@ -45,6 +47,8 @@ export function actLine({ act, files: carried }: Batch, stayed = 0): string {
       return `Added ${act.tag} to ${files(carried)}.`;
     case "removeTag":
       return `Took ${act.tag} off ${files(carried)}.`;
+    case "retag":
+      return retagLine(act.change, carried, batch.folders);
   }
 }
 
@@ -76,6 +80,8 @@ export function undoneLine({ batch }: UndoReport): string {
       return `${act.tag} is off ${files(carried)} again.`;
     case "removeTag":
       return `${act.tag} is back on ${files(carried)}.`;
+    case "retag":
+      return retagUndone(act.change, carried, batch.folders);
   }
 }
 
@@ -113,7 +119,70 @@ export function undoBannerLine({ batch, filesBack, stayed }: UndoReport): string
       return `${act.tag} could not come off ${files(carried)}`;
     case "removeTag":
       return `${act.tag} could not go back on ${files(carried)}`;
+    case "retag":
+      return `${changed(act.change).was} could not come back`;
   }
+}
+
+const folders = (n: number) => `${formatCount(n)} ${n === 1 ? "folder" : "folders"}`;
+
+/** "38 files and 2 folders", either alone, or nothing when the act touched neither. */
+export function filesAndFolders(fileCount: number, folderCount: number): string | null {
+  const parts = [
+    ...(fileCount > 0 ? [files(fileCount)] : []),
+    ...(folderCount > 0 ? [folders(folderCount)] : []),
+  ];
+  return parts.length > 0 ? parts.join(" and ") : null;
+}
+
+/** A tag by its words, a label as `key: value`. */
+export const termText = (key: string | null, value: string) => (key ? `${key}: ${value}` : value);
+
+/** What a change on the tags screen was, now and before, and its verb. */
+function changed(change: Change): { verb: "rename" | "merge" | "delete"; was: string; is: string } {
+  switch (change.kind) {
+    case "renameTag":
+    case "renameKey":
+      return { verb: "rename", was: change.from, is: change.to };
+    case "mergeTags":
+    case "mergeKeys":
+      return { verb: "merge", was: change.from, is: change.into };
+    case "deleteTag":
+      return { verb: "delete", was: change.tag, is: change.tag };
+    case "deleteKey":
+      return { verb: "delete", was: change.key, is: change.key };
+    case "renameValue":
+      return {
+        verb: "rename",
+        was: termText(change.key, change.from),
+        is: termText(change.key, change.to),
+      };
+    case "mergeValues":
+      return {
+        verb: "merge",
+        was: termText(change.key, change.from),
+        is: termText(change.key, change.into),
+      };
+    case "deleteValue":
+      return { verb: "delete", was: termText(change.key, change.value), is: "" };
+  }
+}
+
+/** The line after a rename, a merge or a delete on the tags screen. Artboards › Tags. */
+function retagLine(change: Change, fileCount: number, folderCount: number) {
+  const { verb, was, is } = changed(change);
+  const what = filesAndFolders(fileCount, folderCount);
+  if (verb === "delete") return what ? `Deleted ${was}, from ${what}.` : `Deleted ${was}.`;
+  const done = verb === "rename" ? `Renamed ${was} to ${is}` : `Merged ${was} into ${is}`;
+  return what ? `${done}, on ${what}.` : `${done}.`;
+}
+
+/** The line after undoing one: the term is back where it was, under its own words. */
+function retagUndone(change: Change, fileCount: number, folderCount: number) {
+  const { verb, was, is } = changed(change);
+  if (verb === "rename") return `${is} is ${was} again.`;
+  const what = filesAndFolders(fileCount, folderCount);
+  return what ? `${was} is back on ${what}.` : `${was} is back.`;
 }
 
 /** The banner's sentence for a move that finished in part, or not at all. */

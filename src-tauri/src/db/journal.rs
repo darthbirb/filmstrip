@@ -4,6 +4,7 @@
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use ts_rs::TS;
 
 use crate::db::now;
 use crate::error::Result;
@@ -18,6 +19,7 @@ pub const FOLDER_DELETE: &str = "folder_delete";
 pub const ITEM_RESTORE: &str = "item_restore";
 pub const ITEMS_TAG: &str = "items_tag";
 pub const ITEMS_UNTAG: &str = "items_untag";
+pub const RETAG: &str = "retag";
 
 /// A folder the app made. Its inverse is itself: undoing it removes that folder again.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -116,6 +118,107 @@ pub struct ItemsUntagged {
     pub tag_id: i64,
     pub value: String,
     pub items: Vec<Untagged>,
+}
+
+/// What the tags screen did to the library's vocabulary, in the terms its line names.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(export)]
+pub enum Change {
+    RenameTag {
+        from: String,
+        to: String,
+    },
+    MergeTags {
+        from: String,
+        into: String,
+    },
+    DeleteTag {
+        tag: String,
+    },
+    RenameKey {
+        from: String,
+        to: String,
+    },
+    MergeKeys {
+        from: String,
+        into: String,
+    },
+    DeleteKey {
+        key: String,
+    },
+    RenameValue {
+        key: String,
+        from: String,
+        to: String,
+    },
+    MergeValues {
+        key: String,
+        from: String,
+        into: String,
+    },
+    DeleteValue {
+        key: String,
+        value: String,
+    },
+}
+
+/// A term as the `tag` table held it, under its own id.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Term {
+    pub id: i64,
+    pub key: Option<String>,
+    pub value: String,
+}
+
+/// A term whose text changed where it stands, keeping its id.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Reworded {
+    pub id: i64,
+    pub from: Term,
+    pub to: Term,
+}
+
+/// One `folder_tag` row the act moved onto another term, or took away when `to` is `None`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderUse {
+    pub folder_id: i64,
+    pub rowid: i64,
+    pub source: String,
+    pub from: i64,
+    pub to: Option<i64>,
+}
+
+/// One `item_tag` row the act moved onto another term, or took away when `to` is `None`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemUse {
+    pub item_id: i64,
+    pub rowid: i64,
+    pub added_at: i64,
+    pub from: i64,
+    pub to: Option<i64>,
+}
+
+/// A rename, merge or delete of a tag, a key or a value, with every row it touched, so an undo
+/// puts each back under its own id. Its inverse is itself.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Retagged {
+    pub change: Change,
+    /// What the line counts: the files that carried it and the folders that held it.
+    pub files: u32,
+    pub folders: u32,
+    pub reworded: Vec<Reworded>,
+    /// Terms the act made, which an undo takes away again once nothing holds them.
+    pub made: Vec<Term>,
+    /// Terms the act took away once nothing held them, which an undo makes again.
+    pub removed: Vec<Term>,
+    pub folder_uses: Vec<FolderUse>,
+    pub item_uses: Vec<ItemUse>,
 }
 
 /// One row, as undo reads it back. Both halves stay JSON until its op says what they are.
@@ -282,6 +385,10 @@ pub fn record_items_untag(
     untagged: &ItemsUntagged,
 ) -> Result<()> {
     record(conn, batch_id, ITEMS_UNTAG, untagged, untagged)
+}
+
+pub fn record_retag(conn: &Connection, batch_id: &str, retagged: &Retagged) -> Result<()> {
+    record(conn, batch_id, RETAG, retagged, retagged)
 }
 
 /// Every row in a batch, newest first: the order an undo applies them in, since a later row can
