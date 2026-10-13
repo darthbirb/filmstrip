@@ -61,6 +61,12 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 - `source.root` is unique, and the application also refuses a root that sits inside another
   or contains one.
 
+## Indexes
+
+- `folder_tag` and `item_tag` are each indexed both ways: by their primary key, which leads
+  with the folder or the item, and by `idx_folder_tag_rev` and `idx_item_tag_rev`, which lead
+  with the tag, so what holds a tag is found without reading the whole table.
+
 ## Tags and labels
 
 - Keys and values are stored folded (`db::fold`): lowercase, trimmed, and one space between

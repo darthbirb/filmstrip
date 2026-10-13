@@ -2064,4 +2064,29 @@ mod tests {
         undo::undo_batch(conn, &batch).unwrap();
         assert_eq!(found_by(conn, "tag:felucca"), sorted(set[..3_120].to_vec()));
     }
+
+    #[test]
+    fn forty_thousand_folders_list_inside_two_seconds_with_a_tenth_deleted() {
+        let lib = library();
+        let conn = &lib.conn;
+        let before = list_tags(conn).unwrap().tags.len();
+        let tx = conn.unchecked_transaction().unwrap();
+        for n in 0..40_000 {
+            let parent = [lib.trips, lib.family, lib.beach][n % 3];
+            folders::create(&tx, parent, &format!("day {n:05}")).unwrap();
+        }
+        tx.execute(
+            "UPDATE folder SET deleted_at = 1 WHERE title LIKE 'day %' AND id % 10 = 0",
+            [],
+        )
+        .unwrap();
+        tx.commit().unwrap();
+
+        let started = std::time::Instant::now();
+        let listed = list_tags(conn).unwrap();
+        let took = started.elapsed();
+
+        assert_eq!(listed.tags.len(), before + 36_000);
+        assert!(took < std::time::Duration::from_secs(2), "took {took:?}");
+    }
 }
