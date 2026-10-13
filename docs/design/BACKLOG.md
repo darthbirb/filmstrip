@@ -34,17 +34,3 @@ Consider the old drawing's scrubber: a 16px channel at the grid's edge with a sq
 to jump anywhere; the position is the information. Investigate whether it replaces the
 scrollbar or sits beside it. The pass that drew it recommends building the other ten first, and
 only building this if the largest folders still feel unnavigable afterwards.
-
-## The tags screen · DRAWN
-
-Issue #61. Nothing lists the library's tags, so a misspelt one stays misspelt on every file.
-
-Artboards › Tags. A section of Settings, Library › Tags, after Destination Keys: every tag, then
-every label key with its values, each with the files that carry it and the folders that hold it,
-sortable by its column headings and filtered as you type; an unused tag says so. A click on a chip
-closes Settings and searches. A tag's ⋯ renames, merges or deletes where the row stands: renaming
-onto a tag that exists, after folding, asks to merge on the row; delete asks with its count. A
-key's ⋯ renames, merges or deletes it, and a value's renames, merges within its key, or deletes it.
-A folder's name is listed but only its hand-given uses change. Renaming or merging a key is
-refused where it would give a folder a key one above or below it holds, in the band's words. Each
-act ends with the Line at the section's foot, with Undo, and Ctrl+Z in the section takes it back.

@@ -847,6 +847,8 @@ it.
   restart, because the journal does.
 - **Ctrl+Z belongs to a field while one has the focus**, and does nothing while Settings is open:
   the dialog holds the keyboard, and an undo behind it would change what the person cannot see.
+  The one exception is the Tags section while its own line stands, since what that undo changes
+  is the list in view (DECISIONS.md "The tags screen").
 - **An undo that came back in part answers with the banner, not the line.** What stayed is
   something only the person can settle, so it sits over the grid, open, with Retry.
 - **A row still in the Trash is never shown in Explorer**, which would show the name the Trash

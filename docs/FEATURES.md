@@ -93,7 +93,7 @@ drawn. **Not started** — neither.
 | Add or remove a tag on an item | Built | `add_item_tag`, `remove_item_tag`, Add Tag… in the pane's details, the band's own control; an item owns tags only, never a label, and what it inherits comes off only at its folder; a tag may be several words, kept lowercase with one space between them |
 | A folder's inherited tags | Built | `folder_detail`, in path order in the band, each where it is nearest |
 | What a selection's tags cover | Built | `selection_tag_coverage`, `add_items_tag`, `remove_items_tag`; Tag… on the selection bar and the set's menu: each tag on all, on some with the count, or from which folder; added to every checked file that lacks it, or a file's own taken off every file that has it, each as one batch with the Line and Undo |
-| The vocabulary, with counts; rename and delete a tag | Not started | |
+| The vocabulary, with counts; rename, merge and delete a tag | Built | `list_tags`, `rename_tag`, `merge_tags`, `delete_tag`, and the same for a label's keys and values; Settings › Library › Tags, sorted by its headings and filtered as you type, a click on a chip searching; each act one batch with the Line and Undo, Ctrl+Z in the section; a key merge refused where a branch would hold it twice. A folder's name is listed but only its hand-given uses change |
 
 ## Search
 
@@ -128,7 +128,7 @@ drawn. **Not started** — neither.
 | --- | --- | --- |
 | Three panels, splitters, folding, the rail | Built | |
 | The app's own window chrome | Built | |
-| Settings | Built, with Sources in it | |
+| Settings | Built, with Sources, Destination Keys and Tags in it | |
 | The app's own right-click menus | Built | on a tile, a set of checked tiles, a frame, the pane's picture, a folder and a source, every verb included |
 | A scrubber for very large folders | Backlogged | |
-| Compression review, duplicate detection, a storage screen, a tags screen | Not started | PRODUCT.md "Later" |
+| Compression review, duplicate detection, a storage screen | Not started | PRODUCT.md "Later" |
