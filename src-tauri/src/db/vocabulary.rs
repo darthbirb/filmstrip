@@ -587,6 +587,14 @@ fn blank(change: Change, files: usize, folders: i64) -> Retagged {
 }
 
 fn record(conn: &Connection, batch_id: &str, retagged: &Retagged) -> Result<bool> {
+    let untouched = retagged.reworded.is_empty()
+        && retagged.made.is_empty()
+        && retagged.removed.is_empty()
+        && retagged.folder_uses.is_empty()
+        && retagged.item_uses.is_empty();
+    if untouched {
+        return Ok(false);
+    }
     journal::record_retag(conn, batch_id, retagged)?;
     Ok(true)
 }
@@ -1568,6 +1576,12 @@ mod tests {
         let lisbon = id_of(conn, None, "lisbon");
         delete_tag(conn, lisbon, &journal::new_batch()).unwrap();
         assert!(hand_of(conn, lib.tower).is_empty());
+        let again = journal::new_batch();
+        assert!(
+            !delete_tag(conn, lisbon, &again).unwrap(),
+            "only a name is left"
+        );
+        assert!(journal_rows(conn, &again).is_empty());
         assert_eq!(held_by(conn, lib.lisbon), ["#lisbon", "location:lisbon"]);
         assert_eq!(
             found_by(conn, "tag:lisbon"),
