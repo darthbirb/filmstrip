@@ -1,5 +1,6 @@
 import { type CSSProperties, type KeyboardEvent, useId, useRef } from "react";
 
+import { pillGround } from "./Chip";
 import { Glyph } from "./Glyph";
 import type { GlyphName } from "./glyphs";
 import { anchorOf } from "./OfferList";
@@ -55,56 +56,68 @@ export function SetChip({
       remove.onRemove();
     }
   };
-  const focusable = stop && {
-    tabIndex: 0,
-    role: "button",
-    "aria-label": `${tagKey ? `${tagKey}: ` : ""}${value}${count ? `, ${count}` : ""}`,
-    "aria-describedby": title ? `${id}-tip` : undefined,
-    onKeyDown,
-    onFocus: (event: { currentTarget: HTMLElement }) => {
-      const element = tip.current;
-      if (element && event.currentTarget.matches(":focus-visible")) element.showPopover();
-    },
-    onBlur: () => {
-      if (tip.current?.matches(":popover-open")) tip.current.hidePopover();
-    },
-  };
   const figure = count && (
     <span className="shrink-0 whitespace-nowrap pl-0.5 text-fg-dim text-key tabular-nums">
       {count}
     </span>
   );
-  const lift = "hover:bg-raised-hi hover:text-fg hover:inset-ring-line-strong";
-  const ground = inherited
-    ? `bg-inset ${echoed ? "text-fg-mid inset-ring-line-strong" : "text-fg-dim inset-ring-line"}`
-    : `bg-raised text-fg ${echoed ? "inset-ring-line-strong" : "inset-ring-line-control-hi"}`;
   const acts = add || remove;
-
-  const chip = tagKey ? (
-    <span
-      {...focusable}
-      title={said}
-      style={{ anchorName: anchor } as CSSProperties}
-      className={`focus-ring inline-flex h-chip min-w-0 max-w-full shrink-0 overflow-hidden rounded-nested text-small ${echoed ? "ring-1 ring-line-strong" : ""}`}
-    >
+  const parts = tagKey ? (
+    <>
       <span className="flex shrink-0 items-center bg-well px-2 text-fg-dim">{tagKey}</span>
       <span className="flex min-w-0 items-center gap-1.25 bg-inset px-2 text-fg-dim">
         <span className="truncate">{value}</span>
         {figure}
       </span>
-    </span>
+    </>
   ) : (
-    <span
-      {...focusable}
-      title={said}
-      style={{ anchorName: anchor } as CSSProperties}
-      className={`group focus-ring inline-flex h-chip min-w-0 max-w-full shrink-0 items-center gap-1.25 rounded-full pr-2.5 text-small inset-ring ${name ? "pl-2" : "pl-2.5"} ${ground} ${lift} ${acts ? "hover:pr-1 focus-visible:pr-1" : ""}`}
-    >
+    <>
       {name && <Glyph name="folderName" className="shrink-0 text-glyph-small" />}
       <span className="truncate">{value}</span>
       {figure}
-      {add && <Act glyph="plus" label={add.label} onClick={add.onAdd} />}
-      {remove && <Act glyph="close" label={remove.label} onClick={remove.onRemove} />}
+    </>
+  );
+  const body = tagKey
+    ? "flex h-full min-w-0"
+    : `flex h-full min-w-0 items-center gap-1.25 rounded-full pr-2.5 ${name ? "pl-2" : "pl-2.5"} ${acts ? "group-hover:pr-0 group-has-focus-visible:pr-0" : ""}`;
+  const face = stop ? (
+    <button
+      type="button"
+      data-stop
+      aria-label={`${tagKey ? `${tagKey}: ` : ""}${value}${count ? `, ${count}` : ""}`}
+      aria-describedby={title ? `${id}-tip` : undefined}
+      onKeyDown={onKeyDown}
+      onFocus={(event) => {
+        const element = tip.current;
+        if (element && event.currentTarget.matches(":focus-visible")) element.showPopover();
+      }}
+      onBlur={() => {
+        if (tip.current?.matches(":popover-open")) tip.current.hidePopover();
+      }}
+      className={`${body} cursor-default outline-none`}
+    >
+      {parts}
+    </button>
+  ) : (
+    <span className={body}>{parts}</span>
+  );
+  const shape = tagKey
+    ? `overflow-hidden rounded-nested ${echoed ? "ring-1 ring-line-strong" : ""}`
+    : `items-center rounded-full inset-ring hover:bg-raised-hi hover:text-fg hover:inset-ring-line-strong ${pillGround(inherited, echoed)}`;
+
+  const chip = (
+    <span
+      title={said}
+      style={{ anchorName: anchor } as CSSProperties}
+      className={`group focus-ring-within inline-flex h-chip min-w-0 max-w-full shrink-0 text-small ${shape}`}
+    >
+      {face}
+      {acts && (
+        <span className="hidden shrink-0 items-center gap-1.25 pr-1 pl-1.25 group-hover:flex group-has-focus-visible:flex">
+          {add && <Act glyph="plus" label={add.label} onClick={add.onAdd} />}
+          {remove && <Act glyph="close" label={remove.label} onClick={remove.onRemove} />}
+        </span>
+      )}
     </span>
   );
   if (!stop || !title) return chip;
@@ -141,7 +154,7 @@ function Act({ glyph, label, onClick }: { glyph: GlyphName; label: string; onCli
       title={label}
       aria-label={label}
       onClick={onClick}
-      className="hidden size-chip-remove shrink-0 cursor-default place-items-center rounded-full text-fg-mid text-glyph-small hover:bg-wash hover:text-fg group-hover:grid group-focus-visible:grid"
+      className="grid size-chip-remove shrink-0 cursor-default place-items-center rounded-full text-fg-mid text-glyph-small hover:bg-wash hover:text-fg"
     >
       <Glyph name={glyph} />
     </button>

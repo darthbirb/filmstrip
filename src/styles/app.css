@@ -296,6 +296,14 @@
   }
 }
 
+/* The ring on a chip whose control is one part of it, drawn around the whole. */
+@utility focus-ring-within {
+  &:has(:focus-visible) {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: var(--focus-gap);
+  }
+}
+
 @utility focus-ring-inset {
   &:focus-visible {
     outline: var(--focus-width) solid var(--color-focus);

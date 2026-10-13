@@ -1727,6 +1727,24 @@ mod tests {
     }
 
     #[test]
+    fn an_undo_of_a_tag_that_fails_says_why_in_its_own_kind_and_keeps_its_row() {
+        let (conn, root) = library();
+        let (_, set) = search_set(&conn, root);
+        let batch = journal::new_batch();
+        add_items_tag(&conn, &set, "dawn", &batch).unwrap();
+        conn.execute_batch("DROP TABLE item_fts").unwrap();
+
+        let failed = crate::fs::undo::undo_batch(&conn, &batch).unwrap_err();
+        assert!(matches!(failed, AppError::Db(_)), "{failed:?}");
+        assert_eq!(rows_in(&conn, &batch), [journal::ITEMS_TAG]);
+        assert!(
+            set.iter()
+                .all(|&id| own_of(&conn, id).contains(&"dawn".to_string())),
+            "nothing came off in part"
+        );
+    }
+
+    #[test]
     fn five_thousand_files_take_and_lose_a_tag_in_one_row_each() {
         let (conn, root) = library();
         let trips = folders::create(&conn, root, "Trips").unwrap();

@@ -56,6 +56,7 @@ fn reverse_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
         // What failed stays in the journal, or it could never be tried again.
         match reverse(conn, entry) {
             Ok(()) => journal::drop_entry(conn, entry.id)?,
+            Err(err) if tagging(entry) => return Err(err),
             Err(err) => stayed.push(stayed_of(conn, entry, &err)?),
         }
     }
@@ -85,9 +86,13 @@ fn stayed_of(conn: &Connection, entry: &Entry, err: &AppError) -> Result<Stayed>
         journal::FOLDER_DELETE => {
             stayed::folder(conn, inverse::<FolderDeleted>(entry)?.folder_id, err)
         }
-        journal::ITEMS_TAG | journal::ITEMS_UNTAG => Err(AppError::invalid(err.to_string())),
         other => Err(AppError::invalid(format!("{other} cannot be undone"))),
     }
+}
+
+/// A tag's row names no one file or folder that stayed: it comes back whole or not at all.
+fn tagging(entry: &Entry) -> bool {
+    matches!(entry.op.as_str(), journal::ITEMS_TAG | journal::ITEMS_UNTAG)
 }
 
 fn reverse(conn: &Connection, entry: &Entry) -> Result<()> {

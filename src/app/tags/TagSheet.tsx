@@ -15,6 +15,7 @@ import { keepEscape, SURFACE } from "../../ui/Menu";
 import { SetChip } from "../../ui/SetChip";
 import { StandingTagField } from "../../ui/TagField";
 import { libraryChanged, whenLibraryChanges } from "../library";
+import { getPlace } from "../place";
 import { afterAct } from "../undo/undo";
 import { countOf, refusal, type SetTag, sections, whoseTag } from "./coverage";
 
@@ -43,6 +44,7 @@ type Props = {
 };
 
 const HEADING = "m-0 flex h-chip shrink-0 items-center px-2 text-eyebrow text-fg-dim uppercase";
+const RULE = "mx-2 my-1 h-px shrink-0 border-0 bg-line";
 const files = (n: number) => `${formatCount(n)} ${n === 1 ? "File" : "Files"}`;
 
 /**
@@ -56,6 +58,11 @@ export function TagSheet({ itemIds, anchor, maxHeight, onClose }: Props) {
   const [shown, setShown] = useState(false);
   const [coverage, setCoverage] = useState<Coverage | null>(null);
   const [echo, setEcho] = useState<number | null>(null);
+  const [ringed] = useState(() => document.activeElement?.matches(":focus-visible") ?? false);
+  const [root] = useState(() => {
+    const place = getPlace();
+    return place?.kind === "folder" ? (place.path[0]?.title ?? null) : null;
+  });
   const ids = itemIds.join(",");
 
   const load = useCallback(() => {
@@ -81,7 +88,7 @@ export function TagSheet({ itemIds, anchor, maxHeight, onClose }: Props) {
           anchor.popoverTargetAction = "hide";
         })
       : undefined;
-    element.showPopover();
+    if (!element.matches(":popover-open")) element.showPopover();
     setShown(true);
     return () => {
       clearTimeout(tie);
@@ -109,9 +116,7 @@ export function TagSheet({ itemIds, anchor, maxHeight, onClose }: Props) {
   const remove = (tagId: number) => act(() => removeItemsTag(wanted(), tagId));
 
   // A chip taken off with the keyboard hands its stop to the one after it.
-  const stops = () => [
-    ...(sheet.current?.querySelectorAll<HTMLElement>('[role="button"][tabindex="0"]') ?? []),
-  ];
+  const stops = () => [...(sheet.current?.querySelectorAll<HTMLElement>("[data-stop]") ?? [])];
   const takeOff = (tagId: number) => {
     const at = stops().indexOf(document.activeElement as HTMLElement);
     void remove(tagId).then(() => {
@@ -120,7 +125,7 @@ export function TagSheet({ itemIds, anchor, maxHeight, onClose }: Props) {
     });
   };
   const backOut = () => {
-    const own = sheet.current?.querySelectorAll<HTMLElement>('[data-own] [role="button"]');
+    const own = sheet.current?.querySelectorAll<HTMLElement>("[data-own] [data-stop]");
     own?.[own.length - 1]?.focus();
   };
 
@@ -166,20 +171,21 @@ export function TagSheet({ itemIds, anchor, maxHeight, onClose }: Props) {
             onEcho={setEcho}
             onBackOut={backOut}
             onClose={close}
+            ringed={ringed}
           />
         )}
       </div>
       {groups === null ? (
         <>
           <p className={HEADING}>{count === 1 ? "Its Own" : "Their Own"}</p>
-          <div aria-hidden className="flex flex-wrap gap-1.5 px-2 pb-1.5">
-            {["w-18", "w-26", "w-14"].map((width) => (
-              <span
-                key={width}
-                className={`h-chip ${width} rounded-full bg-inset inset-ring inset-ring-line`}
-              />
-            ))}
-          </div>
+          <StandIns widths={["w-18", "w-26", "w-14"]} />
+          {root !== null && (
+            <>
+              <hr className={RULE} />
+              <p className={`${HEADING} truncate`}>From {root}</p>
+              <StandIns widths={["w-20"]} />
+            </>
+          )}
         </>
       ) : (
         groups.map((section, at) => (
@@ -189,9 +195,7 @@ export function TagSheet({ itemIds, anchor, maxHeight, onClose }: Props) {
             data-own={section.own || undefined}
             className="flex flex-col"
           >
-            {at === 1 && groups[0]?.own && (
-              <hr className="mx-2 my-1 h-px shrink-0 border-0 bg-line" />
-            )}
+            {at === 1 && groups[0]?.own && <hr className={RULE} />}
             <h3 className={`${HEADING} truncate`}>{section.heading}</h3>
             <div className="flex flex-wrap gap-1.5 px-2 pb-1.5">
               {section.tags.map((tag) => (
@@ -210,6 +214,20 @@ export function TagSheet({ itemIds, anchor, maxHeight, onClose }: Props) {
           </section>
         ))
       )}
+    </div>
+  );
+}
+
+/** Chip-shaped places held while what the set carries is read. */
+function StandIns({ widths }: { widths: string[] }) {
+  return (
+    <div aria-hidden className="flex flex-wrap gap-1.5 px-2 pb-1.5">
+      {widths.map((width) => (
+        <span
+          key={width}
+          className={`h-chip ${width} rounded-full bg-inset inset-ring inset-ring-line`}
+        />
+      ))}
     </div>
   );
 }

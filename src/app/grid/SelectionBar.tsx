@@ -53,23 +53,51 @@ type Piece = { id: string; node: ReactNode; action?: MenuAction; group?: number 
 /** What the bar holds open over the grid, and against which of its buttons. */
 type Sheet = { anchor: HTMLElement; maxHeight?: number } | null;
 
+const gridOf = (bar: HTMLElement) => bar.closest(".push-down")?.previousElementSibling ?? null;
+
+/** Against Tag… while it is on the bar, else against More, which holds it; half the grid tall. */
+function sheetPlace(bar: HTMLElement | null): Sheet {
+  const anchor =
+    bar?.querySelector<HTMLElement>(':scope > [data-piece="tag"] > button') ??
+    bar?.querySelector<HTMLElement>(':scope > button[aria-label="More"]');
+  if (!bar || !anchor) return null;
+  const grid = gridOf(bar);
+  return { anchor, maxHeight: grid ? grid.clientHeight / 2 : undefined };
+}
+
 const files = (count: number) => `${formatCount(count)} ${count === 1 ? "File" : "Files"}`;
 
 function InLibrary({ rows }: { rows: readonly CheckedFile[] }) {
   const ids = rows.map((row) => row.id);
   const bar = useRef<HTMLDivElement>(null);
   const [sheet, setSheet] = useState<Sheet>(null);
-  // Against Tag… while it is on the bar, else against More, which holds it.
   const openSheet = () => {
-    const element = bar.current;
-    const anchor =
-      element?.querySelector<HTMLElement>(':scope > [data-piece="tag"] > button') ??
-      element?.querySelector<HTMLElement>(':scope > button[aria-label="More"]');
-    if (!element || !anchor) return;
-    const grid = element.closest(".push-down")?.previousElementSibling;
-    setSheet({ anchor, maxHeight: grid ? grid.clientHeight / 2 : undefined });
+    const at = sheetPlace(bar.current);
+    if (at) setSheet(at);
   };
   useEffect(() => whenTagSheetAsked(openSheet));
+  const open = sheet !== null;
+  useEffect(() => {
+    const element = bar.current;
+    if (!open || !element) return;
+    const follow = () => {
+      const at = sheetPlace(element);
+      if (!at) return;
+      setSheet((was) =>
+        was && (was.anchor !== at.anchor || was.maxHeight !== at.maxHeight) ? at : was,
+      );
+    };
+    const resized = new ResizeObserver(follow);
+    resized.observe(element);
+    const grid = gridOf(element);
+    if (grid) resized.observe(grid);
+    const moved = new MutationObserver(follow);
+    moved.observe(element, { childList: true });
+    return () => {
+      resized.disconnect();
+      moved.disconnect();
+    };
+  }, [open]);
   const live = useSelection().ids.length > 0;
   useEffect(() => {
     if (!live) setSheet(null);

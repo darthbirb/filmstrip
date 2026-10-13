@@ -35,10 +35,13 @@ beforeEach(async () => {
   clearChecked();
 });
 
-async function renderGrid() {
+async function renderGrid(width = 900) {
   await page.viewport(1200, 800);
   render(
-    <div style={{ display: "flex", flexDirection: "column", width: 900, height: 700 }}>
+    <div
+      data-testid="frame"
+      style={{ display: "flex", flexDirection: "column", width, height: 700 }}
+    >
       <div style={{ flex: 1, minHeight: 0 }}>
         <Grid mode="uniform" />
       </div>
@@ -58,7 +61,7 @@ const headings = () =>
     one.getAttribute("aria-label"),
   );
 const own = () =>
-  [...document.querySelectorAll("[role=dialog] section[data-own] [role=button]")].map((chip) =>
+  [...document.querySelectorAll("[role=dialog] section[data-own] [data-stop]")].map((chip) =>
     chip.getAttribute("aria-label"),
   );
 const line = () => {
@@ -127,6 +130,8 @@ test("a chip on some of the set adds to the rest, and × takes it off every file
 
   const chip = sheet(3).getByRole("button", { name: "dawn, 1 of 3" });
   await expect.element(chip).toBeVisible();
+  expect(chip.element().tagName).toBe("BUTTON");
+  expect(chip.element().querySelector("button, [role=button]")).toBeNull();
   await userEvent.hover(chip);
   await userEvent.click(sheet(3).getByRole("button", { name: "Add to the Other 2" }));
   await expect.poll(own).toEqual(["dawn"]);
@@ -184,4 +189,104 @@ test("Tag… on the set's right-click menu opens the same sheet against the bar"
   await userEvent.click(page.getByRole("menuitem", { name: "Tag…" }));
   await expect.element(sheet(2)).toBeVisible();
   await expect.element(field(2)).toHaveFocus();
+});
+
+const more = () => bar().getByRole("button", { name: "More" }).last();
+const outline = (count: number) => getComputedStyle(field(count).element()).outlineStyle;
+const metAbove = (count: number, button: Element) => {
+  const drawn = sheet(count).element().getBoundingClientRect();
+  const at = button.getBoundingClientRect();
+  expect(drawn.bottom).toBeLessThan(at.top);
+  expect(drawn.left).toBeCloseTo(at.left, 0);
+};
+
+test("at the grid's narrowest Tag… on More opens the sheet against More, and Escape goes back to it", async () => {
+  await renderGrid(320);
+  await userEvent.click(box("felucca.mp4"));
+  checkAll();
+  await userEvent.click(more());
+  await userEvent.click(page.getByRole("menuitem", { name: "Tag…" }));
+
+  await expect.element(sheet(3)).toBeVisible();
+  await expect.element(field(3)).toHaveFocus();
+  metAbove(3, more().element());
+  await userEvent.keyboard("{Escape}");
+  await expect.element(sheet(3)).not.toBeInTheDocument();
+  await expect.element(more()).toHaveFocus();
+});
+
+test("while it is open the sheet follows Tag… into More, and stays half the grid's height", async () => {
+  await openOnAll();
+  const frame = page.getByTestId("frame").element() as HTMLElement;
+
+  frame.style.width = "320px";
+  await expect.element(more()).toBeVisible();
+  await expect.element(tagButton()).not.toBeInTheDocument();
+  await expect
+    .poll(() => sheet(3).element().getBoundingClientRect().left)
+    .toBeCloseTo(more().element().getBoundingClientRect().left, 0);
+  metAbove(3, more().element());
+
+  frame.style.height = "400px";
+  const grid = () => frame.firstElementChild?.clientHeight ?? 0;
+  await expect
+    .poll(() => Number.parseFloat(getComputedStyle(sheet(3).element()).maxHeight))
+    .toBeCloseTo(grid() / 2, 0);
+  expect(grid()).toBeLessThan(400);
+
+  frame.style.width = "900px";
+  await expect.element(tagButton()).toBeVisible();
+  await expect
+    .poll(() => sheet(3).element().getBoundingClientRect().left)
+    .toBeCloseTo(tagButton().element().getBoundingClientRect().left, 0);
+  await userEvent.keyboard("{Escape}");
+  await expect.element(tagButton()).toHaveFocus();
+});
+
+test("a click opens the field with no ring, and the keyboard's arrival draws it", async () => {
+  await openOnAll();
+  await expect.element(field(3)).toHaveFocus();
+  expect(outline(3)).toBe("none");
+
+  await userEvent.type(field(3), "dawn{Enter}");
+  await expect.poll(own).toEqual(["dawn"]);
+  expect(outline(3)).toBe("none");
+  await userEvent.keyboard("{Tab}");
+  await expect.element(sheet(3).getByRole("button", { name: "dawn", exact: true })).toHaveFocus();
+  await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
+  await expect.element(field(3)).toHaveFocus();
+  expect(outline(3)).toBe("solid");
+
+  await userEvent.click(field(3));
+  expect(outline(3)).toBe("none");
+});
+
+test("Tag… opened with Enter opens the field ringed", async () => {
+  await renderGrid();
+  await userEvent.click(box("felucca.mp4"));
+  checkAll();
+  await expect.element(bar().getByText("3 Files", { exact: true }).last()).toBeVisible();
+  tagButton().element().focus();
+  await userEvent.keyboard("{Enter}");
+
+  await expect.element(field(3)).toHaveFocus();
+  expect(outline(3)).toBe("solid");
+});
+
+test("while what the set carries is read, stand-ins hold Their Own and the source's own folder", async () => {
+  await renderGrid();
+  await userEvent.click(box("felucca.mp4"));
+  checkAll();
+  await expect.element(bar().getByText("3 Files", { exact: true }).last()).toBeVisible();
+  await recording(
+    async () => {
+      await userEvent.click(tagButton());
+      await expect.element(sheet(3)).toBeVisible();
+      const words = [...sheet(3).element().querySelectorAll("p")].map((one) => one.textContent);
+      expect(words).toEqual(["3 Files", "Their Own", "From Pictures"]);
+      const held = sheet(3).element().querySelectorAll("[aria-hidden] > span");
+      expect(held.length).toBe(4);
+    },
+    (cmd) => (cmd === "selection_tag_coverage" ? new Promise(() => {}) : undefined),
+  );
 });

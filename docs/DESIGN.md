@@ -861,12 +861,13 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   field: a file takes tags only.
 - **Tag sheet.** Tag… on the selection bar opens it over the grid in the menu's surface and width,
   against the button a `tile-gap` above it, left edges met, or against More while Tag… waits
-  there. The count heads it in `eyebrow` capitals, then the tag field, open from the start, the
-  sheet's width and with no ring, then what the set carries: Their Own (Its Own for one file)
-  first, a `line` rule, and each folder's under From and its title in path order. Past four
-  folders, those above every checked file keep their heading and the rest gather under From N
-  Folders. While it is read, chip-shaped stand-ins on `inset` hold the places. It scrolls past
-  half the grid's height.
+  there, following it as Tag… leaves for More or comes back. The count heads it in `eyebrow`
+  capitals, then the tag field, open from the start, the sheet's width and with no ring when a
+  click opened it, then what the set carries: Their Own (Its Own for one file) first, a `line`
+  rule, and each folder's under From and its title in path order. Past four folders, those above
+  every checked file keep their heading and the rest gather under From N Folders. While it is
+  read, chip-shaped stand-ins on `inset` hold the places, under Their Own and under the source's
+  own folder. It scrolls past half the grid's height, as tall as the grid is now.
 - **Set chip.** A tag across a set of files: the chip's own shape with "3 of 5" after the name in
   `key` `fg-dim` tabular figures when only some of the set carry it, and nothing when all do. It
   never searches. The set's own lift as the details' chips do and show a + before the × under the
