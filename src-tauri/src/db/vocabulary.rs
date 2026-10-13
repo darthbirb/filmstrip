@@ -1794,11 +1794,24 @@ mod tests {
     fn five_thousand_files_merge_in_one_row_and_come_back() {
         let lib = library();
         let conn = &lib.conn;
-        let tx = conn.unchecked_transaction().unwrap();
-        let set: Vec<i64> = (0..5_000)
-            .map(|n| item(&tx, lib.trips, &format!("{n:04}.jpg")))
-            .collect();
-        tx.commit().unwrap();
+        conn.execute(
+            "WITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i + 1 FROM n WHERE i < 4999)
+             INSERT INTO item (uuid, source_id, folder_id, disk_name, ext, size_bytes, mtime, kind,
+                               added_at)
+             SELECT 'bulk-' || i, 1, ?1, printf('%04d.jpg', i), 'jpg', 1, 0, 'image', 0 FROM n",
+            params![lib.trips],
+        )
+        .unwrap();
+        let ids = |sql: &str| -> Vec<i64> {
+            let mut stmt = conn.prepare(sql).unwrap();
+            stmt.query_map([], |r| r.get(0))
+                .unwrap()
+                .collect::<rusqlite::Result<_>>()
+                .unwrap()
+        };
+        let set = ids("SELECT id FROM item WHERE uuid LIKE 'bulk-%' ORDER BY id");
+        let every = ids("SELECT id FROM tag");
+        resolve(conn, &set, &every).unwrap();
         tags::add_items_tag(conn, &set[..3_120], "felucca", &journal::new_batch()).unwrap();
         let (felucca, travel) = (id_of(conn, None, "felucca"), id_of(conn, None, "travel"));
         let batch = journal::new_batch();
