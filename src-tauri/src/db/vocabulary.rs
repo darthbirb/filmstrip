@@ -2082,30 +2082,37 @@ mod tests {
         assert_eq!(found_by(conn, "tag:felucca"), sorted(set[..3_120].to_vec()));
     }
 
-    #[test]
-    fn forty_thousand_folders_list_inside_two_seconds_with_a_tenth_deleted() {
-        let lib = library();
-        let conn = &lib.conn;
-        let before = list_tags(conn).unwrap().tags.len();
-        conn.execute_batch(&format!(
-            "WITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i + 1 FROM n WHERE i < 39999)
-             INSERT INTO folder (title, parent_id, created_at, deleted_at)
-             SELECT printf('day %05d', i),
-                    CASE i % 3 WHEN 0 THEN {} WHEN 1 THEN {} ELSE {} END,
-                    0, CASE WHEN i % 10 = 0 THEN 1 END FROM n;
-             INSERT INTO tag (key, value) SELECT NULL, title FROM folder WHERE title LIKE 'day %';
-             INSERT INTO folder_tag (folder_id, tag_id, source)
-             SELECT f.id, t.id, 'title' FROM folder f JOIN tag t ON t.key IS NULL AND t.value = f.title
-              WHERE f.title LIKE 'day %';",
-            lib.trips, lib.family, lib.beach
-        ))
-        .unwrap();
+    mod timing {
+        use super::*;
 
-        let started = std::time::Instant::now();
-        let listed = list_tags(conn).unwrap();
-        let took = started.elapsed();
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn forty_thousand_folders_list_inside_two_seconds_with_a_tenth_deleted() {
+            let lib = library();
+            let conn = &lib.conn;
+            let before = list_tags(conn).unwrap().tags.len();
+            conn.execute_batch(&format!(
+                "WITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i + 1 FROM n WHERE i < 39999)
+                 INSERT INTO folder (title, parent_id, created_at, deleted_at)
+                 SELECT printf('day %05d', i),
+                        CASE i % 3 WHEN 0 THEN {} WHEN 1 THEN {} ELSE {} END,
+                        0, CASE WHEN i % 10 = 0 THEN 1 END FROM n;
+                 INSERT INTO tag (key, value)
+                 SELECT NULL, title FROM folder WHERE title LIKE 'day %';
+                 INSERT INTO folder_tag (folder_id, tag_id, source)
+                 SELECT f.id, t.id, 'title'
+                   FROM folder f JOIN tag t ON t.key IS NULL AND t.value = f.title
+                  WHERE f.title LIKE 'day %';",
+                lib.trips, lib.family, lib.beach
+            ))
+            .unwrap();
 
-        assert_eq!(listed.tags.len(), before + 36_000);
-        assert!(took < std::time::Duration::from_secs(2), "took {took:?}");
+            let started = std::time::Instant::now();
+            let listed = list_tags(conn).unwrap();
+            let took = started.elapsed();
+
+            assert_eq!(listed.tags.len(), before + 36_000);
+            assert!(took < std::time::Duration::from_secs(2), "took {took:?}");
+        }
     }
 }

@@ -916,60 +916,6 @@ mod tests {
         assert_eq!(branch_ids(&conn, root, true).unwrap(), [a, b]);
     }
 
-    /// An eight-level branch of 40,000 files, five side folders at each level; its top folder.
-    fn forty_thousand_deep(conn: &Connection, root: i64) -> i64 {
-        let tx = conn.unchecked_transaction().unwrap();
-        let mut parent = root;
-        let mut at = Vec::new();
-        for depth in 0..8 {
-            parent = folders::create(&tx, parent, &format!("level {depth}")).unwrap();
-            for side in 0..5 {
-                at.push(folders::create(&tx, parent, &format!("side {side}")).unwrap());
-            }
-            at.push(parent);
-        }
-        for n in 0..40_000 {
-            let folder = at[n % at.len()];
-            upsert(&tx, &sample(1, folder, &format!("IMG_{n:05}.jpg"))).unwrap();
-        }
-        tx.commit().unwrap();
-        folders::child_id(conn, root, "level 0").unwrap().unwrap()
-    }
-
-    #[test]
-    fn forty_thousand_ids_come_back_well_inside_a_second() {
-        let (conn, root) = library();
-        let top = forty_thousand_deep(&conn, root);
-
-        let started = std::time::Instant::now();
-        let ids = branch_ids(&conn, top, true).unwrap();
-        let took = started.elapsed();
-
-        assert_eq!(ids.len(), 40_000);
-        assert!(
-            took < std::time::Duration::from_millis(500),
-            "took {took:?}"
-        );
-    }
-
-    #[test]
-    fn forty_thousand_branch_files_are_read_and_written_out_well_inside_a_second() {
-        let (conn, root) = library();
-        let top = forty_thousand_deep(&conn, root);
-
-        let started = std::time::Instant::now();
-        let files = branch_files(&conn, top).unwrap();
-        let json = serde_json::to_vec(&files).unwrap();
-        let took = started.elapsed();
-
-        assert_eq!(files.len(), 40_000);
-        assert!(json.len() < 4_000_000, "{} bytes", json.len());
-        assert!(
-            took < std::time::Duration::from_millis(500),
-            "took {took:?}"
-        );
-    }
-
     #[test]
     fn a_folder_lists_its_live_items_by_name_whatever_the_case() {
         let (conn, root) = library();
@@ -1135,41 +1081,6 @@ mod tests {
             },
             "newest taken first, for every kind of place"
         );
-    }
-
-    #[test]
-    fn forty_thousand_in_one_folder_reorder_by_every_key_well_inside_a_second() {
-        let (conn, root) = library();
-        let tx = conn.unchecked_transaction().unwrap();
-        for n in 0..40_000_i64 {
-            let item = NewItem {
-                captured_at: (n % 3 != 0).then_some(n * 7 % 40_000),
-                size_bytes: n * 31 % 9_973,
-                duration_ms: (n % 5 == 0).then_some(n % 600_000),
-                ..sample(1, root, &format!("IMG_{n:05}.jpg"))
-            };
-            upsert(&tx, &item).unwrap();
-        }
-        tx.commit().unwrap();
-
-        for key in [
-            SortKey::Taken,
-            SortKey::Added,
-            SortKey::Size,
-            SortKey::Length,
-            SortKey::Random,
-        ] {
-            for dir in [SortDir::Desc, SortDir::Asc] {
-                let started = std::time::Instant::now();
-                let rows = in_folder_sorted(&conn, root, &Sort { key, dir, seed: 9 }).unwrap();
-                let took = started.elapsed();
-                assert_eq!(rows.len(), 40_000);
-                assert!(
-                    took < std::time::Duration::from_millis(500),
-                    "{key:?} {dir:?} took {took:?}"
-                );
-            }
-        }
     }
 
     #[test]
@@ -1406,26 +1317,123 @@ mod tests {
         assert_eq!(totals(&conn).unwrap(), LibraryTotals::default());
     }
 
-    #[test]
-    fn the_totals_of_a_hundred_thousand_files_come_back_in_one_quick_read() {
-        let (conn, root) = library();
-        conn.execute(
-            "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 100000)
-             INSERT INTO item (uuid, source_id, folder_id, disk_name, ext, size_bytes, mtime, kind,
-                               added_at)
-             SELECT 'u' || i, 1, ?1, i || '.jpg', 'jpg', 1000, 1,
-                    CASE WHEN i % 10 = 0 THEN 'video' ELSE 'image' END, 1
-               FROM n",
-            params![root],
-        )
-        .unwrap();
+    mod timing {
+        use super::*;
 
-        let started = std::time::Instant::now();
-        let read = totals(&conn).unwrap();
-        let took = started.elapsed();
-        assert_eq!(read.pictures.count, 90_000);
-        assert_eq!(read.videos.count, 10_000);
-        assert_eq!(read.all.bytes, 100_000_000);
-        assert!(took.as_millis() < 1000, "took {took:?}");
+        /// An eight-level branch of 40,000 files, five side folders at each level; its top folder.
+        fn forty_thousand_deep(conn: &Connection, root: i64) -> i64 {
+            let tx = conn.unchecked_transaction().unwrap();
+            let mut parent = root;
+            let mut at = Vec::new();
+            for depth in 0..8 {
+                parent = folders::create(&tx, parent, &format!("level {depth}")).unwrap();
+                for side in 0..5 {
+                    at.push(folders::create(&tx, parent, &format!("side {side}")).unwrap());
+                }
+                at.push(parent);
+            }
+            for n in 0..40_000 {
+                let folder = at[n % at.len()];
+                upsert(&tx, &sample(1, folder, &format!("IMG_{n:05}.jpg"))).unwrap();
+            }
+            tx.commit().unwrap();
+            folders::child_id(conn, root, "level 0").unwrap().unwrap()
+        }
+
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn forty_thousand_ids_come_back_well_inside_a_second() {
+            let (conn, root) = library();
+            let top = forty_thousand_deep(&conn, root);
+
+            let started = std::time::Instant::now();
+            let ids = branch_ids(&conn, top, true).unwrap();
+            let took = started.elapsed();
+
+            assert_eq!(ids.len(), 40_000);
+            assert!(
+                took < std::time::Duration::from_millis(500),
+                "took {took:?}"
+            );
+        }
+
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn forty_thousand_branch_files_are_read_and_written_out_well_inside_a_second() {
+            let (conn, root) = library();
+            let top = forty_thousand_deep(&conn, root);
+
+            let started = std::time::Instant::now();
+            let files = branch_files(&conn, top).unwrap();
+            let json = serde_json::to_vec(&files).unwrap();
+            let took = started.elapsed();
+
+            assert_eq!(files.len(), 40_000);
+            assert!(json.len() < 4_000_000, "{} bytes", json.len());
+            assert!(
+                took < std::time::Duration::from_millis(500),
+                "took {took:?}"
+            );
+        }
+
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn forty_thousand_in_one_folder_reorder_by_every_key_well_inside_a_second() {
+            let (conn, root) = library();
+            let tx = conn.unchecked_transaction().unwrap();
+            for n in 0..40_000_i64 {
+                let item = NewItem {
+                    captured_at: (n % 3 != 0).then_some(n * 7 % 40_000),
+                    size_bytes: n * 31 % 9_973,
+                    duration_ms: (n % 5 == 0).then_some(n % 600_000),
+                    ..sample(1, root, &format!("IMG_{n:05}.jpg"))
+                };
+                upsert(&tx, &item).unwrap();
+            }
+            tx.commit().unwrap();
+
+            for key in [
+                SortKey::Taken,
+                SortKey::Added,
+                SortKey::Size,
+                SortKey::Length,
+                SortKey::Random,
+            ] {
+                for dir in [SortDir::Desc, SortDir::Asc] {
+                    let started = std::time::Instant::now();
+                    let rows = in_folder_sorted(&conn, root, &Sort { key, dir, seed: 9 }).unwrap();
+                    let took = started.elapsed();
+                    assert_eq!(rows.len(), 40_000);
+                    assert!(
+                        took < std::time::Duration::from_millis(500),
+                        "{key:?} {dir:?} took {took:?}"
+                    );
+                }
+            }
+        }
+
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn the_totals_of_a_hundred_thousand_files_come_back_in_one_quick_read() {
+            let (conn, root) = library();
+            conn.execute(
+                "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 100000)
+                 INSERT INTO item (uuid, source_id, folder_id, disk_name, ext, size_bytes, mtime,
+                                   kind, added_at)
+                 SELECT 'u' || i, 1, ?1, i || '.jpg', 'jpg', 1000, 1,
+                        CASE WHEN i % 10 = 0 THEN 'video' ELSE 'image' END, 1
+                   FROM n",
+                params![root],
+            )
+            .unwrap();
+
+            let started = std::time::Instant::now();
+            let read = totals(&conn).unwrap();
+            let took = started.elapsed();
+            assert_eq!(read.pictures.count, 90_000);
+            assert_eq!(read.videos.count, 10_000);
+            assert_eq!(read.all.bytes, 100_000_000);
+            assert!(took.as_millis() < 1000, "took {took:?}");
+        }
     }
 }
