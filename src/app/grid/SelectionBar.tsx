@@ -1,4 +1,11 @@
-import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { copyItems } from "../../ipc/commands";
 import { formatBytes, formatCount } from "../../lib/format";
@@ -10,8 +17,16 @@ import { setFavourites, useEveryFavourite } from "../favourites";
 import { deleteFiles } from "../pane/delete";
 import { openMovePicker } from "../pane/move-picker";
 import { restoreFiles } from "../pane/restore";
+import { TagSheet, whenTagSheetAsked } from "../tags/TagSheet";
 import { inTrash } from "./place-items";
-import { type CheckedFile, checkAll, clearChecked, oneFolder, useChecked } from "./selection";
+import {
+  type CheckedFile,
+  checkAll,
+  clearChecked,
+  oneFolder,
+  useChecked,
+  useSelection,
+} from "./selection";
 
 /**
  * What acts on the files checked in the grid: a row of the grid's own column, under the pictures
@@ -35,10 +50,58 @@ export function SelectionBar() {
 // The line is drawn twice, once out of sight to be measured, so no piece holds a ref.
 type Piece = { id: string; node: ReactNode; action?: MenuAction; group?: number };
 
+/** What the bar holds open over the grid, and against which of its buttons. */
+type Sheet = { anchor: HTMLElement; maxHeight?: number } | null;
+
+const gridOf = (bar: HTMLElement) => bar.closest(".push-down")?.previousElementSibling ?? null;
+
+/** Against Tag… while it is on the bar, else against More, which holds it; half the grid tall. */
+function sheetPlace(bar: HTMLElement | null): Sheet {
+  const anchor =
+    bar?.querySelector<HTMLElement>(':scope > [data-piece="tag"] > button') ??
+    bar?.querySelector<HTMLElement>(':scope > button[aria-label="More"]');
+  if (!bar || !anchor) return null;
+  const grid = gridOf(bar);
+  return { anchor, maxHeight: grid ? grid.clientHeight / 2 : undefined };
+}
+
 const files = (count: number) => `${formatCount(count)} ${count === 1 ? "File" : "Files"}`;
 
 function InLibrary({ rows }: { rows: readonly CheckedFile[] }) {
   const ids = rows.map((row) => row.id);
+  const bar = useRef<HTMLDivElement>(null);
+  const [sheet, setSheet] = useState<Sheet>(null);
+  const openSheet = () => {
+    const at = sheetPlace(bar.current);
+    if (at) setSheet(at);
+  };
+  useEffect(() => whenTagSheetAsked(openSheet));
+  const open = sheet !== null;
+  useEffect(() => {
+    const element = bar.current;
+    if (!open || !element) return;
+    const follow = () => {
+      const at = sheetPlace(element);
+      if (!at) return;
+      setSheet((was) =>
+        was && (was.anchor !== at.anchor || was.maxHeight !== at.maxHeight) ? at : was,
+      );
+    };
+    const resized = new ResizeObserver(follow);
+    resized.observe(element);
+    const grid = gridOf(element);
+    if (grid) resized.observe(grid);
+    const moved = new MutationObserver(follow);
+    moved.observe(element, { childList: true });
+    return () => {
+      resized.disconnect();
+      moved.disconnect();
+    };
+  }, [open]);
+  const live = useSelection().ids.length > 0;
+  useEffect(() => {
+    if (!live) setSheet(null);
+  }, [live]);
   const favourite = useEveryFavourite(rows);
   const star = favourite ? "Remove Favourite" : "Favourite";
   const remove = `Delete ${files(ids.length)}`;
@@ -64,6 +127,22 @@ function InLibrary({ rows }: { rows: readonly CheckedFile[] }) {
         filled: favourite,
         onSelect: run.favourite,
       },
+    },
+    {
+      id: "tag",
+      group: 1,
+      node: (
+        <Button
+          glyph="tag"
+          expanded={sheet !== null && sheet.anchor.closest('[data-piece="tag"]') !== null}
+          onClick={() => {
+            if (!sheet) openSheet();
+          }}
+        >
+          Tag…
+        </Button>
+      ),
+      action: { id: "tag", label: "Tag…", glyph: "tag", onSelect: openSheet },
     },
     {
       id: "move",
@@ -108,7 +187,22 @@ function InLibrary({ rows }: { rows: readonly CheckedFile[] }) {
     },
   ];
   return (
-    <Bar rows={rows} pieces={pieces} sheds={["size", "selectAll", "copy", "favourite", "delete"]} />
+    <>
+      <Bar
+        ref={bar}
+        rows={rows}
+        pieces={pieces}
+        sheds={["size", "selectAll", "copy", "tag", "favourite", "delete"]}
+      />
+      {sheet && (
+        <TagSheet
+          itemIds={ids}
+          anchor={sheet.anchor}
+          maxHeight={sheet.maxHeight}
+          onClose={() => setSheet(null)}
+        />
+      )}
+    </>
   );
 }
 
@@ -145,14 +239,20 @@ function InTrash({ rows }: { rows: readonly CheckedFile[] }) {
   return <Bar rows={rows} pieces={pieces} sheds={["size", "selectAll"]} />;
 }
 
-type BarProps = { rows: readonly CheckedFile[]; pieces: Piece[]; sheds: string[] };
+type BarProps = {
+  rows: readonly CheckedFile[];
+  pieces: Piece[];
+  sheds: string[];
+  ref?: RefObject<HTMLDivElement | null>;
+};
 
 /**
  * The count and its size, Select All, the set's verbs, and the clear. What has no room leaves for
  * More in a fixed order; the count, Move to… and the clear never leave. Measured, never guessed.
  */
-function Bar({ rows, pieces, sheds }: BarProps) {
-  const bar = useRef<HTMLDivElement>(null);
+function Bar({ rows, pieces, sheds, ref }: BarProps) {
+  const own = useRef<HTMLDivElement>(null);
+  const bar = ref ?? own;
   const copy = useRef<HTMLDivElement>(null);
   const bytes = rows.reduce((sum, row) => sum + row.sizeBytes, 0);
   const selectAll: MenuAction = {

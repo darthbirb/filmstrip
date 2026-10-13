@@ -9,8 +9,9 @@ use ts_rs::TS;
 
 use crate::db::journal::{
     self, Entry, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, ItemMoved, ItemRenamed,
-    ItemRestored, ItemTrashed,
+    ItemRestored, ItemTrashed, ItemsTagged,
 };
+use crate::db::tags;
 use crate::error::{AppError, Result};
 use crate::fs::acts::{self, Batch};
 use crate::fs::stayed::{self, Stayed};
@@ -55,6 +56,7 @@ fn reverse_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
         // What failed stays in the journal, or it could never be tried again.
         match reverse(conn, entry) {
             Ok(()) => journal::drop_entry(conn, entry.id)?,
+            Err(err) if tagging(entry) => return Err(err),
             Err(err) => stayed.push(stayed_of(conn, entry, &err)?),
         }
     }
@@ -88,6 +90,11 @@ fn stayed_of(conn: &Connection, entry: &Entry, err: &AppError) -> Result<Stayed>
     }
 }
 
+/// A tag's row names no one file or folder that stayed: it comes back whole or not at all.
+fn tagging(entry: &Entry) -> bool {
+    matches!(entry.op.as_str(), journal::ITEMS_TAG | journal::ITEMS_UNTAG)
+}
+
 fn reverse(conn: &Connection, entry: &Entry) -> Result<()> {
     match entry.op.as_str() {
         journal::FOLDER_CREATE => {
@@ -119,6 +126,11 @@ fn reverse(conn: &Connection, entry: &Entry) -> Result<()> {
             let back: FolderDeleted = inverse(entry)?;
             folders::undelete(conn, back.folder_id, back.retired_at)
         }
+        journal::ITEMS_TAG => {
+            let back: ItemsTagged = inverse(entry)?;
+            tags::untag_items(conn, back.tag_id, &back.item_ids)
+        }
+        journal::ITEMS_UNTAG => tags::retag_items(conn, &inverse(entry)?),
         other => Err(AppError::invalid(format!("{other} cannot be undone"))),
     }
 }

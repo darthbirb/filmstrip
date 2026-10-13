@@ -524,15 +524,24 @@ fn live_count(conn: &Connection, folder_id: i64) -> Result<i64> {
 /// Writes an item's row again from its name and every tag it carries. `tags::rebuild_item` calls
 /// it, so anything that changes what an item carries keeps its row current.
 pub fn index_item(conn: &Connection, item_id: i64) -> Result<()> {
-    conn.execute("DELETE FROM item_fts WHERE rowid = ?1", params![item_id])?;
+    index_items(conn, &[item_id])
+}
+
+/// As [`index_item`], for many items in one statement each.
+pub fn index_items(conn: &Connection, item_ids: &[i64]) -> Result<()> {
+    let ids = serde_json::to_string(item_ids)?;
+    conn.execute(
+        "DELETE FROM item_fts WHERE rowid IN (SELECT value FROM json_each(?1))",
+        params![ids],
+    )?;
     conn.execute(
         "INSERT INTO item_fts (rowid, name, tags)
          SELECT i.id, i.disk_name,
                 COALESCE((SELECT group_concat(t.value, ' ')
                             FROM item_effective_tag e JOIN tag t ON t.id = e.tag_id
                            WHERE e.item_id = i.id), '')
-           FROM item i WHERE i.id = ?1",
-        params![item_id],
+           FROM item i WHERE i.id IN (SELECT value FROM json_each(?1))",
+        params![ids],
     )?;
     Ok(())
 }

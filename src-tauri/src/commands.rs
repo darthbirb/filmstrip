@@ -898,6 +898,52 @@ pub async fn remove_item_tag(state: State<'_, AppState>, item_id: i64, tag_id: i
     .await
 }
 
+/// What a set of files carries, and whose each tag is, in one read however many are checked.
+#[tauri::command]
+pub async fn selection_tag_coverage(
+    state: State<'_, AppState>,
+    item_ids: Vec<i64>,
+) -> Result<tags::Coverage> {
+    run(&state, move |conn| {
+        tags::selection_tag_coverage(conn, &item_ids)
+    })
+    .await
+}
+
+/// A tag for every file in a set that lacks it, as one batch; nothing when they all carry it.
+#[tauri::command]
+pub async fn add_items_tag(
+    state: State<'_, AppState>,
+    item_ids: Vec<i64>,
+    value: String,
+) -> Result<Option<Batch>> {
+    run(&state, move |conn| {
+        in_transaction(conn, |tx| {
+            let batch_id = journal::new_batch();
+            let added = tags::add_items_tag(tx, &item_ids, &value, &batch_id)?;
+            described(tx, added > 0, &batch_id)
+        })
+    })
+    .await
+}
+
+/// A tag off every file in a set that holds it as its own, as one batch; what a folder gives stays.
+#[tauri::command]
+pub async fn remove_items_tag(
+    state: State<'_, AppState>,
+    item_ids: Vec<i64>,
+    tag_id: i64,
+) -> Result<Option<Batch>> {
+    run(&state, move |conn| {
+        in_transaction(conn, |tx| {
+            let batch_id = journal::new_batch();
+            let taken = tags::remove_items_tag(tx, &item_ids, tag_id, &batch_id)?;
+            described(tx, taken > 0, &batch_id)
+        })
+    })
+    .await
+}
+
 /// One item in full for the pane, or nothing once it is gone.
 #[tauri::command]
 pub async fn item_detail(state: State<'_, AppState>, item_id: i64) -> Result<Option<ItemDetail>> {
@@ -1708,6 +1754,36 @@ mod tests {
         let dawn = tags::get_or_create_tag(&conn, None, "dawn").unwrap();
         in_transaction(&conn, |tx| tags::remove_item_tag(tx, file.id, dawn)).unwrap();
         assert_eq!(own(&conn), [] as [String; 0]);
+    }
+
+    #[test]
+    fn a_set_on_an_unplugged_source_still_takes_a_tag_and_gives_it_back_on_undo() {
+        let base = scratch("unplugged-set-tags");
+        let app = app_dir(&base);
+        let drive = base.join("drive");
+        std::fs::create_dir_all(&drive).unwrap();
+        std::fs::write(drive.join("a.jpg"), "a").unwrap();
+        std::fs::write(drive.join("b.jpg"), "b").unwrap();
+        let conn = conn();
+        register(&conn, &drive, &app).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let [summary] = source_summaries(&conn).unwrap().try_into().unwrap();
+        let ids: Vec<i64> = items::in_folder(&conn, summary.root_folder_id)
+            .unwrap()
+            .into_iter()
+            .map(|row| row.id)
+            .collect();
+        std::fs::remove_dir_all(&drive).unwrap();
+        walk::reconcile(&conn).unwrap();
+
+        let batch = journal::new_batch();
+        let added = in_transaction(&conn, |tx| tags::add_items_tag(tx, &ids, "Dawn", &batch));
+        assert_eq!(added.unwrap(), 2);
+        let coverage = tags::selection_tag_coverage(&conn, &ids).unwrap();
+        assert_eq!(coverage.own.first().map(|tag| tag.files), Some(2));
+        undo::undo_batch(&conn, &batch).unwrap();
+        let coverage = tags::selection_tag_coverage(&conn, &ids).unwrap();
+        assert!(coverage.own.is_empty(), "{:?}", coverage.own);
     }
 
     #[test]

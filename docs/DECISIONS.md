@@ -898,6 +898,15 @@ it.
   goes with it; any other file the app does not show keeps it in place and is named.
 - **A source's own folder is not renamed on disk.** Its name in the app is the source's label, and
   its directory is the source's root; renaming that is removing one source and adding another.
+- **Tagging a set is journalled too**, though it never touches the disk. A tag added to the
+  checked files, or one of their own taken off them, is one transaction that writes one row for
+  the whole set, so five thousand checked cost what five do, and the act ends with the Line and
+  Undo as a move does. The row names exactly the files it changed, and for a removal when each had
+  the tag, because a × on "3,120 of 5,000" forgets which files those were: typing the tag again
+  would give it to all 5,000, and only the journal can put it back on the 3,120, in its place
+  among each file's own. Undo works while a drive is away, since tags live in the index. One
+  file's tag in the pane is not journalled: Add Tag… and its × are each other's way back.
+  Artboards › Tagging a set.
 - **The journal keeps everything for now.** Its rows are small, and what to prune is settled with
   the trash's limits.
 

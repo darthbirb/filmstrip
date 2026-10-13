@@ -92,7 +92,7 @@ drawn. **Not started** — neither.
 | An item's effective tags, inherited live | Built | `item_tags`: its own as added, then each folder's from the source down |
 | Add or remove a tag on an item | Built | `add_item_tag`, `remove_item_tag`, Add Tag… in the pane's details, the band's own control; an item owns tags only, never a label, and what it inherits comes off only at its folder; a tag may be several words, kept lowercase with one space between them |
 | A folder's inherited tags | Built | `folder_detail`, in path order in the band, each where it is nearest |
-| What a selection's tags cover | Not started | |
+| What a selection's tags cover | Built | `selection_tag_coverage`, `add_items_tag`, `remove_items_tag`; Tag… on the selection bar and the set's menu: each tag on all, on some with the count, or from which folder; added to every checked file that lacks it, or a file's own taken off every file that has it, each as one batch with the Line and Undo |
 | The vocabulary, with counts; rename and delete a tag | Not started | |
 
 ## Search
@@ -107,7 +107,7 @@ drawn. **Not started** — neither.
 
 | Capability | Filmstrip | Where |
 | --- | --- | --- |
-| Select in a grid, and act on the selection | Built | a box on each tile, Ctrl and Shift with a click, the keyboard; a bar at the grid's foot with Favourite, Move to…, Copy and Delete, or Restore in the Trash |
+| Select in a grid, and act on the selection | Built | a box on each tile, Ctrl and Shift with a click, the keyboard; a bar at the grid's foot with Favourite, Tag…, Move to…, Copy and Delete, or Restore in the Trash |
 | Move a selection somewhere | Built | the bar's Move to…, or dragged onto a row in navigation; one batch undone as one |
 | Destination hotkeys | Built | `destination_keys`, `set_destination_key`, `remove_destination_key`; the digits 1 to 0, bound from a folder's menu or Settings, shown on its row, a press moving the set or the pane's file |
 | The trash as a place, with its own limits | Partly | `trash_listing`, `library_totals`: newest first under a heading per day, each tile saying where it came from, counted on its row and header; there are no limits yet |

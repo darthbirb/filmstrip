@@ -8,6 +8,7 @@ import { getFullScreen, setFullScreen } from "../pane/full-screen";
 import { openMovePicker } from "../pane/move-picker";
 import { startRename } from "../pane/rename";
 import { restoreFiles } from "../pane/restore";
+import { openTagSheet } from "../tags/TagSheet";
 
 /** A file, with when it went to the Trash when it is there. */
 type Item = { id: number; folderId: number; favorite: boolean; trashedAt?: number | null };
@@ -59,6 +60,7 @@ export function setMenu(items: readonly Item[], trash: boolean): HeadedMenu {
           filled: favourite,
           onSelect: () => setFavourites(ids, !favourite),
         },
+        { id: "tag", label: "Tag…", glyph: "tag", onSelect: openTagSheet },
         {
           id: "move",
           label: "Move to…",

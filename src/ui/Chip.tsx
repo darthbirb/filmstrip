@@ -35,6 +35,12 @@ type Props = {
 // One step lighter under the pointer, in the hairline ring a tile takes. Pane › the details' search.
 const SEARCHING = "cursor-default focus-ring hover:ring-1 hover:ring-line-strong";
 
+/** A tag pill's ground and ring: its own raised, an inherited one sunk, either outlined when echoed. */
+export const pillGround = (inherited: boolean, echoed: boolean) =>
+  inherited
+    ? `bg-inset ${echoed ? "text-fg-mid inset-ring-line-strong" : "text-fg-dim inset-ring-line"}`
+    : `bg-raised text-fg ${echoed ? "inset-ring-line-strong" : "inset-ring-line-control-hi"}`;
+
 /** A tag is a pill; a label is a split chip, its key sunk. Inherited ones sit quieter than an item's own. */
 export function Chip({
   value,
@@ -118,9 +124,7 @@ export function Chip({
       </Tag>
     );
   }
-  const ground = inherited
-    ? `bg-inset ${echoed ? "text-fg-mid inset-ring-line-strong" : "text-fg-dim inset-ring-line"}`
-    : `bg-raised text-fg ${echoed ? "inset-ring-line-strong" : "inset-ring-line-control-hi"}`;
+  const ground = pillGround(inherited, echoed);
   if (onSearch && onRemove) {
     // The × is the pointer's; the keyboard removes with Delete, so the chip stays one tab stop.
     return (

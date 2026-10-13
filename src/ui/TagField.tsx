@@ -57,6 +57,20 @@ export function TagField(props: Props) {
   );
 }
 
+type Standing = {
+  onClose: () => void;
+  /** The keyboard opened what holds it, so it opens with the focus ring a click leaves off. */
+  ringed?: boolean;
+};
+
+/**
+ * The field alone, open from the start and the width of what holds it, for a surface that is
+ * about tagging: leaving the field leaves it open, and only Escape or Enter on nothing closes.
+ */
+export function StandingTagField(props: Props & Standing) {
+  return <Field {...props} standing />;
+}
+
 function Field({
   of,
   offers,
@@ -65,12 +79,16 @@ function Field({
   onEcho,
   onBackOut,
   onClose,
-}: Props & { onClose: () => void }) {
+  standing = false,
+  ringed = false,
+}: Props & Standing & { standing?: boolean }) {
   const id = useId();
   const anchor = anchorOf(id, "tag-field");
   const field = useRef<HTMLInputElement>(null);
   const [typed, setTyped] = useState("");
   const [lit, setLit] = useState(0);
+  // A text field matches :focus-visible however it was focused, so a click's arrival is kept here.
+  const [quiet, setQuiet] = useState(standing && !ringed);
   const value = fold(typed);
   const found = useOffers(value, offers);
   const refused = value ? refuse(value) : null;
@@ -121,7 +139,7 @@ function Field({
       setLit((was) => (Math.min(was, rows.length - 1) + step + rows.length) % rows.length);
     } else if (event.key === "Backspace" && typed === "") {
       event.preventDefault();
-      onClose();
+      if (!standing) onClose();
       onBackOut();
     }
   };
@@ -143,9 +161,10 @@ function Field({
           setLit(0);
         }}
         onKeyDown={onKeyDown}
-        onBlur={onClose}
+        onPointerDown={standing ? () => setQuiet(true) : undefined}
+        onBlur={standing ? () => setQuiet(false) : onClose}
         style={{ anchorName: anchor } as CSSProperties}
-        className={`focus-ring field-sizing-content h-chip min-w-24 max-w-full rounded-full bg-ground px-2.5 text-fg-hi text-small inset-ring placeholder:text-fg-faint ${refused ? "inset-ring-line-danger" : "inset-ring-line-control"}`}
+        className={`h-chip max-w-full rounded-full bg-ground px-2.5 text-fg-hi text-small inset-ring placeholder:text-fg-faint ${standing ? `w-full ${quiet ? "outline-none" : "focus-ring"}` : "focus-ring field-sizing-content min-w-24"} ${refused ? "inset-ring-line-danger" : "inset-ring-line-control"}`}
       />
       {refused && <RefusalLine>{refused.line}</RefusalLine>}
       <OfferList

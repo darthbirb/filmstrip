@@ -10,7 +10,7 @@ use ts_rs::TS;
 
 use crate::db::journal::{
     self, Entry, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, ItemMoved, ItemRenamed,
-    ItemRestored, ItemTrashed,
+    ItemRestored, ItemTrashed, ItemsTagged, ItemsUntagged,
 };
 use crate::db::{folders, items};
 use crate::error::{AppError, Result};
@@ -73,6 +73,14 @@ pub enum Act {
         parent: String,
         into: Option<String>,
     },
+    /// A tag given to every file in a set that lacked it.
+    AddTag {
+        tag: String,
+    },
+    /// A file's own tag taken off every file in a set that had it.
+    RemoveTag {
+        tag: String,
+    },
 }
 
 /// Describes a batch still in the journal.
@@ -101,6 +109,8 @@ pub fn count(conn: &Connection, entries: &[Entry]) -> Result<(u32, u32)> {
                 files += items::live_under(conn, moved.folder_id)?.len() as u32;
                 folders_held += 1;
             }
+            journal::ITEMS_TAG => files += forward::<ItemsTagged>(entry)?.item_ids.len() as u32,
+            journal::ITEMS_UNTAG => files += forward::<ItemsUntagged>(entry)?.items.len() as u32,
             _ => folders_held += 1,
         }
     }
@@ -109,6 +119,14 @@ pub fn count(conn: &Connection, entries: &[Entry]) -> Result<(u32, u32)> {
 
 fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
     let of = |op: &'static str| entries.iter().filter(move |entry| entry.op == op);
+    if let Some(entry) = of(journal::ITEMS_TAG).next() {
+        let tag = forward::<ItemsTagged>(entry)?.value;
+        return Ok(Act::AddTag { tag });
+    }
+    if let Some(entry) = of(journal::ITEMS_UNTAG).next() {
+        let tag = forward::<ItemsUntagged>(entry)?.value;
+        return Ok(Act::RemoveTag { tag });
+    }
     if let Some(entry) = of(journal::FOLDER_DELETE).next() {
         let deleted: FolderDeleted = forward(entry)?;
         // What a deleted folder held went to one sorting source's own folder, if anywhere.
