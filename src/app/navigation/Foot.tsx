@@ -10,9 +10,9 @@ import { FirstFit } from "../../ui/FirstFit";
 import { Glyph } from "../../ui/Glyph";
 import { GlyphButton } from "../../ui/GlyphButton";
 import { Line } from "../../ui/Line";
-import { SURFACE } from "../../ui/Menu";
+import { keepEscape, SURFACE } from "../../ui/Menu";
 import { PushDown } from "../../ui/PushDown";
-import { Tallies, type TallyRow } from "../../ui/Tallies";
+import { Tallies, type TallyNote, type TallyRow } from "../../ui/Tallies";
 import { undo } from "../undo/undo";
 import { refusalSentence } from "./add-source";
 import { type FootNews, setNews, useNews } from "./foot-slot";
@@ -34,7 +34,7 @@ export function Foot({ rail = false }: { rail?: boolean }) {
 
   return (
     // Ordered by permanence from the bottom: the count, the walk, then what waits to be read.
-    <div className="shrink-0" style={{ anchorName: anchor } as CSSProperties}>
+    <div className="w-full shrink-0" style={{ anchorName: anchor } as CSSProperties}>
       <PushDown open={shown}>{shown && <News news={news} rail={rail} />}</PushDown>
       <PushDown open={busy}>
         {rail ? (
@@ -125,10 +125,7 @@ function Baseline({ rail, anchor }: { rail: boolean; anchor: string }) {
           )
             trigger.current?.focus();
         }}
-        // Escape closes the totals and nothing else: full screen listens on the window.
-        onKeyDown={(event) => {
-          if (event.key === "Escape") event.stopPropagation();
-        }}
+        onKeyDown={keepEscape}
         style={
           (rail
             ? { positionAnchor: own, left: "anchor(right)", bottom: "anchor(bottom)" }
@@ -139,7 +136,7 @@ function Baseline({ rail, anchor }: { rail: boolean; anchor: string }) {
                 positionTryFallbacks: "flip-block",
               }) as CSSProperties
         }
-        className={`${rail ? "ml-1.5" : "mb-1.5"} outline-none ${SURFACE}`}
+        className={`${rail ? "ml-tile-gap" : "mb-tile-gap"} outline-none ${SURFACE}`}
       >
         {open && <Totals totals={totals ?? NOTHING} sources={sources ?? []} />}
       </div>
@@ -177,11 +174,14 @@ function Totals({ totals, sources }: { totals: LibraryTotals; sources: readonly 
 }
 
 /** A source that is away is still counted, from what the index last read of it. */
-function offlineNote(source: SourceSummary) {
+function offlineNote(source: SourceSummary): TallyNote {
   const held = source.itemCount;
-  if (held === 0) return `${source.title} is offline`;
+  if (held === 0) return { key: source.id, text: `${source.title} is offline` };
   const when = source.indexedAt === null ? "" : `, ${formatShortDay(source.indexedAt)}`;
-  return `${source.title} is offline · its ${formatCount(held)} ${held === 1 ? "is" : "are"} counted from the last walk${when}`;
+  return {
+    key: source.id,
+    text: `${source.title} is offline · its ${formatCount(held)} ${held === 1 ? "is" : "are"} counted from the last walk${when}`,
+  };
 }
 
 /** The slot's one piece of news: a refusal, or what an act or an undo did. DECISIONS.md "Undo". */

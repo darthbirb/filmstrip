@@ -1,6 +1,6 @@
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC } from "@tauri-apps/api/mocks";
-import { beforeEach, expect, test } from "vitest";
+import { beforeEach, expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
@@ -100,6 +100,15 @@ const LINE = "41,236 items · 312 GB";
 /** The line the foot shows, without its glyph. */
 const wordsOf = (foot: { element: () => Element }) => foot.element().lastElementChild?.textContent;
 
+/** The token's own length in pixels, so the code, the test and the doc move together. */
+const tileGap = () => {
+  const root = getComputedStyle(document.documentElement);
+  return (
+    Number.parseFloat(root.getPropertyValue("--spacing-tile-gap")) *
+    Number.parseFloat(root.fontSize)
+  );
+};
+
 /** Each row of the totals: its name, its count, and what follows the count. */
 const rowsOf = (dialog: Element) =>
   [...dialog.querySelectorAll("dt")].map((term) => [
@@ -166,8 +175,7 @@ test("a click opens the totals above the foot, by kind, then what waits and what
   // A tile-gap above the foot, left edges met.
   const surface = totals.element().getBoundingClientRect();
   const baseline = foot.element().getBoundingClientRect();
-  const gap = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) * 0.375;
-  expect(surface.bottom).toBeCloseTo(baseline.top - gap, 0);
+  expect(surface.bottom).toBeCloseTo(baseline.top - tileGap(), 0);
   expect(surface.left).toBeCloseTo(baseline.left, 0);
 
   await userEvent.keyboard("{Escape}");
@@ -198,6 +206,30 @@ test("a source that is away is counted from the index, and the totals say which 
       totals.getByText("Archive is offline · its 6,120 are counted from the last walk, 3 Oct"),
     )
     .toBeVisible();
+});
+
+test("two sources away under one name each keep their own note", async () => {
+  const drive = (id: number, root: string): SourceSummary => ({
+    ...(SOURCES[0] as SourceSummary),
+    id,
+    title: "Photos",
+    root,
+    rootFolderId: id,
+    reachable: false,
+    itemCount: 0,
+  });
+  await holding([drive(5, "E:\\Photos"), drive(6, "F:\\Photos")], TOTALS);
+  const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+  try {
+    const screen = await render(<Foot />);
+    await screen.getByRole("button", { name: LINE }).click();
+    const totals = screen.getByRole("dialog", { name: "Library" });
+    await expect.element(totals).toBeVisible();
+    expect(totals.getByText("Photos is offline").elements()).toHaveLength(2);
+    expect(errors.mock.calls.flat().join(" ")).not.toMatch(/same key/);
+  } finally {
+    errors.mockRestore();
+  }
 });
 
 test("other files have a row of their own, so the kinds still add up to In All", async () => {
@@ -243,13 +275,16 @@ test("at the panel's least the line drops a word, then the size, and never cuts 
 });
 
 test("folded, the foot keeps its glyph with the line in its tooltip, and opens the totals beside the rail", async () => {
+  // The rail's own column, which centres what it holds.
   const screen = await render(
     <div
+      data-testid="rail"
       style={{
         width: "2.75rem",
         height: 600,
         display: "flex",
         flexDirection: "column",
+        alignItems: "center",
         justifyContent: "end",
       }}
     >
@@ -259,13 +294,16 @@ test("folded, the foot keeps its glyph with the line in its tooltip, and opens t
   const foot = screen.getByRole("button", { name: LINE });
   await expect.element(foot).toHaveAttribute("title", LINE);
   expect(foot.element().textContent).not.toContain("41,236");
+  const rail = screen.getByTestId("rail").element().getBoundingClientRect();
+  const square = foot.element().getBoundingClientRect();
+  expect(square.left).toBeCloseTo(rail.left, 0);
+  expect(square.width).toBeCloseTo(rail.width, 0);
 
   await foot.click();
   const totals = screen.getByRole("dialog", { name: "Library" });
   await expect.element(totals).toBeVisible();
   const surface = totals.element().getBoundingClientRect();
-  const square = foot.element().getBoundingClientRect();
-  expect(surface.left).toBeGreaterThan(square.right);
+  expect(surface.left).toBeCloseTo(rail.right + tileGap(), 0);
   expect(surface.bottom).toBeCloseTo(square.bottom, 0);
 });
 
@@ -312,19 +350,28 @@ test("a walk shows above the baseline while it runs, and leaves when it ends", a
   await expect.poll(() => inSight(line())).toBe(false);
 });
 
+/** A button's own text is its glyph, so a count is read off its badge rather than the square. */
+const badgeOf = (button: { element: () => Element }) =>
+  button.element().querySelector(".rounded-mark-badge");
+
 test("the folded rail keeps the app's own places, each carrying its count", async () => {
   const screen = await render(<Rail />);
-  // A button's own text is its glyph, so the count is read off the badge rather than the square.
-  const badge = (name: string) =>
-    screen.getByRole("button", { name }).element().querySelector(".rounded-mark-badge");
   const sorting = screen.getByRole("button", { name: "Sorting Box" });
   await expect.element(sorting).toBeVisible();
-  expect(badge("Sorting Box")?.textContent).toBe("3");
-  expect(badge("Trash")?.textContent).toBe("12");
+  expect(badgeOf(sorting)?.textContent).toBe("3");
+  expect(badgeOf(screen.getByRole("button", { name: "Trash" }))?.textContent).toBe("12");
 
   await sorting.click();
   expect(getPlace()?.kind).toBe("sorting");
   await expect.element(sorting).toHaveAttribute("aria-current", "true");
+});
+
+test("with nothing thrown away, the Trash wears no badge", async () => {
+  await holding(SOURCES, { ...TOTALS, trash: { count: 0, bytes: 0 } });
+  const screen = await render(<Rail />);
+  await expect.element(screen.getByRole("button", { name: "Trash" })).toBeVisible();
+  expect(badgeOf(screen.getByRole("button", { name: "Sorting Box" }))?.textContent).toBe("3");
+  expect(badgeOf(screen.getByRole("button", { name: "Trash" }))).toBeNull();
 });
 
 test("a refusal stacks above the walk, and dismissing it leaves the walk alone", async () => {

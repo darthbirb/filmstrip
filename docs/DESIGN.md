@@ -630,14 +630,14 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   under the pointer, `raised` while its totals are open, its focus ring inside, flush to the
   edge. Where the line does not fit, "items" goes first, then the size, whole, and the count
   stands alone; the tooltip then gives the whole line. Folded, it keeps its glyph alone, the line
-  in its tooltip.
-- **Totals.** Figures under a heading in the menu's surface and width: the `eyebrow` heading
+  in its tooltip. Its totals open as tallies a `tile-gap` above the foot and whatever line stands
+  on it, left edges met, flipping below only without room; folded, a `tile-gap` beside the rail,
+  bottoms met.
+- **Tallies.** Figures under a heading in the menu's surface and width: the `eyebrow` heading
   `chip` tall, then rows `chip` tall, each a name in `ui` `fg-dim`, its count right-aligned in
   tabular `fg-mid`, `fg` for the figure the rest add up to, and a quiet trail in `small` `fg-dim`,
   a size or how many are away; a `line` rule between groups. What the figures cannot vouch for
-  follows in `small` `fg-dim`, a line each, after the `unplugged` glyph in `fg-faint`. The
-  foot's open a `tile-gap` above the foot and whatever line stands on it, left edges met,
-  flipping below only without room; folded, beside the rail, bottoms met.
+  follows in `small` `fg-dim`, a line each, after the `unplugged` glyph in `fg-faint`.
 - **Notice.** A banner above the grid on `panel` at the `control` corner, holding a glyph, a line,
   its actions and a dismiss. What needs a decision takes a `line-danger` hairline and a `danger`
   glyph, never a fill; what is only worth knowing takes the ordinary `line-control` ring. Its list

@@ -114,8 +114,8 @@ const rows = (menu: RefObject<HTMLDivElement | null>) => [
   ...(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []),
 ];
 
-// Escape closes the menu and nothing else: full screen and a floating panel listen on the window.
-function keepEscape(event: KeyboardEvent) {
+// Escape closes the surface and nothing else: full screen and a floating panel listen on the window.
+export function keepEscape(event: KeyboardEvent) {
   if (event.key === "Escape") event.stopPropagation();
 }
 
