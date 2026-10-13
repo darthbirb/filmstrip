@@ -3,6 +3,8 @@ import type { Act } from "../ipc/bindings/Act";
 import type { Batch } from "../ipc/bindings/Batch";
 import type { BranchFile } from "../ipc/bindings/BranchFile";
 import type { Contents } from "../ipc/bindings/Contents";
+import type { Coverage } from "../ipc/bindings/Coverage";
+import type { Covered } from "../ipc/bindings/Covered";
 import type { Crumb } from "../ipc/bindings/Crumb";
 import type { DestinationKey } from "../ipc/bindings/DestinationKey";
 import type { EffectiveTag } from "../ipc/bindings/EffectiveTag";
@@ -304,7 +306,10 @@ type Step =
   | { op: "renameFolder"; node: FolderNode; from: string; to: string }
   | { op: "moveFolder"; node: FolderNode; from: number; to: number }
   | { op: "deleteFolder"; node: FolderNode; parent: number }
-  | { op: "restore"; item: ItemRow; left: number; to: number; went: Trashing };
+  | { op: "restore"; item: ItemRow; left: number; to: number; went: Trashing }
+  | { op: "tag"; value: string; items: ItemRow[] }
+  /** Each file a tag came off, and where it stood among the file's own. */
+  | { op: "untag"; value: string; items: { item: ItemRow; at: number }[] };
 const journal: { batchId: string; steps: Step[] }[] = [];
 let nextBatch = 1;
 
@@ -408,10 +413,17 @@ function stayedFolder(node: FolderNode, parent: number, reason: Reason): Stayed 
 function describe(batchId: string, steps: Step[]): Batch {
   const files = steps.reduce(
     (sum, step) =>
-      sum + ("item" in step ? 1 : step.op === "moveFolder" ? under(step.node.id).length : 0),
+      sum +
+      ("item" in step
+        ? 1
+        : "items" in step
+          ? step.items.length
+          : step.op === "moveFolder"
+            ? under(step.node.id).length
+            : 0),
     0,
   );
-  const folders = steps.filter((step) => !("item" in step)).length;
+  const folders = steps.filter((step) => !("item" in step) && !("items" in step)).length;
   return { batchId, act: act(steps), files, folders };
 }
 
@@ -428,6 +440,8 @@ function act(steps: Step[]): Act {
     return { kind: "deleteFolder", name: gone.node.title, parent: folderName(gone.parent), into };
   }
   const [first] = steps;
+  if (first?.op === "tag") return { kind: "addTag", tag: first.value };
+  if (first?.op === "untag") return { kind: "removeTag", tag: first.value };
   const restores = steps.filter((step) => step.op === "restore");
   if (restores.length > 0) {
     const homes = new Set(restores.map((step) => step.to));
@@ -497,6 +511,22 @@ function takeBack(at: number): UndoReport {
         toTrash(step.item);
         step.item.folderId = step.left;
         trashed.set(step.item.id, step.went);
+        break;
+      case "tag":
+        for (const item of step.items) {
+          const own = ITEM_TAGS.get(item.id) ?? [];
+          ITEM_TAGS.set(
+            item.id,
+            own.filter((value) => value !== step.value),
+          );
+        }
+        break;
+      case "untag":
+        for (const { item, at } of step.items) {
+          const own = [...(ITEM_TAGS.get(item.id) ?? [])];
+          if (!own.includes(step.value)) own.splice(at, 0, step.value);
+          ITEM_TAGS.set(item.id, own);
+        }
         break;
     }
   }
@@ -824,6 +854,61 @@ function itemTags(itemId: number): EffectiveTag[] {
     .filter((value) => !inherited.some((tag) => tag.key === null && tag.value === value))
     .map((value) => ({ tagId: tagId(null, value), key: null, value, from: null, name: false }));
   return [...own, ...inherited];
+}
+
+/** What a set carries, as `selection_tag_coverage` answers: their own, then each folder's in path order. */
+function coverage(itemIds: readonly number[]): Coverage {
+  const rows = everyItem().filter((item) => itemIds.includes(item.id));
+  const own = new Map<number, Covered>();
+  const given = new Map<number, { folder: Crumb; under: number; tags: Map<number, Covered> }>();
+  const count = (into: Map<number, Covered>, tag: EffectiveTag) => {
+    const held = into.get(tag.tagId);
+    if (held) held.files += 1;
+    else into.set(tag.tagId, { ...tag, files: 1 });
+  };
+  for (const row of rows) {
+    for (const crumb of crumbs(row.folderId).folders) {
+      const at = given.get(crumb.id) ?? { folder: crumb, under: 0, tags: new Map() };
+      at.under += 1;
+      given.set(crumb.id, at);
+    }
+    for (const tag of itemTags(row.id)) {
+      if (!tag.from) count(own, tag);
+      else {
+        const at = given.get(tag.from.id);
+        if (at) count(at.tags, tag);
+      }
+    }
+  }
+  const strip = ({ tagId, key, value, name, files }: Covered): Covered => ({
+    tagId,
+    key,
+    value,
+    name,
+    files,
+  });
+  const path = (id: number) => crumbs(id).folders.map((crumb) => crumb.title.toLowerCase());
+  const before = (a: string[], b: string[]) => {
+    for (let at = 0; at < Math.min(a.length, b.length); at++) {
+      if (a[at] !== b[at]) return (a[at] ?? "") < (b[at] ?? "") ? -1 : 1;
+    }
+    return a.length - b.length;
+  };
+  const rank = (tag: Covered) => (tag.name ? 0 : tag.key === null ? 1 : 2);
+  return {
+    files: rows.length,
+    own: [...own.values()]
+      .sort((a, b) => b.files - a.files || a.value.localeCompare(b.value))
+      .map(strip),
+    folders: [...given.values()]
+      .filter((one) => one.tags.size > 0)
+      .sort((a, b) => before(path(a.folder.id), path(b.folder.id)))
+      .map((one) => ({
+        folder: one.folder,
+        under: one.under,
+        tags: [...one.tags.values()].sort((a, b) => rank(a) - rank(b)).map(strip),
+      })),
+  };
 }
 
 /** A folder's band, as `folder_detail` answers: its own tags, then each folder's above it. */
@@ -1237,6 +1322,40 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       own.filter((value) => tagId(null, value) !== id),
     );
     return null;
+  },
+  selection_tag_coverage: ({ itemIds }) => coverage(itemIds as number[]),
+  add_items_tag: ({ itemIds, value }) => {
+    const folded = fold(String(value));
+    const lacking = everyItem().filter(
+      (item) =>
+        (itemIds as number[]).includes(item.id) &&
+        !itemTags(item.id).some((tag) => tag.key === null && tag.value === folded),
+    );
+    for (const item of lacking) {
+      ITEM_TAGS.set(item.id, [...(ITEM_TAGS.get(item.id) ?? []), folded]);
+    }
+    return record(lacking.length > 0 ? [{ op: "tag", value: folded, items: lacking }] : []);
+  },
+  remove_items_tag: ({ itemIds, tagId: id }) => {
+    const holding = everyItem().filter(
+      (item) =>
+        (itemIds as number[]).includes(item.id) &&
+        itemTags(item.id).some((tag) => tag.tagId === id && tag.from === null),
+    );
+    const value =
+      holding.length > 0
+        ? itemTags(holding[0]?.id ?? 0).find((tag) => tag.tagId === id)?.value
+        : undefined;
+    if (value === undefined) return null;
+    const items = holding.map((item) => {
+      const own = ITEM_TAGS.get(item.id) ?? [];
+      ITEM_TAGS.set(
+        item.id,
+        own.filter((one) => one !== value),
+      );
+      return { item, at: own.indexOf(value) };
+    });
+    return record([{ op: "untag", value, items }]);
   },
   item_detail: ({ itemId }) => detail(itemId as number),
   item_path: ({ itemId }) => detail(itemId as number)?.path ?? null,

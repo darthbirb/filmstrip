@@ -8,6 +8,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::db::folders::{self, Crumb};
+use crate::db::journal::{self, ItemsTagged, ItemsUntagged, Untagged};
 use crate::db::{fold, now, search};
 use crate::error::{AppError, Result};
 
@@ -450,6 +451,297 @@ pub fn item_effective_tags(conn: &Connection, item_id: i64) -> Result<Vec<Effect
         carried.extend(level);
     }
     Ok(carried)
+}
+
+/// One tag or label across a set of files: on how many of them, and whether it is a folder's name.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Covered {
+    pub tag_id: i64,
+    pub key: Option<String>,
+    pub value: String,
+    pub name: bool,
+    pub files: i64,
+}
+
+/// What one folder gives some of a set, and how many of the set are below it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct FolderCovers {
+    pub folder: Crumb,
+    pub under: i64,
+    /// Its name first, then its tags, then its labels, each in the order the folder took them.
+    pub tags: Vec<Covered>,
+}
+
+/// What a set of files carries: the files found, the tags they hold themselves, the most carried
+/// first, then each folder's, in path order from the source down. Artboards › Tagging a set.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Coverage {
+    pub files: i64,
+    pub own: Vec<Covered>,
+    pub folders: Vec<FolderCovers>,
+}
+
+/// One grouped read of `item_effective_tag` for the whole set, however many files are in it.
+pub fn selection_tag_coverage(conn: &Connection, item_ids: &[i64]) -> Result<Coverage> {
+    let ids = serde_json::to_string(item_ids)?;
+    let files: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM item WHERE id IN (SELECT value FROM json_each(?1))",
+        params![ids],
+        |r| r.get(0),
+    )?;
+    let mut stmt = conn.prepare(
+        "SELECT e.tag_id, t.key, t.value, e.origin_id, COALESCE(MAX(ft.source = 'title'), 0),
+                MIN(ft.rowid), COUNT(*)
+           FROM item_effective_tag e
+           JOIN tag t ON t.id = e.tag_id
+           LEFT JOIN folder_tag ft ON ft.folder_id = e.origin_id AND ft.tag_id = e.tag_id
+          WHERE e.item_id IN (SELECT value FROM json_each(?1))
+          GROUP BY e.tag_id, e.origin_id",
+    )?;
+    let rows = stmt
+        .query_map(params![ids], |r| {
+            Ok((
+                Covered {
+                    tag_id: r.get(0)?,
+                    key: r.get(1)?,
+                    value: r.get(2)?,
+                    name: r.get(4)?,
+                    files: r.get(6)?,
+                },
+                r.get::<_, Option<i64>>(3)?,
+                r.get::<_, Option<i64>>(5)?.unwrap_or(0),
+            ))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+
+    let mut own = Vec::new();
+    let mut given: HashMap<i64, Vec<(Covered, i64)>> = HashMap::new();
+    for (covered, origin, held_at) in rows {
+        match origin {
+            None => own.push(covered),
+            Some(folder) => given.entry(folder).or_default().push((covered, held_at)),
+        }
+    }
+    own.sort_by(|a, b| b.files.cmp(&a.files).then_with(|| a.value.cmp(&b.value)));
+
+    let under = under_counts(conn, &ids)?;
+    let mut folders = Vec::new();
+    for (folder_id, mut tags) in given {
+        tags.sort_by_key(|(tag, held_at)| (!tag.name, tag.key.is_some(), *held_at));
+        let path = folders::ancestry(conn, folder_id)?;
+        let Some(folder) = path.last().cloned() else {
+            continue;
+        };
+        let titles: Vec<String> = path
+            .iter()
+            .map(|crumb| crumb.title.to_lowercase())
+            .collect();
+        folders.push((
+            titles,
+            FolderCovers {
+                folder,
+                under: under.get(&folder_id).copied().unwrap_or(0),
+                tags: tags.into_iter().map(|(tag, _)| tag).collect(),
+            },
+        ));
+    }
+    folders.sort_by(|(a, one), (b, two)| a.cmp(b).then(one.folder.id.cmp(&two.folder.id)));
+    Ok(Coverage {
+        files,
+        own,
+        folders: folders.into_iter().map(|(_, covers)| covers).collect(),
+    })
+}
+
+/// How many of the set lie at or below each folder above any of them.
+fn under_counts(conn: &Connection, ids: &str) -> Result<HashMap<i64, i64>> {
+    let mut stmt = conn.prepare(
+        "WITH RECURSIVE
+           start(folder_id, n) AS (
+             SELECT folder_id, COUNT(*) FROM item
+              WHERE id IN (SELECT value FROM json_each(?1)) GROUP BY folder_id
+           ),
+           up(folder_id, n) AS (
+             SELECT folder_id, n FROM start
+           UNION ALL
+             SELECT f.parent_id, up.n FROM up JOIN folder f ON f.id = up.folder_id
+              WHERE f.parent_id IS NOT NULL
+           )
+         SELECT folder_id, SUM(n) FROM up GROUP BY folder_id",
+    )?;
+    Ok(stmt
+        .query_map(params![ids], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?)
+}
+
+/// Gives a tag to every file in the set that does not carry it yet, its own or from a folder, and
+/// journals exactly those as one batch. Returns how many took it. DECISIONS.md "Undo".
+pub fn add_items_tag(
+    conn: &Connection,
+    item_ids: &[i64],
+    value: &str,
+    batch_id: &str,
+) -> Result<usize> {
+    if fold(value).is_empty() {
+        return Err(AppError::invalid("a tag needs a word"));
+    }
+    let tag_id = get_or_create_tag(conn, None, value)?;
+    let ids = serde_json::to_string(item_ids)?;
+    let lacking: Vec<i64> = {
+        let mut stmt = conn.prepare(
+            "SELECT i.id FROM item i
+              WHERE i.id IN (SELECT value FROM json_each(?1))
+                AND NOT EXISTS (SELECT 1 FROM item_effective_tag e
+                                 WHERE e.item_id = i.id AND e.tag_id = ?2)
+              ORDER BY i.id",
+        )?;
+        stmt.query_map(params![ids, tag_id], |r| r.get(0))?
+            .collect::<rusqlite::Result<_>>()?
+    };
+    if lacking.is_empty() {
+        return Ok(0);
+    }
+    let at = now();
+    let given: Vec<(i64, i64)> = lacking.iter().map(|&item_id| (item_id, at)).collect();
+    give(conn, tag_id, &given)?;
+    journal::record_items_tag(
+        conn,
+        batch_id,
+        &ItemsTagged {
+            tag_id,
+            value: value_of(conn, tag_id)?,
+            item_ids: lacking.clone(),
+        },
+    )?;
+    Ok(lacking.len())
+}
+
+/// Takes a tag off every file in the set that holds it as its own, never one it inherits, and
+/// journals exactly those, with when each had it, as one batch. Returns how many lost it.
+pub fn remove_items_tag(
+    conn: &Connection,
+    item_ids: &[i64],
+    tag_id: i64,
+    batch_id: &str,
+) -> Result<usize> {
+    let ids = serde_json::to_string(item_ids)?;
+    let items: Vec<Untagged> = {
+        let mut stmt = conn.prepare(
+            "SELECT it.item_id, it.added_at FROM item_tag it
+               JOIN item_effective_tag e ON e.item_id = it.item_id AND e.tag_id = it.tag_id
+              WHERE it.tag_id = ?2 AND e.origin_id IS NULL
+                AND it.item_id IN (SELECT value FROM json_each(?1))
+              ORDER BY it.item_id",
+        )?;
+        stmt.query_map(params![ids, tag_id], |r| {
+            Ok(Untagged {
+                item_id: r.get(0)?,
+                added_at: r.get(1)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?
+    };
+    if items.is_empty() {
+        return Ok(0);
+    }
+    let taken: Vec<i64> = items.iter().map(|one| one.item_id).collect();
+    untag_items(conn, tag_id, &taken)?;
+    journal::record_items_untag(
+        conn,
+        batch_id,
+        &ItemsUntagged {
+            tag_id,
+            value: value_of(conn, tag_id)?,
+            items,
+        },
+    )?;
+    Ok(taken.len())
+}
+
+fn value_of(conn: &Connection, tag_id: i64) -> Result<String> {
+    Ok(conn.query_row(
+        "SELECT value FROM tag WHERE id = ?1",
+        params![tag_id],
+        |r| r.get(0),
+    )?)
+}
+
+/// Takes a tag the files hold themselves off them, leaving whatever a folder gives them. Writes
+/// no journal row: it is what undoing a bulk add applies.
+pub fn untag_items(conn: &Connection, tag_id: i64, item_ids: &[i64]) -> Result<()> {
+    let ids = serde_json::to_string(item_ids)?;
+    atomically(conn, || {
+        conn.execute(
+            "DELETE FROM item_tag
+              WHERE tag_id = ?2 AND item_id IN (SELECT value FROM json_each(?1))",
+            params![ids, tag_id],
+        )?;
+        conn.execute(
+            "DELETE FROM item_effective_tag
+              WHERE tag_id = ?2 AND origin_id IS NULL
+                AND item_id IN (SELECT value FROM json_each(?1))",
+            params![ids, tag_id],
+        )?;
+        search::index_items(conn, item_ids)
+    })
+}
+
+/// Gives a tag back to exactly the files a bulk remove took it off, each with when it first had
+/// it. Writes no journal row: it is what undoing that remove applies.
+pub fn retag_items(conn: &Connection, untagged: &ItemsUntagged) -> Result<()> {
+    let still: Option<i64> = conn
+        .query_row(
+            "SELECT id FROM tag WHERE id = ?1 AND key IS NULL",
+            params![untagged.tag_id],
+            |r| r.get(0),
+        )
+        .optional()?;
+    let tag_id = match still {
+        Some(id) => id,
+        None => get_or_create_tag(conn, None, &untagged.value)?,
+    };
+    let items: Vec<(i64, i64)> = untagged
+        .items
+        .iter()
+        .map(|one| (one.item_id, one.added_at))
+        .collect();
+    atomically(conn, || give(conn, tag_id, &items))
+}
+
+/// Gives each file the tag as its own; where a folder already gives it, the folder's stays the
+/// one it carries, as `rebuild_item` resolves it.
+fn give(conn: &Connection, tag_id: i64, items: &[(i64, i64)]) -> Result<()> {
+    let pairs = serde_json::to_string(items)?;
+    conn.execute(
+        "INSERT OR IGNORE INTO item_tag (item_id, tag_id, added_at)
+         SELECT i.id, ?2, j.value ->> 1 FROM json_each(?1) j JOIN item i ON i.id = j.value ->> 0",
+        params![pairs, tag_id],
+    )?;
+    conn.execute(
+        "INSERT OR IGNORE INTO item_effective_tag (item_id, tag_id, origin_id)
+         SELECT i.id, ?2, NULL FROM json_each(?1) j JOIN item i ON i.id = j.value ->> 0",
+        params![pairs, tag_id],
+    )?;
+    let ids: Vec<i64> = items.iter().map(|(item_id, _)| *item_id).collect();
+    search::index_items(conn, &ids)
+}
+
+/// Runs `work` whole or not at all, inside a transaction already open or on its own.
+fn atomically(conn: &Connection, work: impl FnOnce() -> Result<()>) -> Result<()> {
+    conn.execute_batch("SAVEPOINT tags")?;
+    match work() {
+        Ok(()) => Ok(conn.execute_batch("RELEASE tags")?),
+        Err(err) => {
+            conn.execute_batch("ROLLBACK TO tags; RELEASE tags")?;
+            Err(err)
+        }
+    }
 }
 
 /// Folds every stored term again with `db::fold`, merges terms that then read the same into the
@@ -1214,5 +1506,290 @@ mod tests {
             ["#library<Library", "#old town<Old  Town"],
             "still the one it cannot lose"
         );
+    }
+
+    fn covered(tags: &[Covered]) -> Vec<String> {
+        tags.iter()
+            .map(|tag| {
+                let text = match &tag.key {
+                    Some(key) => format!("{key}:{}", tag.value),
+                    None => tag.value.clone(),
+                };
+                let mark = if tag.name { "#" } else { "" };
+                format!("{mark}{text} {}", tag.files)
+            })
+            .collect()
+    }
+
+    fn whose(coverage: &Coverage) -> Vec<(String, i64, Vec<String>)> {
+        coverage
+            .folders
+            .iter()
+            .map(|one| (one.folder.title.clone(), one.under, covered(&one.tags)))
+            .collect()
+    }
+
+    /// Trips holds travel and trip: egypt 2024; Cairo, inside it, egypt and location: cairo, and
+    /// three files; Lisbon portugal and location: lisbon, and one file with egypt of its own.
+    fn search_set(conn: &Connection, root: i64) -> (i64, Vec<i64>) {
+        let trips = folders::create(conn, root, "Trips").unwrap();
+        let cairo = folders::create(conn, trips, "Cairo").unwrap();
+        let lisbon = folders::create(conn, trips, "Lisbon").unwrap();
+        add_folder_tag(conn, trips, "travel").unwrap();
+        set_folder_label(conn, trips, "trip", "egypt 2024").unwrap();
+        add_folder_tag(conn, cairo, "egypt").unwrap();
+        set_folder_label(conn, cairo, "location", "cairo").unwrap();
+        add_folder_tag(conn, lisbon, "portugal").unwrap();
+        set_folder_label(conn, lisbon, "location", "lisbon").unwrap();
+        let mut set: Vec<i64> = ["a.jpg", "b.jpg", "c.jpg"]
+            .into_iter()
+            .map(|name| item(conn, cairo, name))
+            .collect();
+        add_item_tag(conn, set[0], "sphinx").unwrap();
+        let tram = item(conn, lisbon, "tram.jpg");
+        add_item_tag(conn, tram, "egypt").unwrap();
+        set.push(tram);
+        (cairo, set)
+    }
+
+    #[test]
+    fn a_set_s_coverage_counts_each_tag_and_says_whose_it_is_in_path_order() {
+        let (conn, root) = library();
+        let (_, set) = search_set(&conn, root);
+
+        let coverage = selection_tag_coverage(&conn, &set).unwrap();
+        assert_eq!(coverage.files, 4);
+        assert_eq!(covered(&coverage.own), ["egypt 1", "sphinx 1"]);
+        let line = |tags: &[&str]| tags.iter().map(|tag| tag.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            whose(&coverage),
+            [
+                ("Library".into(), 4, line(&["#library 4"])),
+                (
+                    "Trips".into(),
+                    4,
+                    line(&["#trips 4", "travel 4", "trip:egypt 2024 4"])
+                ),
+                (
+                    "Cairo".into(),
+                    3,
+                    line(&["#cairo 3", "egypt 3", "location:cairo 3"])
+                ),
+                (
+                    "Lisbon".into(),
+                    1,
+                    line(&["#lisbon 1", "portugal 1", "location:lisbon 1"])
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn nothing_checked_covers_nothing_and_a_file_not_in_the_index_is_not_counted() {
+        let (conn, root) = library();
+        let (_, set) = search_set(&conn, root);
+        assert_eq!(
+            selection_tag_coverage(&conn, &[]).unwrap(),
+            Coverage {
+                files: 0,
+                own: vec![],
+                folders: vec![]
+            }
+        );
+        let coverage = selection_tag_coverage(&conn, &[set[3], 9_999, set[3]]).unwrap();
+        assert_eq!(coverage.files, 1);
+        assert_eq!(covered(&coverage.own), ["egypt 1"]);
+        assert_eq!(
+            add_items_tag(&conn, &[], "dawn", &journal::new_batch()).unwrap(),
+            0
+        );
+    }
+
+    #[test]
+    fn a_set_across_two_sources_lists_each_source_s_folders_in_path_order() {
+        let (conn, root) = library();
+        let archive = sources::add(
+            &conn,
+            Path::new("D:/archive"),
+            "Archive",
+            SourceKind::Library,
+        )
+        .unwrap();
+        let archive_root = folders::source_root_folder(&conn, archive.id).unwrap();
+        let scans = folders::create(&conn, archive_root, "Scans").unwrap();
+        let old = item(&conn, scans, "old.jpg");
+        let new = item(&conn, root, "new.jpg");
+
+        let coverage = selection_tag_coverage(&conn, &[new, old]).unwrap();
+        let titles: Vec<String> = whose(&coverage).into_iter().map(|one| one.0).collect();
+        assert_eq!(titles, ["Archive", "Scans", "Library"]);
+    }
+
+    fn own_of(conn: &Connection, item_id: i64) -> Vec<String> {
+        item_effective_tags(conn, item_id)
+            .unwrap()
+            .into_iter()
+            .filter(|tag| tag.from.is_none())
+            .map(|tag| tag.value)
+            .collect()
+    }
+
+    fn rows_in(conn: &Connection, batch_id: &str) -> Vec<String> {
+        journal::batch(conn, batch_id)
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.op)
+            .collect()
+    }
+
+    #[test]
+    fn adding_to_a_set_gives_the_tag_only_to_files_that_lack_it_and_undo_takes_back_those() {
+        let (conn, root) = library();
+        let (cairo, set) = search_set(&conn, root);
+        let trips = folders::parent(&conn, cairo).unwrap().unwrap();
+        let ticket = item(&conn, trips, "ticket.jpg");
+        let mut checked = set[..3].to_vec();
+        checked.push(ticket);
+
+        let batch = journal::new_batch();
+        assert_eq!(add_items_tag(&conn, &checked, "Egypt", &batch).unwrap(), 1);
+        assert_eq!(
+            rows_in(&conn, &batch),
+            [journal::ITEMS_TAG],
+            "one row for the act"
+        );
+        assert_eq!(own_of(&conn, ticket), ["egypt"]);
+        assert_eq!(
+            own_of(&conn, set[1]),
+            [] as [String; 0],
+            "Cairo's stays Cairo's"
+        );
+        assert_eq!(found_by(&conn, "tag:egypt").len(), 5);
+
+        let again = journal::new_batch();
+        assert_eq!(add_items_tag(&conn, &checked, "egypt", &again).unwrap(), 0);
+        assert!(rows_in(&conn, &again).is_empty(), "nothing to journal");
+
+        crate::fs::undo::undo_batch(&conn, &batch).unwrap();
+        assert_eq!(own_of(&conn, ticket), [] as [String; 0]);
+        assert_eq!(
+            found_by(&conn, "tag:egypt").len(),
+            4,
+            "the three in Cairo, and the Lisbon file's own"
+        );
+    }
+
+    #[test]
+    fn removing_takes_a_file_s_own_tag_never_one_it_inherits_and_undo_puts_back_exactly_those() {
+        let (conn, root) = library();
+        let (cairo, set) = search_set(&conn, root);
+        let tram = set[3];
+        let shadowed = item(&conn, cairo, "d.jpg");
+        add_item_tag(&conn, shadowed, "egypt").unwrap();
+        add_item_tag(&conn, tram, "dawn").unwrap();
+        add_item_tag(&conn, tram, "zebra").unwrap();
+        conn.execute(
+            "UPDATE item_tag SET added_at = CASE tag_id
+               WHEN (SELECT id FROM tag WHERE value = 'dawn') THEN 1
+               WHEN (SELECT id FROM tag WHERE value = 'egypt') THEN 2
+               ELSE 3 END WHERE item_id = ?1",
+            params![tram],
+        )
+        .unwrap();
+        assert_eq!(own_of(&conn, tram), ["dawn", "egypt", "zebra"]);
+        let egypt = get_or_create_tag(&conn, None, "egypt").unwrap();
+        let mut checked = set.clone();
+        checked.push(shadowed);
+
+        let batch = journal::new_batch();
+        assert_eq!(remove_items_tag(&conn, &checked, egypt, &batch).unwrap(), 1);
+        assert_eq!(rows_in(&conn, &batch), [journal::ITEMS_UNTAG]);
+        assert_eq!(own_of(&conn, tram), ["dawn", "zebra"]);
+        assert_eq!(
+            found_by(&conn, "tag:egypt").len(),
+            4,
+            "the files in Cairo keep what Cairo gives them"
+        );
+
+        crate::fs::undo::undo_batch(&conn, &batch).unwrap();
+        assert_eq!(
+            own_of(&conn, tram),
+            ["dawn", "egypt", "zebra"],
+            "back in its place"
+        );
+        assert_eq!(found_by(&conn, "tag:egypt").len(), 5);
+        let label = get_or_create_tag(&conn, Some("location"), "cairo").unwrap();
+        assert_eq!(
+            remove_items_tag(&conn, &checked, label, &journal::new_batch()).unwrap(),
+            0,
+            "a label is a folder's, and never comes off a file"
+        );
+    }
+
+    #[test]
+    fn five_thousand_files_take_and_lose_a_tag_in_one_row_each() {
+        let (conn, root) = library();
+        let trips = folders::create(&conn, root, "Trips").unwrap();
+        let tx = conn.unchecked_transaction().unwrap();
+        let set: Vec<i64> = (0..5_000)
+            .map(|n| item(&tx, trips, &format!("{n:04}.jpg")))
+            .collect();
+        tx.commit().unwrap();
+
+        let added = journal::new_batch();
+        assert_eq!(
+            add_items_tag(&conn, &set, "felucca", &added).unwrap(),
+            5_000
+        );
+        let felucca = get_or_create_tag(&conn, None, "felucca").unwrap();
+        let taken = journal::new_batch();
+        assert_eq!(
+            remove_items_tag(&conn, &set[..3_120], felucca, &taken).unwrap(),
+            3_120
+        );
+        assert_eq!(
+            rows_in(&conn, &added).len() + rows_in(&conn, &taken).len(),
+            2
+        );
+        let coverage = selection_tag_coverage(&conn, &set).unwrap();
+        assert_eq!(covered(&coverage.own), ["felucca 1880"]);
+
+        crate::fs::undo::undo_batch(&conn, &taken).unwrap();
+        let coverage = selection_tag_coverage(&conn, &set).unwrap();
+        assert_eq!(covered(&coverage.own), ["felucca 5000"]);
+        assert_eq!(found_by(&conn, "tag:felucca").len(), 5_000);
+    }
+
+    #[test]
+    fn a_bulk_tag_reads_back_as_its_act_and_its_undo_counts_the_files_that_came_back() {
+        use crate::fs::acts::{self, Act};
+        let (conn, root) = library();
+        let (_, set) = search_set(&conn, root);
+        let added = journal::new_batch();
+        add_items_tag(&conn, &set, "Golden  Hour", &added).unwrap();
+        let described = acts::describe(&conn, &added).unwrap();
+        assert_eq!(
+            (described.act, described.files, described.folders),
+            (
+                Act::AddTag {
+                    tag: "golden hour".into()
+                },
+                4,
+                0
+            )
+        );
+
+        let egypt = get_or_create_tag(&conn, None, "egypt").unwrap();
+        let taken = journal::new_batch();
+        remove_items_tag(&conn, &set, egypt, &taken).unwrap();
+        let report = crate::fs::undo::undo_last(&conn).unwrap().unwrap();
+        assert_eq!(
+            report.batch.act,
+            Act::RemoveTag {
+                tag: "egypt".into()
+            }
+        );
+        assert_eq!((report.files_back, report.stayed.len()), (1, 0));
+        assert_eq!(journal::latest_batch(&conn).unwrap(), Some(added));
     }
 }

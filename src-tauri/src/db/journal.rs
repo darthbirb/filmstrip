@@ -16,6 +16,8 @@ pub const ITEM_TRASH: &str = "item_trash";
 pub const ITEM_RENAME: &str = "item_rename";
 pub const FOLDER_DELETE: &str = "folder_delete";
 pub const ITEM_RESTORE: &str = "item_restore";
+pub const ITEMS_TAG: &str = "items_tag";
+pub const ITEMS_UNTAG: &str = "items_untag";
 
 /// A folder the app made. Its inverse is itself: undoing it removes that folder again.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -86,6 +88,34 @@ pub struct ItemRestored {
 pub struct FolderDeleted {
     pub folder_id: i64,
     pub retired_at: i64,
+}
+
+/// A tag given to every file in a set that lacked it, and exactly those. Its inverse is itself:
+/// undoing it takes the tag off those files again.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemsTagged {
+    pub tag_id: i64,
+    pub value: String,
+    pub item_ids: Vec<i64>,
+}
+
+/// One file a tag was taken off, and when it had been given, so an undo puts it back in its place.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Untagged {
+    pub item_id: i64,
+    pub added_at: i64,
+}
+
+/// A file's own tag taken off every file in a set that had it. Its inverse is itself: undoing it
+/// gives the tag back to exactly those files.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemsUntagged {
+    pub tag_id: i64,
+    pub value: String,
+    pub items: Vec<Untagged>,
 }
 
 /// One row, as undo reads it back. Both halves stay JSON until its op says what they are.
@@ -240,6 +270,18 @@ pub fn record_folder_delete(
         retired_at,
     };
     record(conn, batch_id, FOLDER_DELETE, &deleted, &deleted)
+}
+
+pub fn record_items_tag(conn: &Connection, batch_id: &str, tagged: &ItemsTagged) -> Result<()> {
+    record(conn, batch_id, ITEMS_TAG, tagged, tagged)
+}
+
+pub fn record_items_untag(
+    conn: &Connection,
+    batch_id: &str,
+    untagged: &ItemsUntagged,
+) -> Result<()> {
+    record(conn, batch_id, ITEMS_UNTAG, untagged, untagged)
 }
 
 /// Every row in a batch, newest first: the order an undo applies them in, since a later row can

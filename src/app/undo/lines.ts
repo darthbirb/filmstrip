@@ -41,6 +41,10 @@ export function actLine({ act, files: carried }: Batch, stayed = 0): string {
       if (act.into)
         return `Deleted ${act.name}. Its ${files(carried)} ${are(carried)} in ${act.into}.`;
       return `Deleted ${act.name} and its ${files(carried)}.`;
+    case "addTag":
+      return `Added ${act.tag} to ${files(carried)}.`;
+    case "removeTag":
+      return `Took ${act.tag} off ${files(carried)}.`;
   }
 }
 
@@ -68,6 +72,10 @@ export function undoneLine({ batch }: UndoReport): string {
     case "deleteFolder":
       if (carried === 0) return `${act.name} is back in ${act.parent}.`;
       return `${act.name} and its ${files(carried)} are back in ${act.parent}.`;
+    case "addTag":
+      return `${act.tag} is off ${files(carried)} again.`;
+    case "removeTag":
+      return `${act.tag} is back on ${files(carried)}.`;
   }
 }
 
@@ -101,6 +109,10 @@ export function undoBannerLine({ batch, filesBack, stayed }: UndoReport): string
       if (folderStayed) return `${act.name} could not go back to ${act.parent}`;
       return `${act.name} and ${formatCount(filesBack)} of its ${files(carried)} are back in ${act.parent}`;
     }
+    case "addTag":
+      return `${act.tag} could not come off ${files(carried)}`;
+    case "removeTag":
+      return `${act.tag} could not go back on ${files(carried)}`;
   }
 }
 

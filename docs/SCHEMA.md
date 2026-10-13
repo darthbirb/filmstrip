@@ -30,7 +30,7 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 | `item_tag` | Tags an item carries itself. |
 | `item_effective_tag` | Everything an item carries once inheritance is resolved. |
 | `setting` | Key-value pairs. |
-| `journal` | Every change the app made on disk, with what reverses it, grouped into batches. |
+| `journal` | Every change the app made on disk, and every set tagged at once, with what reverses it, grouped into batches. |
 | `job` | Background work: waiting, running, or failed with its error. |
 | `destination_key` | A digit, `0` to `9`, bound to a folder that a press moves files into. |
 | `item_fts` | Each item's name and every tag it carries, tokenised for a bare word. |
@@ -113,6 +113,9 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   after the disk has changed.
 - An undo applies a batch's rows newest first and writes no row of its own. Each row is deleted
   as it comes back, so a batch that came back in part keeps exactly the rows that stayed.
+- A set tagged at once is one row, `items_tag` or `items_untag`, naming every file it changed;
+  an untag keeps each file's `added_at`, so an undo puts the tag back in its place. One file's
+  tag is not journalled.
 - Nothing prunes the journal yet.
 
 ## Destination keys

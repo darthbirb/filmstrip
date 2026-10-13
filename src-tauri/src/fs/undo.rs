@@ -9,8 +9,9 @@ use ts_rs::TS;
 
 use crate::db::journal::{
     self, Entry, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, ItemMoved, ItemRenamed,
-    ItemRestored, ItemTrashed,
+    ItemRestored, ItemTrashed, ItemsTagged,
 };
+use crate::db::tags;
 use crate::error::{AppError, Result};
 use crate::fs::acts::{self, Batch};
 use crate::fs::stayed::{self, Stayed};
@@ -84,6 +85,7 @@ fn stayed_of(conn: &Connection, entry: &Entry, err: &AppError) -> Result<Stayed>
         journal::FOLDER_DELETE => {
             stayed::folder(conn, inverse::<FolderDeleted>(entry)?.folder_id, err)
         }
+        journal::ITEMS_TAG | journal::ITEMS_UNTAG => Err(AppError::invalid(err.to_string())),
         other => Err(AppError::invalid(format!("{other} cannot be undone"))),
     }
 }
@@ -119,6 +121,11 @@ fn reverse(conn: &Connection, entry: &Entry) -> Result<()> {
             let back: FolderDeleted = inverse(entry)?;
             folders::undelete(conn, back.folder_id, back.retired_at)
         }
+        journal::ITEMS_TAG => {
+            let back: ItemsTagged = inverse(entry)?;
+            tags::untag_items(conn, back.tag_id, &back.item_ids)
+        }
+        journal::ITEMS_UNTAG => tags::retag_items(conn, &inverse(entry)?),
         other => Err(AppError::invalid(format!("{other} cannot be undone"))),
     }
 }

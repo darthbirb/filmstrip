@@ -537,6 +537,25 @@ pub fn index_item(conn: &Connection, item_id: i64) -> Result<()> {
     Ok(())
 }
 
+/// As [`index_item`], for many items in one statement each.
+pub fn index_items(conn: &Connection, item_ids: &[i64]) -> Result<()> {
+    let ids = serde_json::to_string(item_ids)?;
+    conn.execute(
+        "DELETE FROM item_fts WHERE rowid IN (SELECT value FROM json_each(?1))",
+        params![ids],
+    )?;
+    conn.execute(
+        "INSERT INTO item_fts (rowid, name, tags)
+         SELECT i.id, i.disk_name,
+                COALESCE((SELECT group_concat(t.value, ' ')
+                            FROM item_effective_tag e JOIN tag t ON t.id = e.tag_id
+                           WHERE e.item_id = i.id), '')
+           FROM item i WHERE i.id IN (SELECT value FROM json_each(?1))",
+        params![ids],
+    )?;
+    Ok(())
+}
+
 /// Writes a folder's row again from the tags it carries itself.
 pub fn index_folder(conn: &Connection, folder_id: i64) -> Result<()> {
     conn.execute(

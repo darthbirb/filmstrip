@@ -3,6 +3,7 @@ import type { AddOutcome } from "./bindings/AddOutcome";
 import type { Batch } from "./bindings/Batch";
 import type { BranchFile } from "./bindings/BranchFile";
 import type { Contents } from "./bindings/Contents";
+import type { Coverage } from "./bindings/Coverage";
 import type { CoverChoice } from "./bindings/CoverChoice";
 import type { DestinationKey } from "./bindings/DestinationKey";
 import type { EffectiveTag } from "./bindings/EffectiveTag";
@@ -165,6 +166,15 @@ export const addItemTag = (itemId: number, value: string) =>
 
 export const removeItemTag = (itemId: number, tagId: number) =>
   invoke<void>("remove_item_tag", { itemId, tagId });
+
+export const selectionTagCoverage = (itemIds: number[]) =>
+  invoke<Coverage>("selection_tag_coverage", { itemIds });
+
+export const addItemsTag = (itemIds: number[], value: string) =>
+  invoke<Batch | null>("add_items_tag", { itemIds, value });
+
+export const removeItemsTag = (itemIds: number[], tagId: number) =>
+  invoke<Batch | null>("remove_items_tag", { itemIds, tagId });
 
 export const itemDetail = (itemId: number) => invoke<ItemDetail | null>("item_detail", { itemId });
 

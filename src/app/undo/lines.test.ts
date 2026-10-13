@@ -34,6 +34,8 @@ const MOVED_FOLDER: Act = { kind: "moveFolder", name: "Lisbon", from: "Trips", t
 const INTO_INBOX: Act = { kind: "deleteFolder", name: "Lisbon", parent: "Trips", into: "Inbox" };
 const TO_TRASH: Act = { kind: "deleteFolder", name: "Lisbon", parent: "Trips", into: null };
 const EMPTY: Act = { kind: "deleteFolder", name: "Egypt", parent: "Trips", into: null };
+const ADD_TAG: Act = { kind: "addTag", tag: "upper east side" };
+const REMOVE_TAG: Act = { kind: "removeTag", tag: "felucca" };
 
 test("each act's line, and the line after undoing it, read as Artboards › Undo's table does", () => {
   const rows: [Act, number, string, string][] = [
@@ -55,6 +57,8 @@ test("each act's line, and the line after undoing it, read as Artboards › Undo
       "Lisbon and its 214 files are back in Trips.",
     ],
     [EMPTY, 0, "Deleted Egypt.", "Egypt is back in Trips."],
+    [ADD_TAG, 5, "Added upper east side to 5 files.", "upper east side is off 5 files again."],
+    [REMOVE_TAG, 3120, "Took felucca off 3,120 files.", "felucca is back on 3,120 files."],
   ];
   for (const [act, files, after, back] of rows) {
     expect(actLine(batch(act, files))).toBe(after);
