@@ -53,6 +53,11 @@ which only some do and on how many, and which folder gives each that comes from 
 there goes on every file that lacks it, and one taken off comes off every file that holds it as
 its own.
 
+The library's vocabulary is tended in Settings › Tags: every tag and label key with the files
+that carry it and the folders that hold it, sorted and filtered as you type. A tag, a key or a
+value is renamed, merged into another or deleted where its row stands, and each comes back with
+Undo. A folder's name is listed too, but only renaming the folder changes it.
+
 ## Search
 
 Terms scope by folder and by tag, and both are offered as **visible controls**. Typing the
@@ -79,5 +84,5 @@ selection somewhere. Destination hotkeys exist for the folders used most.
 ## Later
 
 Built on the finished interface, not alongside it: compression with review before anything is
-replaced, duplicate detection, a storage screen, a tags screen, trash limits and purging, a
+replaced, duplicate detection, a storage screen, trash limits and purging, a
 blur toggle, and bundling HandBrake as ffmpeg already is, so a release needs nothing downloaded.

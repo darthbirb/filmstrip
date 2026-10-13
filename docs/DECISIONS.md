@@ -847,6 +847,8 @@ it.
   restart, because the journal does.
 - **Ctrl+Z belongs to a field while one has the focus**, and does nothing while Settings is open:
   the dialog holds the keyboard, and an undo behind it would change what the person cannot see.
+  The one exception is the Tags section while its own line stands, since what that undo changes
+  is the list in view (DECISIONS.md "The tags screen").
 - **An undo that came back in part answers with the banner, not the line.** What stayed is
   something only the person can settle, so it sits over the grid, open, with Retry.
 - **A row still in the Trash is never shown in Explorer**, which would show the name the Trash
@@ -907,6 +909,9 @@ it.
   among each file's own. Undo works while a drive is away, since tags live in the index. One
   file's tag in the pane is not journalled: Add Tag… and its × are each other's way back.
   Artboards › Tagging a set.
+- **The tags screen's renames, merges and deletes are journalled too**, one row per act
+  (`retag`), for the same reason: a merge of `dawn` into `golden hour` forgets which files held
+  which, and only the journal can split them again. DECISIONS.md "The tags screen".
 - **The journal keeps everything for now.** Its rows are small, and what to prune is settled with
   the trash's limits.
 
@@ -937,6 +942,49 @@ and then scroll, and a rail takes twenty. A section with nothing in it yet is no
 
 **No Save and no Cancel.** Every control writes as it is touched, 400ms after the last change, as
 a splitter does. A dialog that can be cancelled implies a draft, and there is none.
+
+## The tags screen
+
+**The vocabulary is a section of Settings, Library › Tags, after Destination Keys**, as
+Artboards › Tags draws it and built on 13 October 2026. It is tended now and then, not while
+looking, so it does not take a place in navigation: everything navigation shows is somewhere on
+disk, and a list of words is not.
+
+- **The counts are what a search finds.** Files is every live file carrying the term, its own or
+  from a folder; Folders is every live folder holding it itself. Both come from the index, so a
+  source that is away is counted, and every act works while it is away.
+- **A folder's name is in the list but is not the list's to change.** It is a tag every file
+  below carries, and the counts would not add up without it. Rename, merge and delete take only
+  the uses given by hand, and the question says so; a row that is only a name has no ⋯.
+- **A deleted folder's name is not in the list.** Its row stays for undo and keeps its name's
+  tag, which nothing in the list can change and no search finds, so a tag that is only such names
+  is left out, and its delete and rename change nothing. A rename onto one takes that tag, as a
+  merge would. A tag given by hand that is also one leaves the list once its last use goes.
+- **A rename keeps the tag's id**, so nothing holding it moves. A name cannot be renamed, so a
+  rename of a tag that is also a name moves its hand-given uses onto a new tag instead.
+- **Renaming onto a tag that exists is a merge, and asks first.** The backend refuses a rename
+  onto one; the row asks, and Merge Tags calls `merge_tags`. A merge moves every use given by hand
+  onto the other, leaving no file or folder holding it twice, and forgets the first once nothing
+  holds it. Keys and values are the same: `rename_label_key` refuses a key that exists, and
+  `merge_label_keys` is what asking leads to.
+- **A key merge keeps a key once down a branch**, as the band does: `vocabulary::key_clash`
+  names the first folder holding the key that would land on one holding the other, itself, above
+  or below, and a deleted folder holding both; the field refuses it where it is typed, and leaves it
+  out of Merge Into…'s offers. A deleted folder's line says it was deleted, since nothing on
+  screen shows it, but not that it is in the Trash: one whose files went to a sorting source, or
+  whose directory a walk found gone, is not there. `label_key_clashes` answers for every other key at once as the field
+  opens, and an Enter before the answer waits for it. A value never leaves its key, so a value's
+  rename or merge is never refused.
+- **Every act is one batch.** The row records each term it reworded, made or forgot and every
+  `folder_tag` and `item_tag` row it moved or took away, so an undo puts each back under its own
+  id and in its old place among a file's own. An id taken since gives the term another; a term's
+  old words taken since fold that one back in.
+- **What files carry is settled in one statement for the whole set**, nearest folder first, as
+  `tags::rebuild_item` resolves one item, so a merge across five thousand files costs what a
+  merge across five does.
+- **Ctrl+Z works in the section while its line stands**, because the list it changes is in view;
+  elsewhere in Settings it still does nothing, as DECISIONS.md "Undo" has it. In the filter or a
+  field it is the field's own.
 
 ## Testing in a real browser, never jsdom
 

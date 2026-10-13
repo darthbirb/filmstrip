@@ -11,6 +11,7 @@ pub mod search;
 pub mod sources;
 pub mod suggest;
 pub mod tags;
+pub mod vocabulary;
 
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -29,6 +30,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (6, include_str!("migrations/006_keys.sql")),
     (7, include_str!("migrations/007_search.sql")),
     (8, include_str!("migrations/008_indexed.sql")),
+    (9, include_str!("migrations/009_folder_tag_rev.sql")),
 ];
 
 type Rewrite = fn(&Connection) -> Result<()>;

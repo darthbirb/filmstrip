@@ -907,7 +907,33 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   sections grouped under `eyebrow` captions, with a filter field on `ground` above them, the one
   shown on `raised-hi`; and the section's settings as rows in an `inset` group, each a label and
   its control. A section whose body is its own, as Sources is, can close with a caption of its
-  own over such rows.
+  own over such rows. One that heads itself, as Tags does, fills the section: its name in semibold
+  `row` with what it holds after it in `small` `fg-dim`, and a list that scrolls inside it, so the
+  dialog never grows; its Line stands at the section's foot.
+- **Filter field.** Narrows the list under it as you type: `bar-field` tall on `ground` at the
+  `nested` corner in a `line-control` ring, `line-strong` while it has the focus, the search glyph
+  before it in `fg-dim` and "3 of 228" at its end in `small` tabular figures once something is
+  typed. Escape empties it before it leaves anything.
+- **Term table.** The tags screen's list, in the settings' `inset` group: a heading row in
+  `eyebrow` capitals over a `line` rule, each heading a button that sorts, the one it is on in
+  `fg-mid` with its direction's glyph; then rows `row` tall, each the chip, the files and the
+  folders right-aligned in `count` columns in `small` `fg-mid` tabular figures, a zero in
+  `fg-faint`, and a `bar-field` square for ⋯. ⋯ stands at rest in `fg-dim`; under the pointer the
+  row takes the `wash`, and while its menu is open ⋯ is `raised-hi` and the menu opens a tile-gap
+  under it, right edges met. A folder's name is the sunk name chip, "name of Cairo" after it in
+  `small` `fg-dim`, and has no ⋯; a tag nothing carries says "unused". A label's key is the key
+  half alone, on `well` at the `nested` corner, behind the tree's chevron and "3 values"; its
+  values sit under it at the tree's `indent` as split chips.
+- **Term field.** A chip becomes the field that renames it, in its own shape on `ground`, its
+  text selected in `plate`; for Merge Into… it comes after the chip and an arrow, empty, with
+  what the library has offered under it in the tag field's list, less what it cannot take. What
+  cannot be taken turns the ring `line-danger` and says why underneath in `key` `danger`, and so
+  does Enter on a word nothing offered begins with. While its row asks to merge, the
+  field's shape holds what was typed, as it was typed.
+- **Row question.** A question on the row it is about, in the source row's remove shape: the row
+  and the question inside one `line-danger` ring, the `warning` glyph in `danger` at `icon` and the
+  question in `ui` `fg-mid` with the terms it names in `fg`, over its answers at the question's
+  indent, the one that acts first and Cancel, which has the focus. Escape puts the row back.
 - **Band.** What could not be done, at the foot of the panel it was asked from: a sentence, the
   folder's path under it in `--font-mono` or why in `small` `fg-dim`, and a dismiss, on a
   `danger-wash` ground. There is only ever one, and a second refusal replaces it rather than

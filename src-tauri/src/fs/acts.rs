@@ -9,8 +9,8 @@ use serde::de::DeserializeOwned;
 use ts_rs::TS;
 
 use crate::db::journal::{
-    self, Entry, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, ItemMoved, ItemRenamed,
-    ItemRestored, ItemTrashed, ItemsTagged, ItemsUntagged,
+    self, Change, Entry, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, ItemMoved,
+    ItemRenamed, ItemRestored, ItemTrashed, ItemsTagged, ItemsUntagged, Retagged,
 };
 use crate::db::{folders, items};
 use crate::error::{AppError, Result};
@@ -81,6 +81,10 @@ pub enum Act {
     RemoveTag {
         tag: String,
     },
+    /// A tag, a label's key or one of its values renamed, merged or deleted on the tags screen.
+    Retag {
+        change: Change,
+    },
 }
 
 /// Describes a batch still in the journal.
@@ -111,6 +115,11 @@ pub fn count(conn: &Connection, entries: &[Entry]) -> Result<(u32, u32)> {
             }
             journal::ITEMS_TAG => files += forward::<ItemsTagged>(entry)?.item_ids.len() as u32,
             journal::ITEMS_UNTAG => files += forward::<ItemsUntagged>(entry)?.items.len() as u32,
+            journal::RETAG => {
+                let retagged: Retagged = forward(entry)?;
+                files += retagged.files;
+                folders_held += retagged.folders;
+            }
             _ => folders_held += 1,
         }
     }
@@ -122,6 +131,10 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
     if let Some(entry) = of(journal::ITEMS_TAG).next() {
         let tag = forward::<ItemsTagged>(entry)?.value;
         return Ok(Act::AddTag { tag });
+    }
+    if let Some(entry) = of(journal::RETAG).next() {
+        let change = forward::<Retagged>(entry)?.change;
+        return Ok(Act::Retag { change });
     }
     if let Some(entry) = of(journal::ITEMS_UNTAG).next() {
         let tag = forward::<ItemsUntagged>(entry)?.value;

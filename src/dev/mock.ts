@@ -2,6 +2,7 @@ import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import type { Act } from "../ipc/bindings/Act";
 import type { Batch } from "../ipc/bindings/Batch";
 import type { BranchFile } from "../ipc/bindings/BranchFile";
+import type { Change } from "../ipc/bindings/Change";
 import type { Contents } from "../ipc/bindings/Contents";
 import type { Coverage } from "../ipc/bindings/Coverage";
 import type { Covered } from "../ipc/bindings/Covered";
@@ -21,6 +22,9 @@ import type { ItemRow } from "../ipc/bindings/ItemRow";
 import type { ItemsMoved } from "../ipc/bindings/ItemsMoved";
 import type { ItemsTrashed } from "../ipc/bindings/ItemsTrashed";
 import type { KeyBelow } from "../ipc/bindings/KeyBelow";
+import type { KeyClash } from "../ipc/bindings/KeyClash";
+import type { KeyClashFor } from "../ipc/bindings/KeyClashFor";
+import type { KeyRow } from "../ipc/bindings/KeyRow";
 import type { LibraryTotals } from "../ipc/bindings/LibraryTotals";
 import type { Progress } from "../ipc/bindings/Progress";
 import type { QueryTerm } from "../ipc/bindings/QueryTerm";
@@ -34,9 +38,11 @@ import type { SourceSummary } from "../ipc/bindings/SourceSummary";
 import type { Stayed } from "../ipc/bindings/Stayed";
 import type { Suggestion } from "../ipc/bindings/Suggestion";
 import type { Suggestions } from "../ipc/bindings/Suggestions";
+import type { TagRow } from "../ipc/bindings/TagRow";
 import type { Tally } from "../ipc/bindings/Tally";
 import type { Trashed } from "../ipc/bindings/Trashed";
 import type { UndoReport } from "../ipc/bindings/UndoReport";
+import type { Vocabulary } from "../ipc/bindings/Vocabulary";
 import type { AppError } from "../ipc/commands";
 import { FIRST_SORT, isSortKey } from "../ipc/sort";
 import { fold } from "../lib/queryTerm";
@@ -309,7 +315,9 @@ type Step =
   | { op: "restore"; item: ItemRow; left: number; to: number; went: Trashing }
   | { op: "tag"; value: string; items: ItemRow[] }
   /** Each file a tag came off, and where it stood among the file's own. */
-  | { op: "untag"; value: string; items: { item: ItemRow; at: number }[] };
+  | { op: "untag"; value: string; items: { item: ItemRow; at: number }[] }
+  /** An act on the tags screen, and the vocabulary as it was before it, to put back whole. */
+  | { op: "retag"; change: Change; files: number; folders: number; before: Words };
 const journal: { batchId: string; steps: Step[] }[] = [];
 let nextBatch = 1;
 
@@ -420,10 +428,16 @@ function describe(batchId: string, steps: Step[]): Batch {
           ? step.items.length
           : step.op === "moveFolder"
             ? under(step.node.id).length
-            : 0),
+            : step.op === "retag"
+              ? step.files
+              : 0),
     0,
   );
-  const folders = steps.filter((step) => !("item" in step) && !("items" in step)).length;
+  const folders = steps.reduce(
+    (sum, step) =>
+      sum + ("item" in step || "items" in step ? 0 : step.op === "retag" ? step.folders : 1),
+    0,
+  );
   return { batchId, act: act(steps), files, folders };
 }
 
@@ -440,6 +454,7 @@ function act(steps: Step[]): Act {
     return { kind: "deleteFolder", name: gone.node.title, parent: folderName(gone.parent), into };
   }
   const [first] = steps;
+  if (first?.op === "retag") return { kind: "retag", change: first.change };
   if (first?.op === "tag") return { kind: "addTag", tag: first.value };
   if (first?.op === "untag") return { kind: "removeTag", tag: first.value };
   const restores = steps.filter((step) => step.op === "restore");
@@ -527,6 +542,9 @@ function takeBack(at: number): UndoReport {
           if (!own.includes(step.value)) own.splice(at, 0, step.value);
           ITEM_TAGS.set(item.id, own);
         }
+        break;
+      case "retag":
+        putWords(step.before);
         break;
     }
   }
@@ -939,6 +957,160 @@ function folderDetail(folderId: number): FolderDetail | null {
     tags: [...self, ...above.reverse().flat()],
     keysBelow: keysBelow(folderId),
   };
+}
+
+/** A tag nothing carries any more, as a folder renamed leaves its old name behind. */
+const UNUSED = new Set(["winter"]);
+
+/** The vocabulary's own state: what the tags screen changes, and what its undo puts back. */
+type Words = {
+  folders: [number, { key: string | null; value: string }[]][];
+  items: [number, string[]][];
+  unused: string[];
+};
+
+function words(): Words {
+  return {
+    folders: [...OWN].map(([id, own]) => [id, own.tags.map((tag) => ({ ...tag }))]),
+    items: [...ITEM_TAGS].map(([id, values]) => [id, [...values]]),
+    unused: [...UNUSED],
+  };
+}
+
+function putWords(before: Words) {
+  for (const own of OWN.values()) own.tags = [];
+  for (const [id, held] of before.folders) ownOf(id).tags = held;
+  ITEM_TAGS.clear();
+  for (const [id, values] of before.items) ITEM_TAGS.set(id, values);
+  UNUSED.clear();
+  for (const value of before.unused) UNUSED.add(value);
+}
+
+/** Every live folder: each source's own, and every one under it. */
+const everyFolder = () => [...SOURCES.map((one) => one.rootFolderId), ...parents().keys()];
+
+/** A term by the id `tagId` gave it. */
+function termOf(id: unknown) {
+  for (const [term, at] of TAG_IDS) {
+    if (at !== id) continue;
+    const split = term.indexOf(":");
+    return { key: split > 0 ? term.slice(0, split) : null, value: term.slice(split + 1) };
+  }
+  return null;
+}
+
+type Held = { key: string | null; value: string };
+
+const same = (key: string | null, value: string) => (tag: Held) =>
+  tag.key === key && tag.value === value;
+
+/** The library's tags and keys, as `list_tags` answers, counted from the mock library. */
+function vocabulary(): Vocabulary {
+  const files = everyItem();
+  const carries = (key: string | null, value: string) =>
+    files.filter((item) => itemTags(item.id).some(same(key, value))).length;
+  const values = new Set<string>(UNUSED);
+  const keyed = new Map<string, Set<string>>();
+  for (const id of everyFolder()) {
+    values.add(folderName(id).toLowerCase());
+    for (const tag of ownOf(id).tags) {
+      if (tag.key === null) values.add(tag.value);
+      else keyed.set(tag.key, (keyed.get(tag.key) ?? new Set()).add(tag.value));
+    }
+  }
+  for (const own of ITEM_TAGS.values()) for (const value of own) values.add(value);
+  const holding = (key: string | null, value: string) =>
+    everyFolder().filter((id) => ownOf(id).tags.some(same(key, value)));
+  const tags: TagRow[] = [...values].sort().map((value) => {
+    const named = everyFolder()
+      .filter((id) => folderName(id).toLowerCase() === value)
+      .map((id) => ({ id, title: folderName(id) }));
+    const hand = holding(null, value).length;
+    return {
+      tagId: tagId(null, value),
+      value,
+      files: carries(null, value),
+      folders: named.length + hand,
+      named,
+      ownFiles: [...ITEM_TAGS.values()].filter((own) => own.includes(value)).length,
+      handFolders: hand,
+    };
+  });
+  const keys: KeyRow[] = [...keyed]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, held]) => ({
+      key,
+      files: files.filter((item) => itemTags(item.id).some((tag) => tag.key === key)).length,
+      folders: everyFolder().filter((id) => ownOf(id).tags.some((tag) => tag.key === key)).length,
+      values: [...held].sort().map((value) => ({
+        tagId: tagId(key, value),
+        value,
+        files: carries(key, value),
+        folders: holding(key, value).length,
+      })),
+    }));
+  return { tags, keys };
+}
+
+/** What stands in the way of merging one key into another, as `vocabulary::key_clash` finds it. */
+function keyClash(from: string, into: string): KeyClash | null {
+  for (const id of everyFolder()) {
+    if (!ownOf(id).tags.some((tag) => tag.key === from)) continue;
+    const folder = folderName(id);
+    if (ownOf(id).tags.some((tag) => tag.key === into))
+      return { kind: "both", folder, deleted: false };
+    const above = crumbs(id)
+      .folders.slice(0, -1)
+      .reverse()
+      .find((crumb) => ownOf(crumb.id).tags.some((tag) => tag.key === into));
+    if (above) return { kind: "above", folder, above: above.title };
+    const below = keysBelow(id).find((one) => one.key === into);
+    if (below) return { kind: "below", folder, below: below.folder.title };
+  }
+  return null;
+}
+
+/**
+ * One act on the vocabulary: each folder's and file's terms rewritten, or dropped for `null`,
+ * none of them twice, and journalled with what it touched.
+ */
+function retag(
+  change: Change,
+  folderTerm: (tag: Held) => Held | null,
+  itemTerm: (value: string) => string | null,
+) {
+  const before = words();
+  const moved = (tag: Held) => {
+    const term = folderTerm(tag);
+    return !term || term.key !== tag.key || term.value !== tag.value;
+  };
+  const files = everyItem().filter((item) =>
+    itemTags(item.id).some((tag) =>
+      tag.from === null ? itemTerm(tag.value) !== tag.value : !tag.name && moved(tag),
+    ),
+  ).length;
+  let folders = 0;
+  for (const id of everyFolder()) {
+    const own = ownOf(id);
+    const next: Held[] = [];
+    for (const tag of own.tags) {
+      const term = folderTerm(tag);
+      if (moved(tag)) folders += 1;
+      const name = folderName(id).toLowerCase();
+      const itsName = term?.key === null && term.value === name;
+      if (term && !itsName && !next.some(same(term.key, term.value))) next.push(term);
+    }
+    own.tags = next;
+  }
+  for (const [id, values] of ITEM_TAGS) {
+    const next: string[] = [];
+    for (const value of values) {
+      const term = itemTerm(value);
+      if (term !== null && !next.includes(term)) next.push(term);
+    }
+    ITEM_TAGS.set(id, next);
+  }
+  return record([{ op: "retag", change, files, folders, before }]);
 }
 
 type Args = Record<string, unknown>;
@@ -1356,6 +1528,115 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       return { item, at: own.indexOf(value) };
     });
     return record([{ op: "untag", value, items }]);
+  },
+  list_tags: () => vocabulary(),
+  rename_tag: ({ tagId: id, value }) => {
+    const term = termOf(id);
+    const to = fold(String(value));
+    if (!term || term.key !== null) return invalid("that tag is gone");
+    if (!to) return invalid("a tag needs a word");
+    if (to === term.value) return null;
+    if (vocabulary().tags.some((row) => row.value === to)) return invalid(`${to} is already a tag`);
+    if (UNUSED.delete(term.value)) UNUSED.add(to);
+    const was = same(null, term.value);
+    return retag(
+      { kind: "renameTag", from: term.value, to },
+      (tag) => (was(tag) ? { key: null, value: to } : tag),
+      (value) => (value === term.value ? to : value),
+    );
+  },
+  merge_tags: ({ fromId, intoId }) => {
+    const [from, into] = [termOf(fromId), termOf(intoId)];
+    if (!from || !into) return invalid("that tag is gone");
+    UNUSED.delete(from.value);
+    const was = same(null, from.value);
+    return retag(
+      { kind: "mergeTags", from: from.value, into: into.value },
+      (tag) => (was(tag) ? { key: null, value: into.value } : tag),
+      (value) => (value === from.value ? into.value : value),
+    );
+  },
+  delete_tag: ({ tagId: id }) => {
+    const term = termOf(id);
+    if (!term) return invalid("that tag is gone");
+    UNUSED.delete(term.value);
+    const was = same(null, term.value);
+    return retag(
+      { kind: "deleteTag", tag: term.value },
+      (tag) => (was(tag) ? null : tag),
+      (value) => (value === term.value ? null : value),
+    );
+  },
+  label_key_clashes: ({ key }): KeyClashFor[] => {
+    const from = fold(String(key));
+    return vocabulary().keys.flatMap(({ key: into }) => {
+      const clash = into === from ? null : keyClash(from, into);
+      return clash ? [{ into, clash }] : [];
+    });
+  },
+  rename_label_key: ({ key, to }) => {
+    const [from, next] = [fold(String(key)), fold(String(to))];
+    if (!next) return invalid("a key needs a word");
+    if (vocabulary().keys.some((row) => row.key === next)) {
+      return invalid(`${next} is already a key`);
+    }
+    return retag(
+      { kind: "renameKey", from, to: next },
+      (tag) => (tag.key === from ? { key: next, value: tag.value } : tag),
+      (value) => value,
+    );
+  },
+  merge_label_keys: ({ key, into }) => {
+    const [from, kept] = [fold(String(key)), fold(String(into))];
+    if (keyClash(from, kept)) return invalid(`${from} cannot merge into ${kept}`);
+    return retag(
+      { kind: "mergeKeys", from, into: kept },
+      (tag) => (tag.key === from ? { key: kept, value: tag.value } : tag),
+      (value) => value,
+    );
+  },
+  delete_label_key: ({ key }) => {
+    const gone = fold(String(key));
+    return retag(
+      { kind: "deleteKey", key: gone },
+      (tag) => (tag.key === gone ? null : tag),
+      (value) => value,
+    );
+  },
+  rename_label_value: ({ tagId: id, value }) => {
+    const term = termOf(id);
+    const to = fold(String(value));
+    if (!term?.key) return invalid("that label is gone");
+    const key = term.key;
+    if (!to) return invalid("a label needs a value");
+    if (to === term.value) return null;
+    const was = same(key, term.value);
+    return retag(
+      { kind: "renameValue", key, from: term.value, to },
+      (tag) => (was(tag) ? { key, value: to } : tag),
+      (one) => one,
+    );
+  },
+  merge_label_values: ({ fromId, intoId }) => {
+    const [from, into] = [termOf(fromId), termOf(intoId)];
+    if (!from?.key || from.key !== into?.key) return invalid("a value never leaves its key");
+    const key = from.key;
+    const was = same(key, from.value);
+    return retag(
+      { kind: "mergeValues", key, from: from.value, into: into.value },
+      (tag) => (was(tag) ? { key, value: into.value } : tag),
+      (one) => one,
+    );
+  },
+  delete_label_value: ({ tagId: id }) => {
+    const term = termOf(id);
+    if (!term?.key) return invalid("that label is gone");
+    const was = same(term.key, term.value);
+    return retag(
+      { kind: "deleteValue", key: term.key, value: term.value },
+      (tag) => (was(tag) ? null : tag),
+      (one) => one,
+    );
   },
   item_detail: ({ itemId }) => detail(itemId as number),
   item_path: ({ itemId }) => detail(itemId as number)?.path ?? null,

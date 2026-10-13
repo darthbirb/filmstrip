@@ -61,6 +61,12 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 - `source.root` is unique, and the application also refuses a root that sits inside another
   or contains one.
 
+## Indexes
+
+- `folder_tag` and `item_tag` are each indexed both ways: by their primary key, which leads
+  with the folder or the item, and by `idx_folder_tag_rev` and `idx_item_tag_rev`, which lead
+  with the tag, so what holds a tag is found without reading the whole table.
+
 ## Tags and labels
 
 - Keys and values are stored folded (`db::fold`): lowercase, trimmed, and one space between
@@ -116,6 +122,9 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 - A set tagged at once is one row, `items_tag` or `items_untag`, naming every file it changed;
   an untag keeps each file's `added_at`, so an undo puts the tag back in its place. One file's
   tag is not journalled.
+- An act on the tags screen is one row, `retag`: the terms it reworded, made or forgot, and
+  every `folder_tag` and `item_tag` row it moved onto another term or took away, each with its
+  `rowid`, so an undo puts it back in its place.
 - Nothing prunes the journal yet.
 
 ## Destination keys

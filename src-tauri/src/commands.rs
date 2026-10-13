@@ -21,6 +21,7 @@ use crate::db::search::{self, FolderMatch};
 use crate::db::sources::{self, Refusal, Source, SourceKind};
 use crate::db::suggest::{self, Suggestion};
 use crate::db::tags::{self, EffectiveTag};
+use crate::db::vocabulary::{self, KeyClashFor, Vocabulary};
 use crate::error::{AppError, Result};
 use crate::fs::acts::{self, Batch};
 use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
@@ -940,6 +941,133 @@ pub async fn remove_items_tag(
             let taken = tags::remove_items_tag(tx, &item_ids, tag_id, &batch_id)?;
             described(tx, taken > 0, &batch_id)
         })
+    })
+    .await
+}
+
+/// Every tag and label key in the library, with what carries each, for the tags screen.
+#[tauri::command]
+pub async fn list_tags(state: State<'_, AppState>) -> Result<Vocabulary> {
+    run(&state, vocabulary::list_tags).await
+}
+
+/// One act on the vocabulary as one batch; nothing when it changed nothing.
+async fn retag(
+    state: &AppState,
+    act: impl FnOnce(&Connection, &str) -> Result<bool> + Send + 'static,
+) -> Result<Option<Batch>> {
+    run(state, move |conn| {
+        in_transaction(conn, |tx| {
+            let batch_id = journal::new_batch();
+            let changed = act(tx, &batch_id)?;
+            described(tx, changed, &batch_id)
+        })
+    })
+    .await
+}
+
+/// A tag renamed everywhere at once; refused onto one that exists, which `merge_tags` does.
+#[tauri::command]
+pub async fn rename_tag(
+    state: State<'_, AppState>,
+    tag_id: i64,
+    value: String,
+) -> Result<Option<Batch>> {
+    retag(&state, move |conn, batch| {
+        vocabulary::rename_tag(conn, tag_id, &value, batch)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn merge_tags(
+    state: State<'_, AppState>,
+    from_id: i64,
+    into_id: i64,
+) -> Result<Option<Batch>> {
+    retag(&state, move |conn, batch| {
+        vocabulary::merge_tags(conn, from_id, into_id, batch)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn delete_tag(state: State<'_, AppState>, tag_id: i64) -> Result<Option<Batch>> {
+    retag(&state, move |conn, batch| {
+        vocabulary::delete_tag(conn, tag_id, batch)
+    })
+    .await
+}
+
+/// Every other key one cannot merge into, and why, for the field to refuse it.
+#[tauri::command]
+pub async fn label_key_clashes(
+    state: State<'_, AppState>,
+    key: String,
+) -> Result<Vec<KeyClashFor>> {
+    run(&state, move |conn| vocabulary::key_clashes(conn, &key)).await
+}
+
+#[tauri::command]
+pub async fn rename_label_key(
+    state: State<'_, AppState>,
+    key: String,
+    to: String,
+) -> Result<Option<Batch>> {
+    retag(&state, move |conn, batch| {
+        vocabulary::rename_key(conn, &key, &to, batch)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn merge_label_keys(
+    state: State<'_, AppState>,
+    key: String,
+    into: String,
+) -> Result<Option<Batch>> {
+    retag(&state, move |conn, batch| {
+        vocabulary::merge_keys(conn, &key, &into, batch)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn delete_label_key(state: State<'_, AppState>, key: String) -> Result<Option<Batch>> {
+    retag(&state, move |conn, batch| {
+        vocabulary::delete_key(conn, &key, batch)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn rename_label_value(
+    state: State<'_, AppState>,
+    tag_id: i64,
+    value: String,
+) -> Result<Option<Batch>> {
+    retag(&state, move |conn, batch| {
+        vocabulary::rename_value(conn, tag_id, &value, batch)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn merge_label_values(
+    state: State<'_, AppState>,
+    from_id: i64,
+    into_id: i64,
+) -> Result<Option<Batch>> {
+    retag(&state, move |conn, batch| {
+        vocabulary::merge_values(conn, from_id, into_id, batch)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn delete_label_value(state: State<'_, AppState>, tag_id: i64) -> Result<Option<Batch>> {
+    retag(&state, move |conn, batch| {
+        vocabulary::delete_value(conn, tag_id, batch)
     })
     .await
 }

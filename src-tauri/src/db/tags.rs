@@ -91,24 +91,7 @@ pub fn set_folder_label(conn: &Connection, folder_id: i64, key: &str, value: &st
 /// A folder may not take a key one above it gives it, nor one a folder below it already holds.
 /// DECISIONS.md "A folder's details".
 fn refuse_key_held_elsewhere(conn: &Connection, folder_id: i64, key: &str) -> Result<()> {
-    let above: Option<i64> = conn
-        .query_row(
-            "WITH RECURSIVE above(id, depth) AS (
-                 SELECT parent_id, 1 FROM folder WHERE id = ?1 AND parent_id IS NOT NULL
-               UNION ALL
-                 SELECT f.parent_id, a.depth + 1 FROM folder f JOIN above a ON f.id = a.id
-                  WHERE f.parent_id IS NOT NULL
-             )
-             SELECT a.id FROM above a
-               JOIN folder_tag ft ON ft.folder_id = a.id
-               JOIN tag t ON t.id = ft.tag_id
-              WHERE t.key = ?2
-              ORDER BY a.depth LIMIT 1",
-            params![folder_id, key],
-            |r| r.get(0),
-        )
-        .optional()?;
-    if let Some(above) = above {
+    if let Some(above) = holding_above(conn, folder_id, key)? {
         let from = folders::ancestry(conn, folder_id)?
             .into_iter()
             .find(|crumb| crumb.id == above)
@@ -126,6 +109,27 @@ fn refuse_key_held_elsewhere(conn: &Connection, folder_id: i64, key: &str) -> Re
         )));
     }
     Ok(())
+}
+
+/// The nearest folder above one that holds a label of the key.
+pub(crate) fn holding_above(conn: &Connection, folder_id: i64, key: &str) -> Result<Option<i64>> {
+    Ok(conn
+        .query_row(
+            "WITH RECURSIVE above(id, depth) AS (
+                 SELECT parent_id, 1 FROM folder WHERE id = ?1 AND parent_id IS NOT NULL
+               UNION ALL
+                 SELECT f.parent_id, a.depth + 1 FROM folder f JOIN above a ON f.id = a.id
+                  WHERE f.parent_id IS NOT NULL
+             )
+             SELECT a.id FROM above a
+               JOIN folder_tag ft ON ft.folder_id = a.id
+               JOIN tag t ON t.id = ft.tag_id
+              WHERE t.key = ?2
+              ORDER BY a.depth LIMIT 1",
+            params![folder_id, key],
+            |r| r.get(0),
+        )
+        .optional()?)
 }
 
 /// A label's key a folder below holds, and the nearest folder that holds it.
@@ -148,7 +152,11 @@ pub fn keys_below(conn: &Connection, folder_id: i64) -> Result<Vec<KeyBelow>> {
 }
 
 /// Every label the live folders below one hold, of one key or of all, the nearest first.
-fn holding_below(conn: &Connection, folder_id: i64, key: Option<&str>) -> Result<Vec<KeyBelow>> {
+pub(crate) fn holding_below(
+    conn: &Connection,
+    folder_id: i64,
+    key: Option<&str>,
+) -> Result<Vec<KeyBelow>> {
     let mut stmt = conn.prepare(
         "WITH RECURSIVE below(id, title, depth) AS (
              SELECT id, title, 1 FROM folder WHERE parent_id = ?1 AND deleted_at IS NULL
@@ -733,7 +741,7 @@ fn give(conn: &Connection, tag_id: i64, items: &[(i64, i64)]) -> Result<()> {
 }
 
 /// Runs `work` whole or not at all, inside a transaction already open or on its own.
-fn atomically(conn: &Connection, work: impl FnOnce() -> Result<()>) -> Result<()> {
+pub(crate) fn atomically(conn: &Connection, work: impl FnOnce() -> Result<()>) -> Result<()> {
     conn.execute_batch("SAVEPOINT tags")?;
     match work() {
         Ok(()) => Ok(conn.execute_batch("RELEASE tags")?),
@@ -809,7 +817,7 @@ pub fn refold(conn: &Connection) -> Result<()> {
 
 /// Moves everything that carries one term onto another, then drops the first. A folder's name
 /// stays its name whichever of the two it was.
-fn merge_term(conn: &Connection, from: i64, into: i64) -> Result<()> {
+pub(crate) fn merge_term(conn: &Connection, from: i64, into: i64) -> Result<()> {
     conn.execute(
         "UPDATE folder_tag SET source = 'title'
           WHERE tag_id = ?2 AND folder_id IN

@@ -208,7 +208,9 @@ export function Menu({ label, glyph, groups, align = "end" }: Props) {
  * Where a right-click menu opens: at the pointer, or against the element the keyboard is on.
  * `held` says the button was still down, as it is wherever the menu opens on press.
  */
-export type MenuAnchor = { x: number; y: number; held?: boolean } | { element: HTMLElement };
+export type MenuAnchor =
+  | { x: number; y: number; held?: boolean }
+  | { element: HTMLElement; align?: "start" | "end" };
 
 type ContextProps = {
   label: string;
@@ -303,7 +305,7 @@ export function placement(anchor: MenuAnchor, size: DOMRect) {
       Number.parseFloat(root.getPropertyValue("--focus-gap")) +
       Number.parseFloat(root.getPropertyValue("--spacing-tile-gap")) *
         Number.parseFloat(root.fontSize);
-    left = box.left;
+    left = anchor.align === "end" ? box.right - size.width : box.left;
     top = box.bottom + clear;
     if (top + size.height > view.height) top = box.top - clear - size.height;
   } else {
