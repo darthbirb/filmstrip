@@ -33,7 +33,7 @@ type Props = {
 
 // The two halves a label is drawn in, as fields: the key sunk, the value on the ground.
 const HALVES =
-  "m-0 inline-flex h-chip max-w-full overflow-hidden rounded-nested border-0 p-0 text-small inset-ring inset-ring-line-control has-focus-visible:outline has-focus-visible:outline-focus has-focus-visible:outline-offset-(--focus-gap)";
+  "m-0 inline-flex h-chip max-w-full overflow-hidden rounded-nested border-0 p-0 text-small inset-ring inset-ring-line-control focus-ring-within";
 const HALF =
   "field-sizing-content h-full px-2 outline-none placeholder:text-fg-faint selection:bg-plate selection:text-on-plate";
 
@@ -251,7 +251,7 @@ export function LabelValueField({ tagKey, value, onCommit, onCancel }: ValueProp
 
   return (
     <>
-      <span className="m-0 inline-flex h-chip max-w-full overflow-hidden rounded-nested text-small has-focus-visible:outline has-focus-visible:outline-focus has-focus-visible:outline-offset-(--focus-gap)">
+      <span className="m-0 inline-flex h-chip max-w-full overflow-hidden rounded-nested text-small focus-ring-within">
         <span className="flex items-center bg-well px-2 text-fg-dim">{tagKey}</span>
         <input
           ref={field}
