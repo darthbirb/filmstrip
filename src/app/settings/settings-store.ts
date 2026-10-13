@@ -18,6 +18,10 @@ export function closeSettings() {
   for (const listener of listeners) listener();
 }
 
+export function getSettingsRequest() {
+  return request;
+}
+
 export function useSettingsRequest() {
   return useSyncExternalStore(subscribe, () => request);
 }

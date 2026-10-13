@@ -35,7 +35,7 @@ export async function undo(batchId?: string) {
     }
     await libraryChanged();
     if (report.stayed.length === 0) {
-      setNews({ kind: "undone", line: undoneLine(report) });
+      setNews({ kind: "undone", line: undoneLine(report), batchId: report.batch.batchId });
       return;
     }
     // The banner is the answer to an undo that came back in part; the foot says nothing.

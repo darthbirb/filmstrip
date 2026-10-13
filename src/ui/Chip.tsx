@@ -159,3 +159,20 @@ export function Chip({
     </Tag>
   );
 }
+
+type KeyProps = { tagKey: string; title?: string; onSearch: (adding: boolean) => void };
+
+/** A label's key alone, sunk as a key is: a click searches for every value of it. */
+export function KeyOnlyChip({ tagKey, title, onSearch }: KeyProps) {
+  return (
+    <button
+      type="button"
+      data-chip
+      title={title}
+      onClick={(event) => onSearch(event.ctrlKey || event.metaKey)}
+      className={`inline-flex h-chip min-w-0 max-w-full items-center rounded-nested bg-well px-2 text-fg-dim text-small inset-ring inset-ring-line-control hover:text-fg ${SEARCHING}`}
+    >
+      <span className="truncate">{tagKey}</span>
+    </button>
+  );
+}

@@ -1094,7 +1094,9 @@ function retag(
     for (const tag of own.tags) {
       const term = folderTerm(tag);
       if (moved(tag)) folders += 1;
-      if (term && !next.some(same(term.key, term.value))) next.push(term);
+      const name = folderName(id).toLowerCase();
+      const itsName = term?.key === null && term.value === name;
+      if (term && !itsName && !next.some(same(term.key, term.value))) next.push(term);
     }
     own.tags = next;
   }

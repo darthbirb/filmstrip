@@ -12,7 +12,8 @@ export type FootNews =
   | { kind: "keyRefused"; line: string; detail?: string }
   /** An act that changed the disk, and the batch its Undo takes back. */
   | { kind: "done"; line: string; batchId: string }
-  | { kind: "undone"; line: string }
+  /** What an undo brought back, and the batch it took back. */
+  | { kind: "undone"; line: string; batchId?: string }
   | { kind: "nothing" };
 
 // One slot: whatever arrives last replaces what was there. DECISIONS.md "Undo".

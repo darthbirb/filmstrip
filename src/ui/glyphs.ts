@@ -44,6 +44,8 @@ export const GLYPHS = {
   minusCircle: { icon: "minus-circle", code: 0xe32c },
   readAgain: { icon: "arrows-clockwise", code: 0xe094 },
   rename: { icon: "textbox", code: 0xeb0a },
+  merge: { icon: "arrows-merge", code: 0xed3e },
+  into: { icon: "arrow-right", code: 0xe06c },
   done: { icon: "check", code: 0xe182 },
   undo: { icon: "arrow-counter-clockwise", code: 0xe038 },
   moveTo: { icon: "folder-simple-plus", code: 0xe25e },

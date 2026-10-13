@@ -9,6 +9,7 @@ import { SCALES, updatePreferences, usePreferences } from "../preferences";
 import { Keys } from "./Keys";
 import { Caption, type Row, Rows } from "./Rows";
 import { Sources } from "./Sources";
+import { Tags } from "./Tags";
 
 type Section = {
   id: string;
@@ -16,10 +17,13 @@ type Section = {
   group: string;
   title: string;
   glyph: GlyphName;
-  caption: string;
+  /** What the rows are about, over them; a section whose body heads itself has none. */
+  caption?: string;
   rows: Row[];
   /** A section whose shape is its own, rather than a list of labels and controls. */
   body?: ReactNode;
+  /** A body that fills the section and scrolls inside itself, so the dialog never grows. */
+  fill?: boolean;
 };
 
 const SIZES = SCALES.map((scale) => ({ value: String(scale), label: `${scale * 100}%` }));
@@ -83,6 +87,15 @@ function useSections(asking?: number): Section[] {
       caption: "Destination Keys",
       rows: [],
       body: <Keys />,
+    },
+    {
+      id: "tags",
+      group: "Library",
+      title: "Tags",
+      glyph: "tag",
+      rows: [],
+      body: <Tags />,
+      fill: true,
     },
   ];
 }
@@ -194,10 +207,14 @@ function Body({ onClose, section, asking }: Omit<Props, "open">) {
             </Fragment>
           ))}
         </nav>
-        <div className="min-w-0 flex-1 overflow-auto p-3.5">
-          {shown ? (
+        <div className={`min-w-0 flex-1 ${shown?.fill ? "flex flex-col" : "overflow-auto p-3.5"}`}>
+          {shown?.fill ? (
+            <section aria-label={shown.title} className="flex min-h-0 flex-1 flex-col">
+              {shown.body}
+            </section>
+          ) : shown ? (
             <section aria-label={shown.title} className="flex flex-col gap-1.5">
-              <Caption>{shown.caption}</Caption>
+              {shown.caption && <Caption>{shown.caption}</Caption>}
               {shown.body ?? <Rows rows={shown.rows} />}
             </section>
           ) : (
