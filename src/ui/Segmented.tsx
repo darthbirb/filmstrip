@@ -45,7 +45,7 @@ export function Segmented<T extends string>({
       {options.map((option) => (
         <label
           key={option.value}
-          className={`flex h-full cursor-default items-center px-2 transition-colors duration-(--motion-quick) has-focus-visible:outline has-focus-visible:outline-focus motion-reduce:transition-none ${look.option} ${
+          className={`flex h-full cursor-default items-center px-2 transition-colors duration-(--motion-quick) focus-ring-within-inset motion-reduce:transition-none ${look.option} ${
             option.value === value ? look.chosen : look.idle
           }`}
         >

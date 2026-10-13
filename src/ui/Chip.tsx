@@ -79,7 +79,7 @@ export function Chip({
     return (
       <span
         data-chip
-        className={`group inline-flex h-chip max-w-full overflow-hidden rounded-nested text-small has-focus-visible:outline has-focus-visible:outline-focus has-focus-visible:outline-offset-(--focus-gap) ${echoed ? "ring-1 ring-line-strong" : ""}`}
+        className={`group inline-flex h-chip max-w-full overflow-hidden rounded-nested text-small focus-ring-within ${echoed ? "ring-1 ring-line-strong" : ""}`}
       >
         <button
           {...control}
@@ -130,7 +130,7 @@ export function Chip({
     return (
       <span
         data-chip
-        className={`group inline-flex h-chip max-w-full items-center rounded-full text-small inset-ring hover:bg-raised-hi hover:text-fg hover:ring-1 hover:ring-line-strong has-focus-visible:outline has-focus-visible:outline-focus has-focus-visible:outline-offset-(--focus-gap) ${ground}`}
+        className={`group inline-flex h-chip max-w-full items-center rounded-full text-small inset-ring hover:bg-raised-hi hover:text-fg hover:ring-1 hover:ring-line-strong focus-ring-within ${ground}`}
       >
         <button
           {...control}

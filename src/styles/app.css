@@ -304,6 +304,13 @@
   }
 }
 
+@utility focus-ring-within-inset {
+  &:has(:focus-visible) {
+    outline: var(--focus-width) solid var(--color-focus);
+    outline-offset: calc(var(--focus-width) * -1);
+  }
+}
+
 @utility focus-ring-inset {
   &:focus-visible {
     outline: var(--focus-width) solid var(--color-focus);
