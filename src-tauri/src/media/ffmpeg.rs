@@ -247,29 +247,24 @@ mod tests {
     }
 
     #[test]
+    fn a_program_still_running_at_its_limit_is_stopped() {
+        let started = Instant::now();
+        // Run directly, not through a shell, so stopping it stops the program itself.
+        let (program, args): (&str, &[&str]) = if cfg!(windows) {
+            ("ping", &["-n", "30", "127.0.0.1"])
+        } else {
+            ("sleep", &["30"])
+        };
+        let error = run(Path::new(program), args, Duration::from_millis(500)).unwrap_err();
+        assert!(error.to_string().contains("gave up"), "{error}");
+        assert!(started.elapsed() < Duration::from_secs(10));
+    }
+
+    #[test]
     fn a_file_is_always_named_through_the_file_protocol() {
         assert_eq!(
             input(Path::new("D:/clips/concat:a.mp4")),
             "file:D:/clips/concat:a.mp4"
         );
-    }
-
-    mod timing {
-        use super::*;
-
-        #[test]
-        #[ignore = "timing: runs alone, one test at a time"]
-        fn a_program_still_running_at_its_limit_is_stopped() {
-            let started = Instant::now();
-            // Run directly, not through a shell, so stopping it stops the program itself.
-            let (program, args): (&str, &[&str]) = if cfg!(windows) {
-                ("ping", &["-n", "30", "127.0.0.1"])
-            } else {
-                ("sleep", &["30"])
-            };
-            let error = run(Path::new(program), args, Duration::from_millis(500)).unwrap_err();
-            assert!(error.to_string().contains("gave up"), "{error}");
-            assert!(started.elapsed() < Duration::from_secs(10));
-        }
     }
 }
