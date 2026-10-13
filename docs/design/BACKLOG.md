@@ -72,10 +72,14 @@ name already given in that folder, in the order the library read them; a source'
 named for the source, a sorting source's for the Sorting Box. A file on a drive that is away is
 said before and skipped; a set wholly away is refused before the dialog. The export is a job with
 its own line and Cancel, and a cancelled or failed one leaves no zip. The app never replaces a
-file: the save dialog's overwrite question is off, and a name already taken is refused in the band,
-Trips.zip is already in Exports. Drawn: the sheet on the bar, From Folders, from a folder's menu,
-part away, all away, a name taken, exporting, exported with Show in Explorer, cancelled, the zip
-not written, exported in part with the banner, and what the zip holds.
+file. Windows' save dialog asks whether to replace a name that exists, which the dialog plugin
+cannot turn off; No keeps it open for another name, and a Yes is refused in the band, Filmstrip
+never replaces a file. Trips.zip is already in Exports. For #64, the finished zip goes into place
+by a step that refuses an existing name: std::fs::hard_link then removing the temporary file, or
+MoveFileExW without MOVEFILE_REPLACE_EXISTING, never std::fs::rename, which replaces on Windows.
+Drawn: the sheet on the bar, From Folders, from a folder's menu, part away, all away, a name taken,
+exporting, exported with Show in Explorer, cancelled, the zip not written, exported in part with
+the banner, and what the zip holds.
 
 ## Backing up the index · DRAWN
 
@@ -87,9 +91,10 @@ first, each with when, how it was taken (at launch, by hand, before restore), it
 Restore…. Restore… asks on the row, in the row question's shape, and keeps the index as it was as a
 backup first; a backup that cannot be read is refused at the section's foot and the index is
 untouched. The chosen one is checked before the current index is backed up, and the oldest go only
-once the swap has succeeded, never the one restored. A restore keeps the Trash as it is now and
-starts the job queue empty but for the walk. Lowering the number removes nothing until the next
-backup, and marks every row that will not be among the newest after it. Drawn: the whole dialog,
-asking, restoring, restored with the way back on top, unreadable, the dropdown open, lowered, the
-640px window, thirty kept, none yet, one being written, and a backup refused in Settings and at
-launch.
+once the swap has succeeded, never the one restored. A restore keeps the Trash as it is now, each
+trashed item with its chain of folders, retired, and one from a source added since goes as that
+source's other rows do; it starts the job queue empty but for the walk. Lowering the number
+removes nothing until the next backup, and marks every row that will not be among the newest after
+it. Drawn: the whole dialog, asking, restoring, restored with the way back on top, unreadable, the
+dropdown open, lowered, the 640px window, thirty kept, none yet, one being written, and a backup
+refused in Settings and at launch.
