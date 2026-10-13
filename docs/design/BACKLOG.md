@@ -64,16 +64,18 @@ Issue #64. A branch or a selection cannot leave the library as one file.
 
 Artboards › Exporting a zip. Export… follows Show in Explorer on a folder's and a source's menu,
 and Copy Path on the set's menu and Copy on the selection bar, shedding behind More after Select
-All. Windows' save dialog comes first, then a sheet in the menu's surface and width, against
-what asked, says how the files are named: Keep Names or From Folders, a segmented pair, with the
-first file as it will be in the zip, the zip it will write, and Export and Cancel. The tree is
-kept either way; From Folders names a file from its folder and when it was taken, (2) and (3)
-after a name already given in that folder, in the order the library read them. A file on a drive
-that is away is said before and skipped; a set wholly away is refused before the dialog. The
-export is a job with its own line and Cancel, and a cancelled or failed one leaves no zip.
-Drawn: the sheet on the bar, From Folders, from a folder's menu, part away, all away, exporting,
-exported with Show in Explorer, cancelled, the zip not written, exported in part with the banner,
-and what the zip holds.
+All. Windows' save dialog comes first, then a sheet in the menu's surface and width, against what
+asked, says how the files are named: Keep Names or From Folders, a segmented pair, with the first
+file as it will be in the zip, the zip it will write, and Export and Cancel. The tree is kept
+either way; From Folders names a file from its folder and when it was taken, (2) and (3) after a
+name already given in that folder, in the order the library read them; a source's own files are
+named for the source, a sorting source's for the Sorting Box. A file on a drive that is away is
+said before and skipped; a set wholly away is refused before the dialog. The export is a job with
+its own line and Cancel, and a cancelled or failed one leaves no zip. The app never replaces a
+file: the save dialog's overwrite question is off, and a name already taken is refused in the band,
+Trips.zip is already in Exports. Drawn: the sheet on the bar, From Folders, from a folder's menu,
+part away, all away, a name taken, exporting, exported with Show in Explorer, cancelled, the zip
+not written, exported in part with the banner, and what the zip holds.
 
 ## Backing up the index · DRAWN
 
