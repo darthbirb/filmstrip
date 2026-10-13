@@ -591,6 +591,7 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
 - **Button.** A named move in words: `control`-tall at the `control` corner, `ui` text, a glyph
   before the label in `fg-dim` where it has one and a count or chevron after it. Raised on
   `raised` with a `line-control` ring, or quiet with no ground until the pointer brings a `wash`.
+  A raised one stays `raised-hi` in a `line-control-hi` ring while the sheet it opened is open.
   One that destroys or forgets is `danger` ink on `danger-tint` in a `line-danger` ring, filled
   `danger` under the pointer. Its label is Title Case, as every label is: "Words" above.
   A label never wraps: too little room ends it in an ellipsis, and the panel it sits in stops
@@ -858,6 +859,21 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   scroller. Its own tags, never a folder's name or what it inherits, show an × under the
   pointer or the keyboard, a `chip-remove` circle that takes a `wash`. A file's Labels row has no
   field: a file takes tags only.
+- **Tag sheet.** Tag… on the selection bar opens it over the grid in the menu's surface and width,
+  against the button a `tile-gap` above it, left edges met, or against More while Tag… waits
+  there. The count heads it in `eyebrow` capitals, then the tag field, open from the start, the
+  sheet's width and with no ring, then what the set carries: Their Own (Its Own for one file)
+  first, a `line` rule, and each folder's under From and its title in path order. Past four
+  folders, those above every checked file keep their heading and the rest gather under From N
+  Folders. While it is read, chip-shaped stand-ins on `inset` hold the places. It scrolls past
+  half the grid's height.
+- **Set chip.** A tag across a set of files: the chip's own shape with "3 of 5" after the name in
+  `key` `fg-dim` tabular figures when only some of the set carry it, and nothing when all do. It
+  never searches. The set's own lift as the details' chips do and show a + before the × under the
+  pointer or the keyboard, `chip-remove` circles taking a `wash`: + adds it to the rest, × takes
+  it off every file that holds it. What a folder gives sits sunk with neither. A chip gathered
+  under From N Folders takes a keyboard stop, and its tooltip, on focus as under the pointer,
+  names the folders it comes from in `small` on `panel`.
 - **Label field.** Add Label… is an outline chip at the nested corner; it becomes a label in its
   own two halves, the key on `well` and the value on `ground` in one `line-control` ring, "key" and
   "value" for placeholders, each offered what the library has in the tag field's list with "on 2

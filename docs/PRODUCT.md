@@ -48,6 +48,11 @@ inherits from its ancestors too. **A value is never shown without its key** — 
 `Cairo` says it matched the label `Location: Cairo`, and says that it was a label rather than a
 tag.
 
+A set of checked files is tagged at once. Its Tag… says which tags every one of them carries,
+which only some do and on how many, and which folder gives each that comes from one; a tag added
+there goes on every file that lacks it, and one taken off comes off every file that holds it as
+its own.
+
 ## Search
 
 Terms scope by folder and by tag, and both are offered as **visible controls**. Typing the

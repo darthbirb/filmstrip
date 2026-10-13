@@ -57,6 +57,14 @@ export function TagField(props: Props) {
   );
 }
 
+/**
+ * The field alone, open from the start and the width of what holds it, for a surface that is
+ * about tagging: leaving the field leaves it open, and only Escape or Enter on nothing closes.
+ */
+export function StandingTagField(props: Props & { onClose: () => void }) {
+  return <Field {...props} standing />;
+}
+
 function Field({
   of,
   offers,
@@ -65,7 +73,8 @@ function Field({
   onEcho,
   onBackOut,
   onClose,
-}: Props & { onClose: () => void }) {
+  standing = false,
+}: Props & { onClose: () => void; standing?: boolean }) {
   const id = useId();
   const anchor = anchorOf(id, "tag-field");
   const field = useRef<HTMLInputElement>(null);
@@ -121,7 +130,7 @@ function Field({
       setLit((was) => (Math.min(was, rows.length - 1) + step + rows.length) % rows.length);
     } else if (event.key === "Backspace" && typed === "") {
       event.preventDefault();
-      onClose();
+      if (!standing) onClose();
       onBackOut();
     }
   };
@@ -143,9 +152,9 @@ function Field({
           setLit(0);
         }}
         onKeyDown={onKeyDown}
-        onBlur={onClose}
+        onBlur={standing ? undefined : onClose}
         style={{ anchorName: anchor } as CSSProperties}
-        className={`focus-ring field-sizing-content h-chip min-w-24 max-w-full rounded-full bg-ground px-2.5 text-fg-hi text-small inset-ring placeholder:text-fg-faint ${refused ? "inset-ring-line-danger" : "inset-ring-line-control"}`}
+        className={`h-chip max-w-full rounded-full bg-ground px-2.5 text-fg-hi text-small inset-ring placeholder:text-fg-faint ${standing ? "w-full outline-none" : "focus-ring field-sizing-content min-w-24"} ${refused ? "inset-ring-line-danger" : "inset-ring-line-control"}`}
       />
       {refused && <RefusalLine>{refused.line}</RefusalLine>}
       <OfferList

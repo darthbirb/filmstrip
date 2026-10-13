@@ -197,7 +197,7 @@ test("at the grid's narrowest the count, Move to… and × stay, and the rest wa
 
   await userEvent.click(bar().getByRole("button", { name: "More" }).last());
   const rows = page.getByRole("menuitem").elements().map(words);
-  expect(rows).toEqual(["Select All", "Favourite", "Copy", "Delete 3 Files"]);
+  expect(rows).toEqual(["Select All", "Favourite", "Tag…", "Copy", "Delete 3 Files"]);
 });
 
 const tile = (name: string) => page.getByRole("button", { name, exact: true });
@@ -211,7 +211,14 @@ test("right-clicking a checked tile opens the set's menu, counted, with the verb
   await userEvent.click(tile("sphinx.jpg"), { button: "right" });
 
   await expect.element(page.getByRole("menu", { name: "2 Files" })).toBeVisible();
-  expect(menuRows()).toEqual(["Favourite", "Move to…", "Copy", "Copy Path", "Delete 2 Files"]);
+  expect(menuRows()).toEqual([
+    "Favourite",
+    "Tag…",
+    "Move to…",
+    "Copy",
+    "Copy Path",
+    "Delete 2 Files",
+  ]);
   await recording(async (calls) => {
     await userEvent.click(page.getByRole("menuitem", { name: "Delete 2 Files" }));
     await expect

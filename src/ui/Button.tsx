@@ -25,7 +25,8 @@ const SHAPE =
   "focus-ring flex h-control max-w-full shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control px-2.5 text-ui transition-colors duration-(--motion-quick) motion-reduce:transition-none";
 
 const TONES = {
-  raised: "bg-raised text-fg inset-ring inset-ring-line-control hover:bg-raised-hi",
+  raised:
+    "bg-raised text-fg inset-ring inset-ring-line-control hover:bg-raised-hi aria-expanded:bg-raised-hi aria-expanded:inset-ring-line-control-hi",
   quiet: "text-fg-mid hover:bg-wash hover:text-fg aria-expanded:bg-raised-hi aria-expanded:text-fg",
   danger:
     "bg-danger-tint text-danger inset-ring inset-ring-line-danger hover:bg-danger hover:text-on-danger active:bg-danger-press",
