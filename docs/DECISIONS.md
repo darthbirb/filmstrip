@@ -956,6 +956,10 @@ disk, and a list of words is not.
 - **A folder's name is in the list but is not the list's to change.** It is a tag every file
   below carries, and the counts would not add up without it. Rename, merge and delete take only
   the uses given by hand, and the question says so; a row that is only a name has no ⋯.
+- **A deleted folder's name is not in the list.** Its row stays for undo and keeps its name's
+  tag, which nothing in the list can change and no search finds, so a tag that is only such names
+  is left out, and its delete and rename change nothing. A rename onto one takes that tag, as a
+  merge would. A tag given by hand that is also one leaves the list once its last use goes.
 - **A rename keeps the tag's id**, so nothing holding it moves. A name cannot be renamed, so a
   rename of a tag that is also a name moves its hand-given uses onto a new tag instead.
 - **Renaming onto a tag that exists is a merge, and asks first.** The backend refuses a rename

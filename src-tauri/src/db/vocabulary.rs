@@ -61,6 +61,14 @@ pub struct Vocabulary {
     pub keys: Vec<KeyRow>,
 }
 
+/// A tag that is only the name of deleted folders, which no act can change, so the list leaves it
+/// out. DECISIONS.md "The tags screen".
+const ONLY_A_DELETED_NAME: &str = "t.key IS NULL
+    AND EXISTS (SELECT 1 FROM folder_tag ft WHERE ft.tag_id = t.id)
+    AND NOT EXISTS (SELECT 1 FROM folder_tag ft JOIN folder f ON f.id = ft.folder_id
+                     WHERE ft.tag_id = t.id AND (ft.source <> 'title' OR f.deleted_at IS NULL))
+    AND NOT EXISTS (SELECT 1 FROM item_tag it WHERE it.tag_id = t.id)";
+
 /// Every term in the library, counted from the index, so a source that is away still counts.
 pub fn list_tags(conn: &Connection) -> Result<Vocabulary> {
     let files = counts(
@@ -120,8 +128,10 @@ pub fn list_tags(conn: &Connection) -> Result<Vocabulary> {
     }
     let of = |map: &HashMap<i64, i64>, id: i64| map.get(&id).copied().unwrap_or(0);
 
-    let mut stmt =
-        conn.prepare("SELECT id, key, value FROM tag ORDER BY key IS NOT NULL, key, value")?;
+    let mut stmt = conn.prepare(&format!(
+        "SELECT id, key, value FROM tag t WHERE NOT ({ONLY_A_DELETED_NAME})
+          ORDER BY key IS NOT NULL, key, value"
+    ))?;
     let terms = stmt
         .query_map([], |r| {
             Ok(Term {
@@ -255,13 +265,16 @@ pub fn rename_tag(conn: &Connection, tag_id: i64, value: &str, batch_id: &str) -
     if to == term.value {
         return Ok(false);
     }
-    if find(conn, None, &to)?.is_some() {
-        return Err(AppError::invalid(format!("{to} is already a tag")));
-    }
     let change = Change::RenameTag {
         from: term.value.clone(),
         to: to.clone(),
     };
+    if let Some(other) = find(conn, None, &to)? {
+        if !only_a_deleted_name(conn, other)? {
+            return Err(AppError::invalid(format!("{to} is already a tag")));
+        }
+        return fold_into(conn, &term, other, change, batch_id);
+    }
     if !named(conn, tag_id)? {
         let mut retagged = blank(
             change,
@@ -279,6 +292,9 @@ pub fn rename_tag(conn: &Connection, tag_id: i64, value: &str, batch_id: &str) -
             },
         )?;
         return record(conn, batch_id, &retagged);
+    }
+    if !hand_given(conn, tag_id)? {
+        return Ok(false);
     }
     let before = live_carriers(conn, &[tag_id])?;
     let mut retagged = blank(change, 0, live_hand_holders(conn, tag_id)?);
@@ -298,19 +314,27 @@ pub fn merge_tags(conn: &Connection, from: i64, into: i64, batch_id: &str) -> Re
     if from == into {
         return Ok(false);
     }
+    let change = Change::MergeTags {
+        from: one.value.clone(),
+        into: other.value,
+    };
+    fold_into(conn, &one, into, change, batch_id)
+}
+
+fn fold_into(
+    conn: &Connection,
+    one: &Term,
+    into: i64,
+    change: Change,
+    batch_id: &str,
+) -> Result<bool> {
+    let from = one.id;
     let before = live_carriers(conn, &[from])?;
-    let mut retagged = blank(
-        Change::MergeTags {
-            from: one.value.clone(),
-            into: other.value,
-        },
-        0,
-        live_hand_holders(conn, from)?,
-    );
+    let mut retagged = blank(change, 0, live_hand_holders(conn, from)?);
     let items = carriers(conn, &[from, into])?;
     take_uses(conn, &mut retagged, from, Some(into))?;
     settle(conn, &retagged, &items, &[from, into])?;
-    retire(conn, &mut retagged, &one)?;
+    retire(conn, &mut retagged, one)?;
     retagged.files = gone_from(&before, &live_carriers(conn, &[from])?);
     record(conn, batch_id, &retagged)
 }
@@ -677,6 +701,24 @@ fn key_terms(conn: &Connection, key: &str) -> Result<Vec<Term>> {
 fn named(conn: &Connection, tag_id: i64) -> Result<bool> {
     Ok(conn.query_row(
         "SELECT EXISTS (SELECT 1 FROM folder_tag WHERE tag_id = ?1 AND source = 'title')",
+        params![tag_id],
+        |r| r.get(0),
+    )?)
+}
+
+fn only_a_deleted_name(conn: &Connection, tag_id: i64) -> Result<bool> {
+    Ok(conn.query_row(
+        &format!("SELECT EXISTS (SELECT 1 FROM tag t WHERE t.id = ?1 AND {ONLY_A_DELETED_NAME})"),
+        params![tag_id],
+        |r| r.get(0),
+    )?)
+}
+
+/// Whether anything holds the tag but a folder's name, in whatever state.
+fn hand_given(conn: &Connection, tag_id: i64) -> Result<bool> {
+    Ok(conn.query_row(
+        "SELECT EXISTS (SELECT 1 FROM item_tag WHERE tag_id = ?1)
+             OR EXISTS (SELECT 1 FROM folder_tag WHERE tag_id = ?1 AND source <> 'title')",
         params![tag_id],
         |r| r.get(0),
     )?)
@@ -1286,6 +1328,17 @@ mod tests {
         );
     }
 
+    /// A folder sent to the Trash with everything in it, as the app's delete leaves it.
+    fn trash(conn: &Connection, folder_id: i64) {
+        folders::trash_subtree(conn, folder_id).unwrap();
+        conn.execute(
+            "UPDATE item SET deleted_at = 1, trashed_at = 1
+              WHERE folder_id IN (SELECT id FROM folder WHERE deleted_at IS NOT NULL)",
+            [],
+        )
+        .unwrap();
+    }
+
     fn journal_rows(conn: &Connection, batch_id: &str) -> Vec<String> {
         journal::batch(conn, batch_id)
             .unwrap()
@@ -1802,6 +1855,79 @@ mod tests {
         assert_eq!(held_by(conn, lib.beach), ["#beach", "place:gouna"]);
         undo::undo_batch(conn, &batch).unwrap();
         assert_eq!(held_by(conn, lib.beach), ["#beach", "place:gouna", "dawn"]);
+    }
+
+    #[test]
+    fn a_deleted_folder_s_name_is_not_listed_and_its_delete_and_rename_change_nothing() {
+        let lib = library();
+        let conn = &lib.conn;
+        let cairo = id_of(conn, None, "cairo");
+        trash(conn, lib.cairo);
+        let lines = tag_lines(conn);
+        assert!(
+            !lines.iter().any(|line| line.contains("cairo")),
+            "{lines:?}"
+        );
+        let batch = journal::new_batch();
+        assert!(!delete_tag(conn, cairo, &batch).unwrap());
+        assert!(!rename_tag(conn, cairo, "giza", &batch).unwrap());
+        assert!(find(conn, None, "giza").unwrap().is_none(), "nothing made");
+        assert!(journal_rows(conn, &batch).is_empty());
+        assert_eq!(held_by(conn, lib.cairo)[0], "#cairo");
+    }
+
+    #[test]
+    fn a_tag_sharing_a_deleted_folder_s_name_leaves_the_list_once_its_uses_go() {
+        let lib = library();
+        let conn = &lib.conn;
+        let folder = folders::create(conn, lib.root, "Dawn").unwrap();
+        trash(conn, folder);
+        let dawn = id_of(conn, None, "dawn");
+        assert!(tag_lines(conn).contains(&"dawn 4/1".to_string()));
+
+        let deleted = journal::new_batch();
+        assert!(delete_tag(conn, dawn, &deleted).unwrap());
+        let lines = tag_lines(conn);
+        assert!(!lines.iter().any(|line| line.contains("dawn")), "{lines:?}");
+        undo::undo_batch(conn, &deleted).unwrap();
+        assert!(tag_lines(conn).contains(&"dawn 4/1".to_string()));
+
+        assert!(rename_tag(conn, dawn, "first light", &journal::new_batch()).unwrap());
+        let lines = tag_lines(conn);
+        assert!(lines.contains(&"first light 4/1".to_string()), "{lines:?}");
+        assert!(!lines.iter().any(|line| line.contains("dawn")), "{lines:?}");
+        assert_eq!(
+            held_by(conn, folder),
+            ["#dawn"],
+            "the folder keeps its name"
+        );
+        assert_resolved(conn);
+    }
+
+    #[test]
+    fn a_rename_onto_a_deleted_folder_s_name_takes_that_tag() {
+        let lib = library();
+        let conn = &lib.conn;
+        let cairo = id_of(conn, None, "cairo");
+        trash(conn, lib.cairo);
+        let golden = id_of(conn, None, "golden hour");
+        let batch = journal::new_batch();
+        assert!(rename_tag(conn, golden, "Cairo", &batch).unwrap());
+        assert_eq!(hand_of(conn, lib.aunt), ["cairo", "dawn"]);
+        assert_eq!(id_of(conn, None, "cairo"), cairo);
+        assert!(find(conn, None, "golden hour").unwrap().is_none());
+        let lines = tag_lines(conn);
+        assert!(lines.contains(&"cairo 1/0".to_string()), "{lines:?}");
+        assert_resolved(conn);
+
+        undo::undo_batch(conn, &batch).unwrap();
+        assert_eq!(hand_of(conn, lib.aunt), ["golden hour", "dawn"]);
+        let lines = tag_lines(conn);
+        assert!(
+            !lines.iter().any(|line| line.contains("cairo")),
+            "{lines:?}"
+        );
+        assert_resolved(conn);
     }
 
     #[test]
