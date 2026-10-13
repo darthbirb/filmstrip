@@ -260,3 +260,38 @@ test("at the window's least the counts keep their columns and a long name ends i
     if (own) await removeItemTag(1, own.tagId);
   }
 });
+
+test("a key merged into another asks first and each folder keeps its value; Delete Key asks with its count", async () => {
+  await setFolderLabel(5, "season", "winter");
+  try {
+    await opened();
+    await userEvent.click(more("season"));
+    await userEvent.click(menuRow("Merge Into…"));
+    await userEvent.keyboard("loc{Enter}");
+    await expect
+      .element(
+        page.getByText(
+          "location is already a key, on 1 folder. Merge season into it? Its 1 folder keeps its value, as location: winter.",
+        ),
+      )
+      .toBeVisible();
+    await userEvent.click(page.getByRole("button", { name: "Merge Keys" }));
+    await expect
+      .poll(async () => (await listTags()).keys.map((key) => key.key))
+      .toEqual(["location", "trip"]);
+
+    await userEvent.click(more("trip"));
+    await userEvent.click(menuRow("Delete Key"));
+    await expect
+      .element(page.getByText("Delete trip? It comes off 1 folder and the 5 files under it."))
+      .toBeVisible();
+    await userEvent.click(page.getByRole("button", { name: "Delete Key" }));
+    await expect
+      .poll(async () => (await listTags()).keys.map((key) => key.key))
+      .toEqual(["location"]);
+  } finally {
+    while (await undoLast()) {}
+    const season = (await listTags()).keys.find((key) => key.key === "season")?.values[0];
+    if (season) await removeFolderTag(5, season.tagId);
+  }
+});
