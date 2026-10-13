@@ -82,11 +82,14 @@ not written, exported in part with the banner, and what the zip holds.
 Issue #65. The index holds everything the disk does not, and nothing keeps a copy of it.
 
 Artboards › Backing up the index. Settings › Library › Backups, after Tags: its name, how many are
-kept and what they weigh, and Back Up Now; Backups to Keep, 3, 7, 14 or 30; then the backups
-newest first, each with when, how it was taken (at launch, by hand, before restore), its size and
-Restore…. Restore… asks on the row, in the row question's shape, and keeps the index as it was
-as a backup first; a backup that cannot be read is refused at the section's foot and the index is
-untouched. Lowering the number removes nothing until the next backup. Drawn: the whole dialog,
-asking, restoring, restored with the way back on top, unreadable, the dropdown open, lowered,
-the 640px window, thirty kept, none yet, one being written, and a backup refused in Settings and
-at launch.
+kept and what they weigh, and Back Up Now; Backups to Keep, 3, 7, 14 or 30; then the backups newest
+first, each with when, how it was taken (at launch, by hand, before restore), its size and
+Restore…. Restore… asks on the row, in the row question's shape, and keeps the index as it was as a
+backup first; a backup that cannot be read is refused at the section's foot and the index is
+untouched. The chosen one is checked before the current index is backed up, and the oldest go only
+once the swap has succeeded, never the one restored. A restore keeps the Trash as it is now and
+starts the job queue empty but for the walk. Lowering the number removes nothing until the next
+backup, and marks every row that will not be among the newest after it. Drawn: the whole dialog,
+asking, restoring, restored with the way back on top, unreadable, the dropdown open, lowered, the
+640px window, thirty kept, none yet, one being written, and a backup refused in Settings and at
+launch.
