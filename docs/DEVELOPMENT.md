@@ -25,6 +25,7 @@ version through `npx`:
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check` | Rust format |
 | `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings` | Rust lint |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | Rust tests; also writes `src/ipc/bindings` |
+| `cargo test --manifest-path src-tauri/Cargo.toml -- --ignored --test-threads=1 ::timing::` | Rust timing tests, one at a time |
 
 ### Where pnpm cannot run
 
@@ -70,12 +71,20 @@ Three ways, cheapest first.
   the test that reproduces it. CI runs every suite below on each pull request.
 - **Rust** is tested beside the code, in `#[cfg(test)]` modules. A test that needs real files
   writes them under `src-tauri/target/`, never outside the repository.
+- **A test that bounds how long the code takes runs alone.** Beside the rest of the suite it
+  times the machine, not the code, so it sits in a `timing` module inside its file's tests and
+  is `#[ignore]`d. After the plain run,
+  `cargo test --manifest-path src-tauri/Cargo.toml -- --ignored --test-threads=1 ::timing::`
+  runs them one at a time; CI does both on every pull request, and fails if that selects
+  nothing. Its bound is never loosened to make it pass. A limit that only guards against a hang,
+  many times longer than the work, does not bound the code, so its test stays in the plain run.
 - **A test that needs ffmpeg is `#[ignore]`d**, so a plain `cargo test` needs nothing
   downloaded. `pwsh scripts/fetch-ffmpeg.ps1` puts the build the release carries in
   `src-tauri/target/tools`, where those tests look before PATH, and
-  `cargo test --manifest-path src-tauri/Cargo.toml -- --ignored` runs them; CI does both on every
-  pull request. Run them after touching video. For video in `tauri dev`, fetch it beside the
-  debug build: `pwsh scripts/fetch-ffmpeg.ps1 -Into src-tauri/target/debug/tools`.
+  `cargo test --manifest-path src-tauri/Cargo.toml -- --ignored --skip ::timing::` runs them;
+  CI does both on every pull request. Run them after touching video. For video in `tauri dev`,
+  fetch it beside the debug build:
+  `pwsh scripts/fetch-ffmpeg.ps1 -Into src-tauri/target/debug/tools`.
 - **Component tests** run in Vitest's browser mode over `src/**/*.test.tsx`, on Edge under
   Windows and Chromium elsewhere, in the `en-GB` locale (`tests/browser.ts`). **Never jsdom** —
   see DECISIONS.md "Testing in a real browser, never jsdom".
