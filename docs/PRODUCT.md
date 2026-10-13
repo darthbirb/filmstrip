@@ -35,8 +35,12 @@ it on disk, out of its sorting source and into the library.
 ## Trash
 
 A place: a folder in the app's own directory, with a maximum total size, a maximum size per
-item, and a time to live, all adjustable by the user. What happens when an item expires — the
-recycle bin, or deletion — is not settled yet.
+item, and a time to live, all adjustable by the user.
+
+**An item that expires goes to the Windows Recycle Bin**: one that outlives the time to live,
+and the oldest first while the trash is over its total size. That is one more chance to get it
+back, outside the app; the app's Restore and undo can no longer reach it. Nothing is destroyed
+by expiry. Purging the trash is the one way the app deletes a file outright.
 
 ## Tags and labels
 

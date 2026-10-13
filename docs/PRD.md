@@ -73,7 +73,7 @@ and the small verbs ggallery had.
 ### M5 · The trash, finished
 
 - Limits on the trash's total size, per-item size and time to live, set in Settings (#70)
-- What happens when an item expires — **open: the recycle bin or deletion; the owner decides** (#69)
+- What happens when an item expires — **decided: the Windows Recycle Bin** (#69)
 - Purging the trash, the one irreversible act (#70)
 
 ### M6 · Self-contained
@@ -104,5 +104,4 @@ Decided against; reopening one is a decision for the owner, recorded in DECISION
 Each is an issue labelled `needs-human` until the owner answers it, and the answer is written
 here and in DECISIONS.md.
 
-- What happens when a trashed item expires: the recycle bin, or deletion? (#69)
 - Does compression replace originals in place once approved, or keep them in the trash?
