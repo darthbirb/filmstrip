@@ -34,3 +34,67 @@ Consider the old drawing's scrubber: a 16px channel at the grid's edge with a sq
 to jump anywhere; the position is the information. Investigate whether it replaces the
 scrollbar or sits beside it. The pass that drew it recommends building the other ten first, and
 only building this if the largest folders still feel unnavigable afterwards.
+
+## Bringing files in from Explorer · DRAWN
+
+Issue #63. Files copied or dragged in Explorer cannot be brought into a folder or the Sorting Box.
+
+Artboards › Bringing files in. A drag from Explorer draws the app's own ghost under Explorer's
+picture, the hatch where the picture will be, and says the act before it lands: Copy 3 files to
+Lisbon over a row that takes it, lifted as for a move, and the reason in red over one that will not
+(the files' own folder, a folder onto itself, the Trash, a drive that is away). A folder's grid
+takes it as its row does, inside a 2px pewter ring; a search, the Trash and an offline grid do not
+light. The Sorting Box with more than one sorting source asks which at the pointer on release.
+Paste 3 Files follows New Folder on a folder's and a source's menu, counts what the clipboard
+holds, and is absent when it holds no files; the grid's ground opens its place's menu under the
+place's name, and the Sorting Box's row has Paste alone. Ctrl+V pastes into the place the grid
+shows. The copy is a job with its own line at the foot and a Cancel; it ends with the Line and
+Undo, which sends what came in to the Trash. A name already taken is reported in the banner, never
+changed, and a folder whose name is taken stays out whole. A Paste of files already in the place is
+refused in the band, Already in Cairo; a mix copies the rest and the banner names the others, with
+no Retry. Drawn: over a row, four refusals, over a folder's grid, over a search, the Sorting Box's
+pick, Paste on the menus, the Sorting Box's row, Ctrl+V with nothing and refused, the job's line,
+two jobs and the walk, the Line with the counts moved, cancelled partway, after Undo, a folder with
+its tree, names taken, a folder's name taken, a mix some of it already there, and Paste where it
+already is.
+
+## Exporting a zip · DRAWN
+
+Issue #64. A branch or a selection cannot leave the library as one file.
+
+Artboards › Exporting a zip. Export… follows Show in Explorer on a folder's and a source's menu,
+and Copy Path on the set's menu and Copy on the selection bar, shedding behind More after Select
+All. Windows' save dialog comes first, then a sheet in the menu's surface and width, against what
+asked, says how the files are named: Keep Names or From Folders, a segmented pair, with the first
+file as it will be in the zip, the zip it will write, and Export and Cancel. The tree is kept
+either way; From Folders names a file from its folder and when it was taken, (2) and (3) after a
+name already given in that folder, in the order the library read them; a source's own files are
+named for the source, a sorting source's for the Sorting Box. A file on a drive that is away is
+said before and skipped; a set wholly away is refused before the dialog. The export is a job with
+its own line and Cancel, and a cancelled or failed one leaves no zip. The app never replaces a
+file. Windows' save dialog asks whether to replace a name that exists, which the dialog plugin
+cannot turn off; No keeps it open for another name, and a Yes is refused in the band, Filmstrip
+never replaces a file. Trips.zip is already in Exports. For #64, the finished zip goes into place
+by a step that refuses an existing name: std::fs::hard_link then removing the temporary file, or
+MoveFileExW without MOVEFILE_REPLACE_EXISTING, never std::fs::rename, which replaces on Windows.
+Drawn: the sheet on the bar, From Folders, from a folder's menu, part away, all away, a name taken,
+exporting, exported with Show in Explorer, cancelled, the zip not written, exported in part with
+the banner, and what the zip holds.
+
+## Backing up the index · DRAWN
+
+Issue #65. The index holds everything the disk does not, and nothing keeps a copy of it.
+
+Artboards › Backing up the index. Settings › Library › Backups, after Tags: its name, how many are
+kept and what they weigh, and Back Up Now; Backups to Keep, 3, 7, 14 or 30; then the backups newest
+first, each with when, how it was taken (at launch, by hand, before restore), its size and
+Restore…. Restore… asks on the row, in the row question's shape, and keeps the index as it was as a
+backup first; a backup that cannot be read is refused at the section's foot and the index is
+untouched. The chosen one is checked before the current index is backed up, and the oldest go only
+once the swap has succeeded, never the one restored. A restore keeps the Trash as it is now, each
+trashed item with its chain of folders, retired, and one from a source added since goes as that
+source's other rows do; it starts the job queue empty but for the walk. Lowering the number
+removes nothing until the next backup, and marks every row that will not be among the newest after
+it. Drawn: the whole dialog, asking, restoring, restored with the way back on top, unreadable, the
+dropdown open, lowered, the 640px window, thirty kept, none yet, one being written, and a backup
+refused in Settings and at launch.
