@@ -56,7 +56,6 @@ type Editing = { row: string; mode: Mode; into?: string; typed?: string };
 type Clashes = { from: string; lines: Record<string, string> };
 type Menu = { row: string; label: string; anchor: MenuAnchor; groups: MenuGroups };
 
-const OFFERS = 7;
 const plural = (n: number, one: string, many = `${one}s`) =>
   `${formatCount(n)} ${n === 1 ? one : many}`;
 const article = (word: string) => (/^[aeiou]/.test(word) ? "an" : "a");
@@ -272,7 +271,6 @@ export function Tags() {
       tags
         .filter((other) => other.tagId !== tag.tagId && other.value.startsWith(typed))
         .sort((a, b) => b.files - a.files || byName(a.value, b.value))
-        .slice(0, OFFERS)
         .map((other) => ({
           value: other.value,
           said: other.value,
@@ -493,7 +491,6 @@ export function Tags() {
                     keys
                       .filter((other) => other.key !== key.key && other.key.startsWith(typed))
                       .sort((a, b) => b.folders - a.folders || byName(a.key, b.key))
-                      .slice(0, OFFERS)
                       .map((other) => ({
                         value: other.key,
                         said: other.key,
@@ -655,7 +652,6 @@ export function Tags() {
                       .filter(
                         (other) => other.tagId !== value.tagId && other.value.startsWith(typed),
                       )
-                      .slice(0, OFFERS)
                       .map((other) => ({
                         value: other.value,
                         said: other.value,

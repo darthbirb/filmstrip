@@ -44,3 +44,29 @@ test("Enter before the field can refuse waits, then takes what nothing refuses",
   await screen.rerender(field(true, false, commit));
   await expect.poll(() => taken).toEqual(["location"]);
 });
+
+test("a merge offers seven it can take, however many it refuses ahead of them", async () => {
+  const taken: string[] = [];
+  const keys = Array.from({ length: 16 }, (_, n) => `place ${n + 1}`);
+  await render(
+    <TermField
+      label="Merge trip into"
+      shape="key"
+      offers={(typed) =>
+        keys
+          .filter((key) => key.startsWith(typed))
+          .map((key) => ({ value: key, said: key, count: "on 1 folder" }))
+      }
+      refuse={(value) => (Number(value.split(" ")[1]) <= 7 ? line : null)}
+      onCommit={(value) => taken.push(value)}
+      onCancel={() => undefined}
+    />,
+  );
+  await userEvent.keyboard("place");
+  const offers = page.getByRole("option");
+  await expect
+    .poll(() => offers.elements().map((option) => option.textContent))
+    .toEqual([8, 9, 10, 11, 12, 13, 14].map((n) => `place ${n}on 1 folder`));
+  await userEvent.keyboard("{Enter}");
+  expect(taken).toEqual(["place 8"]);
+});

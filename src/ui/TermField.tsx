@@ -20,7 +20,10 @@ type Props = {
   value?: string;
   /** A tag is a pill; a label's key a nested chip; a value sits after its sunk key. */
   shape: "tag" | "key" | { key: string };
-  /** What the library has for what is typed, the row's own left out; a merge picks one. */
+  /**
+   * What the library has for what is typed, best first and the row's own left out; a merge picks
+   * one. The field shows the first seven it does not refuse.
+   */
   offers?: (typed: string) => OfferRow[];
   /** Why a folded value cannot be taken, said under the field, or `null` when it can. */
   refuse?: (value: string) => string | null;
@@ -38,6 +41,8 @@ type Props = {
 };
 
 type Shape = Props["shape"];
+
+const OFFERS = 7;
 
 const TEXT =
   "field-sizing-content h-full min-w-24 max-w-full px-2.5 text-fg-hi outline-none selection:bg-plate selection:text-on-plate";
@@ -98,7 +103,7 @@ export function TermField({
   const folded = fold(typed);
   const refused = folded && refuse ? refuse(folded) : null;
   const all = offers && !refused ? offers(folded) : [];
-  const rows = refuse ? all.filter((row) => !refuse(row.value)) : all;
+  const rows = (refuse ? all.filter((row) => !refuse(row.value)) : all).slice(0, OFFERS);
   const at = Math.min(lit, rows.length - 1);
   const said = refused ?? (missed && folded && nothing ? nothing(folded) : null);
 
