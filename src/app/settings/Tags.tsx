@@ -451,6 +451,17 @@ export function Tags() {
         else next.add(key.key);
         return next;
       });
+    const chevron = (
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={`${open ? "Hide" : "Show"} the values of ${key.key}`}
+        onClick={toggle}
+        className="focus-ring grid h-chip w-chevron shrink-0 place-items-center rounded-badge text-fg-dim text-glyph-small hover:text-fg"
+      >
+        <Glyph name={open ? "chevronDown" : "chevronRight"} />
+      </button>
+    );
     const chip = (
       <KeyOnlyChip tagKey={key.key} title={`Search ${keyTerm}`} onSearch={search(keyTerm)} />
     );
@@ -459,6 +470,7 @@ export function Tags() {
       const merging = now.mode === "merge";
       name = (
         <>
+          {chevron}
           {merging && chip}
           {merging && <Glyph name="into" className="shrink-0 text-fg-dim text-glyph-small" />}
           <TermField
@@ -480,6 +492,7 @@ export function Tags() {
                       }))
                 : undefined
             }
+            trail={merging ? undefined : <Said>{counted}</Said>}
             onCancel={stop}
             onCommit={(to) => {
               if (to === key.key) return stop();
@@ -487,21 +500,12 @@ export function Tags() {
               void act(() => renameLabelKey(key.key, to));
             }}
           />
-          {!merging && <Said>{counted}</Said>}
         </>
       );
     } else {
       name = (
         <>
-          <button
-            type="button"
-            aria-expanded={open}
-            aria-label={`${open ? "Hide" : "Show"} the values of ${key.key}`}
-            onClick={toggle}
-            className="focus-ring grid w-chevron shrink-0 place-items-center rounded-badge text-fg-dim text-glyph-small hover:text-fg"
-          >
-            <Glyph name={open ? "chevronDown" : "chevronRight"} />
-          </button>
+          {chevron}
           {chip}
           <Said>{counted}</Said>
         </>

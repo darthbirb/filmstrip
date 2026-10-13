@@ -1,6 +1,7 @@
 import {
   type CSSProperties,
   type KeyboardEvent,
+  type ReactNode,
   useId,
   useLayoutEffect,
   useRef,
@@ -23,6 +24,8 @@ type Props = {
   refuse?: (value: string) => string | null;
   /** Each folded value as it is typed, for a refusal the caller has to ask about. */
   onType?: (value: string) => void;
+  /** What the row says after the chip, kept on the field's line above a refusal. */
+  trail?: ReactNode;
   onCommit: (value: string) => void;
   onCancel: () => void;
 };
@@ -41,6 +44,7 @@ export function TermField({
   offers,
   refuse,
   onType,
+  trail,
   onCommit,
   onCancel,
 }: Props) {
@@ -122,6 +126,7 @@ export function TermField({
       ) : (
         <span className="inline-flex h-chip max-w-full text-small">{input}</span>
       )}
+      {trail}
       {refused && <RefusalLine>{refused}</RefusalLine>}
       {offers && (
         <OfferList
