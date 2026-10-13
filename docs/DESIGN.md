@@ -576,7 +576,8 @@ a pill, so the two chip families differ by shape, never by height; a strip step 
 Every state is designed: at rest, under the pointer, pressed, keyboard focus, and current or
 chosen where it applies. **Hover is one step lighter in the same neutral, never a hue.** Focus is
 a 2px `focus` ring outside the element, only for the keyboard; a control flush to the window's
-edge, or an option flush in a menu, takes it inside. Pressing steps back toward the rest surface.
+edge, or an option flush in a menu or a segmented trough, takes it inside. Pressing steps back
+toward the rest surface.
 
 - **Glyph.** A square 1em across, drawn from its Phosphor codepoint; it takes its size and ink
   from where it sits. Filled names a thing, outlined names an action; the pane's panel glyph is
@@ -944,7 +945,8 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   the two replaces the other. Folded, the rail keeps the Undo glyph button alone, its sentence in
   the tooltip; "Nothing to undo." comes out beside the rail on `panel` with the overlay shadow.
 - **Segmented.** A value with few enough answers to show them all at once, the one it is on filled
-  on `raised-hi` inside an `inset` trough. Real radios, so the arrow keys move between them. In a
+  on `raised-hi` inside an `inset` trough. Real radios, so the arrow keys move between them. Its
+  segments sit flush in the trough, so the keyboard's ring is drawn inside the segment. In a
   row of the details it is a `chip` high, its segments at the `badge` corner in `small`, `fg-dim`
   until chosen.
 - **Source row.** In Settings, two lines: the source's glyph, its name as a field where it stands,
