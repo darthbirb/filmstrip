@@ -2087,17 +2087,19 @@ mod tests {
         let lib = library();
         let conn = &lib.conn;
         let before = list_tags(conn).unwrap().tags.len();
-        let tx = conn.unchecked_transaction().unwrap();
-        for n in 0..40_000 {
-            let parent = [lib.trips, lib.family, lib.beach][n % 3];
-            folders::create(&tx, parent, &format!("day {n:05}")).unwrap();
-        }
-        tx.execute(
-            "UPDATE folder SET deleted_at = 1 WHERE title LIKE 'day %' AND id % 10 = 0",
-            [],
-        )
+        conn.execute_batch(&format!(
+            "WITH RECURSIVE n(i) AS (SELECT 0 UNION ALL SELECT i + 1 FROM n WHERE i < 39999)
+             INSERT INTO folder (title, parent_id, created_at, deleted_at)
+             SELECT printf('day %05d', i),
+                    CASE i % 3 WHEN 0 THEN {} WHEN 1 THEN {} ELSE {} END,
+                    0, CASE WHEN i % 10 = 0 THEN 1 END FROM n;
+             INSERT INTO tag (key, value) SELECT NULL, title FROM folder WHERE title LIKE 'day %';
+             INSERT INTO folder_tag (folder_id, tag_id, source)
+             SELECT f.id, t.id, 'title' FROM folder f JOIN tag t ON t.key IS NULL AND t.value = f.title
+              WHERE f.title LIKE 'day %';",
+            lib.trips, lib.family, lib.beach
+        ))
         .unwrap();
-        tx.commit().unwrap();
 
         let started = std::time::Instant::now();
         let listed = list_tags(conn).unwrap();
