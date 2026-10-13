@@ -1057,7 +1057,8 @@ function keyClash(from: string, into: string): KeyClash | null {
   for (const id of everyFolder()) {
     if (!ownOf(id).tags.some((tag) => tag.key === from)) continue;
     const folder = folderName(id);
-    if (ownOf(id).tags.some((tag) => tag.key === into)) return { kind: "both", folder };
+    if (ownOf(id).tags.some((tag) => tag.key === into))
+      return { kind: "both", folder, deleted: false };
     const above = crumbs(id)
       .folders.slice(0, -1)
       .reverse()

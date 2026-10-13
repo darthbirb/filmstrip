@@ -197,8 +197,8 @@ fn key_counts(conn: &Connection, sql: &str) -> Result<HashMap<String, i64>> {
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[ts(export)]
 pub enum KeyClash {
-    /// The folder holds both keys.
-    Both { folder: String },
+    /// The folder holds both keys, and may have been deleted, which leaves it nowhere to be seen.
+    Both { folder: String, deleted: bool },
     /// A folder above it holds the key it would take.
     Above { folder: String, above: String },
     /// A folder below it holds the key it would take.
@@ -216,7 +216,17 @@ impl KeyClash {
             }
         };
         match self {
-            KeyClash::Both { folder } => format!("{folder} already has {} {into}.", a(into)),
+            KeyClash::Both {
+                folder,
+                deleted: false,
+            } => format!("{folder} already has {} {into}.", a(into)),
+            KeyClash::Both {
+                folder,
+                deleted: true,
+            } => format!(
+                "{folder}, which was deleted, already has {} {into}.",
+                a(into)
+            ),
             KeyClash::Above { folder, above } => {
                 format!(
                     "{folder} has {} {from}, and {into} comes from {above}.",
@@ -286,7 +296,7 @@ pub fn key_clash(conn: &Connection, from: &str, into: &str) -> Result<Option<Key
             |r| r.get(0),
         )?;
         if both {
-            return Ok(Some(KeyClash::Both { folder }));
+            return Ok(Some(KeyClash::Both { folder, deleted }));
         }
         if deleted {
             continue;
@@ -1773,7 +1783,8 @@ mod tests {
         assert_eq!(
             key_clash(conn, "season", "location").unwrap(),
             Some(KeyClash::Both {
-                folder: "Lisbon".into()
+                folder: "Lisbon".into(),
+                deleted: false
             })
         );
         let refused = merge_keys(conn, "place", "owner", &journal::new_batch()).unwrap_err();
@@ -2020,10 +2031,16 @@ mod tests {
         assert_eq!(
             key_clash(conn, "season", "location").unwrap(),
             Some(KeyClash::Both {
-                folder: "Lisbon".into()
+                folder: "Lisbon".into(),
+                deleted: true
             })
         );
-        assert!(merge_keys(conn, "season", "location", &journal::new_batch()).is_err());
+        let refused = merge_keys(conn, "season", "location", &journal::new_batch()).unwrap_err();
+        assert!(
+            matches!(&refused, AppError::Invalid(line)
+                if line == "Lisbon, which was deleted, already has a location."),
+            "{refused}"
+        );
         assert_eq!(
             held_by(conn, lib.lisbon),
             ["#lisbon", "location:lisbon", "season:spring"]

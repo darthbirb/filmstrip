@@ -970,7 +970,9 @@ disk, and a list of words is not.
 - **A key merge keeps a key once down a branch**, as the band does: `vocabulary::key_clash`
   names the first folder holding the key that would land on one holding the other, itself, above
   or below, and a deleted folder holding both; the field refuses it where it is typed, and leaves it
-  out of Merge Into…'s offers. `label_key_clashes` answers for every other key at once as the field
+  out of Merge Into…'s offers. A deleted folder's line says it was deleted, since nothing on
+  screen shows it, but not that it is in the Trash: one whose files went to a sorting source, or
+  whose directory a walk found gone, is not there. `label_key_clashes` answers for every other key at once as the field
   opens, and an Enter before the answer waits for it. A value never leaves its key, so a value's
   rename or merge is never refused.
 - **Every act is one batch.** The row records each term it reworded, made or forgot and every

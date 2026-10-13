@@ -74,7 +74,7 @@ function comesOff(folders: number, files: number, carry: string) {
 export function clashLine(clash: KeyClash, from: string, into: string) {
   switch (clash.kind) {
     case "both":
-      return `${clash.folder} already has ${article(into)} ${into}.`;
+      return `${clash.folder}${clash.deleted ? ", which was deleted," : ""} already has ${article(into)} ${into}.`;
     case "above":
       return `${clash.folder} has ${article(from)} ${from}, and ${into} comes from ${clash.above}.`;
     case "below":

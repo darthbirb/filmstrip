@@ -259,8 +259,11 @@ test("a value's Merge Into… offers only its key's other values, and the merge 
 });
 
 test("a key clash reads in the band's words, whichever way it runs", () => {
-  expect(clashLine({ kind: "both", folder: "Lisbon" }, "season", "location")).toBe(
+  expect(clashLine({ kind: "both", folder: "Lisbon", deleted: false }, "season", "location")).toBe(
     "Lisbon already has a location.",
+  );
+  expect(clashLine({ kind: "both", folder: "Lisbon", deleted: true }, "season", "location")).toBe(
+    "Lisbon, which was deleted, already has a location.",
   );
   expect(clashLine({ kind: "above", folder: "Family", above: "People" }, "place", "owner")).toBe(
     "Family has a place, and owner comes from People.",

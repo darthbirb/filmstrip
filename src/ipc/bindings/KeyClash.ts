@@ -4,4 +4,4 @@
  * Why merging one key into another would give a folder a key twice down its branch, in the
  * folder band's terms: the folder it would land on first, then where the other is.
  */
-export type KeyClash = { "kind": "both", folder: string, } | { "kind": "above", folder: string, above: string, } | { "kind": "below", folder: string, below: string, };
+export type KeyClash = { "kind": "both", folder: string, deleted: boolean, } | { "kind": "above", folder: string, above: string, } | { "kind": "below", folder: string, below: string, };
