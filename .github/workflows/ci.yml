@@ -63,15 +63,22 @@ jobs:
       - name: Rust tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked
 
+      - name: Timing tests are found
+        shell: pwsh
+        run: |
+          $listed = cargo test --manifest-path src-tauri/Cargo.toml --locked -- --ignored --list ::timing:: | Select-String -Pattern ': test$'
+          if (-not $listed) { Write-Output 'No ignored test matches ::timing::, so the timing step would run nothing'; exit 1 }
+          Write-Output "$(@($listed).Count) timing tests found"
+
       - name: Rust timing tests, one at a time
-        run: cargo test --manifest-path src-tauri/Cargo.toml --locked -- --ignored --test-threads=1 ::timing::
+        run: 'cargo test --manifest-path src-tauri/Cargo.toml --locked -- --ignored --test-threads=1 ::timing::'
 
       - name: Fetch the ffmpeg the release carries
         shell: pwsh
         run: ./scripts/fetch-ffmpeg.ps1
 
       - name: Rust tests that need ffmpeg
-        run: cargo test --manifest-path src-tauri/Cargo.toml --locked -- --ignored --skip ::timing::
+        run: 'cargo test --manifest-path src-tauri/Cargo.toml --locked -- --ignored --skip ::timing::'
 
       - name: Bindings are current
         shell: bash

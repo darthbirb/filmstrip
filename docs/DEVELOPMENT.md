@@ -75,8 +75,8 @@ Three ways, cheapest first.
   times the machine, not the code, so it sits in a `timing` module inside its file's tests and
   is `#[ignore]`d. After the plain run,
   `cargo test --manifest-path src-tauri/Cargo.toml -- --ignored --test-threads=1 ::timing::`
-  runs them one at a time; CI does both on every pull request. Its bound is never loosened to
-  make it pass.
+  runs them one at a time; CI does both on every pull request, and fails if that selects
+  nothing. Its bound is never loosened to make it pass.
 - **A test that needs ffmpeg is `#[ignore]`d**, so a plain `cargo test` needs nothing
   downloaded. `pwsh scripts/fetch-ffmpeg.ps1` puts the build the release carries in
   `src-tauri/target/tools`, where those tests look before PATH, and
