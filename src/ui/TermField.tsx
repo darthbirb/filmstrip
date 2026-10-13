@@ -2,6 +2,8 @@ import {
   type CSSProperties,
   type KeyboardEvent,
   type ReactNode,
+  useEffect,
+  useEffectEvent,
   useId,
   useLayoutEffect,
   useRef,
@@ -22,6 +24,10 @@ type Props = {
   offers?: (typed: string) => OfferRow[];
   /** Why a folded value cannot be taken, said under the field, or `null` when it can. */
   refuse?: (value: string) => string | null;
+  /** Whether `refuse` can answer yet; Enter or a pick before then waits for it. */
+  ready?: boolean;
+  /** What a merge field says for Enter on a word nothing it offers begins with. */
+  nothing?: (value: string) => string;
   /** Each folded value as it is typed, for a refusal the caller has to ask about. */
   onType?: (value: string) => void;
   /** What the row says after the chip, kept on the field's line above a refusal. */
@@ -74,6 +80,8 @@ export function TermField({
   shape,
   offers,
   refuse,
+  ready = true,
+  nothing,
   onType,
   trail,
   onCommit,
@@ -84,11 +92,15 @@ export function TermField({
   const field = useRef<HTMLInputElement>(null);
   const [typed, setTyped] = useState(value);
   const [lit, setLit] = useState(0);
+  const [missed, setMissed] = useState(false);
+  const [waiting, setWaiting] = useState<string | null>(null);
   const settled = useRef(false);
   const folded = fold(typed);
   const refused = folded && refuse ? refuse(folded) : null;
-  const rows = offers && !refused ? offers(folded) : [];
+  const all = offers && !refused ? offers(folded) : [];
+  const rows = refuse ? all.filter((row) => !refuse(row.value)) : all;
   const at = Math.min(lit, rows.length - 1);
+  const said = refused ?? (missed && folded && nothing ? nothing(folded) : null);
 
   useLayoutEffect(() => {
     field.current?.focus();
@@ -100,8 +112,21 @@ export function TermField({
     settled.current = true;
     then();
   };
-  const commit = (picked: string) => settle(() => onCommit(picked, typed));
   const cancel = () => settle(onCancel);
+  const pick = (picked: string) => {
+    if (!ready) setWaiting(picked);
+    else if (refuse?.(picked)) {
+      setTyped(picked);
+      setLit(0);
+      onType?.(picked);
+    } else settle(() => onCommit(picked, typed));
+  };
+  const picked = useEffectEvent(pick);
+  useEffect(() => {
+    if (!ready || waiting === null) return;
+    setWaiting(null);
+    picked(waiting);
+  }, [ready, waiting]);
 
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key === "Escape") {
@@ -111,9 +136,10 @@ export function TermField({
     } else if (event.key === "Enter") {
       event.preventDefault();
       if (refused) return;
-      const picked = offers ? rows[at]?.value : folded;
-      if (picked) commit(picked);
+      const chosen = offers ? (rows[at] ?? all[0])?.value : folded;
+      if (chosen) pick(chosen);
       else if (!folded) cancel();
+      else setMissed(true);
     } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       if (rows.length === 0) return;
       event.preventDefault();
@@ -122,7 +148,7 @@ export function TermField({
     }
   };
 
-  const ring = refused ? "inset-ring-line-danger" : "inset-ring-line-control";
+  const ring = said ? "inset-ring-line-danger" : "inset-ring-line-control";
   const input = (
     <input
       ref={field}
@@ -133,11 +159,13 @@ export function TermField({
         "aria-activedescendant": rows.length > 0 ? `${id}-${at}` : undefined,
       })}
       aria-label={label}
-      aria-invalid={refused !== null}
+      aria-invalid={said !== null}
       value={typed}
       onChange={(event) => {
         setTyped(event.target.value);
         setLit(0);
+        setMissed(false);
+        setWaiting(null);
         onType?.(fold(event.target.value));
       }}
       onKeyDown={onKeyDown}
@@ -151,7 +179,7 @@ export function TermField({
     <>
       <Shaped shape={shape}>{input}</Shaped>
       {trail}
-      {refused && <RefusalLine>{refused}</RefusalLine>}
+      {said && <RefusalLine>{said}</RefusalLine>}
       {offers && (
         <OfferList
           id={id}
@@ -159,7 +187,7 @@ export function TermField({
           label={`${label}: what the library has`}
           rows={rows}
           lit={at}
-          onPick={commit}
+          onPick={pick}
         />
       )}
     </>

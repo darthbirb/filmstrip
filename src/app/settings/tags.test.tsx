@@ -203,6 +203,36 @@ test("a key merged where a branch would hold it twice is refused in the band's w
     .toBeVisible();
 });
 
+test("Merge Into… leaves out a key it cannot merge into, and Enter on it says why", async () => {
+  await opened();
+  await userEvent.click(more("trip"));
+  await userEvent.click(menuRow("Merge Into…"));
+  await userEvent.keyboard("loc");
+  await expect.element(page.getByRole("option", { name: /location/ })).not.toBeInTheDocument();
+  await userEvent.keyboard("{Enter}");
+  await expect
+    .element(page.getByText("Trips has a trip, and Cairo, inside Trips, already has a location."))
+    .toBeVisible();
+  expect(document.body.textContent).not.toContain("location is already a key");
+  expect((await listTags()).keys.map((key) => key.key)).toEqual(["location", "trip"]);
+});
+
+test("Enter on a word a merge field offers nothing for says so", async () => {
+  await opened();
+  await userEvent.click(more("trip"));
+  await userEvent.click(menuRow("Merge Into…"));
+  await userEvent.keyboard("zz{Enter}");
+  await expect.element(page.getByText("No key begins with zz.")).toBeVisible();
+  await userEvent.keyboard("{Escape}");
+
+  await userEvent.click(more("egypt"));
+  await userEvent.click(menuRow("Merge Into…"));
+  await userEvent.keyboard("zz{Enter}");
+  await expect.element(page.getByText("No tag begins with zz.")).toBeVisible();
+  await userEvent.keyboard("{Backspace}");
+  await expect.element(page.getByText("No tag begins with zz.")).not.toBeInTheDocument();
+});
+
 test("a value's Merge Into… offers only its key's other values, and the merge asks first", async () => {
   await setFolderLabel(5, "location", "lisbon");
   try {

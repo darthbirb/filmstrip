@@ -21,7 +21,7 @@ use crate::db::search::{self, FolderMatch};
 use crate::db::sources::{self, Refusal, Source, SourceKind};
 use crate::db::suggest::{self, Suggestion};
 use crate::db::tags::{self, EffectiveTag};
-use crate::db::vocabulary::{self, KeyClash, Vocabulary};
+use crate::db::vocabulary::{self, KeyClashFor, Vocabulary};
 use crate::error::{AppError, Result};
 use crate::fs::acts::{self, Batch};
 use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
@@ -999,14 +999,13 @@ pub async fn delete_tag(state: State<'_, AppState>, tag_id: i64) -> Result<Optio
     .await
 }
 
-/// What would stand in the way of merging one key into another, for the field to refuse it.
+/// Every other key one cannot merge into, and why, for the field to refuse it.
 #[tauri::command]
-pub async fn label_key_clash(
+pub async fn label_key_clashes(
     state: State<'_, AppState>,
     key: String,
-    into: String,
-) -> Result<Option<KeyClash>> {
-    run(&state, move |conn| vocabulary::key_clash(conn, &key, &into)).await
+) -> Result<Vec<KeyClashFor>> {
+    run(&state, move |conn| vocabulary::key_clashes(conn, &key)).await
 }
 
 #[tauri::command]

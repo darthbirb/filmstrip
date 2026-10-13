@@ -969,7 +969,9 @@ disk, and a list of words is not.
   `merge_label_keys` is what asking leads to.
 - **A key merge keeps a key once down a branch**, as the band does: `vocabulary::key_clash`
   names the first folder holding the key that would land on one holding the other, itself, above
-  or below, and the field refuses it where it is typed. A value never leaves its key, so a value's
+  or below, and a deleted folder holding both; the field refuses it where it is typed, and leaves it
+  out of Merge Into…'s offers. `label_key_clashes` answers for every other key at once as the field
+  opens, and an Enter before the answer waits for it. A value never leaves its key, so a value's
   rename or merge is never refused.
 - **Every act is one batch.** The row records each term it reworded, made or forgot and every
   `folder_tag` and `item_tag` row it moved or took away, so an undo puts each back under its own

@@ -20,7 +20,7 @@ import type { ItemRow } from "./bindings/ItemRow";
 import type { ItemsMoved } from "./bindings/ItemsMoved";
 import type { ItemsRestored } from "./bindings/ItemsRestored";
 import type { ItemsTrashed } from "./bindings/ItemsTrashed";
-import type { KeyClash } from "./bindings/KeyClash";
+import type { KeyClashFor } from "./bindings/KeyClashFor";
 import type { LabelOffer } from "./bindings/LabelOffer";
 import type { LibraryTotals } from "./bindings/LibraryTotals";
 import type { Progress } from "./bindings/Progress";
@@ -188,8 +188,7 @@ export const mergeTags = (fromId: number, intoId: number) =>
 
 export const deleteTag = (tagId: number) => invoke<Batch | null>("delete_tag", { tagId });
 
-export const labelKeyClash = (key: string, into: string) =>
-  invoke<KeyClash | null>("label_key_clash", { key, into });
+export const labelKeyClashes = (key: string) => invoke<KeyClashFor[]>("label_key_clashes", { key });
 
 export const renameLabelKey = (key: string, to: string) =>
   invoke<Batch | null>("rename_label_key", { key, to });

@@ -18,7 +18,7 @@ import {
   deleteLabelKey,
   deleteLabelValue,
   deleteTag,
-  labelKeyClash,
+  labelKeyClashes,
   listTags,
   mergeLabelKeys,
   mergeLabelValues,
@@ -52,6 +52,8 @@ import { closeSettings } from "./settings-store";
 type Mode = "rename" | "merge" | "askMerge" | "askDelete";
 /** The row being acted on, for a merge the term it goes into, and what a rename onto it typed. */
 type Editing = { row: string; mode: Mode; into?: string; typed?: string };
+/** What one key cannot merge into, each with the band's words for why. */
+type Clashes = { from: string; lines: Record<string, string> };
 type Menu = { row: string; label: string; anchor: MenuAnchor; groups: MenuGroups };
 
 const OFFERS = 7;
@@ -105,7 +107,8 @@ export function Tags() {
   const [opened, setOpened] = useState<ReadonlySet<string>>(new Set());
   const [editing, setEditing] = useState<Editing | null>(null);
   const [menu, setMenu] = useState<Menu | null>(null);
-  const [clashes, setClashes] = useState<Record<string, string>>({});
+  const [clashes, setClashes] = useState<Clashes | null>(null);
+  const asked = useRef<string | null>(null);
   const mine = useRef(new Set<string>());
   const mores = useRef(new Map<string, HTMLButtonElement>());
   const back = useRef<string | null>(null);
@@ -308,6 +311,7 @@ export function Tags() {
             label={`Merge ${tag.value} into`}
             shape="tag"
             offers={offers}
+            nothing={(typed) => `No tag begins with ${typed}.`}
             onCancel={stop}
             onCommit={(to) => setEditing({ row, mode: "askMerge", into: to })}
           />
@@ -411,19 +415,19 @@ export function Tags() {
   };
 
   const loadClashes = (from: string) => {
-    for (const other of keys) {
-      if (other.key === from) continue;
-      void labelKeyClash(from, other.key)
-        .then((clash) =>
-          setClashes((was) => ({
-            ...was,
-            [`${from}\u0000${other.key}`]: clash ? clashLine(clash, from, other.key) : "",
-          })),
-        )
-        .catch(() => undefined);
-    }
+    asked.current = from;
+    setClashes(null);
+    const answer = (lines: Record<string, string>) => {
+      if (asked.current === from) setClashes({ from, lines });
+    };
+    labelKeyClashes(from)
+      .then((found) =>
+        answer(
+          Object.fromEntries(found.map((one) => [one.into, clashLine(one.clash, from, one.into)])),
+        ),
+      )
+      .catch(() => answer({}));
   };
-  const clashOf = (from: string, into: string) => clashes[`${from}\u0000${into}`] || null;
 
   const keyRow = (key: KeyRow & { keyHit: boolean; matching: ValueRow[] }) => {
     const row = `key:${key.key}`;
@@ -445,7 +449,8 @@ export function Tags() {
         : setEditing({ row, mode: "askDelete" });
     const existing = (to: string) =>
       keys.find((other) => other.key === to && other.key !== key.key);
-    const refuse = (to: string) => (existing(to) ? clashOf(key.key, to) : null);
+    const ready = clashes?.from === key.key;
+    const refuse = (to: string) => (ready && existing(to) ? (clashes.lines[to] ?? null) : null);
     const toggle = () =>
       setOpened((was) => {
         const next = new Set(was);
@@ -480,6 +485,8 @@ export function Tags() {
             value={merging ? "" : key.key}
             shape="key"
             refuse={refuse}
+            ready={ready}
+            nothing={(typed) => `No key begins with ${typed}.`}
             offers={
               merging
                 ? (typed) =>
@@ -640,6 +647,7 @@ export function Tags() {
             label={merging ? `Merge ${label} into` : `Rename ${label}`}
             value={merging ? "" : value.value}
             shape={{ key: key.key }}
+            nothing={(typed) => `${key.key} has no value that begins with ${typed}.`}
             offers={
               merging
                 ? (typed) =>

@@ -205,24 +205,79 @@ pub enum KeyClash {
     Below { folder: String, below: String },
 }
 
+impl KeyClash {
+    /// The band's words for it.
+    pub fn line(&self, from: &str, into: &str) -> String {
+        let a = |word: &str| {
+            if word.starts_with(['a', 'e', 'i', 'o', 'u']) {
+                "an"
+            } else {
+                "a"
+            }
+        };
+        match self {
+            KeyClash::Both { folder } => format!("{folder} already has {} {into}.", a(into)),
+            KeyClash::Above { folder, above } => {
+                format!(
+                    "{folder} has {} {from}, and {into} comes from {above}.",
+                    a(from)
+                )
+            }
+            KeyClash::Below { folder, below } => format!(
+                "{folder} has {} {from}, and {below}, inside {folder}, already has {} {into}.",
+                a(from),
+                a(into)
+            ),
+        }
+    }
+}
+
+/// A key another cannot merge into, and why.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct KeyClashFor {
+    pub into: String,
+    pub clash: KeyClash,
+}
+
+/// Every other key `from` cannot merge into, with why, for the field to refuse where it is typed.
+pub fn key_clashes(conn: &Connection, from: &str) -> Result<Vec<KeyClashFor>> {
+    let from = fold(from);
+    let others: Vec<String> = {
+        let mut stmt = conn.prepare(
+            "SELECT DISTINCT key FROM tag WHERE key IS NOT NULL AND key <> ?1 ORDER BY key",
+        )?;
+        stmt.query_map(params![from], |r| r.get(0))?
+            .collect::<rusqlite::Result<_>>()?
+    };
+    let mut clashes = Vec::new();
+    for into in others {
+        if let Some(clash) = key_clash(conn, &from, &into)? {
+            clashes.push(KeyClashFor { into, clash });
+        }
+    }
+    Ok(clashes)
+}
+
 /// What stands in the way of merging `from` into `into`, or nothing when no branch would hold
-/// either key twice. DECISIONS.md "A folder's details".
+/// either key twice, nor a deleted folder both. DECISIONS.md "A folder's details".
 pub fn key_clash(conn: &Connection, from: &str, into: &str) -> Result<Option<KeyClash>> {
     let (from, into) = (fold(from), fold(into));
     if from == into {
         return Ok(None);
     }
-    let holders: Vec<(i64, String)> = {
+    let holders: Vec<(i64, bool)> = {
         let mut stmt = conn.prepare(
-            "SELECT DISTINCT f.id, f.title FROM folder_tag ft
+            "SELECT DISTINCT f.id, f.deleted_at IS NOT NULL, f.title FROM folder_tag ft
                JOIN tag t ON t.id = ft.tag_id JOIN folder f ON f.id = ft.folder_id
-              WHERE t.key = ?1 AND f.deleted_at IS NULL
-              ORDER BY f.title COLLATE NOCASE, f.id",
+              WHERE t.key = ?1
+              ORDER BY f.deleted_at IS NOT NULL, f.title COLLATE NOCASE, f.id",
         )?;
         stmt.query_map(params![from], |r| Ok((r.get(0)?, r.get(1)?)))?
             .collect::<rusqlite::Result<_>>()?
     };
-    for (folder_id, _) in holders {
+    for (folder_id, deleted) in holders {
         let folder = name(conn, folder_id)?;
         let both: bool = conn.query_row(
             "SELECT EXISTS (SELECT 1 FROM folder_tag ft JOIN tag t ON t.id = ft.tag_id
@@ -232,6 +287,9 @@ pub fn key_clash(conn: &Connection, from: &str, into: &str) -> Result<Option<Key
         )?;
         if both {
             return Ok(Some(KeyClash::Both { folder }));
+        }
+        if deleted {
+            continue;
         }
         if let Some(above) = tags::holding_above(conn, folder_id, &into)? {
             let above = name(conn, above)?;
@@ -401,9 +459,7 @@ pub fn merge_keys(conn: &Connection, from: &str, into: &str, batch_id: &str) -> 
         return Err(AppError::invalid(format!("{into} is not a key")));
     }
     if let Some(clash) = key_clash(conn, &from, &into)? {
-        return Err(AppError::invalid(format!(
-            "{from} cannot merge into {into}: {clash:?}"
-        )));
+        return Err(AppError::invalid(clash.line(&from, &into)));
     }
     let ids: Vec<i64> = terms.iter().map(|term| term.id).collect();
     let mut scope = ids.clone();
@@ -1720,7 +1776,32 @@ mod tests {
                 folder: "Lisbon".into()
             })
         );
-        assert!(merge_keys(conn, "place", "owner", &journal::new_batch()).is_err());
+        let refused = merge_keys(conn, "place", "owner", &journal::new_batch()).unwrap_err();
+        assert!(
+            matches!(&refused, AppError::Invalid(line)
+                if line == "Family has a place, and owner comes from People."),
+            "{refused}"
+        );
+        assert_eq!(
+            key_clashes(conn, "trip").unwrap(),
+            [
+                KeyClashFor {
+                    into: "location".into(),
+                    clash: KeyClash::Below {
+                        folder: "Trips".into(),
+                        below: "Cairo".into()
+                    }
+                },
+                KeyClashFor {
+                    into: "season".into(),
+                    clash: KeyClash::Below {
+                        folder: "Trips".into(),
+                        below: "Lisbon".into()
+                    }
+                }
+            ],
+            "every other key at once, only those it cannot merge into"
+        );
         assert_eq!(
             held_by(conn, lib.family),
             ["#family", "place:home"],
@@ -1928,6 +2009,25 @@ mod tests {
             "{lines:?}"
         );
         assert_resolved(conn);
+    }
+
+    #[test]
+    fn a_key_merge_is_refused_on_a_deleted_folder_holding_both() {
+        let lib = library();
+        let conn = &lib.conn;
+        set_folder_label(conn, lib.lisbon, "season", "spring").unwrap();
+        trash(conn, lib.lisbon);
+        assert_eq!(
+            key_clash(conn, "season", "location").unwrap(),
+            Some(KeyClash::Both {
+                folder: "Lisbon".into()
+            })
+        );
+        assert!(merge_keys(conn, "season", "location", &journal::new_batch()).is_err());
+        assert_eq!(
+            held_by(conn, lib.lisbon),
+            ["#lisbon", "location:lisbon", "season:spring"]
+        );
     }
 
     #[test]

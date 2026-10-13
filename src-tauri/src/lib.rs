@@ -141,7 +141,7 @@ pub fn run() {
             commands::rename_tag,
             commands::merge_tags,
             commands::delete_tag,
-            commands::label_key_clash,
+            commands::label_key_clashes,
             commands::rename_label_key,
             commands::merge_label_keys,
             commands::delete_label_key,

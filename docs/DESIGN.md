@@ -926,8 +926,9 @@ edge, or an option flush in a menu, takes it inside. Pressing steps back toward 
   values sit under it at the tree's `indent` as split chips.
 - **Term field.** A chip becomes the field that renames it, in its own shape on `ground`, its
   text selected in `plate`; for Merge Into… it comes after the chip and an arrow, empty, with
-  what the library has offered under it in the tag field's list. What cannot be taken turns the
-  ring `line-danger` and says why underneath in `key` `danger`. While its row asks to merge, the
+  what the library has offered under it in the tag field's list, less what it cannot take. What
+  cannot be taken turns the ring `line-danger` and says why underneath in `key` `danger`, and so
+  does Enter on a word nothing offered begins with. While its row asks to merge, the
   field's shape holds what was typed, as it was typed.
 - **Row question.** A question on the row it is about, in the source row's remove shape: the row
   and the question inside one `line-danger` ring, the `warning` glyph in `danger` at `icon` and the

@@ -23,6 +23,7 @@ import type { ItemsMoved } from "../ipc/bindings/ItemsMoved";
 import type { ItemsTrashed } from "../ipc/bindings/ItemsTrashed";
 import type { KeyBelow } from "../ipc/bindings/KeyBelow";
 import type { KeyClash } from "../ipc/bindings/KeyClash";
+import type { KeyClashFor } from "../ipc/bindings/KeyClashFor";
 import type { KeyRow } from "../ipc/bindings/KeyRow";
 import type { LibraryTotals } from "../ipc/bindings/LibraryTotals";
 import type { Progress } from "../ipc/bindings/Progress";
@@ -1565,7 +1566,13 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       (value) => (value === term.value ? null : value),
     );
   },
-  label_key_clash: ({ key, into }) => keyClash(fold(String(key)), fold(String(into))),
+  label_key_clashes: ({ key }): KeyClashFor[] => {
+    const from = fold(String(key));
+    return vocabulary().keys.flatMap(({ key: into }) => {
+      const clash = into === from ? null : keyClash(from, into);
+      return clash ? [{ into, clash }] : [];
+    });
+  },
   rename_label_key: ({ key, to }) => {
     const [from, next] = [fold(String(key)), fold(String(to))];
     if (!next) return invalid("a key needs a word");
