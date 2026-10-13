@@ -136,7 +136,7 @@ export function filesAndFolders(fileCount: number, folderCount: number): string 
 }
 
 /** A tag by its words, a label as `key: value`. */
-export const termText = (key: string | null, value: string) => (key ? `${key}: ${value}` : value);
+const termText = (key: string | null, value: string) => (key ? `${key}: ${value}` : value);
 
 /** What a change on the tags screen was, now and before, and its verb. */
 function changed(change: Change): { verb: "rename" | "merge" | "delete"; was: string; is: string } {

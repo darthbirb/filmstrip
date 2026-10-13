@@ -98,6 +98,7 @@ test("renaming onto a tag that exists asks to merge on the row, and Escape puts 
   await userEvent.keyboard("{Control>}a{/Control}Travel{Enter}");
   const question = page.getByText(/travel is already a tag, on 5 files\. Merge egypt into it\?/);
   await expect.element(question).toBeVisible();
+  await expect.element(page.getByText("Travel", { exact: true })).toBeVisible();
   await expect.element(page.getByRole("button", { name: "Cancel" })).toHaveFocus();
   await userEvent.keyboard("{Escape}");
   await expect.element(question).not.toBeInTheDocument();

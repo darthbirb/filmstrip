@@ -37,7 +37,7 @@ import { Glyph } from "../../ui/Glyph";
 import { Line } from "../../ui/Line";
 import { ContextMenu, type MenuAnchor, type MenuGroups } from "../../ui/Menu";
 import type { OfferRow } from "../../ui/OfferList";
-import { TermField } from "../../ui/TermField";
+import { TermField, TypedTerm } from "../../ui/TermField";
 import { MoreButton, RowQuestion, TermGroup, TermRow, type TermSort } from "../../ui/TermTable";
 import { libraryChanged, whenLibraryChanges } from "../library";
 import { setNews, useNews } from "../navigation/foot-slot";
@@ -50,8 +50,8 @@ import { closeSettings } from "./settings-store";
 // DECISIONS.md "The tags screen".
 
 type Mode = "rename" | "merge" | "askMerge" | "askDelete";
-/** The row being acted on, and for a merge the term it goes into. */
-type Editing = { row: string; mode: Mode; into?: string };
+/** The row being acted on, for a merge the term it goes into, and what a rename onto it typed. */
+type Editing = { row: string; mode: Mode; into?: string; typed?: string };
 type Menu = { row: string; label: string; anchor: MenuAnchor; groups: MenuGroups };
 
 const OFFERS = 7;
@@ -292,9 +292,9 @@ export function Tags() {
           value={tag.value}
           shape="tag"
           onCancel={stop}
-          onCommit={(to) => {
+          onCommit={(to, typed) => {
             if (to === tag.value) return stop();
-            if (into(to)) return setEditing({ row, mode: "askMerge", into: to });
+            if (into(to)) return setEditing({ row, mode: "askMerge", into: to, typed });
             void act(() => renameTag(tag.tagId, to));
           }}
         />
@@ -313,6 +313,8 @@ export function Tags() {
           />
         </>
       );
+    } else if (now?.mode === "askMerge" && now.typed !== undefined) {
+      name = <TypedTerm text={now.typed} shape="tag" />;
     } else {
       name = (
         <>
@@ -494,12 +496,27 @@ export function Tags() {
             }
             trail={merging ? undefined : <Said>{counted}</Said>}
             onCancel={stop}
-            onCommit={(to) => {
+            onCommit={(to, typed) => {
               if (to === key.key) return stop();
-              if (existing(to)) return setEditing({ row, mode: "askMerge", into: to });
+              if (existing(to)) {
+                return setEditing({
+                  row,
+                  mode: "askMerge",
+                  into: to,
+                  typed: merging ? undefined : typed,
+                });
+              }
               void act(() => renameLabelKey(key.key, to));
             }}
           />
+        </>
+      );
+    } else if (now?.mode === "askMerge" && now.typed !== undefined) {
+      name = (
+        <>
+          {chevron}
+          <TypedTerm text={now.typed} shape="key" />
+          <Said>{counted}</Said>
         </>
       );
     } else {
@@ -639,14 +656,23 @@ export function Tags() {
                 : undefined
             }
             onCancel={stop}
-            onCommit={(to) => {
+            onCommit={(to, typed) => {
               if (to === value.value) return stop();
-              if (existing(to)) return setEditing({ row, mode: "askMerge", into: to });
+              if (existing(to)) {
+                return setEditing({
+                  row,
+                  mode: "askMerge",
+                  into: to,
+                  typed: merging ? undefined : typed,
+                });
+              }
               void act(() => renameLabelValue(value.tagId, to));
             }}
           />
         </>
       );
+    } else if (now?.mode === "askMerge" && now.typed !== undefined) {
+      name = <TypedTerm text={now.typed} shape={{ key: key.key }} />;
     }
     let asking: ReactNode = null;
     const target = now?.mode === "askMerge" && now.into ? existing(now.into) : undefined;

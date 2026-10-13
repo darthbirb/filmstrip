@@ -26,12 +26,43 @@ type Props = {
   onType?: (value: string) => void;
   /** What the row says after the chip, kept on the field's line above a refusal. */
   trail?: ReactNode;
-  onCommit: (value: string) => void;
+  /** The folded value, and the text as it was typed. */
+  onCommit: (value: string, typed: string) => void;
   onCancel: () => void;
 };
 
+type Shape = Props["shape"];
+
 const TEXT =
   "field-sizing-content h-full min-w-24 max-w-full px-2.5 text-fg-hi outline-none selection:bg-plate selection:text-on-plate";
+
+const corner = (shape: Shape) =>
+  shape === "tag" ? "rounded-full" : shape === "key" ? "rounded-nested" : "";
+
+/** The field's line in its shape: a value's field sits after its sunk key. */
+function Shaped({ shape, children }: { shape: Shape; children: ReactNode }) {
+  return typeof shape === "object" ? (
+    <span className="inline-flex h-chip max-w-full overflow-hidden rounded-nested text-small">
+      <span className="flex items-center bg-well px-2 text-fg-dim">{shape.key}</span>
+      {children}
+    </span>
+  ) : (
+    <span className="inline-flex h-chip max-w-full text-small">{children}</span>
+  );
+}
+
+/** What was typed in a term field, held in the field's shape while its row asks about it. */
+export function TypedTerm({ text, shape }: { text: string; shape: Shape }) {
+  return (
+    <Shaped shape={shape}>
+      <span
+        className={`flex h-full min-w-24 max-w-full items-center bg-ground px-2.5 text-fg-hi inset-ring inset-ring-line-control ${corner(shape)}`}
+      >
+        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-pre">{text}</span>
+      </span>
+    </Shaped>
+  );
+}
 
 /**
  * A term's chip as the field that renames it, or picks what it merges into: Enter takes what is
@@ -69,7 +100,7 @@ export function TermField({
     settled.current = true;
     then();
   };
-  const commit = (picked: string) => settle(() => onCommit(picked));
+  const commit = (picked: string) => settle(() => onCommit(picked, typed));
   const cancel = () => settle(onCancel);
 
   const onKeyDown = (event: KeyboardEvent) => {
@@ -112,20 +143,13 @@ export function TermField({
       onKeyDown={onKeyDown}
       onBlur={cancel}
       style={{ anchorName: anchor } as CSSProperties}
-      className={`${TEXT} bg-ground inset-ring ${ring} ${shape === "tag" ? "rounded-full" : shape === "key" ? "rounded-nested" : ""}`}
+      className={`${TEXT} bg-ground inset-ring ${ring} ${corner(shape)}`}
     />
   );
 
   return (
     <>
-      {typeof shape === "object" ? (
-        <span className="inline-flex h-chip max-w-full overflow-hidden rounded-nested text-small">
-          <span className="flex items-center bg-well px-2 text-fg-dim">{shape.key}</span>
-          {input}
-        </span>
-      ) : (
-        <span className="inline-flex h-chip max-w-full text-small">{input}</span>
-      )}
+      <Shaped shape={shape}>{input}</Shaped>
       {trail}
       {refused && <RefusalLine>{refused}</RefusalLine>}
       {offers && (
