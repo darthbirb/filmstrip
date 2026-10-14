@@ -94,14 +94,16 @@ pub fn cancel_waiting(
     job_id: i64,
     payload: &CopyPayload,
 ) -> Result<()> {
-    paste::abandon(conn, &payload.batch_id, payload.folder_id)?;
+    // Its job is already gone, so its line ends even when the tidy cannot.
+    let abandoned = paste::abandon(conn, &payload.batch_id, payload.folder_id);
     let ended = Ended {
         whole: payload.whole,
         refused: Vec::new(),
         cancelled: true,
         stopped: None,
     };
-    announce(inner, conn, job_id, payload, ended)
+    announce(inner, conn, job_id, payload, ended)?;
+    abandoned
 }
 
 struct Ended {

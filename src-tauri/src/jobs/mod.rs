@@ -558,6 +558,28 @@ mod tests {
         assert!(!dir.join("library/Trips/IMG_5001.jpg").exists());
     }
 
+    #[test]
+    fn cancelling_a_waiting_copy_ends_its_line_even_when_its_library_has_been_removed() {
+        let (conn, dir, trips, entries) = library_with_downloads("copy-cancel-removed");
+        let job = enqueue_copy(&conn, trips, &entries).unwrap();
+        sources::remove(&conn, 1).unwrap();
+
+        let (said, heard) = mpsc::channel();
+        let inner = QueueInner::new(
+            dir.join("library.db"),
+            dir.join("thumbs"),
+            None,
+            Box::new(|_| {}),
+            Box::new(move |copied| {
+                let _ = said.send(copied.clone());
+            }),
+        );
+        let _ = inner.cancel_copy(&conn, job);
+        let copied = heard.try_recv().expect("its line ends");
+        assert_eq!((copied.job_id, copied.cancelled), (job, true));
+        assert!(inner.progress(&conn).unwrap().copies.is_empty());
+    }
+
     /// Starting the queue on a fresh library walks it and thumbnails its pictures, off this thread.
     #[test]
     fn a_walk_indexes_a_library_and_its_pictures_get_thumbnails() {
