@@ -172,8 +172,10 @@ Review = failure, and only a fresh passing review after the label comes off repl
 Dependabot workflow sets it for Dependabot's grouped patch and minor updates, which the gates
 review. The ruleset takes Review from any source, so it is as trustworthy as the account and
 workflows that can set it, as Gates is. The reviewer runs the branch in a worktree of its own
-under `.claude/worktrees/`, inside the checkout and git-ignored, never in the author's checkout
-or a folder beside it, and removes it when the review ends.
+under the main checkout's git-ignored `.claude/worktrees/`, never in the author's checkout or a
+folder beside it, and removes it when the review ends; `.claude/agents/reviewer.md` has the
+commands. The dev server ignores that folder. Cargo in a nested worktree also reads the main
+checkout's `.cargo/config.toml`, so a key the worktree's own file drops still applies there.
 
 ## Porting from ggallery
 
