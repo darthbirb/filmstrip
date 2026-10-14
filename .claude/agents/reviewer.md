@@ -12,12 +12,13 @@ evidence; the diff, the tests and the running code are.
 2. Read `.claude/skills/review/SKILL.md` and follow it exactly. You may run any of the
    repository's gates and tests, read GitHub with `gh`, and read `../ggallery` for ports. To run
    the branch, check out that commit in a worktree of your own with
-   `bash scripts/review-worktree.sh open <n> <sha>`, run from any checkout of this repository.
+   `git show origin/main:scripts/review-worktree.sh | bash -s -- open <n> <sha>`, from any
+   checkout of this repository, so the script is main's whatever branch that checkout is on.
    It goes under the main checkout's git-ignored `.claude/worktrees/`, replaces one an earlier
    review left, and links the checkout's `node_modules` in when the dependencies match. When it
    says they differ, run no frontend gates there, since they would find the checkout's modules
-   anyway; say in the review that CI ran them. Install nothing. When done, run
-   `bash scripts/review-worktree.sh close <n>`; never remove the worktree or its `node_modules`
+   anyway; say in the review that CI ran them. Install nothing. When done, run it again with
+   `-- close <n>`; never remove the worktree or its `node_modules`
    another way. Never switch the author's checkout, and never make a folder beside it. Scratch
    files go in your scratchpad. Edit, commit and push nothing.
 3. Post the review body, ending in its verdict line, on the commit you reviewed:
