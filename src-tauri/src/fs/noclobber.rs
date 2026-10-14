@@ -12,13 +12,24 @@ pub fn rename(from: &Path, to: &Path) -> io::Result<()> {
     use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Storage::FileSystem::MoveFileExW;
 
-    let wide = |path: &Path| -> Vec<u16> {
-        path.as_os_str()
+    // Verbatim, as `std::fs` passes its own paths, or a name past MAX_PATH would not move.
+    let wide = |path: &Path| -> io::Result<Vec<u16>> {
+        let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
+            return Err(io::Error::from(io::ErrorKind::InvalidInput));
+        };
+        let parent = if parent.as_os_str().is_empty() {
+            Path::new(".")
+        } else {
+            parent
+        };
+        Ok(std::fs::canonicalize(parent)?
+            .join(name)
+            .as_os_str()
             .encode_wide()
             .chain(std::iter::once(0))
-            .collect()
+            .collect())
     };
-    let (from, to) = (wide(from), wide(to));
+    let (from, to) = (wide(from)?, wide(to)?);
     // SAFETY: both are NUL-terminated wide strings that outlive the call.
     if unsafe { MoveFileExW(from.as_ptr(), to.as_ptr(), 0) } == 0 {
         return Err(io::Error::last_os_error());
@@ -70,6 +81,21 @@ mod tests {
             "theirs"
         );
         assert_eq!(std::fs::read_to_string(dir.join("part")).unwrap(), "new");
+    }
+
+    #[test]
+    fn a_name_past_the_old_path_limit_is_given_as_any_other() {
+        let mut deep = scratch("long");
+        while deep.as_os_str().len() < 300 {
+            deep.push("a folder named long enough to pass the limit");
+        }
+        std::fs::create_dir_all(&deep).unwrap();
+        std::fs::write(deep.join("part"), "new").unwrap();
+        let to = deep.join("IMG_1.jpg");
+        assert!(to.as_os_str().len() > 260);
+        rename(&deep.join("part"), &to).unwrap();
+        assert_eq!(std::fs::read_to_string(&to).unwrap(), "new");
+        assert!(!deep.join("part").exists());
     }
 
     #[cfg(windows)]

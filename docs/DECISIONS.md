@@ -944,8 +944,9 @@ arrive, and the originals stay as Explorer left them.
 - **The rename into place refuses a name taken.** `std::fs::rename` replaces a file on Windows, and
   the turn keeps out only the app's own writers, so the name is given by `MoveFileExW` without
   `MOVEFILE_REPLACE_EXISTING`, which fails in the same call that would move. Not a hard link and a
-  removal, which FAT32 and exFAT cards cannot do. The rename lives in `fs/noclobber.rs` for the
-  app's other renames to share.
+  removal, which FAT32 and exFAT cards cannot do. Its paths are given in their verbatim form, as
+  `std::fs` gives its own, so a name past the old 260-character limit moves as any other. The
+  rename lives in `fs/noclobber.rs` for the app's other renames to share.
 - **Where the copy goes is read again for each file.** A long copy outlives the folder's name: the
   app can rename or move it meanwhile, so each file and folder finds its folder's directory from
   its id in the turn, and its part is opened there in the turn too.
