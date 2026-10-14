@@ -10,8 +10,13 @@ modules="$wt/node_modules"
 
 close() {
   # rmdir takes off the junction alone; rm -r, or a trailing slash, empties the checkout's modules.
-  if [ -e "$modules" ]; then cmd //c rmdir "$(cygpath -w "$modules")"; fi
+  if [ -L "$modules" ] || [ -e "$modules" ]; then cmd //c rmdir "$(cygpath -w "$modules")"; fi
   git -C "$main" worktree remove --force "$wt" 2>/dev/null || true
+  if [ -e "$wt" ] && [ ! -L "$modules" ] && [ ! -e "$modules" ]; then
+    # PowerShell 7's Remove-Item takes off a link without following it; Windows PowerShell 5.1 follows.
+    FILMSTRIP_WT="\\\\?\\$(cygpath -w "$wt")" pwsh -NoProfile -NonInteractive -Command \
+      'Remove-Item -LiteralPath $env:FILMSTRIP_WT -Recurse -Force' || true
+  fi
   git -C "$main" worktree prune
   [ ! -e "$wt" ] || { echo "$wt is still there; remove it by hand" >&2; exit 1; }
 }

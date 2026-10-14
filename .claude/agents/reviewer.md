@@ -11,9 +11,10 @@ evidence; the diff, the tests and the running code are.
    commit you review and the only one your verdict covers.
 2. Read `.claude/skills/review/SKILL.md` and follow it exactly. You may run any of the
    repository's gates and tests, read GitHub with `gh`, and read `../ggallery` for ports. To run
-   the branch, check out that commit in a worktree of your own with
+   the branch, run `git fetch origin`, then check out that commit in a worktree of your own with
    `git show origin/main:scripts/review-worktree.sh | bash -s -- open <n> <sha>`, from any
    checkout of this repository, so the script is main's whatever branch that checkout is on.
+   The fetch makes main's copy of the script current and the head commit present.
    It goes under the main checkout's git-ignored `.claude/worktrees/`, replaces one an earlier
    review left, and links the checkout's `node_modules` in when the dependencies match. When it
    says they differ, run no frontend gates there, since they would find the checkout's modules
