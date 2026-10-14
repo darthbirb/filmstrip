@@ -249,8 +249,9 @@ const NO_FILES = "The clipboard holds no files.";
 function Nothing({ noFiles = false }: { noFiles?: boolean }) {
   const line = useRef<HTMLDivElement>(null);
   const anchor = `--nothing-${useId().replace(/[^\w-]/g, "")}`;
+  // The top layer escapes the folded face's hiding, so it shows only while the rail is the face shown.
   useLayoutEffect(() => {
-    line.current?.showPopover();
+    if (!line.current?.closest("[inert]")) line.current?.showPopover();
   }, []);
   return (
     <span

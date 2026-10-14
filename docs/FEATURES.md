@@ -66,7 +66,7 @@ drawn. **Not started** — neither.
 | Move items between folders | Built | `move_items`, Move to… on the pane's bar and a file's menu; a name already taken is reported, never changed |
 | Delete items to the trash | Built | `trash_items`, Delete on the pane's bar and a file's menu; undo takes an item back |
 | Rename a file, on disk | Built | `rename_item`, the pane's Name row; not in ggallery; a name already taken is refused |
-| Paste files in, and take an OS drop | Not started | |
+| Paste files in, and take an OS drop | Built | `paste_files`, `drop_files`: Paste on a folder's, a source's and the Sorting Box's menus, Ctrl+V, and a drop from Explorer on a row or a folder's grid; a copy as a job with Cancel, a name taken refused, never changed; undo sends what came in to the Trash. The grid's ground has no menu yet |
 | Copy an item's path | Built | `copy_item_paths`, Copy Path in a file's menu, a set's and the pane's ⋯; one path to a line |
 | Counts: unsorted, trashed, totals, arrival duplicates | Partly | `library_totals`, one query: the foot says what the library holds and weighs, and opens its totals by kind with the Sorting Box, the Trash and the sources, any offline named; arrival duplicates wait for duplicate detection |
 

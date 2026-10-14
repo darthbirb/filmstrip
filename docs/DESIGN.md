@@ -710,7 +710,10 @@ toward the rest surface.
   `ghost-thumb` square at the `badge` corner, the rest stacked `--ghost-stack` behind it in
   `line-strong`, then its words in `ui` `fg`: the count, the act, or after a `danger` prohibit the
   reason. A tree row that will take the drop lifts to the `wash` inside a 2px `plate` ring, its
-  glyph in `fg`; one that refuses does not change.
+  glyph in `fg`; one that refuses does not change. Files from Explorer wear the same ghost under
+  Explorer's own picture, the hatch where a picture will be since nothing is read until they land,
+  and say Copy rather than Move. A folder's grid that will take them wears the row's 2px `plate`
+  ring inside its edge at the `control` corner, and no wash.
 - **Checkbox.** A `badge` square at the `badge` corner on `raised` in a `line-control` ring,
   filled with `plate` and a check in `on-plate` when ticked; its sentence beside it in `fg-mid`,
   `fg` under the pointer or ticked. The ring the keyboard sees is on the square.
@@ -943,7 +946,12 @@ toward the rest surface.
   (a check after an act, the undo arrow after an undo), the sentence in `ui`, the way back under it
   as a raised Undo button, and a dismiss. It shares the one slot with the Band, and the newest of
   the two replaces the other. Folded, the rail keeps the Undo glyph button alone, its sentence in
-  the tooltip; "Nothing to undo." comes out beside the rail on `panel` with the overlay shadow.
+  the tooltip; "Nothing to undo." comes out beside the rail on `panel` with the overlay shadow, as
+  does "The clipboard holds no files.", with the clipboard glyph.
+- **Copy line.** A copy in progress has the walk's line of its own at the foot, above the walk:
+  "Copying to Lisbon…" in `small` `fg-mid`, its figure in `fg`, a dismiss whose tooltip is Cancel
+  Copy, and the `progress` bar in `plate` under them. Its tooltip counts what is left. Each copy
+  has one, the newest highest; folded, the rail keeps the bar alone.
 - **Segmented.** A value with few enough answers to show them all at once, the one it is on filled
   on `raised-hi` inside an `inset` trough. Real radios, so the arrow keys move between them. Its
   segments sit flush in the trough, so the keyboard's ring is drawn inside the segment. In a

@@ -48,10 +48,13 @@ export function refusal(why: CopyRefusal, how: "paste" | "drop"): FootNews {
   switch (why.kind) {
     case "alreadyIn": {
       const own = why.place.endsWith("s") ? `${why.place}’` : `${why.place}’s`;
-      const what = counted(why.carried);
-      const are = why.carried.files + why.carried.folders === 1 ? "is" : "are";
+      const one = why.carried.files + why.carried.folders === 1;
+      // One is named by what it is, not counted: "the file", as "the 3 files".
+      const what = one ? (why.carried.folders > 0 ? "folder" : "file") : counted(why.carried);
       const detail =
-        how === "paste" ? `The ${what} on the clipboard ${are} ${own} own.` : undefined;
+        how === "paste"
+          ? `The ${what} on the clipboard ${one ? "is" : "are"} ${own} own.`
+          : undefined;
       return { kind: "keyRefused", line: `Already in ${why.place}.`, detail };
     }
     case "intoItself":
