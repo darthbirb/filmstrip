@@ -320,6 +320,10 @@ export function reasonText(reason: Reason): string {
         : `Holds ${reason.name}`;
     case "alreadyIn":
       return `Already in ${reason.place}`;
+    case "offline":
+      return `${reason.source} is offline`;
+    case "diskFull":
+      return "The disk is full";
     case "other":
       return reason.message.charAt(0).toUpperCase() + reason.message.slice(1);
   }
