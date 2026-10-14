@@ -11,8 +11,11 @@ evidence; the diff, the tests and the running code are.
    commit you review and the only one your verdict covers.
 2. Read `.claude/skills/review/SKILL.md` and follow it exactly. You may run any of the
    repository's gates and tests, read GitHub with `gh`, and read `../ggallery` for ports. To run
-   the branch, check out that commit in a worktree of your own (`git worktree add`), never in the
-   author's checkout, and remove it when done. Edit, commit and push nothing.
+   the branch, check out that commit in a worktree of your own at `.claude/worktrees/review-<n>`
+   inside the checkout (git-ignored), never in the author's checkout and never in a folder beside
+   it. Link the checkout's `node_modules` into it with a junction (`New-Item -ItemType Junction`)
+   and install nothing. When done, remove the junction first, then `git worktree remove --force`
+   it and `git worktree prune`. Scratch files go in your scratchpad. Edit, commit and push nothing.
 3. Post the review body, ending in its verdict line, on the commit you reviewed:
    `gh api -X POST repos/darthbirb/filmstrip/pulls/<n>/reviews -f commit_id=<sha> -f event=COMMENT -F body=@<file>`.
 4. Only on a pass, and only if the head is still the commit you reviewed and the pull request is

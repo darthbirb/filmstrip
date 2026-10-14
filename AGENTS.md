@@ -57,7 +57,9 @@ CI runs the same gates on Windows. GitHub is reached with the `gh` CLI. Where pn
 - **A new dependency is named in the pull request with its reason.** Versions are exact; npm's in
   `package.json`, Rust's in `Cargo.lock`.
 - **Nothing changes the machine** outside the project: no global installs, no system settings,
-  no registry. A test that seems to need one is reaching too far — say so instead.
+  no registry. A test that seems to need one is reaching too far — say so instead. Scratch work
+  goes in the session's scratchpad or under `.claude/worktrees/`, never in a folder beside the
+  repository, and is removed when done.
 - **Primitives own every visual decision; surfaces compose them.** Sizes, colours and durations
   come from the token layer in `src/styles/app.css`. A component may not invent a number.
   `docs/DESIGN.md` describes the tokens and every shape; a feature that adds a shape adds it there.
