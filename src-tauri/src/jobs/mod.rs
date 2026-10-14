@@ -146,6 +146,21 @@ impl QueueInner {
     }
 }
 
+impl QueueInner {
+    fn cancel_copy(&self, conn: &Connection, job_id: i64) -> Result<bool> {
+        if let Some(payload) = table::cancel_pending(conn, job_id)? {
+            let payload: kinds::CopyPayload = serde_json::from_str(&payload)?;
+            worker::cancel_waiting(self, conn, job_id, &payload)?;
+            return Ok(true);
+        }
+        if !lock(&self.copies).contains_key(&job_id) {
+            return Ok(false);
+        }
+        lock(&self.cancelled).insert(job_id);
+        Ok(true)
+    }
+}
+
 /// Each copy running, and each waiting its turn at none of its files settled, oldest first.
 fn copies(conn: &Connection, running: &BTreeMap<i64, Copying>) -> Result<Vec<Copying>> {
     let mut copies: Vec<Copying> = running.values().cloned().collect();
@@ -211,14 +226,7 @@ impl JobQueue {
     /// Stops a copy: one still waiting is taken off the queue, one running stops after the file
     /// in hand. `false` when there was nothing to stop.
     pub fn cancel_copy(&self, conn: &Connection, job_id: i64) -> Result<bool> {
-        if table::cancel_pending(conn, job_id)? {
-            return Ok(true);
-        }
-        if !lock(&self.inner.copies).contains_key(&job_id) {
-            return Ok(false);
-        }
-        lock(&self.inner.cancelled).insert(job_id);
-        Ok(true)
+        self.inner.cancel_copy(conn, job_id)
     }
 
     /// Asks every thread to finish, and waits for them no longer than the grace period.
@@ -494,11 +502,60 @@ mod tests {
         queue.stop();
 
         assert_eq!((copied.job_id, copied.whole, copied.batch), (job, 2, None));
-        assert!(
-            matches!(&copied.stopped, Some(Reason::Other { message }) if message.contains("no longer")),
-            "{:?}",
-            copied.stopped
+        assert_eq!(
+            copied.stopped,
+            Some(Reason::FolderGone {
+                name: "Trips".into()
+            })
         );
+    }
+
+    struct Through;
+
+    impl crate::fs::paste::Control for Through {
+        fn halt(&self) -> Option<crate::fs::paste::Halt> {
+            None
+        }
+        fn progress(&self, _done: u32, _whole: u32) {}
+        fn landed(&self, _conn: &Connection, _item_id: i64, _kind: &str) -> Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn cancelling_a_copy_waiting_after_a_crash_clears_what_the_crash_left_and_ends_its_line() {
+        let (conn, dir, trips, entries) = library_with_downloads("copy-cancel-waiting");
+        let job = enqueue_copy(&conn, trips, &entries).unwrap();
+        let payload: kinds::CopyPayload =
+            serde_json::from_str(&table::waiting_copies(&conn).unwrap()[0].1).unwrap();
+        let batch = payload.batch_id.clone();
+        crate::fs::paste::run(&conn, &batch, trips, &entries, &Through).unwrap();
+        let landed = dir.join("library/Trips");
+        let part = landed.join(format!(".{batch}.filmstrip-part"));
+        std::fs::rename(landed.join("IMG_5002.jpg"), &part).unwrap();
+
+        let (said, heard) = mpsc::channel();
+        let inner = QueueInner::new(
+            dir.join("library.db"),
+            dir.join("thumbs"),
+            None,
+            Box::new(|_| {}),
+            Box::new(move |copied| {
+                let _ = said.send(copied.clone());
+            }),
+        );
+        assert!(inner.cancel_copy(&conn, job).unwrap());
+        let copied = heard.try_recv().expect("its line ends with what came in");
+        assert!(copied.cancelled);
+        assert_eq!((copied.job_id, copied.whole), (job, 2));
+        assert_eq!(copied.batch.map(|batch| batch.files), Some(1));
+        assert!(!part.exists(), "the part a crash left is cleared");
+        assert!(inner.progress(&conn).unwrap().copies.is_empty());
+
+        let back = crate::fs::undo::undo_batch(&conn, &batch).unwrap();
+        assert!(back.stayed.is_empty(), "{:?}", back.stayed);
+        assert_eq!(back.files_back, 1);
+        assert!(!dir.join("library/Trips/IMG_5001.jpg").exists());
     }
 
     /// Starting the queue on a fresh library walks it and thumbnails its pictures, off this thread.

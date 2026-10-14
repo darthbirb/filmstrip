@@ -109,12 +109,16 @@ pub fn release(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
-/// Takes a copy off the queue before it has started; `false` when it is already running.
-pub fn cancel_pending(conn: &Connection, id: i64) -> Result<bool> {
-    Ok(conn.execute(
-        "DELETE FROM job WHERE id = ?1 AND kind = ?2 AND status = 'pending'",
-        params![id, COPY_IN],
-    )? > 0)
+/// Takes a copy off the queue while it waits, and returns what it carries; nothing when it is
+/// running or gone.
+pub fn cancel_pending(conn: &Connection, id: i64) -> Result<Option<String>> {
+    Ok(conn
+        .query_row(
+            "DELETE FROM job WHERE id = ?1 AND kind = ?2 AND status = 'pending' RETURNING payload",
+            params![id, COPY_IN],
+            |r| r.get(0),
+        )
+        .optional()?)
 }
 
 /// Each copy not yet started, oldest first, with what it carries.

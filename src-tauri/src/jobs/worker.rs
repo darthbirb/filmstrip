@@ -9,6 +9,7 @@ use crate::db::jobs::{self as table, QueuedJob};
 use crate::db::{items, journal};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::paste::{self, Halt};
+use crate::fs::stayed::Stayed;
 use crate::fs::{paths, walk};
 use crate::jobs::kinds::{self, CopyPayload, FolderPayload, ItemPayload};
 use crate::jobs::{Copied, Copying, QueueInner, enqueue_scrub, enqueue_thumb, lock};
@@ -50,7 +51,7 @@ fn copy_in(
     let line = Copying {
         job_id,
         folder_id: payload.folder_id,
-        to: to.clone(),
+        to,
         done: 0,
         whole: payload.whole,
     };
@@ -64,21 +65,59 @@ fn copy_in(
         &entries,
         &control,
     );
-    let (whole, refused, cancelled, stopped) = match ran {
-        Ok(outcome) if outcome.halted == Some(Halt::Stop) => return Ok(Done::Paused),
-        Ok(outcome) => (
-            outcome.whole,
-            outcome.refused,
-            outcome.halted == Some(Halt::Cancel),
-            None,
-        ),
-        Err(err) => (
-            paste::whole(&entries),
-            Vec::new(),
-            false,
-            Some(Reason::of(&err)),
-        ),
+    let ended = match ran {
+        Ok(outcome) if outcome.halted == Some(Halt::Stop) && outcome.stopped.is_none() => {
+            return Ok(Done::Paused);
+        }
+        Ok(outcome) => Ended {
+            whole: outcome.whole,
+            refused: outcome.refused,
+            cancelled: outcome.halted == Some(Halt::Cancel),
+            stopped: outcome.stopped,
+        },
+        Err(err) => Ended {
+            whole: paste::whole(&entries),
+            refused: Vec::new(),
+            cancelled: false,
+            stopped: Some(Reason::of(&err)),
+        },
     };
+    announce(inner, conn, job_id, &payload, ended)?;
+    Ok(Done::Finished)
+}
+
+/// A copy taken off the queue as it waited, after a restart or before it ever ran: what a crash
+/// left of it is cleared, and it ends as one cancelled while running does.
+pub fn cancel_waiting(
+    inner: &QueueInner,
+    conn: &Connection,
+    job_id: i64,
+    payload: &CopyPayload,
+) -> Result<()> {
+    paste::abandon(conn, &payload.batch_id, payload.folder_id)?;
+    let ended = Ended {
+        whole: payload.whole,
+        refused: Vec::new(),
+        cancelled: true,
+        stopped: None,
+    };
+    announce(inner, conn, job_id, payload, ended)
+}
+
+struct Ended {
+    whole: u32,
+    refused: Vec<Stayed>,
+    cancelled: bool,
+    stopped: Option<Reason>,
+}
+
+fn announce(
+    inner: &QueueInner,
+    conn: &Connection,
+    job_id: i64,
+    payload: &CopyPayload,
+    ended: Ended,
+) -> Result<()> {
     let journalled = !journal::batch(conn, &payload.batch_id)?.is_empty();
     let batch = if journalled {
         Some(crate::fs::acts::describe(conn, &payload.batch_id)?)
@@ -88,14 +127,14 @@ fn copy_in(
     (inner.announce)(&Copied {
         job_id,
         folder_id: payload.folder_id,
-        to,
+        to: crate::fs::acts::name(conn, payload.folder_id).unwrap_or_default(),
         batch,
-        whole,
-        refused,
-        cancelled,
-        stopped,
+        whole: ended.whole,
+        refused: ended.refused,
+        cancelled: ended.cancelled,
+        stopped: ended.stopped,
     });
-    Ok(Done::Finished)
+    Ok(())
 }
 
 struct QueueControl<'a> {

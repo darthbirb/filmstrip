@@ -2,7 +2,7 @@
 //! a copy, under their own names, a folder with its tree. A name already taken is refused and
 //! reported, never changed, and a copy cut short leaves no half file. DECISIONS.md "Bringing files in".
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
@@ -115,6 +115,8 @@ pub struct Outcome {
     pub done: u32,
     pub refused: Vec<Stayed>,
     pub halted: Option<Halt>,
+    /// Why it stopped before the end, when something other than a halt stopped it.
+    pub stopped: Option<Reason>,
 }
 
 /// Copies each entry into `folder_id` under `batch_id`, so one undo takes the whole copy back.
@@ -127,17 +129,16 @@ pub fn run(
     entries: &[PathBuf],
     control: &impl Control,
 ) -> Result<Outcome> {
-    if !folders::is_live(conn, folder_id)? {
-        return Err(AppError::invalid("that folder is no longer in the index"));
-    }
+    let mut ours = Ours::read(conn, batch_id)?;
+    ours.reclaim(conn, folder_id)?;
     let mut copy = Run {
         conn,
         batch_id,
         into: folder_id,
-        part: format!(".{batch_id}.filmstrip-part"),
+        part: part_of(batch_id),
         place: acts::name(conn, folder_id)?,
         source_id: folders::location(conn, folder_id)?.source_id,
-        ours: Ours::read(conn, batch_id)?,
+        ours,
         control,
         whole: whole(entries),
         done: 0,
@@ -146,20 +147,45 @@ pub fn run(
     };
     control.progress(0, copy.whole);
     let brought = copy.bring_all(entries);
-    copy.tidy();
-    brought?;
+    tidy(conn, folder_id, &copy.ours, &copy.part);
     Ok(Outcome {
         whole: copy.whole,
         done: copy.done,
         refused: copy.refused,
         halted: copy.halted,
+        stopped: brought.err().map(|err| Reason::of(&err)),
     })
 }
 
-/// What this batch has already brought in, read from its journal rows: each file with its row.
+/// A copy that will not run again, taken off the queue while it waited: what a crash left of it
+/// is taken back and its parts cleared, as a run that ended would leave them.
+pub fn abandon(conn: &Connection, batch_id: &str, folder_id: i64) -> Result<()> {
+    let mut ours = Ours::read(conn, batch_id)?;
+    ours.reclaim(conn, folder_id)?;
+    tidy(conn, folder_id, &ours, &part_of(batch_id));
+    Ok(())
+}
+
+/// Hidden, so a walk that reads a directory meanwhile passes it over.
+fn part_of(batch_id: &str) -> String {
+    format!(".{batch_id}.filmstrip-part")
+}
+
+/// A copy cut short by a crash leaves its part under a hidden name, in the folder it went into
+/// or one the batch made; this clears any still there.
+fn tidy(conn: &Connection, into: i64, ours: &Ours, part: &str) {
+    for folder in std::iter::once(into).chain(ours.folders.keys().copied()) {
+        if let Ok(dir) = paths::folder_dir(conn, folder) {
+            let _ = std::fs::remove_file(dir.join(part));
+        }
+    }
+}
+
+/// What this batch has already brought in, read from its journal rows: each file and folder with
+/// its row.
 #[derive(Default)]
 struct Ours {
-    folders: HashSet<i64>,
+    folders: HashMap<i64, i64>,
     items: HashMap<i64, i64>,
 }
 
@@ -174,20 +200,74 @@ impl Ours {
                 }
                 journal::FOLDER_COPY => {
                     let made: FolderCopied = serde_json::from_value(entry.forward)?;
-                    ours.folders.insert(made.folder_id);
+                    ours.folders.insert(made.folder_id, entry.id);
                 }
                 _ => {}
             }
         }
         Ok(ours)
     }
+
+    /// Takes back each row whose file or folder is not there: a crash between a file's rows and
+    /// its name leaves one, and a launch's walk may have retired it since. Kept, it would name
+    /// something that never came in, and its undo could never finish.
+    fn reclaim(&mut self, conn: &Connection, into: i64) -> Result<()> {
+        let _turn = super::turn();
+        // A drive that is away holds none of its files, and that is no crash to take back.
+        let source = sources::get(conn, folders::location(conn, into)?.source_id)?;
+        if !source.is_some_and(|source| Path::new(&source.root).is_dir()) {
+            return Ok(());
+        }
+        let mut lost = Vec::new();
+        for (&item, &row) in &self.items {
+            if !at_its_name(conn, item)? {
+                lost.push((item, row));
+            }
+        }
+        for (item, row) in lost {
+            take_back(conn, item, row)?;
+            self.items.remove(&item);
+        }
+        let mut gone = Vec::new();
+        for (&folder, &row) in &self.folders {
+            if !folders::is_live(conn, folder)? {
+                gone.push((folder, row));
+            }
+        }
+        for (folder, row) in gone {
+            journal::drop_entry(conn, row)?;
+            self.folders.remove(&folder);
+        }
+        Ok(())
+    }
+}
+
+/// Whether a file the batch brought in is live and on disk under its name.
+fn at_its_name(conn: &Connection, item: i64) -> Result<bool> {
+    if !items::is_live(conn, item)? {
+        return Ok(false);
+    }
+    let Some(file) = items::file_of(conn, item)? else {
+        return Ok(false);
+    };
+    Ok(paths::item_path(conn, file.folder_id, &file.disk_name).is_ok_and(|path| path.is_file()))
+}
+
+/// Takes back the rows of a file that never got its name, retired as a walk would find it.
+fn take_back(conn: &Connection, item: i64, row: i64) -> Result<()> {
+    in_transaction(conn, |tx| {
+        journal::drop_entry(tx, row)?;
+        if items::is_live(tx, item)? {
+            items::retire(tx, item)?;
+        }
+        Ok(())
+    })
 }
 
 struct Run<'a, C: Control> {
     conn: &'a Connection,
     batch_id: &'a str,
     into: i64,
-    /// Hidden, so a walk that reads a directory meanwhile passes it over.
     part: String,
     place: String,
     source_id: i64,
@@ -201,6 +281,7 @@ struct Run<'a, C: Control> {
 
 impl<C: Control> Run<'_, C> {
     fn bring_all(&mut self, entries: &[PathBuf]) -> Result<()> {
+        self.dir_of(self.into)?;
         for path in entries {
             if self.stopped() {
                 break;
@@ -245,7 +326,8 @@ impl<C: Control> Run<'_, C> {
     /// long copy runs.
     fn dir_of(&self, folder: i64) -> Result<PathBuf> {
         if !folders::is_live(self.conn, folder)? {
-            return Err(AppError::invalid("that folder is no longer in the index"));
+            let name = acts::name(self.conn, folder)?;
+            return Err(AppError::refused(Reason::FolderGone { name }));
         }
         paths::folder_dir(self.conn, folder)
     }
@@ -268,7 +350,9 @@ impl<C: Control> Run<'_, C> {
     fn bring_folder(&mut self, from: &Path, parent: i64) -> Result<()> {
         let name = file_name(from);
         let made = match folders::child_id(self.conn, parent, &name)? {
-            Some(id) if self.ours.folders.contains(&id) => self.remake_folder(id).map(|()| id),
+            Some(id) if self.ours.folders.contains_key(&id) => {
+                self.remake_folder(id, parent, &name).map(|()| id)
+            }
             Some(_) => Err(taken(self.conn, parent, &name, true)),
             None => self.make_folder(parent, &name),
         };
@@ -322,20 +406,51 @@ impl<C: Control> Run<'_, C> {
                 _ => err.into(),
             });
         }
-        self.ours.folders.insert(id);
+        self.ours.folders.insert(id, row);
         Ok(id)
     }
 
     /// A folder this batch made whose directory is not there: a crash came between its rows and it.
-    fn remake_folder(&self, id: i64) -> Result<()> {
+    /// One there already is the batch's own only while it holds nothing, or something the batch
+    /// brought in; one holding only what someone else put there is theirs, and stays out whole.
+    fn remake_folder(&mut self, id: i64, parent: i64, name: &str) -> Result<()> {
         let _turn = super::turn();
         let to = self.dir_of(id)?;
         match std::fs::create_dir(&to) {
+            Ok(()) => return Ok(()),
             Err(err) if !(err.kind() == std::io::ErrorKind::AlreadyExists && to.is_dir()) => {
-                Err(err.into())
+                return Err(err.into());
             }
-            _ => Ok(()),
+            Err(_) => {}
         }
+        if self.ours_to_go_on_in(id, &to)? {
+            return Ok(());
+        }
+        if let Some(row) = self.ours.folders.remove(&id) {
+            journal::drop_entry(self.conn, row)?;
+        }
+        Err(taken(self.conn, parent, name, true))
+    }
+
+    fn ours_to_go_on_in(&self, id: i64, dir: &Path) -> Result<bool> {
+        let (mut ours, mut theirs) = (false, false);
+        for entry in std::fs::read_dir(dir)? {
+            let name = entry?.file_name().to_string_lossy().into_owned();
+            if name == self.part {
+                continue;
+            }
+            let mine = match folders::child_id(self.conn, id, &name)? {
+                Some(folder) => self.ours.folders.contains_key(&folder),
+                None => items::existing_by_disk_name(self.conn, id, &name)?
+                    .is_some_and(|held| !held.deleted && self.ours.items.contains_key(&held.id)),
+            };
+            if mine {
+                ours = true;
+            } else {
+                theirs = true;
+            }
+        }
+        Ok(ours || !theirs)
     }
 
     fn bring_file(&mut self, from: &Path, folder: i64) -> Result<()> {
@@ -343,19 +458,12 @@ impl<C: Control> Run<'_, C> {
         if let Some(held) = items::existing_by_disk_name(self.conn, folder, &name)?
             && !held.deleted
         {
-            match self.ours.items.get(&held.id).copied() {
-                Some(row) if !self.dir_of(folder)?.join(&name).exists() => {
-                    self.unland(held.id, row)?;
-                }
-                Some(_) => {
-                    self.settle(1);
-                    return Ok(());
-                }
-                None => {
-                    self.refuse(from, folder, taken(self.conn, folder, &name, false));
-                    return Ok(());
-                }
+            if self.ours.items.contains_key(&held.id) {
+                self.settle(1);
+            } else {
+                self.refuse(from, folder, taken(self.conn, folder, &name, false));
             }
+            return Ok(());
         }
         if self.dir_of(folder)?.join(&name).exists() {
             self.refuse(from, folder, taken(self.conn, folder, &name, false));
@@ -430,7 +538,7 @@ impl<C: Control> Run<'_, C> {
             Ok((id, journal::record_item_copy(tx, self.batch_id, &copied)?))
         })?;
         if let Err(err) = noclobber::rename(&part, &to) {
-            self.unland(id, row)?;
+            take_back(self.conn, id, row)?;
             return Err(match err.kind() {
                 std::io::ErrorKind::AlreadyExists => taken(self.conn, folder, name, false),
                 _ => err.into(),
@@ -438,26 +546,6 @@ impl<C: Control> Run<'_, C> {
         }
         self.ours.items.insert(id, row);
         Ok(id)
-    }
-
-    /// Takes back the rows of a file that never got its name, retired as a walk would find it.
-    fn unland(&mut self, item: i64, row: i64) -> Result<()> {
-        in_transaction(self.conn, |tx| {
-            journal::drop_entry(tx, row)?;
-            items::retire(tx, item)
-        })?;
-        self.ours.items.remove(&item);
-        Ok(())
-    }
-
-    /// A copy cut short by a crash leaves its part under a hidden name, in the folder it went into
-    /// or one the batch made; this clears any still there.
-    fn tidy(&self) {
-        for folder in std::iter::once(self.into).chain(self.ours.folders.iter().copied()) {
-            if let Ok(dir) = paths::folder_dir(self.conn, folder) {
-                let _ = std::fs::remove_file(dir.join(&self.part));
-            }
-        }
     }
 }
 
@@ -1055,6 +1143,205 @@ mod tests {
         assert_eq!(rows::live_under(&conn, lisbon).unwrap().len(), 3);
         let described = acts::describe(&conn, &batch).unwrap();
         assert_eq!((described.files, described.folders), (2, 1));
+    }
+
+    /// A crash between a file's rows and its name, as the next launch finds it: the first of two
+    /// files recorded and still under its part, the second never started.
+    fn crashed_in_the_window(name: &str) -> (Connection, PathBuf, i64, String, Vec<PathBuf>) {
+        let (conn, dir, lisbon) = library(name);
+        let entries: Vec<PathBuf> = (1..=2)
+            .map(|n| write(&dir.join(format!("Downloads/IMG_{n}.jpg")), "bytes"))
+            .collect();
+        let batch = journal::new_batch();
+        let closing = Script {
+            after: Some((1, Halt::Stop)),
+            ..Script::default()
+        };
+        run(&conn, &batch, lisbon, &entries, &closing).unwrap();
+        let lisbon_dir = dir.join("library/Trips/Lisbon");
+        std::fs::rename(
+            lisbon_dir.join("IMG_1.jpg"),
+            lisbon_dir.join(part_of(&batch)),
+        )
+        .unwrap();
+        (conn, dir, lisbon, batch, entries)
+    }
+
+    #[test]
+    fn a_crash_the_launchs_walk_found_first_still_leaves_a_copy_that_undoes_whole() {
+        let (conn, dir, lisbon, batch, entries) = crashed_in_the_window("crash-then-walk");
+        walk::reconcile(&conn).unwrap();
+
+        let again = run(&conn, &batch, lisbon, &entries, &Script::default()).unwrap();
+        assert!(again.refused.is_empty(), "{:?}", again.refused);
+        assert_eq!((again.done, again.stopped), (2, None));
+        let lisbon_dir = dir.join("library/Trips/Lisbon");
+        assert_eq!(
+            names_in(&lisbon_dir),
+            ["IMG_1.jpg", "IMG_2.jpg", "tram.jpg"]
+        );
+        assert_eq!(acts::describe(&conn, &batch).unwrap().files, 2);
+
+        let back = undo::undo_batch(&conn, &batch).unwrap();
+        assert!(back.stayed.is_empty(), "{:?}", back.stayed);
+        assert_eq!(back.files_back, 2);
+        assert!(journal::batch(&conn, &batch).unwrap().is_empty());
+        assert_eq!(names_in(&lisbon_dir), ["tram.jpg"]);
+        assert_eq!(undo::undo_last(&conn).unwrap(), None);
+    }
+
+    #[test]
+    fn a_copy_going_on_while_its_drive_is_away_keeps_what_came_in() {
+        let (conn, dir, lisbon) = library("resumed-away");
+        let entries: Vec<PathBuf> = (1..=2)
+            .map(|n| write(&dir.join(format!("Downloads/IMG_{n}.jpg")), "bytes"))
+            .collect();
+        let batch = journal::new_batch();
+        let closing = Script {
+            after: Some((1, Halt::Stop)),
+            ..Script::default()
+        };
+        run(&conn, &batch, lisbon, &entries, &closing).unwrap();
+        std::fs::rename(dir.join("library"), dir.join("unplugged")).unwrap();
+
+        let _ = run(&conn, &batch, lisbon, &entries, &Script::default()).unwrap();
+        std::fs::rename(dir.join("unplugged"), dir.join("library")).unwrap();
+        assert_eq!(acts::describe(&conn, &batch).unwrap().files, 1);
+        let back = undo::undo_batch(&conn, &batch).unwrap();
+        assert!(back.stayed.is_empty(), "{:?}", back.stayed);
+        assert_eq!(back.files_back, 1);
+        assert_eq!(names_in(&dir.join("library/Trips/Lisbon")), ["tram.jpg"]);
+    }
+
+    #[test]
+    fn a_crashed_file_whose_original_has_gone_since_is_taken_back_and_its_undo_finishes() {
+        let (conn, dir, lisbon, batch, entries) = crashed_in_the_window("crash-original-gone");
+        std::fs::remove_file(&entries[0]).unwrap();
+
+        let again = run(&conn, &batch, lisbon, &entries, &Script::default()).unwrap();
+        let [refused] = again.refused.as_slice() else {
+            panic!("{:?}", again.refused)
+        };
+        assert_eq!(
+            refused.reason,
+            Reason::NotOnDisk {
+                name: "IMG_1.jpg".into()
+            }
+        );
+        let lisbon_dir = dir.join("library/Trips/Lisbon");
+        assert_eq!(names_in(&lisbon_dir), ["IMG_2.jpg", "tram.jpg"]);
+        assert_eq!(rows::live_under(&conn, lisbon).unwrap().len(), 2);
+        assert_eq!(acts::describe(&conn, &batch).unwrap().files, 1);
+
+        let back = undo::undo_batch(&conn, &batch).unwrap();
+        assert!(back.stayed.is_empty(), "{:?}", back.stayed);
+        assert_eq!(back.files_back, 1);
+        assert!(journal::batch(&conn, &batch).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_copied_file_gone_from_the_disk_and_the_index_since_does_not_hold_up_its_undo() {
+        let (conn, dir, lisbon) = library("gone-since");
+        let a = write(&dir.join("Downloads/a.jpg"), "a");
+        let b = write(&dir.join("Downloads/b.jpg"), "b");
+        let first = journal::new_batch();
+        run(&conn, &first, lisbon, &[a.clone(), b], &Script::default()).unwrap();
+        let lisbon_dir = dir.join("library/Trips/Lisbon");
+        std::fs::remove_file(lisbon_dir.join("a.jpg")).unwrap();
+        std::fs::remove_file(lisbon_dir.join("b.jpg")).unwrap();
+        walk::reconcile(&conn).unwrap();
+        // a.jpg comes in again, taking the name its retired row held, so that row is forgotten.
+        let second = journal::new_batch();
+        run(&conn, &second, lisbon, &[a], &Script::default()).unwrap();
+        undo::undo_batch(&conn, &second).unwrap();
+
+        let back = undo::undo_batch(&conn, &first).unwrap();
+        assert!(back.stayed.is_empty(), "{:?}", back.stayed);
+        assert!(journal::batch(&conn, &first).unwrap().is_empty());
+        assert_eq!(undo::undo_last(&conn).unwrap(), None);
+    }
+
+    #[test]
+    fn a_folder_made_in_explorer_where_a_crash_left_the_copys_own_is_never_merged_into() {
+        let (conn, dir, lisbon) = library("crash-folder-theirs");
+        write(&dir.join("Downloads/Alexandria/a.jpg"), "a");
+        let entries = [dir.join("Downloads/Alexandria")];
+        let batch = journal::new_batch();
+        run(&conn, &batch, lisbon, &entries, &Script::default()).unwrap();
+        let theirs = dir.join("library/Trips/Lisbon/Alexandria");
+        std::fs::remove_dir_all(&theirs).unwrap();
+        write(&theirs.join("theirs.jpg"), "theirs");
+
+        let again = run(&conn, &batch, lisbon, &entries, &Script::default()).unwrap();
+        let [refused] = again.refused.as_slice() else {
+            panic!("{:?}", again.refused)
+        };
+        assert_eq!(
+            refused.reason,
+            Reason::NameTaken {
+                place: "Lisbon".into(),
+                name: "Alexandria".into(),
+                folder: true
+            }
+        );
+        assert_eq!(names_in(&theirs), ["theirs.jpg"]);
+        assert!(journal::batch(&conn, &batch).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_folder_the_copy_made_goes_on_filling_when_it_holds_what_the_copy_brought() {
+        let (conn, dir, lisbon) = library("folder-ours-filled");
+        write(&dir.join("Downloads/Alexandria/a.jpg"), "a");
+        write(&dir.join("Downloads/Alexandria/b.jpg"), "b");
+        let entries = [dir.join("Downloads/Alexandria")];
+        let batch = journal::new_batch();
+        let closing = Script {
+            after: Some((1, Halt::Stop)),
+            ..Script::default()
+        };
+        run(&conn, &batch, lisbon, &entries, &closing).unwrap();
+        let landed = dir.join("library/Trips/Lisbon/Alexandria");
+        write(&landed.join("added.jpg"), "added meanwhile");
+
+        let again = run(&conn, &batch, lisbon, &entries, &Script::default()).unwrap();
+        assert!(again.refused.is_empty(), "{:?}", again.refused);
+        assert_eq!(names_in(&landed), ["a.jpg", "added.jpg", "b.jpg"]);
+    }
+
+    #[test]
+    fn a_copy_whose_folder_goes_partway_says_why_and_keeps_what_it_refused() {
+        let (conn, dir, lisbon) = library("folder-goes");
+        let tram = write(&dir.join("Downloads/tram.jpg"), "a different tram");
+        let fresh = write(&dir.join("Downloads/fresh.jpg"), "fresh");
+        let db_path = dir.join("library.db");
+        let script = Script::default();
+        script.meanwhile.replace(Some((
+            1,
+            Box::new(move || {
+                let other = db::open(&db_path).unwrap();
+                folders::retire_subtree_at(&other, lisbon, now()).unwrap();
+            }),
+        )));
+
+        let outcome = run(
+            &conn,
+            &journal::new_batch(),
+            lisbon,
+            &[tram, fresh],
+            &script,
+        )
+        .unwrap();
+        assert_eq!(
+            outcome.stopped,
+            Some(Reason::FolderGone {
+                name: "Lisbon".into()
+            })
+        );
+        let [refused] = outcome.refused.as_slice() else {
+            panic!("{:?}", outcome.refused)
+        };
+        assert_eq!(refused.name, "tram.jpg");
+        assert!(!dir.join("library/Trips/Lisbon/fresh.jpg").exists());
     }
 
     #[test]

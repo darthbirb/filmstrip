@@ -142,10 +142,11 @@ fn reverse(conn: &Connection, entry: &Entry) -> Result<()> {
         }
         journal::ITEMS_UNTAG => tags::retag_items(conn, &inverse(entry)?),
         journal::RETAG => vocabulary::reverse(conn, &inverse(entry)?),
-        // What a copy brought in goes to the trash, never straight off the disk.
+        // What a copy brought in goes to the trash, never straight off the disk; one already in
+        // the trash, or gone from the disk and the index since, leaves nothing to take back.
         journal::ITEM_COPY => {
             let came: ItemCopied = inverse(entry)?;
-            if crate::db::items::is_trashed(conn, came.item_id)? {
+            if !crate::db::items::is_live(conn, came.item_id)? {
                 return Ok(());
             }
             trash::trash_unjournalled(conn, came.item_id, None)
