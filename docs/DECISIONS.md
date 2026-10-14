@@ -937,15 +937,29 @@ arrive, and the originals stay as Explorer left them.
 - **No half file is ever left.** Each file is written under a hidden name beside where it goes,
   which a walk passes over, and given its own name only once it is whole, in the disk's turn. Its
   row and its journal row go in first, so a crash between the two leaves a row the next run knows
-  is its own and takes back, never a file it would refuse as someone else's; a folder is made the
-  same way. A copy the app's closing cuts short removes the file in hand and waits; at the next
-  launch it goes on under the same batch, which is how it tells what it already brought in from a
-  name someone else has taken, and it clears every hidden part left in the folders it went into.
+  is its own, never a file it would refuse as someone else's; a folder is made the same way. A
+  copy the app's closing cuts short removes the file in hand and waits; at the next launch it goes
+  on under the same batch, which is how it tells what it already brought in from a name someone
+  else has taken, and it clears every hidden part left in the folders it went into.
+- **A run starts by taking back what its journal claims but the disk does not hold.** Each row of
+  the batch whose file is not live or not under its name is dropped and the file retired, whatever
+  a walk made of it meanwhile: the launch's walk runs before the copy goes on, and retires the row
+  a crash left. Kept, that row would name a file that never came in and its Undo could never
+  finish. The file is then copied again, or refused if its original has gone. A folder the batch
+  made whose directory is there already is taken as its own only while it holds nothing or
+  something the batch brought in; one holding only what someone else put there stays theirs, and
+  the copy's folder stays out whole. Holding something the batch brought in is enough, since a
+  copy the closing paused goes on in folders that already hold what it brought and may have been
+  added to meanwhile; a folder made after a crash never holds the batch's own files.
+- **Cancel on a copy still waiting after a restart ends it as a running one ends**: what the crash
+  left is taken back, its parts cleared, and its Line says what came in, with its Undo.
 - **The rename into place refuses a name taken.** `std::fs::rename` replaces a file on Windows, and
   the turn keeps out only the app's own writers, so the name is given by `MoveFileExW` without
   `MOVEFILE_REPLACE_EXISTING`, which fails in the same call that would move. Not a hard link and a
   removal, which FAT32 and exFAT cards cannot do. Its paths are given in their verbatim form, as
-  `std::fs` gives its own, so a name past the old 260-character limit moves as any other. The
+  `std::fs` gives its own, so a name past the old 260-character limit moves as any other. The form
+  is built from the absolute path, not from `canonicalize`, which opens the folder and fails on
+  drives that cannot say where a handle points, as some RAM disks and encrypted volumes. The
   rename lives in `fs/noclobber.rs` for the app's other renames to share.
 - **Where the copy goes is read again for each file.** A long copy outlives the folder's name: the
   app can rename or move it meanwhile, so each file and folder finds its folder's directory from
@@ -954,10 +968,15 @@ arrive, and the originals stay as Explorer left them.
   over the batch of a copy still waiting or running and takes the act before it, and its Undo is
   refused until it ends: taking back half a copy while it goes on would leave neither.
 - **Retry carries each file back to the folder it was going into**, so a file left out from deep
-  in a copied tree goes back into that tree, not the folder the copy started at.
+  in a copied tree goes back into that tree, not the folder the copy started at. A copy goes into
+  one folder, so a Retry over several starts one copy for each, each its own batch with its own
+  Line, and Ctrl+Z takes back the newest of them first. That is meant: each is a copy of its own,
+  and folding them into one batch would make the retry an act unlike any the person started.
 - **Undo sends what came in to the Trash**, never straight off the disk, and takes away the folders
   the copy made once they are empty. Those folders are retired rather than forgotten, since the
-  Trash still names them as where their files came from.
+  Trash still names them as where their files came from. A file the copy brought in that is
+  gone from the index and the disk since is passed over: there is nothing left to send, and
+  failing on it would hold the copy's Undo, and every Undo before it, for good.
 - **Refused whole, before anything is queued**: a folder carried into itself or below itself, a
   drive that is away, and files that are all already where they would go. A mix copies the rest,
   and the banner names the ones already there.
