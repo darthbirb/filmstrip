@@ -37,10 +37,11 @@ only building this if the largest folders still feel unnavigable afterwards.
 
 ## Bringing files in from Explorer · DRAWN
 
-Issue #63 built the rest; two parts of Artboards › Bringing files in wait. The grid's ground, between
-the tiles or under the last row, opens its place's menu under the place's name, with Paste, as the
-place's row does; the Sorting Box's ground has Paste alone. And a drag from Explorer near the tree's
-top or foot scrolls the tree, as a move's drag does.
+Issue #112. Issue #63 built the rest; two parts of Artboards › Bringing files in wait. The grid's
+ground, between the tiles or under the last row, opens its place's menu under the place's name, with
+Paste, as the place's row does; the Sorting Box's ground has Paste alone. And a drag from Explorer
+near the tree's top or foot scrolls the tree, as a move's drag does.
+
 ## Exporting a zip · DRAWN
 
 Issue #64. A branch or a selection cannot leave the library as one file.
