@@ -14,18 +14,21 @@ pub fn rename(from: &Path, to: &Path) -> io::Result<()> {
 
     // Verbatim, as `std::fs` passes its own paths, or a name past MAX_PATH would not move.
     let wide = |path: &Path| -> io::Result<Vec<u16>> {
-        let (Some(parent), Some(name)) = (path.parent(), path.file_name()) else {
-            return Err(io::Error::from(io::ErrorKind::InvalidInput));
-        };
-        let parent = if parent.as_os_str().is_empty() {
-            Path::new(".")
-        } else {
-            parent
-        };
-        Ok(std::fs::canonicalize(parent)?
-            .join(name)
+        let full: Vec<u16> = std::path::absolute(path)?
             .as_os_str()
             .encode_wide()
+            .collect();
+        let starts = |with: &str| full.starts_with(&with.encode_utf16().collect::<Vec<_>>());
+        let (prefix, rest) = if starts(r"\\?\") || starts(r"\\.\") {
+            ("", &full[..])
+        } else if starts(r"\\") {
+            (r"\\?\UNC\", &full[2..])
+        } else {
+            (r"\\?\", &full[..])
+        };
+        Ok(prefix
+            .encode_utf16()
+            .chain(rest.iter().copied())
             .chain(std::iter::once(0))
             .collect())
     };
@@ -96,6 +99,25 @@ mod tests {
         rename(&deep.join("part"), &to).unwrap();
         assert_eq!(std::fs::read_to_string(&to).unwrap(), "new");
         assert!(!deep.join("part").exists());
+
+        std::fs::write(deep.join("part"), "newer").unwrap();
+        let err = rename(&deep.join("part"), &to).unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::AlreadyExists);
+        assert_eq!(std::fs::read_to_string(&to).unwrap(), "new");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_relative_name_is_given_where_it_is() {
+        let dir = scratch("relative");
+        std::fs::write(dir.join("part"), "new").unwrap();
+        let here = std::env::current_dir().unwrap();
+        let from = dir.strip_prefix(&here).unwrap().join("part");
+        rename(&from, &from.with_file_name("IMG_1.jpg")).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.join("IMG_1.jpg")).unwrap(),
+            "new"
+        );
     }
 
     #[cfg(windows)]
