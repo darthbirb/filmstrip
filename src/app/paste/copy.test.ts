@@ -55,12 +55,12 @@ test("Retry carries each file left out back into the folder it was going into", 
 test("a copy that stopped on its own says why, with what came in and its Undo", async () => {
   setNews(null);
   const copy = { jobId: 9, folderId: 4, to: "Trips", whole: 3, refused: [], cancelled: false };
-  const stopped = { kind: "other", message: "that folder is no longer in the index" } as const;
+  const stopped = { kind: "folderGone", name: "Trips" } as const;
   await afterCopied({ ...copy, batch: null, stopped });
   expect(getNews()).toEqual({
     kind: "keyRefused",
     line: "The 3 files could not come into Trips.",
-    detail: "That folder is no longer in the index.",
+    detail: "Trips is gone.",
   });
 
   const batch = {
@@ -72,8 +72,32 @@ test("a copy that stopped on its own says why, with what came in and its Undo", 
   await afterCopied({ ...copy, batch, stopped });
   expect(getNews()).toEqual({
     kind: "done",
-    line: "Copied 2 of 3 files to Trips. That folder is no longer in the index.",
+    line: "Copied 2 of 3 files to Trips. Trips is gone.",
     batchId: "b1",
   });
+  setNews(null);
+});
+
+test("a copy that stopped on its own still lists what it left out before it stopped", async () => {
+  setNews(null);
+  showReport(null);
+  const taken = {
+    ...left("tram.jpg", "C:\\Users\\Ana\\Downloads", 4),
+    reason: { kind: "nameTaken", place: "Trips", name: "tram.jpg", folder: false },
+  } as const;
+  await afterCopied({
+    jobId: 9,
+    folderId: 4,
+    to: "Trips",
+    batch: null,
+    whole: 3,
+    refused: [taken],
+    cancelled: false,
+    stopped: { kind: "folderGone", name: "Trips" },
+  });
+  expect(getReport()?.rows).toEqual([taken]);
+  expect(getReport()?.sentence).toBe("tram.jpg could not come into Trips");
+  expect(getNews()).toEqual({ kind: "keyRefused", line: "Trips is gone." });
+  showReport(null);
   setNews(null);
 });

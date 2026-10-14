@@ -953,7 +953,8 @@ toward the rest surface.
   Copy, and the `progress` bar in `plate` under them. Its tooltip counts what is left. Each copy
   has one, the newest highest, a copy waiting its turn included at none settled; folded, the rail
   keeps the bar alone. One that stops on its own says why: in the Line after what came in, or in
-  the Band when nothing did.
+  the Band when nothing did. What it left out before it stopped is still in the banner, and then
+  the Band gives the reason alone.
 - **Segmented.** A value with few enough answers to show them all at once, the one it is on filled
   on `raised-hi` inside an `inset` trough. Real radios, so the arrow keys move between them. Its
   segments sit flush in the trough, so the keyboard's ring is drawn inside the segment. In a

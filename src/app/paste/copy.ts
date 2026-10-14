@@ -87,18 +87,12 @@ function retryAll(again: readonly Again[], to: string) {
 /**
  * How a copy ended: the Line with Undo for what came in, and the banner for what stayed out,
  * with Retry while it lists something a second try could bring in. One that stopped on its own
- * says why at the foot.
+ * says why at the foot, and the banner still lists what it left out before it stopped.
  */
 export async function afterCopied(copied: Copied) {
   await libraryChanged();
   const { batch, refused, whole, to, stopped } = copied;
   const came = batch?.files ?? 0;
-  if (stopped) {
-    const why = `${reasonText(stopped)}.`;
-    if (batch) afterAct(batch, 0, `${copyCancelledLine(batch, whole)} ${why}`);
-    else setNews({ kind: "keyRefused", line: `${copiedBannerLine(0, whole, to)}.`, detail: why });
-    return;
-  }
   if (refused.length > 0) {
     const again = refused.map(againOf).filter((one): one is Again => one !== null);
     const [only] = refused;
@@ -112,6 +106,13 @@ export async function afterCopied(copied: Copied) {
       rows: refused,
       retry: again.length > 0 ? () => retryAll(again, to) : undefined,
     });
+  }
+  if (stopped) {
+    const why = `${reasonText(stopped)}.`;
+    if (batch) afterAct(batch, 0, `${copyCancelledLine(batch, whole)} ${why}`);
+    else if (refused.length > 0) setNews({ kind: "keyRefused", line: why });
+    else setNews({ kind: "keyRefused", line: `${copiedBannerLine(0, whole, to)}.`, detail: why });
+    return;
   }
   // With nothing come in, the banner turns the line round and the foot says nothing.
   if (!batch) return;
