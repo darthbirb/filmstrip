@@ -19,7 +19,14 @@ const FAILURES: Failure[] = [
   { jobId: 2, kind: "thumb", name: "People\\scan 03.tif", error: "Permission denied", attempts: 3 },
 ];
 
-const IDLE: Progress = { phase: "idle", pending: 0, running: 0, failed: 0, completed: 0 };
+const IDLE: Progress = {
+  phase: "idle",
+  pending: 0,
+  running: 0,
+  failed: 0,
+  completed: 0,
+  copies: [],
+};
 
 let served: Failure[] = FAILURES;
 let retried = 0;

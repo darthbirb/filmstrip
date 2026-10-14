@@ -1,4 +1,4 @@
-import { copyItemPaths, copyItems, openItem, revealItem } from "../../ipc/commands";
+import { copyItemPaths, openItem, revealItem } from "../../ipc/commands";
 import { formatCount } from "../../lib/format";
 import type { HeadedMenu, MenuAction, MenuGroups } from "../../ui/Menu";
 import { isFavourite, setFavourite, setFavourites } from "../favourites";
@@ -8,6 +8,7 @@ import { getFullScreen, setFullScreen } from "../pane/full-screen";
 import { openMovePicker } from "../pane/move-picker";
 import { startRename } from "../pane/rename";
 import { restoreFiles } from "../pane/restore";
+import { copyFiles } from "../paste/clipboard";
 import { openTagSheet } from "../tags/TagSheet";
 
 /** A file, with when it went to the Trash when it is there. */
@@ -73,7 +74,7 @@ export function setMenu(items: readonly Item[], trash: boolean): HeadedMenu {
           id: "copy",
           label: "Copy",
           glyph: "copy",
-          onSelect: () => void copyItems(ids).catch(() => undefined),
+          onSelect: () => void copyFiles(ids).catch(() => undefined),
         },
         {
           id: "copy-path",
@@ -164,7 +165,7 @@ export function itemMenu(item: Item, show: () => void): MenuGroups {
         glyph: "folderOpen",
         onSelect: () => quietly(revealItem(item.id)),
       },
-      { id: "copy", label: "Copy", glyph: "copy", onSelect: () => quietly(copyItems([item.id])) },
+      { id: "copy", label: "Copy", glyph: "copy", onSelect: () => quietly(copyFiles([item.id])) },
       {
         id: "copy-path",
         label: "Copy Path",

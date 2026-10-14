@@ -8,12 +8,16 @@ pub const INDEX: &str = "index";
 pub const INDEX_FOLDER: &str = "index_folder";
 pub const THUMB: &str = "thumb";
 pub const SCRUB: &str = "scrub";
+/// Files copied in from outside the library, which counts itself rather than in the walk's line.
+pub const COPY_IN: &str = "copy_in";
 
 /// The kinds that walk the disk. Only one runs at a time: each retires what it did not see, so a
 /// second walk alongside would retire what the first had just found.
 pub const WALKS: [&str; 2] = [INDEX, INDEX_FOLDER];
 
 pub const PRIORITY_INDEX: i64 = 100;
+/// A copy was asked for and is watched while it runs, so it starts before any thumbnail.
+pub const PRIORITY_COPY: i64 = 50;
 pub const PRIORITY_THUMB: i64 = 20;
 pub const PRIORITY_SCRUB: i64 = 1;
 
@@ -30,4 +34,17 @@ pub struct ItemPayload {
 #[serde(rename_all = "camelCase")]
 pub struct FolderPayload {
     pub folder_id: i64,
+}
+
+/// What a copy brings in, where, and the batch its journal rows go under: the same batch when it
+/// goes on after a restart, which is how it knows what already came in.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CopyPayload {
+    pub batch_id: String,
+    pub folder_id: i64,
+    pub paths: Vec<String>,
+    /// Every file it carries, for its line while it waits.
+    #[serde(default)]
+    pub whole: u32,
 }

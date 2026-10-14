@@ -1,9 +1,13 @@
+import { emit } from "@tauri-apps/api/event";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import type { Act } from "../ipc/bindings/Act";
 import type { Batch } from "../ipc/bindings/Batch";
 import type { BranchFile } from "../ipc/bindings/BranchFile";
+import type { Carried } from "../ipc/bindings/Carried";
 import type { Change } from "../ipc/bindings/Change";
 import type { Contents } from "../ipc/bindings/Contents";
+import type { Copied } from "../ipc/bindings/Copied";
+import type { CopyStart } from "../ipc/bindings/CopyStart";
 import type { Coverage } from "../ipc/bindings/Coverage";
 import type { Covered } from "../ipc/bindings/Covered";
 import type { Crumb } from "../ipc/bindings/Crumb";
@@ -317,7 +321,10 @@ type Step =
   /** Each file a tag came off, and where it stood among the file's own. */
   | { op: "untag"; value: string; items: { item: ItemRow; at: number }[] }
   /** An act on the tags screen, and the vocabulary as it was before it, to put back whole. */
-  | { op: "retag"; change: Change; files: number; folders: number; before: Words };
+  | { op: "retag"; change: Change; files: number; folders: number; before: Words }
+  /** A file copied in from outside, and the folder the copy was made into. */
+  | { op: "copy"; item: ItemRow; into: number }
+  | { op: "copyFolder"; node: FolderNode; parent: number; into: number };
 const journal: { batchId: string; steps: Step[] }[] = [];
 let nextBatch = 1;
 
@@ -442,6 +449,27 @@ function describe(batchId: string, steps: Step[]): Batch {
 }
 
 function act(steps: Step[]): Act {
+  const copies = steps.flatMap((step) =>
+    step.op === "copy" || step.op === "copyFolder" ? [step] : [],
+  );
+  const [firstCopy] = copies;
+  if (firstCopy) {
+    const into = firstCopy.into;
+    const tops = copies.flatMap((step) =>
+      step.op === "copyFolder" && step.parent === into ? [step.node] : [],
+    );
+    const loose = copies.flatMap((step) =>
+      step.op === "copy" && step.item.folderId === into ? [step.item] : [],
+    );
+    const [top] = tops;
+    return {
+      kind: "copy",
+      to: folderName(into),
+      one: tops.length === 0 && loose.length === 1 ? (loose[0]?.diskName ?? null) : null,
+      folder: tops.length === 1 && loose.length === 0 && top ? top.title : null,
+      folders: tops.length,
+    };
+  }
   const gone = steps.find((step) => step.op === "deleteFolder");
   if (gone) {
     const moved = steps.find((step) => step.op === "move" || step.op === "moveFolder");
@@ -545,6 +573,12 @@ function takeBack(at: number): UndoReport {
         break;
       case "retag":
         putWords(step.before);
+        break;
+      case "copy":
+        toTrash(step.item);
+        break;
+      case "copyFolder":
+        detach(step.node);
         break;
     }
   }
@@ -1115,6 +1149,95 @@ function retag(
 
 type Args = Record<string, unknown>;
 
+// The clipboard and Explorer, as far as the mock has them: the app's own Copy puts its files'
+// paths here, and a path outside the library is a file to copy in, or a folder when it has no dot.
+let clipboard: string[] = [];
+let nextCopyJob = 1;
+
+const isFolderPath = (path: string) => !/\.[^\\/]+$/.test(path);
+const lastName = (path: string) =>
+  path
+    .split(/[\\/]+/)
+    .filter(Boolean)
+    .at(-1) ?? path;
+const parentOf = (path: string) => path.replace(/[\\/]+[^\\/]*$/, "").toLowerCase();
+
+function carriedBy(paths: readonly string[]): Carried {
+  const folders = paths.filter(isFolderPath).length;
+  return { files: paths.length - folders, folders };
+}
+
+/** A folder's directory, as the Rust side resolves one. */
+function dirOf(folderId: number) {
+  const { folders, home } = crumbs(folderId);
+  return [home?.root ?? "", ...folders.slice(1).map((crumb) => crumb.title)].join("\\");
+}
+
+/** A copy in, at once: refused whole as Rust refuses one, or done, its end heard a moment later. */
+function copyIn(folderId: number, paths: readonly string[]): CopyStart {
+  const carried = carriedBy(paths);
+  if (paths.length === 0) return { kind: "empty" };
+  const { home } = crumbs(folderId);
+  if (home && !home.reachable)
+    return { kind: "refused", why: { kind: "offline", source: home.title } };
+  const dir = dirOf(folderId).toLowerCase();
+  const itself = paths.find(
+    (one) =>
+      isFolderPath(one) && (dir === one.toLowerCase() || dir.startsWith(`${one.toLowerCase()}\\`)),
+  );
+  if (itself) return { kind: "refused", why: { kind: "intoItself", name: lastName(itself) } };
+  const to = folderName(folderId);
+  if (paths.every((one) => parentOf(one) === dir)) {
+    return { kind: "refused", why: { kind: "alreadyIn", place: to, carried } };
+  }
+  const steps: Step[] = [];
+  const refused: Stayed[] = [];
+  const outside = (path: string, reason: Reason): Stayed => ({
+    kind: isFolderPath(path) ? "folder" : "file",
+    id: 0,
+    name: lastName(path),
+    at: { kind: "outside", dir: path.replace(/[\\/]+[^\\/]*$/, ""), into: folderId },
+    reason,
+  });
+  for (const path of paths) {
+    const name = lastName(path);
+    if (parentOf(path) === dir) {
+      refused.push(outside(path, { kind: "alreadyIn", place: to }));
+    } else if (isFolderPath(path)) {
+      if (folderTaken(folderId, name)) {
+        refused.push(outside(path, { kind: "nameTaken", place: to, name, folder: true }));
+        continue;
+      }
+      const node = folder(nextFolderId++, name, 0, 0);
+      attach(node, folderId);
+      steps.push({ op: "copyFolder", node, parent: folderId, into: folderId });
+    } else {
+      const [item] = items(folderId, [name]);
+      if (!item) continue;
+      if (taken(folderId, name, item)) {
+        refused.push(outside(path, { kind: "nameTaken", place: to, name, folder: false }));
+        continue;
+      }
+      ITEMS[folderId] = [...(ITEMS[folderId] ?? []), item];
+      recount();
+      steps.push({ op: "copy", item, into: folderId });
+    }
+  }
+  const jobId = nextCopyJob++;
+  const copied: Copied = {
+    jobId,
+    folderId,
+    to,
+    batch: record(steps),
+    whole: carried.files,
+    refused,
+    cancelled: false,
+    stopped: null,
+  };
+  setTimeout(() => void emit("copy-done", copied));
+  return { kind: "started", jobId, to, carried };
+}
+
 let storedPreferences: unknown = null;
 
 const COMMANDS: Record<string, (args: Args) => unknown> = {
@@ -1651,7 +1774,16 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   },
   reveal_item: () => null,
   open_item: () => null,
-  copy_items: () => null,
+  copy_items: ({ itemIds }) => {
+    clipboard = (itemIds as number[]).flatMap((id) => detail(id)?.path ?? []);
+    return null;
+  },
+  clipboard_files: () => (clipboard.length > 0 ? carriedBy(clipboard) : null),
+  count_carried: ({ paths }) => carriedBy(paths as string[]),
+  paste_files: ({ folderId }) => copyIn(folderId as number, clipboard),
+  drop_files: ({ folderId, paths }) => copyIn(folderId as number, paths as string[]),
+  cancel_copy: () => false,
+  reveal_path: () => null,
   copy_item_paths: () => null,
   start_index: () => null,
   index_progress: (): Progress => ({
@@ -1660,18 +1792,23 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     running: 0,
     failed: 0,
     completed: 0,
+    copies: [],
   }),
   index_failures: () => [],
   retry_failed_jobs: () => 0,
 };
 
 mockWindows("main");
-mockIPC((cmd, payload) => {
-  if (cmd.startsWith("plugin:")) return undefined;
-  const command = COMMANDS[cmd];
-  if (!command) throw new Error(`the dev mock does not know the command "${cmd}"`);
-  return command((payload ?? {}) as Args);
-});
+// Events are the mock's own, so the copies it makes can say how they ended.
+mockIPC(
+  (cmd, payload) => {
+    if (cmd.startsWith("plugin:")) return undefined;
+    const command = COMMANDS[cmd];
+    if (!command) throw new Error(`the dev mock does not know the command "${cmd}"`);
+    return command((payload ?? {}) as Args);
+  },
+  { shouldMockEvents: true },
+);
 // Tauri's own mock would turn each path into an asset URL that nothing here answers.
 (
   window as unknown as { __TAURI_INTERNALS__: { convertFileSrc: (path: string) => string } }

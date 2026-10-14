@@ -2,6 +2,8 @@ pub mod acts;
 pub mod clipboard;
 pub mod folders;
 pub mod items;
+pub mod noclobber;
+pub mod paste;
 pub mod paths;
 pub mod relocate;
 pub mod sanitize;

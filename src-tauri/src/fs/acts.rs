@@ -9,8 +9,9 @@ use serde::de::DeserializeOwned;
 use ts_rs::TS;
 
 use crate::db::journal::{
-    self, Change, Entry, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, ItemMoved,
-    ItemRenamed, ItemRestored, ItemTrashed, ItemsTagged, ItemsUntagged, Retagged,
+    self, Change, Entry, FolderCopied, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed,
+    ItemCopied, ItemMoved, ItemRenamed, ItemRestored, ItemTrashed, ItemsTagged, ItemsUntagged,
+    Retagged,
 };
 use crate::db::{folders, items};
 use crate::error::{AppError, Result};
@@ -85,6 +86,14 @@ pub enum Act {
     Retag {
         change: Change,
     },
+    /// Files and folders copied in from outside the library. `folders` counts the folders that
+    /// came in at its top; `folder` names the one when it came alone, and `one` the lone file.
+    Copy {
+        to: String,
+        one: Option<String>,
+        folder: Option<String>,
+        folders: u32,
+    },
 }
 
 /// Describes a batch still in the journal.
@@ -107,7 +116,8 @@ pub fn count(conn: &Connection, entries: &[Entry]) -> Result<(u32, u32)> {
             journal::ITEM_MOVE
             | journal::ITEM_TRASH
             | journal::ITEM_RENAME
-            | journal::ITEM_RESTORE => files += 1,
+            | journal::ITEM_RESTORE
+            | journal::ITEM_COPY => files += 1,
             journal::FOLDER_MOVE => {
                 let moved: FolderMoved = forward(entry)?;
                 files += items::live_under(conn, moved.folder_id)?.len() as u32;
@@ -139,6 +149,13 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
     if let Some(entry) = of(journal::ITEMS_UNTAG).next() {
         let tag = forward::<ItemsUntagged>(entry)?.value;
         return Ok(Act::RemoveTag { tag });
+    }
+    let copied: Vec<ItemCopied> = of(journal::ITEM_COPY).map(forward).collect::<Result<_>>()?;
+    let made: Vec<FolderCopied> = of(journal::FOLDER_COPY)
+        .map(forward)
+        .collect::<Result<_>>()?;
+    if !copied.is_empty() || !made.is_empty() {
+        return copy_act(conn, &copied, &made);
     }
     if let Some(entry) = of(journal::FOLDER_DELETE).next() {
         let deleted: FolderDeleted = forward(entry)?;
@@ -236,8 +253,37 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
     })
 }
 
+/// A copy, named by where it went and by what came in at its top: one file, one folder, or counts.
+fn copy_act(conn: &Connection, copied: &[ItemCopied], made: &[FolderCopied]) -> Result<Act> {
+    let into = copied
+        .first()
+        .map(|one| one.into)
+        .or_else(|| made.first().map(|folder| folder.into))
+        .unwrap_or_default();
+    let tops: Vec<&FolderCopied> = made.iter().filter(|one| one.parent_id == into).collect();
+    let loose: Vec<i64> = copied
+        .iter()
+        .filter(|one| one.folder_id == into)
+        .map(|one| one.item_id)
+        .collect();
+    let folder = match (tops.as_slice(), loose.is_empty()) {
+        ([only], true) => Some(name(conn, only.folder_id)?),
+        _ => None,
+    };
+    Ok(Act::Copy {
+        to: name(conn, into)?,
+        one: if tops.is_empty() {
+            one_name(conn, &loose)?
+        } else {
+            None
+        },
+        folder,
+        folders: tops.len() as u32,
+    })
+}
+
 /// A folder as navigation names it: a source's own folder goes by the source's title.
-fn name(conn: &Connection, folder_id: i64) -> Result<String> {
+pub(crate) fn name(conn: &Connection, folder_id: i64) -> Result<String> {
     Ok(folders::ancestry(conn, folder_id)?
         .pop()
         .map(|crumb| crumb.title)

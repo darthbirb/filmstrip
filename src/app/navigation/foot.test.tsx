@@ -11,6 +11,7 @@ import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { getPlace, setPlace } from "../place";
 import { Breadcrumb } from "./Breadcrumb";
 import { Foot } from "./Foot";
+import { getNews, sayOnce, setNews } from "./foot-slot";
 import { loadIndex, resetIndex, startIndex } from "./index-store";
 import { Rail } from "./Rail";
 import { setRefused } from "./refusal-store";
@@ -69,7 +70,14 @@ const NOTHING: LibraryTotals = {
   trash: { count: 0, bytes: 0 },
 };
 
-const IDLE: Progress = { phase: "idle", pending: 0, running: 0, failed: 0, completed: 0 };
+const IDLE: Progress = {
+  phase: "idle",
+  pending: 0,
+  running: 0,
+  failed: 0,
+  completed: 0,
+  copies: [],
+};
 
 /** Answers as the app would, over these sources and totals. */
 async function holding(sources: SourceSummary[], totals: LibraryTotals) {
@@ -421,4 +429,48 @@ test("the baseline is read again when a walk goes quiet", async () => {
   now = { ...TOTALS, all: { count: 41_300, bytes: 313 * GB } };
   await emit("job-progress", IDLE);
   await expect.element(screen.getByRole("button", { name: "41,300 items · 313 GB" })).toBeVisible();
+});
+
+test("the rail's own line for a key that did nothing stays out of sight while the panel is the face shown", async () => {
+  const screen = await render(
+    <>
+      <div inert>
+        <Foot rail />
+      </div>
+      <Foot />
+    </>,
+  );
+  setNews({ kind: "noFiles" });
+  await expect.element(screen.getByText("The clipboard holds no files.").first()).toBeVisible();
+  const lines = [...document.querySelectorAll("[popover=manual]")];
+  expect(lines.length).toBe(1);
+  expect(lines.some((line) => line.matches(":popover-open"))).toBe(false);
+  setNews(null);
+});
+
+const NO_FILES = "The clipboard holds no files.";
+
+test("a line said once goes at a key pressed the moment it is drawn", async () => {
+  const screen = await render(<Foot />);
+  const drawn = new MutationObserver(() => {
+    if (!document.body.textContent?.includes(NO_FILES)) return;
+    drawn.disconnect();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
+  });
+  drawn.observe(document.body, { childList: true, subtree: true, characterData: true });
+  sayOnce({ kind: "noFiles" });
+  await expect.poll(getNews).toBeNull();
+  await expect.element(screen.getByText(NO_FILES)).not.toBeInTheDocument();
+});
+
+test("the key that says a line once is not the one that clears it", async () => {
+  const screen = await render(<Foot />);
+  document.addEventListener("keydown", () => sayOnce({ kind: "noFiles" }), {
+    capture: true,
+    once: true,
+  });
+  await userEvent.keyboard("x");
+  await expect.element(screen.getByText(NO_FILES)).toBeVisible();
+  await userEvent.keyboard("{ArrowDown}");
+  await expect.element(screen.getByText(NO_FILES)).not.toBeInTheDocument();
 });

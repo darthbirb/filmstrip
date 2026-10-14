@@ -5,6 +5,8 @@ import type { Stayed } from "../../ipc/bindings/Stayed";
 import type { UndoReport } from "../../ipc/bindings/UndoReport";
 import {
   actLine,
+  copiedBannerLine,
+  copyCancelledLine,
   deletedBannerLine,
   folderStayedBanner,
   folderStayedLine,
@@ -233,4 +235,45 @@ test("an act on the tags screen says what it touched, and undoing it puts the te
       back,
     );
   }
+});
+
+test("a copy's lines read as Artboards › Bringing files in has them", () => {
+  const files: Act = { kind: "copy", to: "Lisbon", one: null, folder: null, folders: 0 };
+  const lone: Act = { kind: "copy", to: "Lisbon", one: "IMG_5001.jpg", folder: null, folders: 0 };
+  const tree: Act = { kind: "copy", to: "Lisbon", one: null, folder: "Alexandria", folders: 1 };
+  const mix: Act = { kind: "copy", to: "Lisbon", one: null, folder: null, folders: 2 };
+  expect(actLine(batch(files, 3))).toBe("Copied 3 files to Lisbon.");
+  expect(actLine(batch(lone, 1))).toBe("Copied IMG_5001.jpg to Lisbon.");
+  expect(actLine(batch(tree, 214, 3))).toBe("Copied Alexandria and its 214 files to Lisbon.");
+  expect(actLine(batch(mix, 219, 4))).toBe("Copied 219 files and 2 folders to Lisbon.");
+  expect(actLine(batch(files, 117), 3)).toBe(
+    "Copied 117 of 120 files to Lisbon. The other 3 are in the banner.",
+  );
+  expect(copyCancelledLine(batch(files, 412), 1200)).toBe("Copied 412 of 1,200 files to Lisbon.");
+  expect(copiedBannerLine(117, 120, "Lisbon")).toBe("117 of 120 files came into Lisbon");
+  expect(copiedBannerLine(0, 214, "Lisbon", "Alexandria")).toBe(
+    "Alexandria could not come into Lisbon",
+  );
+  expect(undoneLine(undone(files, 3))).toBe("3 files left Lisbon for the Trash.");
+  expect(undoBannerLine(undone(files, 3, 2))).toBe("2 of 3 files left Lisbon for the Trash");
+  expect(reasonText({ kind: "alreadyIn", place: "Cairo" })).toBe("Already in Cairo");
+});
+
+test("what a copy left outside the library is grouped under the directory it is still in", () => {
+  const outside = (name: string, dir: string): Stayed => ({
+    kind: "file",
+    id: 0,
+    name,
+    at: { kind: "outside", dir, into: 1 },
+    reason: { kind: "inUse" },
+  });
+  const groups = stayedGroups([
+    outside("IMG_5004.jpg", "C:\\Users\\Ana\\Downloads"),
+    outside("IMG_5017.jpg", "C:\\Users\\Ana\\downloads"),
+    outside("clip.mov", "E:\\DCIM\\100CANON"),
+  ]);
+  expect(groups.map((group) => [group.heading, group.rows.length])).toEqual([
+    ["Still in Downloads", 2],
+    ["Still in 100CANON", 1],
+  ]);
 });

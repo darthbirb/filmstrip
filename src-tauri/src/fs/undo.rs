@@ -8,8 +8,8 @@ use serde::de::DeserializeOwned;
 use ts_rs::TS;
 
 use crate::db::journal::{
-    self, Entry, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, ItemMoved, ItemRenamed,
-    ItemRestored, ItemTrashed, ItemsTagged,
+    self, Entry, FolderCopied, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed,
+    ItemCopied, ItemMoved, ItemRenamed, ItemRestored, ItemTrashed, ItemsTagged,
 };
 use crate::db::{tags, vocabulary};
 use crate::error::{AppError, Result};
@@ -32,6 +32,9 @@ pub struct UndoReport {
 /// Reverses one batch by id.
 pub fn undo_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
     let _turn = super::turn();
+    if journal::copying(conn, batch_id)? {
+        return Err(AppError::invalid("that copy has not ended yet"));
+    }
     reverse_batch(conn, batch_id)
 }
 
@@ -86,6 +89,10 @@ fn stayed_of(conn: &Connection, entry: &Entry, err: &AppError) -> Result<Stayed>
         journal::FOLDER_DELETE => {
             stayed::folder(conn, inverse::<FolderDeleted>(entry)?.folder_id, err)
         }
+        journal::ITEM_COPY => stayed::file(conn, inverse::<ItemCopied>(entry)?.item_id, err),
+        journal::FOLDER_COPY => {
+            stayed::folder(conn, inverse::<FolderCopied>(entry)?.folder_id, err)
+        }
         other => Err(AppError::invalid(format!("{other} cannot be undone"))),
     }
 }
@@ -135,6 +142,19 @@ fn reverse(conn: &Connection, entry: &Entry) -> Result<()> {
         }
         journal::ITEMS_UNTAG => tags::retag_items(conn, &inverse(entry)?),
         journal::RETAG => vocabulary::reverse(conn, &inverse(entry)?),
+        // What a copy brought in goes to the trash, never straight off the disk; one already in
+        // the trash, or gone from the disk and the index since, leaves nothing to take back.
+        journal::ITEM_COPY => {
+            let came: ItemCopied = inverse(entry)?;
+            if !crate::db::items::is_live(conn, came.item_id)? {
+                return Ok(());
+            }
+            trash::trash_unjournalled(conn, came.item_id, None)
+        }
+        journal::FOLDER_COPY => {
+            let made: FolderCopied = inverse(entry)?;
+            folders::unmake_copy(conn, made.folder_id)
+        }
         other => Err(AppError::invalid(format!("{other} cannot be undone"))),
     }
 }

@@ -1,26 +1,181 @@
 //! What each kind of job does. Runs on a worker thread, never on the window's.
 
+use std::path::PathBuf;
 use std::sync::atomic::Ordering;
 
 use rusqlite::Connection;
 
-use crate::db::items;
 use crate::db::jobs::{self as table, QueuedJob};
-use crate::error::{AppError, Result};
+use crate::db::{items, journal};
+use crate::error::{AppError, Reason, Result};
+use crate::fs::paste::{self, Halt};
+use crate::fs::stayed::Stayed;
 use crate::fs::{paths, walk};
-use crate::jobs::kinds::{self, FolderPayload, ItemPayload};
-use crate::jobs::{QueueInner, enqueue_scrub, enqueue_thumb};
+use crate::jobs::kinds::{self, CopyPayload, FolderPayload, ItemPayload};
+use crate::jobs::{Copied, Copying, QueueInner, enqueue_scrub, enqueue_thumb, lock};
 use crate::media::ffmpeg::Ffmpeg;
 use crate::media::probe::Probe;
 use crate::media::{scrub, thumbs};
 
-pub fn execute(inner: &QueueInner, conn: &mut Connection, job: &QueuedJob) -> Result<()> {
+/// How a job that did not fail ended.
+pub enum Done {
+    Finished,
+    /// Stopped partway as the app closed, to go on at the next launch.
+    Paused,
+}
+
+pub fn execute(inner: &QueueInner, conn: &mut Connection, job: &QueuedJob) -> Result<Done> {
+    let finished = |result: Result<()>| result.map(|()| Done::Finished);
     match job.kind.as_str() {
-        kinds::INDEX => index(inner, conn),
-        kinds::INDEX_FOLDER => index_folder(inner, conn, serde_json::from_str(&job.payload)?),
-        kinds::THUMB => thumb(inner, conn, serde_json::from_str(&job.payload)?),
-        kinds::SCRUB => scrub(inner, conn, serde_json::from_str(&job.payload)?),
+        kinds::INDEX => finished(index(inner, conn)),
+        kinds::INDEX_FOLDER => finished(index_folder(
+            inner,
+            conn,
+            serde_json::from_str(&job.payload)?,
+        )),
+        kinds::THUMB => finished(thumb(inner, conn, serde_json::from_str(&job.payload)?)),
+        kinds::SCRUB => finished(scrub(inner, conn, serde_json::from_str(&job.payload)?)),
+        kinds::COPY_IN => copy_in(inner, conn, job.id, serde_json::from_str(&job.payload)?),
         other => Err(AppError::invalid(format!("no job of the kind {other}"))),
+    }
+}
+
+/// A copy into a folder, its line kept while it runs, and how it ended said once it has.
+fn copy_in(
+    inner: &QueueInner,
+    conn: &Connection,
+    job_id: i64,
+    payload: CopyPayload,
+) -> Result<Done> {
+    let to = crate::fs::acts::name(conn, payload.folder_id).unwrap_or_default();
+    let line = Copying {
+        job_id,
+        folder_id: payload.folder_id,
+        to,
+        done: 0,
+        whole: payload.whole,
+    };
+    lock(&inner.copies).insert(job_id, line);
+    let control = QueueControl { inner, job_id };
+    let entries: Vec<PathBuf> = payload.paths.iter().map(PathBuf::from).collect();
+    let ran = paste::run(
+        conn,
+        &payload.batch_id,
+        payload.folder_id,
+        &entries,
+        &control,
+    );
+    let ended = match ran {
+        Ok(outcome) if outcome.halted == Some(Halt::Stop) && outcome.stopped.is_none() => {
+            return Ok(Done::Paused);
+        }
+        Ok(outcome) => Ended {
+            whole: outcome.whole,
+            refused: outcome.refused,
+            cancelled: outcome.halted == Some(Halt::Cancel),
+            stopped: outcome.stopped,
+        },
+        Err(err) => Ended {
+            whole: paste::whole(&entries),
+            refused: Vec::new(),
+            cancelled: false,
+            stopped: Some(Reason::of(&err)),
+        },
+    };
+    announce(inner, conn, job_id, &payload, ended)?;
+    Ok(Done::Finished)
+}
+
+/// A copy taken off the queue as it waited, after a restart or before it ever ran: what a crash
+/// left of it is cleared, and it ends as one cancelled while running does.
+pub fn cancel_waiting(
+    inner: &QueueInner,
+    conn: &Connection,
+    job_id: i64,
+    payload: &CopyPayload,
+) -> Result<()> {
+    // Its job is already gone, so its line ends even when the tidy cannot.
+    let abandoned = paste::abandon(conn, &payload.batch_id, payload.folder_id);
+    let ended = Ended {
+        whole: payload.whole,
+        refused: Vec::new(),
+        cancelled: true,
+        stopped: None,
+    };
+    announce(inner, conn, job_id, payload, ended)?;
+    abandoned
+}
+
+struct Ended {
+    whole: u32,
+    refused: Vec<Stayed>,
+    cancelled: bool,
+    stopped: Option<Reason>,
+}
+
+fn announce(
+    inner: &QueueInner,
+    conn: &Connection,
+    job_id: i64,
+    payload: &CopyPayload,
+    ended: Ended,
+) -> Result<()> {
+    let journalled = !journal::batch(conn, &payload.batch_id)?.is_empty();
+    let batch = if journalled {
+        Some(crate::fs::acts::describe(conn, &payload.batch_id)?)
+    } else {
+        None
+    };
+    (inner.announce)(&Copied {
+        job_id,
+        folder_id: payload.folder_id,
+        to: crate::fs::acts::name(conn, payload.folder_id).unwrap_or_default(),
+        batch,
+        whole: ended.whole,
+        refused: ended.refused,
+        cancelled: ended.cancelled,
+        stopped: ended.stopped,
+    });
+    Ok(())
+}
+
+struct QueueControl<'a> {
+    inner: &'a QueueInner,
+    job_id: i64,
+}
+
+/// A copy's line and its Cancel go when it ends, however it ends: a panic included.
+impl Drop for QueueControl<'_> {
+    fn drop(&mut self) {
+        lock(&self.inner.copies).remove(&self.job_id);
+        lock(&self.inner.cancelled).remove(&self.job_id);
+    }
+}
+
+impl paste::Control for QueueControl<'_> {
+    fn halt(&self) -> Option<Halt> {
+        if self.inner.stop.load(Ordering::Relaxed) {
+            Some(Halt::Stop)
+        } else if lock(&self.inner.cancelled).contains(&self.job_id) {
+            Some(Halt::Cancel)
+        } else {
+            None
+        }
+    }
+
+    fn progress(&self, done: u32, whole: u32) {
+        if let Some(line) = lock(&self.inner.copies).get_mut(&self.job_id) {
+            line.done = done;
+            line.whole = whole;
+        }
+    }
+
+    /// A picture's thumbnail is queued as it lands, and a video's while ffmpeg is at hand.
+    fn landed(&self, conn: &Connection, item_id: i64, kind: &str) -> Result<()> {
+        if kind == "image" || (kind == "video" && self.inner.ffmpeg.is_some()) {
+            enqueue_thumb(conn, item_id)?;
+        }
+        Ok(())
     }
 }
 
@@ -117,8 +272,7 @@ pub fn is_transient(error: &AppError) -> bool {
 mod tests {
     use super::*;
     use crate::db::{self, sources, sources::SourceKind};
-    use std::path::{Path, PathBuf};
-    use std::sync::atomic::{AtomicBool, AtomicU64};
+    use std::path::Path;
 
     fn scratch(name: &str) -> PathBuf {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -141,15 +295,13 @@ mod tests {
             };
             std::fs::write(tools.join(name), "").unwrap();
         }
-        QueueInner {
-            db_path: dir.join("library.db"),
-            thumbs: dir.join("thumbs"),
-            ffmpeg: Ffmpeg::discover(&tools),
-            stop: AtomicBool::new(false),
-            walking: AtomicBool::new(false),
-            completed: AtomicU64::new(0),
-            report: Box::new(|_| {}),
-        }
+        QueueInner::new(
+            dir.join("library.db"),
+            dir.join("thumbs"),
+            Ffmpeg::discover(&tools),
+            Box::new(|_| {}),
+            Box::new(|_| {}),
+        )
     }
 
     fn library(dir: &Path, names: &[&str]) -> (Connection, Vec<(i64, String)>) {

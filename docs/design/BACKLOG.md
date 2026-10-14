@@ -37,26 +37,10 @@ only building this if the largest folders still feel unnavigable afterwards.
 
 ## Bringing files in from Explorer · DRAWN
 
-Issue #63. Files copied or dragged in Explorer cannot be brought into a folder or the Sorting Box.
-
-Artboards › Bringing files in. A drag from Explorer draws the app's own ghost under Explorer's
-picture, the hatch where the picture will be, and says the act before it lands: Copy 3 files to
-Lisbon over a row that takes it, lifted as for a move, and the reason in red over one that will not
-(the files' own folder, a folder onto itself, the Trash, a drive that is away). A folder's grid
-takes it as its row does, inside a 2px pewter ring; a search, the Trash and an offline grid do not
-light. The Sorting Box with more than one sorting source asks which at the pointer on release.
-Paste 3 Files follows New Folder on a folder's and a source's menu, counts what the clipboard
-holds, and is absent when it holds no files; the grid's ground opens its place's menu under the
-place's name, and the Sorting Box's row has Paste alone. Ctrl+V pastes into the place the grid
-shows. The copy is a job with its own line at the foot and a Cancel; it ends with the Line and
-Undo, which sends what came in to the Trash. A name already taken is reported in the banner, never
-changed, and a folder whose name is taken stays out whole. A Paste of files already in the place is
-refused in the band, Already in Cairo; a mix copies the rest and the banner names the others, with
-no Retry. Drawn: over a row, four refusals, over a folder's grid, over a search, the Sorting Box's
-pick, Paste on the menus, the Sorting Box's row, Ctrl+V with nothing and refused, the job's line,
-two jobs and the walk, the Line with the counts moved, cancelled partway, after Undo, a folder with
-its tree, names taken, a folder's name taken, a mix some of it already there, and Paste where it
-already is.
+Issue #112. Issue #63 built the rest; two parts of Artboards › Bringing files in wait. The grid's
+ground, between the tiles or under the last row, opens its place's menu under the place's name, with
+Paste, as the place's row does; the Sorting Box's ground has Paste alone. And a drag from Explorer
+near the tree's top or foot scrolls the tree, as a move's drag does.
 
 ## Exporting a zip · DRAWN
 

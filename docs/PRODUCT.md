@@ -23,6 +23,11 @@ as the default: from then on a folder with files in it moves there without askin
 Settings changes the default or goes back to asking each time. With no sorting source there is no Sorting Box to move to, so the only answer is the
 trash.
 
+Files copied in Explorer are pasted into a folder or the Sorting Box, and files dragged from
+Explorer are dropped on one. Either way they are **copied in, never moved**, under their own names,
+a folder with its tree; a name already taken there is reported and left out. The copy runs in the
+background with a Cancel, and one Undo sends everything it brought in to the trash.
+
 ## The Sorting Box
 
 **A real place, but not a single folder.** It is one or more *sorting sources* — folders the

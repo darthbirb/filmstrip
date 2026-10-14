@@ -7,7 +7,6 @@ import {
   useState,
 } from "react";
 
-import { copyItems } from "../../ipc/commands";
 import { formatBytes, formatCount } from "../../lib/format";
 import { Button } from "../../ui/Button";
 import { DismissButton } from "../../ui/DismissButton";
@@ -17,6 +16,7 @@ import { setFavourites, useEveryFavourite } from "../favourites";
 import { deleteFiles } from "../pane/delete";
 import { openMovePicker } from "../pane/move-picker";
 import { restoreFiles } from "../pane/restore";
+import { copyFiles } from "../paste/clipboard";
 import { TagSheet, whenTagSheetAsked } from "../tags/TagSheet";
 import { inTrash } from "./place-items";
 import {
@@ -107,7 +107,7 @@ function InLibrary({ rows }: { rows: readonly CheckedFile[] }) {
   const remove = `Delete ${files(ids.length)}`;
   const run = {
     favourite: () => setFavourites(ids, !favourite),
-    copy: () => void copyItems(ids).catch(() => undefined),
+    copy: () => void copyFiles(ids).catch(() => undefined),
     delete: () => void deleteFiles(ids),
   };
   // Written in the bar's order; `sheds` is the order they leave it for More.

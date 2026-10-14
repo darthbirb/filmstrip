@@ -47,7 +47,10 @@ test("each button does its own thing to the file the pane is showing", async () 
   await screen.getByRole("button", { name: "Copy" }).click();
   await screen.getByRole("button", { name: "Open with Default App" }).click();
 
-  expect(sent.map((call) => call.cmd)).toEqual(["reveal_item", "copy_items", "open_item"]);
+  // Copy reads the clipboard back, so Paste can count what it now holds.
+  await expect.poll(() => sent.some((call) => call.cmd === "clipboard_files")).toBe(true);
+  const acts = sent.map((call) => call.cmd).filter((cmd) => cmd !== "clipboard_files");
+  expect(acts).toEqual(["reveal_item", "copy_items", "open_item"]);
   expect(sent[0]?.payload).toEqual({ itemId: sample.id });
   await expect.element(screen.getByRole("button", { name: "Move to…" })).toBeVisible();
   await expect.element(screen.getByRole("button", { name: "Delete" })).toBeVisible();

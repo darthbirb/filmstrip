@@ -22,6 +22,8 @@ import { MovePickerHost } from "./pane/move-picker";
 import { Pane, PaneHeader } from "./pane/Pane";
 import { PaneDetailProvider } from "./pane/pane-detail";
 import { whenShownInPane } from "./pane/pane-store";
+import { ExplorerGhost, PickHost, useExplorerDrops } from "./paste/drop";
+import { usePasteKey } from "./paste/keys";
 import { usePreferences, useScaleHotkeys } from "./preferences";
 import { useSearchKeys } from "./search/keys";
 import { SearchField } from "./search/SearchField";
@@ -40,6 +42,8 @@ export function App() {
   useUndoKey();
   useDestinationKeys();
   useSearchKeys();
+  usePasteKey();
+  useExplorerDrops();
 
   return (
     <div className="flex h-dvh flex-col bg-ground text-fg">
@@ -86,6 +90,8 @@ export function App() {
       </PaneDetailProvider>
       <MovePickerHost />
       <Dragging />
+      <ExplorerGhost />
+      <PickHost />
       <Settings
         open={settings !== null}
         onClose={closeSettings}

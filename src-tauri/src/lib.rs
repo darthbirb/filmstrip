@@ -48,12 +48,16 @@ pub fn run() {
             }
 
             let handle = app.handle().clone();
+            let announcer = app.handle().clone();
             let queue = jobs::JobQueue::start(
                 db_path.clone(),
                 thumbs.clone(),
                 ffmpeg,
                 Box::new(move |progress| {
                     let _ = handle.emit(jobs::PROGRESS_EVENT, progress);
+                }),
+                Box::new(move |copied| {
+                    let _ = announcer.emit(jobs::COPIED_EVENT, copied);
                 }),
             );
             app.manage(commands::AppState {
@@ -102,6 +106,12 @@ pub fn run() {
             commands::delete_folder,
             commands::undo_last,
             commands::undo_batch,
+            commands::clipboard_files,
+            commands::count_carried,
+            commands::paste_files,
+            commands::drop_files,
+            commands::cancel_copy,
+            commands::reveal_path,
             commands::remove_source,
             commands::folder_children,
             commands::list_folders,

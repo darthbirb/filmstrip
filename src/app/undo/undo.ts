@@ -4,7 +4,7 @@ import type { Batch } from "../../ipc/bindings/Batch";
 import type { UndoReport } from "../../ipc/bindings/UndoReport";
 import { undoBatch, undoLast } from "../../ipc/commands";
 import { libraryChanged } from "../library";
-import { getNews, setNews } from "../navigation/foot-slot";
+import { sayOnce, setNews } from "../navigation/foot-slot";
 import { actLine, undoBannerLine, undoneLine } from "./lines";
 import { showReport } from "./report-store";
 
@@ -53,17 +53,7 @@ export async function undo(batchId?: string) {
 
 /** "Nothing to undo." answers a key, not an act, so it goes at the next key or click. */
 function sayNothing() {
-  setNews({ kind: "nothing" });
-  const clear = () => {
-    window.removeEventListener("keydown", clear, true);
-    window.removeEventListener("pointerdown", clear, true);
-    if (getNews()?.kind === "nothing") setNews(null);
-  };
-  // After this key has finished, so it is not the one that clears it.
-  setTimeout(() => {
-    window.addEventListener("keydown", clear, true);
-    window.addEventListener("pointerdown", clear, true);
-  });
+  sayOnce({ kind: "nothing" });
 }
 
 /** Ctrl+Z takes back the newest act, wherever the focus is but in a field or over Settings. */
@@ -82,7 +72,8 @@ export function useUndoKey() {
   }, []);
 }
 
-function inField(target: EventTarget | null) {
+/** Whether a key belongs to a field, which keeps its own undo and paste. */
+export function inField(target: EventTarget | null) {
   return (
     target instanceof HTMLElement &&
     (target.isContentEditable || target.matches("input, textarea, select"))

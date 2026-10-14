@@ -38,6 +38,8 @@ tauri-plugin-dialog = "2"
 # A real CF_HDROP copy, so pasting into Explorer produces the file and not its path.
 [target.'cfg(windows)'.dependencies]
 clipboard-win = "5"
+# MoveFileExW, for a rename that refuses a name already taken where std's replaces it.
+windows-sys = { version = "=0.61.2", features = ["Win32_Storage_FileSystem"] }
 
 [profile.release]
 opt-level = 3

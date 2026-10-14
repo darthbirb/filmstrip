@@ -27,6 +27,15 @@ import { type CheckedFile, checkBranch } from "../grid/selection";
 import { DIGITS } from "../keys";
 import { libraryChanged } from "../library";
 import { openMovePicker } from "../pane/move-picker";
+import { counted, getClipboard } from "../paste/clipboard";
+import { openPick, pasteInto, sortingPlaces } from "../paste/copy";
+import {
+  landingInto,
+  type Landing as OutsideLanding,
+  setOutsideResolver,
+  sortingLanding,
+  useOutsideDrag,
+} from "../paste/drop";
 import { type Place, setPlace, usePlace } from "../place";
 import { searchIn } from "../search/SearchField";
 import { openSettings } from "../settings/settings-store";
@@ -65,6 +74,7 @@ export function Navigation() {
   const [taken, setTaken] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const drag = useDrag();
+  const outside = useOutsideDrag();
 
   useEffect(() => {
     ensureChildren([...expanded]);
@@ -73,9 +83,17 @@ export function Navigation() {
   // A drop is answered by the rows of the newest render, and by none while there is no tree.
   const landing = useRef<Resolver>(() => null);
   landing.current = () => null;
+  const landingOutside = useRef<(id: string, paths: readonly string[]) => OutsideLanding | null>(
+    () => null,
+  );
+  landingOutside.current = () => null;
   useEffect(() => {
     setDropResolver((id, carried) => landing.current(id, carried));
-    return () => setDropResolver(() => null);
+    setOutsideResolver((id, paths) => landingOutside.current(id, paths));
+    return () => {
+      setDropResolver(() => null);
+      setOutsideResolver(() => null);
+    };
   }, []);
 
   if (!sources) return null;
@@ -164,7 +182,58 @@ export function Navigation() {
 
   landing.current = landingFor;
 
+  /**
+   * What a row does with files from Explorer: as for a move, a folder, a source or a favourite takes
+   * them, the Trash never does, and the Sorting Box asks which source when it has more than one.
+   * Artboards › Bringing files in.
+   */
+  landingOutside.current = (id, paths) => {
+    if (id === TRASH_ID) return { kind: "refuse", why: "Only Delete sends to the Trash" };
+    if (id === SORTING_ID) return sortingLanding(sources, paths);
+    const source = sourceOf(id);
+    const at = places.get(id);
+    if (!source || at?.kind !== "folder") return null;
+    const row = rows.find((one) => one.id === id);
+    const open = row?.expandable && !row.expanded ? () => setOpen(id, true) : undefined;
+    return landingInto(source, at.path, paths, open);
+  };
+
+  /** The Sorting Box's own menu: Paste alone, and only while the clipboard holds files. */
+  const sortingMenu = (): HeadedMenu => {
+    const held = getClipboard();
+    const boxes = sortingPlaces(sources);
+    const [one] = boxes;
+    if (!held || !one) return { groups: [] };
+    const what = counted(held, true);
+    if (boxes.length === 1) {
+      return {
+        groups: [
+          [
+            {
+              id: "paste",
+              label: `Paste ${what}`,
+              glyph: "paste",
+              onSelect: () => void pasteInto(one),
+            },
+          ],
+        ],
+      };
+    }
+    // The pick takes the menu's place against the same row, which the menu hands the focus back to.
+    const ask = () => {
+      const element = document.activeElement;
+      openPick({
+        heading: `Paste ${what} Into`,
+        anchor: element instanceof HTMLElement ? { element } : { x: 0, y: 0 },
+        places: boxes,
+        onPick: (to) => void pasteInto(to),
+      });
+    };
+    return { groups: [[{ id: "paste", label: `Paste ${what}…`, glyph: "paste", onSelect: ask }]] };
+  };
+
   const menuFor = (id: string): HeadedMenu => {
+    if (id === SORTING_ID) return sortingMenu();
     const source = sourceOf(id);
     const folder = rowFolder(id);
     if (!source || folder === undefined) return { groups: [] };
@@ -186,6 +255,19 @@ export function Navigation() {
         openFolders(path.map((crumb) => crumb.id));
       },
     };
+    // Read when the menu opens; with no files on the clipboard the row is absent.
+    const held = getClipboard();
+    const pasteHere: MenuAction[] = held
+      ? [
+          {
+            id: "paste",
+            label: `Paste ${counted(held, true)}`,
+            glyph: "paste",
+            onSelect: () =>
+              void pasteInto({ id: folder, title: path.at(-1)?.title ?? source.title }),
+          },
+        ]
+      : [];
     // A favourite changes nothing on disk, so it is there whether the drive is or not.
     const favourite = favourites.some((one) => one.folderId === folder);
     const star: MenuAction = {
@@ -234,7 +316,7 @@ export function Navigation() {
       const search = searchHere("Search in Source");
       return {
         heading: "Source",
-        groups: sourceMenu(source, rename, { newFolder, star, assign, search, inside }),
+        groups: sourceMenu(source, rename, { newFolder, star, assign, search, inside }, pasteHere),
       };
     }
     // A folder whose drive is away keeps what only the index holds, as its source's row does.
@@ -261,7 +343,7 @@ export function Navigation() {
     };
     return {
       groups: [
-        [newFolder, star, assign, moveTo],
+        [newFolder, ...pasteHere, star, assign, moveTo],
         [
           searchHere("Search in Folder"),
           inside,
@@ -338,7 +420,13 @@ export function Navigation() {
         onExpand={(id) => setOpen(id, true)}
         onCollapse={(id) => setOpen(id, false)}
         menuFor={menuFor}
-        accepting={drag?.over?.landing.kind === "accept" ? drag.over.rowId : null}
+        accepting={
+          drag?.over?.landing.kind === "accept"
+            ? drag.over.rowId
+            : outside?.over && outside.over.landing.kind !== "refuse"
+              ? outside.over.rowId
+              : null
+        }
         renaming={
           renaming
             ? {
@@ -398,6 +486,7 @@ function sourceMenu(
   source: SourceSummary,
   rename: () => void,
   rows: Record<"newFolder" | "star" | "assign" | "search" | "inside", MenuAction>,
+  paste: readonly MenuAction[],
 ): MenuGroups {
   const { newFolder, star, assign, search, inside } = rows;
   const folder = source.rootFolderId;
@@ -410,7 +499,7 @@ function sourceMenu(
   const naming = renameRow(rename);
   // New Folder is on it because a source's row is the only row that stands for its top level.
   return [
-    source.reachable ? [newFolder, star, assign] : [star, assign],
+    source.reachable ? [newFolder, ...paste, star, assign] : [star, assign],
     source.reachable ? [search, inside, reveal, naming, readAgainRow(folder)] : [inside, naming],
     [
       {
