@@ -146,7 +146,7 @@ impl QueueInner {
     }
 }
 
-/// The copies running, and after them each one waiting its turn, at none of its files settled.
+/// Each copy running, and each waiting its turn at none of its files settled, oldest first.
 fn copies(conn: &Connection, running: &BTreeMap<i64, Copying>) -> Result<Vec<Copying>> {
     let mut copies: Vec<Copying> = running.values().cloned().collect();
     for (job_id, payload) in table::waiting_copies(conn)? {
