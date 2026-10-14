@@ -11,6 +11,7 @@ import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { getPlace, setPlace } from "../place";
 import { Breadcrumb } from "./Breadcrumb";
 import { Foot } from "./Foot";
+import { setNews } from "./foot-slot";
 import { loadIndex, resetIndex, startIndex } from "./index-store";
 import { Rail } from "./Rail";
 import { setRefused } from "./refusal-store";
@@ -428,4 +429,21 @@ test("the baseline is read again when a walk goes quiet", async () => {
   now = { ...TOTALS, all: { count: 41_300, bytes: 313 * GB } };
   await emit("job-progress", IDLE);
   await expect.element(screen.getByRole("button", { name: "41,300 items · 313 GB" })).toBeVisible();
+});
+
+test("the rail's own line for a key that did nothing stays out of sight while the panel is the face shown", async () => {
+  const screen = await render(
+    <>
+      <div inert>
+        <Foot rail />
+      </div>
+      <Foot />
+    </>,
+  );
+  setNews({ kind: "noFiles" });
+  await expect.element(screen.getByText("The clipboard holds no files.").first()).toBeVisible();
+  const lines = [...document.querySelectorAll("[popover=manual]")];
+  expect(lines.length).toBe(1);
+  expect(lines.some((line) => line.matches(":popover-open"))).toBe(false);
+  setNews(null);
 });
