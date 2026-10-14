@@ -55,18 +55,15 @@ fn copy_in(
         whole: 0,
     };
     lock(&inner.copies).insert(job_id, line);
-    let entries: Vec<PathBuf> = payload.paths.iter().map(PathBuf::from).collect();
     let control = QueueControl { inner, job_id };
-    let ran = paste::run(
+    let entries: Vec<PathBuf> = payload.paths.iter().map(PathBuf::from).collect();
+    let outcome = paste::run(
         conn,
         &payload.batch_id,
         payload.folder_id,
         &entries,
         &control,
-    );
-    lock(&inner.copies).remove(&job_id);
-    let cancelled = lock(&inner.cancelled).remove(&job_id);
-    let outcome = ran?;
+    )?;
     if outcome.halted == Some(Halt::Stop) {
         return Ok(Done::Paused);
     }
@@ -83,7 +80,7 @@ fn copy_in(
         batch,
         whole: outcome.whole,
         refused: outcome.refused,
-        cancelled: cancelled || outcome.halted == Some(Halt::Cancel),
+        cancelled: outcome.halted == Some(Halt::Cancel),
     });
     Ok(Done::Finished)
 }
@@ -91,6 +88,14 @@ fn copy_in(
 struct QueueControl<'a> {
     inner: &'a QueueInner,
     job_id: i64,
+}
+
+/// A copy's line and its Cancel go when it ends, however it ends: a panic included.
+impl Drop for QueueControl<'_> {
+    fn drop(&mut self) {
+        lock(&self.inner.copies).remove(&self.job_id);
+        lock(&self.inner.cancelled).remove(&self.job_id);
+    }
 }
 
 impl paste::Control for QueueControl<'_> {

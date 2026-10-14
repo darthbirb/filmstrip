@@ -385,6 +385,11 @@ mod tests {
             }),
         );
         let copied = heard.recv_timeout(Duration::from_secs(60)).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !queue.progress().unwrap().copies.is_empty() && Instant::now() < deadline {
+            std::thread::sleep(IDLE);
+        }
+        assert!(queue.progress().unwrap().copies.is_empty(), "its line goes");
         queue.stop();
 
         assert_eq!((copied.job_id, copied.to.as_str()), (job, "Trips"));

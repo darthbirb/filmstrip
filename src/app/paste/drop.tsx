@@ -4,6 +4,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import type { Carried } from "../../ipc/bindings/Carried";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { countCarried } from "../../ipc/commands";
+import { formatCount } from "../../lib/format";
 import { DragGhost } from "../../ui/DragGhost";
 import { ContextMenu } from "../../ui/Menu";
 import { getIndex } from "../navigation/index-store";
@@ -137,7 +138,7 @@ function land(x: number, y: number) {
   if (!was || !landing) return;
   if (landing.kind === "accept") void dropInto(landing.to, was.paths);
   if (landing.kind === "pick") {
-    const what = was.carried ? counted(was.carried, true) : "Files";
+    const what = was.carried ? counted(was.carried, true) : items(was.paths.length, true);
     openPick({
       heading: `Copy ${what} To`,
       anchor: { x, y },
@@ -193,7 +194,8 @@ export function ExplorerGhost() {
   const now = useOutsideDrag();
   if (!now) return null;
   const landing = now.over?.landing;
-  const what = now.carried ? counted(now.carried) : `${now.paths.length}`;
+  // Until Explorer's paths are read, they are only items; a moment later, files or folders.
+  const what = now.carried ? counted(now.carried) : items(now.paths.length);
   const label =
     landing?.kind === "accept"
       ? `Copy ${what} to ${landing.to.title}`
@@ -234,6 +236,12 @@ export function PickHost() {
       onClose={() => openPick(null)}
     />
   );
+}
+
+/** What Explorer carries before its paths are read: neither files nor folders yet. */
+function items(count: number, title = false) {
+  const word = count === 1 ? "item" : "items";
+  return `${formatCount(count)} ${title ? word.charAt(0).toUpperCase() + word.slice(1) : word}`;
 }
 
 function subscribe(listener: () => void) {
