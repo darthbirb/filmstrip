@@ -44,4 +44,7 @@ pub struct CopyPayload {
     pub batch_id: String,
     pub folder_id: i64,
     pub paths: Vec<String>,
+    /// Every file it carries, for its line while it waits.
+    #[serde(default)]
+    pub whole: u32,
 }

@@ -7,7 +7,7 @@ use rusqlite::Connection;
 
 use crate::db::jobs::{self as table, QueuedJob};
 use crate::db::{items, journal};
-use crate::error::{AppError, Result};
+use crate::error::{AppError, Reason, Result};
 use crate::fs::paste::{self, Halt};
 use crate::fs::{paths, walk};
 use crate::jobs::kinds::{self, CopyPayload, FolderPayload, ItemPayload};
@@ -52,21 +52,28 @@ fn copy_in(
         folder_id: payload.folder_id,
         to: to.clone(),
         done: 0,
-        whole: 0,
+        whole: payload.whole,
     };
     lock(&inner.copies).insert(job_id, line);
     let control = QueueControl { inner, job_id };
     let entries: Vec<PathBuf> = payload.paths.iter().map(PathBuf::from).collect();
-    let outcome = paste::run(
+    let ran = paste::run(
         conn,
         &payload.batch_id,
         payload.folder_id,
         &entries,
         &control,
-    )?;
-    if outcome.halted == Some(Halt::Stop) {
-        return Ok(Done::Paused);
-    }
+    );
+    let (whole, refused, cancelled, stopped) = match ran {
+        Ok(outcome) if outcome.halted == Some(Halt::Stop) => return Ok(Done::Paused),
+        Ok(outcome) => (
+            outcome.whole,
+            outcome.refused,
+            outcome.halted == Some(Halt::Cancel),
+            None,
+        ),
+        Err(err) => (paste::whole(&entries), Vec::new(), false, Some(Reason::of(&err))),
+    };
     let journalled = !journal::batch(conn, &payload.batch_id)?.is_empty();
     let batch = if journalled {
         Some(crate::fs::acts::describe(conn, &payload.batch_id)?)
@@ -78,9 +85,10 @@ fn copy_in(
         folder_id: payload.folder_id,
         to,
         batch,
-        whole: outcome.whole,
-        refused: outcome.refused,
-        cancelled: outcome.halted == Some(Halt::Cancel),
+        whole,
+        refused,
+        cancelled,
+        stopped,
     });
     Ok(Done::Finished)
 }

@@ -11,7 +11,7 @@ import { dropFiles, pasteFiles } from "../../ipc/commands";
 import type { MenuAnchor } from "../../ui/Menu";
 import { libraryChanged } from "../library";
 import { type FootNews, sayOnce, setNews } from "../navigation/foot-slot";
-import { actLine, copiedBannerLine, copyCancelledLine } from "../undo/lines";
+import { actLine, copiedBannerLine, copyCancelledLine, reasonText } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
 import { counted } from "./clipboard";
@@ -86,12 +86,19 @@ function retryAll(again: readonly Again[], to: string) {
 
 /**
  * How a copy ended: the Line with Undo for what came in, and the banner for what stayed out,
- * with Retry while it lists something a second try could bring in.
+ * with Retry while it lists something a second try could bring in. One that stopped on its own
+ * says why at the foot.
  */
 export async function afterCopied(copied: Copied) {
   await libraryChanged();
-  const { batch, refused, whole, to } = copied;
+  const { batch, refused, whole, to, stopped } = copied;
   const came = batch?.files ?? 0;
+  if (stopped) {
+    const why = `${reasonText(stopped)}.`;
+    if (batch) afterAct(batch, 0, `${copyCancelledLine(batch, whole)} ${why}`);
+    else setNews({ kind: "keyRefused", line: `${copiedBannerLine(0, whole, to)}.`, detail: why });
+    return;
+  }
   if (refused.length > 0) {
     const again = refused.map(againOf).filter((one): one is Again => one !== null);
     const [only] = refused;

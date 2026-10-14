@@ -935,10 +935,25 @@ arrive, and the originals stay as Explorer left them.
   foot counts files, and its dismiss is Cancel, which finishes the file in hand and starts nothing
   more; what came in is one batch with its Undo, and what was never started is no failure.
 - **No half file is ever left.** Each file is written under a hidden name beside where it goes,
-  which a walk passes over, and given its own name only once it is whole, in the disk's turn, with
-  its row and its journal row. A copy the app's closing cuts short removes the file in hand and
-  waits; at the next launch it goes on under the same batch, which is how it tells what it already
-  brought in from a name someone else has taken.
+  which a walk passes over, and given its own name only once it is whole, in the disk's turn. Its
+  row and its journal row go in first, so a crash between the two leaves a row the next run knows
+  is its own and takes back, never a file it would refuse as someone else's; a folder is made the
+  same way. A copy the app's closing cuts short removes the file in hand and waits; at the next
+  launch it goes on under the same batch, which is how it tells what it already brought in from a
+  name someone else has taken, and it clears every hidden part left in the folders it went into.
+- **The rename into place refuses a name taken.** `std::fs::rename` replaces a file on Windows, and
+  the turn keeps out only the app's own writers, so the name is given by `MoveFileExW` without
+  `MOVEFILE_REPLACE_EXISTING`, which fails in the same call that would move. Not a hard link and a
+  removal, which FAT32 and exFAT cards cannot do. The rename lives in `fs/noclobber.rs` for the
+  app's other renames to share.
+- **Where the copy goes is read again for each file.** A long copy outlives the folder's name: the
+  app can rename or move it meanwhile, so each file and folder finds its folder's directory from
+  its id in the turn, and its part is opened there in the turn too.
+- **A copy is not an act until it has ended.** Its journal rows go in as it runs, but Ctrl+Z passes
+  over the batch of a copy still waiting or running and takes the act before it, and its Undo is
+  refused until it ends: taking back half a copy while it goes on would leave neither.
+- **Retry carries each file back to the folder it was going into**, so a file left out from deep
+  in a copied tree goes back into that tree, not the folder the copy started at.
 - **Undo sends what came in to the Trash**, never straight off the disk, and takes away the folders
   the copy made once they are empty. Those folders are retired rather than forgotten, since the
   Trash still names them as where their files came from.

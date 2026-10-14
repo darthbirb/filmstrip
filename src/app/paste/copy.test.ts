@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 
 import { recording } from "../../dev/recording";
 import type { Stayed } from "../../ipc/bindings/Stayed";
+import { getNews, setNews } from "../navigation/foot-slot";
 import { getReport, showReport } from "../undo/report-store";
 import { afterCopied } from "./copy";
 
@@ -33,6 +34,7 @@ test("Retry carries each file left out back into the folder it was going into", 
       },
     ],
     cancelled: false,
+    stopped: null,
   });
 
   await recording(
@@ -48,4 +50,30 @@ test("Retry carries each file left out back into the folder it was going into", 
     (cmd) => (cmd === "drop_files" ? { kind: "empty" } : undefined),
   );
   showReport(null);
+});
+
+test("a copy that stopped on its own says why, with what came in and its Undo", async () => {
+  setNews(null);
+  const copy = { jobId: 9, folderId: 4, to: "Trips", whole: 3, refused: [], cancelled: false };
+  const stopped = { kind: "other", message: "that folder is no longer in the index" } as const;
+  await afterCopied({ ...copy, batch: null, stopped });
+  expect(getNews()).toEqual({
+    kind: "keyRefused",
+    line: "The 3 files could not come into Trips.",
+    detail: "That folder is no longer in the index.",
+  });
+
+  const batch = {
+    batchId: "b1",
+    act: { kind: "copy", to: "Trips", one: null, folder: null, folders: 0 },
+    files: 2,
+    folders: 0,
+  } as const;
+  await afterCopied({ ...copy, batch, stopped });
+  expect(getNews()).toEqual({
+    kind: "done",
+    line: "Copied 2 of 3 files to Trips. That folder is no longer in the index.",
+    batchId: "b1",
+  });
+  setNews(null);
 });

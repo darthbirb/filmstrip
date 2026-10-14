@@ -117,6 +117,17 @@ pub fn cancel_pending(conn: &Connection, id: i64) -> Result<bool> {
     )? > 0)
 }
 
+/// Each copy not yet started, oldest first, with what it carries.
+pub fn waiting_copies(conn: &Connection) -> Result<Vec<(i64, String)>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, payload FROM job WHERE kind = ?1 AND status = 'pending' ORDER BY id",
+    )?;
+    let rows = stmt
+        .query_map([COPY_IN], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(rows)
+}
+
 /// The walk's work and what it queues: a copy counts itself.
 pub fn counts(conn: &Connection) -> Result<Counts> {
     let mut counts = Counts::default();

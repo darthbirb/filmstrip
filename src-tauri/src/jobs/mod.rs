@@ -17,7 +17,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::db::{self, jobs as table};
-use crate::error::Result;
+use crate::error::{Reason, Result};
 use crate::fs::acts::Batch;
 use crate::fs::stayed::Stayed;
 use crate::media::ffmpeg::Ffmpeg;
@@ -53,7 +53,7 @@ pub struct Progress {
     pub failed: i64,
     /// Jobs finished since launch.
     pub completed: u64,
-    /// Each copy running, oldest first.
+    /// Each copy running or waiting to, oldest first.
     pub copies: Vec<Copying>,
 }
 
@@ -83,6 +83,8 @@ pub struct Copied {
     pub whole: u32,
     pub refused: Vec<Stayed>,
     pub cancelled: bool,
+    /// Why it stopped before the end, when something other than Cancel stopped it.
+    pub stopped: Option<Reason>,
 }
 
 pub type Report = Box<dyn Fn(&Progress) + Send + Sync>;
@@ -139,9 +141,31 @@ impl QueueInner {
             running: counts.running,
             failed: counts.failed,
             completed: self.completed.load(Ordering::Relaxed),
-            copies: lock(&self.copies).values().cloned().collect(),
+            copies: copies(conn, &lock(&self.copies))?,
         })
     }
+}
+
+/// The copies running, and after them each one waiting its turn, at none of its files settled.
+fn copies(conn: &Connection, running: &BTreeMap<i64, Copying>) -> Result<Vec<Copying>> {
+    let mut copies: Vec<Copying> = running.values().cloned().collect();
+    for (job_id, payload) in table::waiting_copies(conn)? {
+        if running.contains_key(&job_id) {
+            continue;
+        }
+        let Ok(payload) = serde_json::from_str::<kinds::CopyPayload>(&payload) else {
+            continue;
+        };
+        copies.push(Copying {
+            job_id,
+            folder_id: payload.folder_id,
+            to: crate::fs::acts::name(conn, payload.folder_id).unwrap_or_default(),
+            done: 0,
+            whole: payload.whole,
+        });
+    }
+    copies.sort_by_key(|copy| copy.job_id);
+    Ok(copies)
 }
 
 /// A poisoned lock still holds what it held: one panicking copy must not stop the others' lines.
@@ -312,6 +336,7 @@ pub fn enqueue_copy(conn: &Connection, folder_id: i64, paths: &[PathBuf]) -> Res
             .iter()
             .map(|path| path.to_string_lossy().into_owned())
             .collect(),
+        whole: crate::fs::paste::whole(paths),
     };
     table::enqueue(
         conn,
@@ -401,6 +426,78 @@ mod tests {
         assert!(
             !queue.cancel_copy(&conn, job).unwrap(),
             "nothing is left to stop"
+        );
+    }
+
+    fn library_with_downloads(name: &str) -> (Connection, PathBuf, i64, [PathBuf; 2]) {
+        let dir = scratch(name);
+        std::fs::create_dir_all(dir.join("Downloads")).unwrap();
+        let entries = [
+            dir.join("Downloads/IMG_5001.jpg"),
+            dir.join("Downloads/IMG_5002.jpg"),
+        ];
+        for entry in &entries {
+            std::fs::write(entry, "bytes").unwrap();
+        }
+        let mut conn = db::open(&dir.join("library.db")).unwrap();
+        db::migrate(&mut conn).unwrap();
+        sources::add(&conn, &dir.join("library"), "Library", SourceKind::Library).unwrap();
+        crate::fs::walk::reconcile(&conn).unwrap();
+        let root = crate::db::folders::source_root_folder(&conn, 1).unwrap();
+        let trips = crate::db::folders::child_id(&conn, root, "Trips")
+            .unwrap()
+            .unwrap();
+        (conn, dir, trips, entries)
+    }
+
+    #[test]
+    fn a_copy_waiting_its_turn_has_its_line_at_none_settled() {
+        let (conn, dir, trips, entries) = library_with_downloads("copy-waiting");
+        let job = enqueue_copy(&conn, trips, &entries).unwrap();
+        let inner = QueueInner::new(
+            dir.join("library.db"),
+            dir.join("thumbs"),
+            None,
+            Box::new(|_| {}),
+            Box::new(|_| {}),
+        );
+        assert_eq!(
+            inner.progress(&conn).unwrap().copies,
+            [Copying {
+                job_id: job,
+                folder_id: trips,
+                to: "Trips".into(),
+                done: 0,
+                whole: 2,
+            }]
+        );
+        assert_eq!(table::counts(&conn).unwrap().pending, 0);
+    }
+
+    #[test]
+    fn a_copy_whose_folder_went_before_it_ran_says_why_it_stopped() {
+        let (conn, dir, trips, entries) = library_with_downloads("copy-stopped");
+        let job = enqueue_copy(&conn, trips, &entries).unwrap();
+        crate::db::folders::retire_subtree_at(&conn, trips, crate::db::now()).unwrap();
+
+        let (said, heard) = mpsc::channel();
+        let queue = JobQueue::start(
+            dir.join("library.db"),
+            dir.join("thumbs"),
+            None,
+            Box::new(|_| {}),
+            Box::new(move |copied| {
+                let _ = said.send(copied.clone());
+            }),
+        );
+        let copied = heard.recv_timeout(Duration::from_secs(60)).unwrap();
+        queue.stop();
+
+        assert_eq!((copied.job_id, copied.whole, copied.batch), (job, 2, None));
+        assert!(
+            matches!(&copied.stopped, Some(Reason::Other { message }) if message.contains("no longer")),
+            "{:?}",
+            copied.stopped
         );
     }
 

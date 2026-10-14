@@ -1232,6 +1232,7 @@ function copyIn(folderId: number, paths: readonly string[]): CopyStart {
     whole: carried.files,
     refused,
     cancelled: false,
+    stopped: null,
   };
   setTimeout(() => void emit("copy-done", copied));
   return { kind: "started", jobId, to, carried };

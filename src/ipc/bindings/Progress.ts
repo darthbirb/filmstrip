@@ -12,6 +12,6 @@ pending: number, running: number, failed: number,
  */
 completed: number, 
 /**
- * Each copy running, oldest first.
+ * Each copy running or waiting to, oldest first.
  */
 copies: Array<Copying>, };

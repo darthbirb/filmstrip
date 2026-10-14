@@ -139,7 +139,7 @@ pub fn run(
         source_id: folders::location(conn, folder_id)?.source_id,
         ours: Ours::read(conn, batch_id)?,
         control,
-        whole: entries.iter().map(|path| files_in(path)).sum(),
+        whole: whole(entries),
         done: 0,
         refused: Vec::new(),
         halted: None,
@@ -502,6 +502,11 @@ fn listing(dir: &Path) -> Result<Vec<PathBuf>> {
     }
     inside.sort_by_key(|path| file_name(path).to_lowercase());
     Ok(inside)
+}
+
+/// How many files a copy of `entries` carries, every file in each tree counted.
+pub fn whole(entries: &[PathBuf]) -> u32 {
+    entries.iter().map(|path| files_in(path)).sum()
 }
 
 /// How many files a copy of `path` carries: itself, or every file in its tree.
@@ -940,6 +945,7 @@ mod tests {
                 .iter()
                 .map(|path| path.to_string_lossy().into_owned())
                 .collect(),
+            whole: 4,
         };
         let job = crate::db::jobs::enqueue(
             &conn,

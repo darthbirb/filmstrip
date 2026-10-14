@@ -951,7 +951,9 @@ toward the rest surface.
 - **Copy line.** A copy in progress has the walk's line of its own at the foot, above the walk:
   "Copying to Lisbon…" in `small` `fg-mid`, its figure in `fg`, a dismiss whose tooltip is Cancel
   Copy, and the `progress` bar in `plate` under them. Its tooltip counts what is left. Each copy
-  has one, the newest highest; folded, the rail keeps the bar alone.
+  has one, the newest highest, a copy waiting its turn included at none settled; folded, the rail
+  keeps the bar alone. One that stops on its own says why: in the Line after what came in, or in
+  the Band when nothing did.
 - **Segmented.** A value with few enough answers to show them all at once, the one it is on filled
   on `raised-hi` inside an `inset` trough. Real radios, so the arrow keys move between them. Its
   segments sit flush in the trough, so the keyboard's ring is drawn inside the segment. In a
