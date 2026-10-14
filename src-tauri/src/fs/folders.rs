@@ -376,6 +376,26 @@ pub(super) fn unmake(conn: &Connection, folder_id: i64) -> Result<()> {
     folders::forget(conn, folder_id)
 }
 
+/// Takes back a folder a copy made, once what came into it has gone: its directory while still
+/// empty, then its row, which is retired rather than forgotten since the trash still names it as
+/// where its files came from.
+pub(super) fn unmake_copy(conn: &Connection, folder_id: i64) -> Result<()> {
+    if !folders::is_live(conn, folder_id)? {
+        return Ok(());
+    }
+    let title = folders::title(conn, folder_id)?.unwrap_or_default();
+    let holds = || AppError::invalid(format!("{title} holds something now, so it stays"));
+    if folders::holds_anything(conn, folder_id)? {
+        return Err(holds());
+    }
+    match std::fs::remove_dir(paths::folder_dir(conn, folder_id)?) {
+        Ok(()) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(_) => return Err(holds()),
+    }
+    folders::retire_subtree_at(conn, folder_id, now()).map(|_| ())
+}
+
 fn refuse_clash(conn: &Connection, parent_id: i64, title: &str, own: Option<i64>) -> Result<()> {
     match folders::child_id(conn, parent_id, title)? {
         Some(id) if Some(id) != own => Err(taken(conn, parent_id, title)),

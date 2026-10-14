@@ -4,4 +4,4 @@
  * Why one file or folder stayed where it was. The interface writes each in its own words; the
  * sentence here is for logs.
  */
-export type Reason = { "kind": "nameTaken", place: string, name: string, folder: boolean, } | { "kind": "folderGone", name: string, } | { "kind": "inUse" } | { "kind": "permissionDenied" } | { "kind": "notOnDisk", name: string, } | { "kind": "holds", name: string, more: number, } | { "kind": "other", message: string, };
+export type Reason = { "kind": "nameTaken", place: string, name: string, folder: boolean, } | { "kind": "folderGone", name: string, } | { "kind": "inUse" } | { "kind": "permissionDenied" } | { "kind": "notOnDisk", name: string, } | { "kind": "holds", name: string, more: number, } | { "kind": "alreadyIn", place: string, } | { "kind": "other", message: string, };

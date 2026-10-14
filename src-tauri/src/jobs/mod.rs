@@ -4,10 +4,11 @@
 pub mod kinds;
 pub mod worker;
 
+use std::collections::{BTreeMap, HashSet};
 use std::panic::AssertUnwindSafe;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -17,9 +18,12 @@ use ts_rs::TS;
 
 use crate::db::{self, jobs as table};
 use crate::error::Result;
+use crate::fs::acts::Batch;
+use crate::fs::stayed::Stayed;
 use crate::media::ffmpeg::Ffmpeg;
 
 pub const PROGRESS_EVENT: &str = "job-progress";
+pub const COPIED_EVENT: &str = "copy-done";
 
 const TICK: Duration = Duration::from_millis(500);
 const IDLE: Duration = Duration::from_millis(150);
@@ -43,14 +47,46 @@ pub enum Phase {
 #[ts(export)]
 pub struct Progress {
     pub phase: Phase,
+    /// The walk's work and what it queued; a copy is not counted here.
     pub pending: i64,
     pub running: i64,
     pub failed: i64,
     /// Jobs finished since launch.
     pub completed: u64,
+    /// Each copy running, oldest first.
+    pub copies: Vec<Copying>,
+}
+
+/// A copy in progress: where it is going, and how many of the files it carries are settled.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Copying {
+    pub job_id: i64,
+    pub folder_id: i64,
+    pub to: String,
+    pub done: u32,
+    pub whole: u32,
+}
+
+/// How a copy ended, as the line at the foot and the banner say it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Copied {
+    pub job_id: i64,
+    pub folder_id: i64,
+    pub to: String,
+    /// What came in, as one batch; nothing when nothing did.
+    pub batch: Option<Batch>,
+    /// Every file the copy carried, those that stayed out included.
+    pub whole: u32,
+    pub refused: Vec<Stayed>,
+    pub cancelled: bool,
 }
 
 pub type Report = Box<dyn Fn(&Progress) + Send + Sync>;
+pub type Announce = Box<dyn Fn(&Copied) + Send + Sync>;
 
 pub struct QueueInner {
     db_path: PathBuf,
@@ -61,9 +97,33 @@ pub struct QueueInner {
     walking: AtomicBool,
     completed: AtomicU64,
     report: Report,
+    announce: Announce,
+    copies: Mutex<BTreeMap<i64, Copying>>,
+    cancelled: Mutex<HashSet<i64>>,
 }
 
 impl QueueInner {
+    fn new(
+        db_path: PathBuf,
+        thumbs: PathBuf,
+        ffmpeg: Option<Ffmpeg>,
+        report: Report,
+        announce: Announce,
+    ) -> QueueInner {
+        QueueInner {
+            db_path,
+            thumbs,
+            ffmpeg,
+            stop: AtomicBool::new(false),
+            walking: AtomicBool::new(false),
+            completed: AtomicU64::new(0),
+            report,
+            announce,
+            copies: Mutex::new(BTreeMap::new()),
+            cancelled: Mutex::new(HashSet::new()),
+        }
+    }
+
     pub fn progress(&self, conn: &Connection) -> Result<Progress> {
         let counts = table::counts(conn)?;
         let phase = if self.walking.load(Ordering::Relaxed) {
@@ -79,8 +139,14 @@ impl QueueInner {
             running: counts.running,
             failed: counts.failed,
             completed: self.completed.load(Ordering::Relaxed),
+            copies: lock(&self.copies).values().cloned().collect(),
         })
     }
+}
+
+/// A poisoned lock still holds what it held: one panicking copy must not stop the others' lines.
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 pub struct JobQueue {
@@ -95,16 +161,9 @@ impl JobQueue {
         thumbs: PathBuf,
         ffmpeg: Option<Ffmpeg>,
         report: Report,
+        announce: Announce,
     ) -> JobQueue {
-        let inner = Arc::new(QueueInner {
-            db_path,
-            thumbs,
-            ffmpeg,
-            stop: AtomicBool::new(false),
-            walking: AtomicBool::new(false),
-            completed: AtomicU64::new(0),
-            report,
-        });
+        let inner = Arc::new(QueueInner::new(db_path, thumbs, ffmpeg, report, announce));
         let workers = std::thread::available_parallelism()
             .map_or(MIN_WORKERS, |cores| cores.get().saturating_sub(1))
             .clamp(MIN_WORKERS, MAX_WORKERS);
@@ -123,6 +182,19 @@ impl JobQueue {
 
     pub fn progress(&self) -> Result<Progress> {
         self.inner.progress(&db::open(&self.inner.db_path)?)
+    }
+
+    /// Stops a copy: one still waiting is taken off the queue, one running stops after the file
+    /// in hand. `false` when there was nothing to stop.
+    pub fn cancel_copy(&self, conn: &Connection, job_id: i64) -> Result<bool> {
+        if table::cancel_pending(conn, job_id)? {
+            return Ok(true);
+        }
+        if !lock(&self.inner.copies).contains_key(&job_id) {
+            return Ok(false);
+        }
+        lock(&self.inner.cancelled).insert(job_id);
+        Ok(true)
     }
 
     /// Asks every thread to finish, and waits for them no longer than the grace period.
@@ -165,10 +237,11 @@ fn work(inner: &QueueInner) {
         let outcome =
             std::panic::catch_unwind(AssertUnwindSafe(|| worker::execute(inner, &mut conn, &job)));
         let _ = match outcome {
-            Ok(Ok(())) => {
+            Ok(Ok(worker::Done::Finished)) => {
                 inner.completed.fetch_add(1, Ordering::Relaxed);
                 table::complete(&conn, job.id)
             }
+            Ok(Ok(worker::Done::Paused)) => table::release(&conn, job.id),
             Ok(Err(err)) => {
                 let retry = job.attempt < kinds::MAX_ATTEMPTS && worker::is_transient(&err);
                 table::fail(&conn, job.id, &err.to_string(), retry)
@@ -230,6 +303,24 @@ pub fn enqueue_thumb(conn: &Connection, item_id: i64) -> Result<()> {
     Ok(())
 }
 
+/// Queues a copy into a folder under a batch of its own, and returns the job that runs it.
+pub fn enqueue_copy(conn: &Connection, folder_id: i64, paths: &[PathBuf]) -> Result<i64> {
+    let payload = kinds::CopyPayload {
+        batch_id: crate::db::journal::new_batch(),
+        folder_id,
+        paths: paths
+            .iter()
+            .map(|path| path.to_string_lossy().into_owned())
+            .collect(),
+    };
+    table::enqueue(
+        conn,
+        kinds::COPY_IN,
+        &serde_json::to_string(&payload)?,
+        kinds::PRIORITY_COPY,
+    )
+}
+
 /// Queues a video's scrub frames, unless they are already waiting.
 pub fn enqueue_scrub(conn: &Connection, item_id: i64) -> Result<()> {
     let payload = serde_json::to_string(&kinds::ItemPayload { item_id })?;
@@ -255,6 +346,59 @@ mod tests {
         dir
     }
 
+    #[test]
+    fn a_copy_runs_off_this_thread_and_ends_by_saying_what_came_in_as_one_batch() {
+        let dir = scratch("copy");
+        std::fs::create_dir_all(dir.join("Downloads")).unwrap();
+        image::DynamicImage::new_rgb8(32, 24)
+            .save(dir.join("Downloads/IMG_5001.png"))
+            .unwrap();
+        std::fs::write(dir.join("Downloads/IMG_5002.jpg"), "b").unwrap();
+        let db_path = dir.join("library.db");
+        let mut conn = db::open(&db_path).unwrap();
+        db::migrate(&mut conn).unwrap();
+        sources::add(&conn, &dir.join("library"), "Library", SourceKind::Library).unwrap();
+        crate::fs::walk::reconcile(&conn).unwrap();
+        let root = crate::db::folders::source_root_folder(&conn, 1).unwrap();
+        let trips = crate::db::folders::child_id(&conn, root, "Trips")
+            .unwrap()
+            .unwrap();
+        let entries = [
+            dir.join("Downloads/IMG_5001.png"),
+            dir.join("Downloads/IMG_5002.jpg"),
+        ];
+        let job = enqueue_copy(&conn, trips, &entries).unwrap();
+        assert_eq!(
+            table::counts(&conn).unwrap().pending,
+            0,
+            "the walk's line counts no copy"
+        );
+
+        let (said, heard) = mpsc::channel();
+        let queue = JobQueue::start(
+            db_path,
+            dir.join("thumbs"),
+            None,
+            Box::new(|_| {}),
+            Box::new(move |copied| {
+                let _ = said.send(copied.clone());
+            }),
+        );
+        let copied = heard.recv_timeout(Duration::from_secs(60)).unwrap();
+        queue.stop();
+
+        assert_eq!((copied.job_id, copied.to.as_str()), (job, "Trips"));
+        assert_eq!((copied.whole, copied.cancelled), (2, false));
+        assert!(copied.refused.is_empty(), "{:?}", copied.refused);
+        let batch = copied.batch.unwrap();
+        assert_eq!(batch.files, 2);
+        assert!(dir.join("library/Trips/IMG_5001.png").is_file());
+        assert!(
+            !queue.cancel_copy(&conn, job).unwrap(),
+            "nothing is left to stop"
+        );
+    }
+
     /// Starting the queue on a fresh library walks it and thumbnails its pictures, off this thread.
     #[test]
     fn a_walk_indexes_a_library_and_its_pictures_get_thumbnails() {
@@ -277,6 +421,7 @@ mod tests {
             Box::new(move |progress| {
                 let _ = sent.send(progress.clone());
             }),
+            Box::new(|_| {}),
         );
         let deadline = Instant::now() + Duration::from_secs(60);
         let mut settled = false;
@@ -343,6 +488,7 @@ mod tests {
             Box::new(move |progress| {
                 let _ = sent.send(progress.clone());
             }),
+            Box::new(|_| {}),
         );
         let deadline = Instant::now() + Duration::from_secs(60);
         let mut settled = false;

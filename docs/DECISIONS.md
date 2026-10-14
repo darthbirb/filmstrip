@@ -915,6 +915,40 @@ it.
 - **The journal keeps everything for now.** Its rows are small, and what to prune is settled with
   the trash's limits.
 
+## Bringing files in
+
+**Files from Explorer come in by a copy, never a move**, built on 14 October 2026 from Artboards ›
+Bringing files in, and ported from ggallery's `fs/paste.rs` with most of it changed on the way.
+A paste or a drop takes nothing from where it was: the files are not the library's until they
+arrive, and the originals stay as Explorer left them.
+
+- **Under their own names, as a move is.** ggallery copied each file in under a fresh name of its
+  own; here a file keeps its name and a name already taken is refused and reported in the banner,
+  never suffixed and never overwritten (DECISIONS.md "Undo").
+- **A folder comes in whole, its tree kept.** ggallery flattened a pasted folder into the one it
+  landed in, because it had nowhere to put the shape; here every folder becomes a folder, at any
+  depth. One whose name is taken stays out whole: merging it into the folder already there would
+  scatter its files among another's.
+- **What a walk never reads is never copied**: Windows' own litter and hidden entries. They would
+  otherwise sit in the copied folders unseen, and keep an undo from taking those folders away.
+- **The copy is a job**, so a camera card's thousand files never hold the window. Its line at the
+  foot counts files, and its dismiss is Cancel, which finishes the file in hand and starts nothing
+  more; what came in is one batch with its Undo, and what was never started is no failure.
+- **No half file is ever left.** Each file is written under a hidden name beside where it goes,
+  which a walk passes over, and given its own name only once it is whole, in the disk's turn, with
+  its row and its journal row. A copy the app's closing cuts short removes the file in hand and
+  waits; at the next launch it goes on under the same batch, which is how it tells what it already
+  brought in from a name someone else has taken.
+- **Undo sends what came in to the Trash**, never straight off the disk, and takes away the folders
+  the copy made once they are empty. Those folders are retired rather than forgotten, since the
+  Trash still names them as where their files came from.
+- **Refused whole, before anything is queued**: a folder carried into itself or below itself, a
+  drive that is away, and files that are all already where they would go. A mix copies the rest,
+  and the banner names the ones already there.
+- **The clipboard is read when it may have changed**: as the window takes the focus, as a right
+  button goes down, and after the app's own Copy. A menu reads that reading, since a menu opens
+  at once and cannot wait on the clipboard.
+
 ## Expiry goes to the Recycle Bin
 
 **An item that expires from the trash goes to the Windows Recycle Bin**, as the owner decided on

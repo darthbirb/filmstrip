@@ -69,7 +69,14 @@ const NOTHING: LibraryTotals = {
   trash: { count: 0, bytes: 0 },
 };
 
-const IDLE: Progress = { phase: "idle", pending: 0, running: 0, failed: 0, completed: 0 };
+const IDLE: Progress = {
+  phase: "idle",
+  pending: 0,
+  running: 0,
+  failed: 0,
+  completed: 0,
+  copies: [],
+};
 
 /** Answers as the app would, over these sources and totals. */
 async function holding(sources: SourceSummary[], totals: LibraryTotals) {

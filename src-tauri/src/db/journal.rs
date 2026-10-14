@@ -20,6 +20,28 @@ pub const ITEM_RESTORE: &str = "item_restore";
 pub const ITEMS_TAG: &str = "items_tag";
 pub const ITEMS_UNTAG: &str = "items_untag";
 pub const RETAG: &str = "retag";
+pub const ITEM_COPY: &str = "item_copy";
+pub const FOLDER_COPY: &str = "folder_copy";
+
+/// A file copied in from outside the library, and the folder the copy was made into, which is
+/// its own folder or one above it. Its inverse is itself: undoing it sends the file to the trash.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ItemCopied {
+    pub item_id: i64,
+    pub folder_id: i64,
+    pub into: i64,
+}
+
+/// A folder made by a copy, to hold what came in under it. Its inverse is itself: undoing it
+/// takes the folder away again once what came into it has gone.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderCopied {
+    pub folder_id: i64,
+    pub parent_id: i64,
+    pub into: i64,
+}
 
 /// A folder the app made. Its inverse is itself: undoing it removes that folder again.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -389,6 +411,14 @@ pub fn record_items_untag(
 
 pub fn record_retag(conn: &Connection, batch_id: &str, retagged: &Retagged) -> Result<()> {
     record(conn, batch_id, RETAG, retagged, retagged)
+}
+
+pub fn record_item_copy(conn: &Connection, batch_id: &str, copied: &ItemCopied) -> Result<()> {
+    record(conn, batch_id, ITEM_COPY, copied, copied)
+}
+
+pub fn record_folder_copy(conn: &Connection, batch_id: &str, made: &FolderCopied) -> Result<()> {
+    record(conn, batch_id, FOLDER_COPY, made, made)
 }
 
 /// Every row in a batch, newest first: the order an undo applies them in, since a later row can

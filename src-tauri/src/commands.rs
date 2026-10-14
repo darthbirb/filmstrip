@@ -24,8 +24,10 @@ use crate::db::tags::{self, EffectiveTag};
 use crate::db::vocabulary::{self, KeyClashFor, Vocabulary};
 use crate::error::{AppError, Result};
 use crate::fs::acts::{self, Batch};
+use crate::fs::clipboard;
 use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
 use crate::fs::items::{self as fs_items, MoveReport};
+use crate::fs::paste::{self, Carried, CopyRefusal};
 use crate::fs::paths;
 use crate::fs::trash::{self, Origin, RestoreReport, TrashReport, Trashed};
 use crate::fs::undo::{self, UndoReport};
@@ -376,6 +378,102 @@ pub async fn undo_last(state: State<'_, AppState>) -> Result<Option<UndoReport>>
 #[tauri::command]
 pub async fn undo_batch(state: State<'_, AppState>, batch_id: String) -> Result<UndoReport> {
     run(&state, move |conn| undo::undo_batch(conn, &batch_id)).await
+}
+
+/// What came of asking for a copy: a job started, a refusal of the whole, or nothing to bring.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(export)]
+pub enum CopyStart {
+    Started {
+        #[serde(rename = "jobId")]
+        job_id: i64,
+        to: String,
+        carried: Carried,
+    },
+    Refused {
+        why: CopyRefusal,
+    },
+    Empty,
+}
+
+/// What the clipboard holds that Paste would bring in, read each time a menu opens; nothing when
+/// it holds no files. DECISIONS.md "Bringing files in".
+#[tauri::command]
+pub async fn clipboard_files() -> Result<Option<Carried>> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let Some(list) = clipboard::file_list()? else {
+            return Ok(None);
+        };
+        let carried = paste::carried(&list);
+        Ok((carried.files + carried.folders > 0).then_some(carried))
+    })
+    .await?
+}
+
+/// What a drag from Explorer carries, counted as the ghost says it.
+#[tauri::command]
+pub async fn count_carried(paths: Vec<String>) -> Result<Carried> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let entries: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+        Ok(paste::carried(&entries))
+    })
+    .await?
+}
+
+/// The clipboard's files copied into a folder, as a job.
+#[tauri::command]
+pub async fn paste_files(state: State<'_, AppState>, folder_id: i64) -> Result<CopyStart> {
+    run(&state, move |conn| {
+        let entries = clipboard::file_list()?.unwrap_or_default();
+        start_copy(conn, folder_id, &entries)
+    })
+    .await
+}
+
+/// Files dropped from Explorer copied into a folder, as a job. A drop is always a copy.
+#[tauri::command]
+pub async fn drop_files(
+    state: State<'_, AppState>,
+    folder_id: i64,
+    paths: Vec<String>,
+) -> Result<CopyStart> {
+    run(&state, move |conn| {
+        let entries: Vec<PathBuf> = paths.into_iter().map(PathBuf::from).collect();
+        start_copy(conn, folder_id, &entries)
+    })
+    .await
+}
+
+/// A copy refused whole is refused before anything is queued; anything else is queued.
+pub fn start_copy(conn: &Connection, folder_id: i64, entries: &[PathBuf]) -> Result<CopyStart> {
+    let carried = paste::carried(entries);
+    if carried.files + carried.folders == 0 {
+        return Ok(CopyStart::Empty);
+    }
+    Ok(match paste::check(conn, folder_id, entries)? {
+        Err(why) => CopyStart::Refused { why },
+        Ok(to) => CopyStart::Started {
+            job_id: jobs::enqueue_copy(conn, folder_id, entries)?,
+            to,
+            carried,
+        },
+    })
+}
+
+/// Stops a copy after the file in hand; what came in stays, as one batch with its Undo.
+#[tauri::command]
+pub async fn cancel_copy(state: State<'_, AppState>, job_id: i64) -> Result<bool> {
+    let conn = crate::db::open(&state.db)?;
+    state.queue.cancel_copy(&conn, job_id)
+}
+
+/// A file outside the library selected in Explorer, as a copy that left it there reports it.
+#[tauri::command]
+pub async fn reveal_path(app: AppHandle, path: String) -> Result<()> {
+    app.opener()
+        .reveal_item_in_dir(path)
+        .map_err(AppError::invalid)
 }
 
 /// The walk the app runs at launch, aimed at one folder and everything under it.

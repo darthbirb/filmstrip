@@ -1660,6 +1660,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     running: 0,
     failed: 0,
     completed: 0,
+    copies: [],
   }),
   index_failures: () => [],
   retry_failed_jobs: () => 0,

@@ -2,7 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 import type { AddOutcome } from "./bindings/AddOutcome";
 import type { Batch } from "./bindings/Batch";
 import type { BranchFile } from "./bindings/BranchFile";
+import type { Carried } from "./bindings/Carried";
 import type { Contents } from "./bindings/Contents";
+import type { CopyStart } from "./bindings/CopyStart";
 import type { Coverage } from "./bindings/Coverage";
 import type { CoverChoice } from "./bindings/CoverChoice";
 import type { DestinationKey } from "./bindings/DestinationKey";
@@ -101,6 +103,19 @@ export const deleteFolder = (folderId: number, contents: Contents | null) =>
 export const undoLast = () => invoke<UndoReport | null>("undo_last");
 
 export const undoBatch = (batchId: string) => invoke<UndoReport>("undo_batch", { batchId });
+
+export const clipboardFiles = () => invoke<Carried | null>("clipboard_files");
+
+export const countCarried = (paths: string[]) => invoke<Carried>("count_carried", { paths });
+
+export const pasteFiles = (folderId: number) => invoke<CopyStart>("paste_files", { folderId });
+
+export const dropFiles = (folderId: number, paths: string[]) =>
+  invoke<CopyStart>("drop_files", { folderId, paths });
+
+export const cancelCopy = (jobId: number) => invoke<boolean>("cancel_copy", { jobId });
+
+export const revealPath = (path: string) => invoke<void>("reveal_path", { path });
 
 export const folderChildren = (folderId: number) =>
   invoke<FolderNode[]>("folder_children", { folderId });

@@ -57,6 +57,10 @@ pub enum Reason {
         name: String,
         more: u32,
     },
+    /// A file brought in where it already is: a copy could only clash with itself.
+    AlreadyIn {
+        place: String,
+    },
     /// Anything else, in the words it came with.
     Other {
         message: String,
@@ -80,6 +84,7 @@ impl fmt::Display for Reason {
             Reason::NotOnDisk { name } => write!(f, "{name} is no longer on disk"),
             Reason::Holds { name, more: 0 } => write!(f, "it holds {name}"),
             Reason::Holds { name, more } => write!(f, "it holds {name} and {more} more"),
+            Reason::AlreadyIn { place } => write!(f, "it is already in {place}"),
             Reason::Other { message } => f.write_str(message),
         }
     }

@@ -131,6 +131,48 @@ fn record_file(conn: &Connection, file: &Path, folder_id: i64, source_id: i64) -
         return Ok(Outcome::Unchanged);
     }
 
+    let id = record_new(conn, name, size, mtime, folder_id, source_id)?;
+    let uuid: String = conn.query_row(
+        "SELECT uuid FROM item WHERE id = ?1",
+        rusqlite::params![id],
+        |r| r.get(0),
+    )?;
+    items::mark_seen(conn, &uuid)?;
+    Ok(Outcome::Indexed)
+}
+
+/// A file the app has just put in a folder itself, recorded as a walk would record it. No walk is
+/// sweeping meanwhile: both hold the turn.
+pub(crate) fn index_arrival(
+    conn: &Connection,
+    file: &Path,
+    folder_id: i64,
+    source_id: i64,
+) -> Result<i64> {
+    let name = file
+        .file_name()
+        .ok_or_else(|| crate::error::AppError::invalid("a file with no name"))?
+        .to_string_lossy()
+        .to_string();
+    let meta = std::fs::metadata(file)?;
+    record_new(
+        conn,
+        name,
+        meta.len() as i64,
+        mtime_secs(&meta),
+        folder_id,
+        source_id,
+    )
+}
+
+fn record_new(
+    conn: &Connection,
+    name: String,
+    size: i64,
+    mtime: i64,
+    folder_id: i64,
+    source_id: i64,
+) -> Result<i64> {
     let ext = paths::extension_of(&name);
     let id = items::upsert(
         conn,
@@ -155,14 +197,7 @@ fn record_file(conn: &Connection, file: &Path, folder_id: i64, source_id: i64) -
         },
     )?;
     crate::db::tags::rebuild_item(conn, id)?;
-
-    let uuid: String = conn.query_row(
-        "SELECT uuid FROM item WHERE id = ?1",
-        rusqlite::params![id],
-        |r| r.get(0),
-    )?;
-    items::mark_seen(conn, &uuid)?;
-    Ok(Outcome::Indexed)
+    Ok(id)
 }
 
 /// Brings the index back in line with what is on disk.

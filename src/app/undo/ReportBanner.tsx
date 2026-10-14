@@ -1,7 +1,7 @@
 import { Fragment, useState } from "react";
 
 import type { Stayed } from "../../ipc/bindings/Stayed";
-import { revealFolder, revealHeld, revealItem } from "../../ipc/commands";
+import { revealFolder, revealHeld, revealItem, revealPath } from "../../ipc/commands";
 import { Banner, LIST_HEADING, LIST_ROW, listRow } from "../../ui/Banner";
 import { Glyph } from "../../ui/Glyph";
 import { openMovePicker } from "../pane/move-picker";
@@ -49,8 +49,13 @@ function Shown({ report }: { report: Report }) {
   );
 }
 
-/** A file, or a folder in its parent; a folder a file kept, open, with that file selected. */
+/**
+ * A file, or a folder in its parent; a folder a file kept, open, with that file selected; and one
+ * a copy left outside the library, where it still is.
+ */
 function reveal(row: Stayed) {
+  if (row.at.kind === "outside")
+    return revealPath(`${row.at.dir.replace(/[\\/]+$/, "")}\\${row.name}`);
   if (row.kind === "file") return revealItem(row.id);
   return row.reason.kind === "holds" ? revealHeld(row.id) : revealFolder(row.id);
 }
@@ -60,7 +65,7 @@ const GO =
 
 function Row({ row, inTrash }: { row: Stayed; inTrash: "show" | "restoreTo" }) {
   // Explorer has nothing to show for a file gone from disk, or one under the trash's own name.
-  const showable = row.at.kind === "folder" && row.reason.kind !== "notOnDisk";
+  const showable = row.at.kind !== "trash" && row.reason.kind !== "notOnDisk";
   return (
     <div className={`${COLUMNS} ${LIST_ROW}`}>
       <span className="flex min-w-0 items-center gap-2 text-fg">

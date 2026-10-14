@@ -6,7 +6,7 @@ use ts_rs::TS;
 
 use crate::db::now;
 use crate::error::Result;
-use crate::jobs::kinds::WALKS;
+use crate::jobs::kinds::{COPY_IN, WALKS};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QueuedJob {
@@ -100,10 +100,31 @@ pub fn fail(conn: &Connection, id: i64, error: &str, retry: bool) -> Result<()> 
     Ok(())
 }
 
+/// Back to waiting without counting as an attempt, for a job the app stopped partway as it closed.
+pub fn release(conn: &Connection, id: i64) -> Result<()> {
+    conn.execute(
+        "UPDATE job SET status = 'pending', attempts = MAX(attempts - 1, 0) WHERE id = ?1",
+        params![id],
+    )?;
+    Ok(())
+}
+
+/// Takes a copy off the queue before it has started; `false` when it is already running.
+pub fn cancel_pending(conn: &Connection, id: i64) -> Result<bool> {
+    Ok(conn.execute(
+        "DELETE FROM job WHERE id = ?1 AND kind = ?2 AND status = 'pending'",
+        params![id, COPY_IN],
+    )? > 0)
+}
+
+/// The walk's work and what it queues: a copy counts itself.
 pub fn counts(conn: &Connection) -> Result<Counts> {
     let mut counts = Counts::default();
-    let mut stmt = conn.prepare("SELECT status, COUNT(*) FROM job GROUP BY status")?;
-    let rows = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?)))?;
+    let mut stmt =
+        conn.prepare("SELECT status, COUNT(*) FROM job WHERE kind <> ?1 GROUP BY status")?;
+    let rows = stmt.query_map([COPY_IN], |r| {
+        Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
+    })?;
     for row in rows {
         match row? {
             (status, n) if status == "pending" => counts.pending = n,

@@ -49,7 +49,36 @@ export function actLine(batch: Batch, stayed = 0): string {
       return `Took ${act.tag} off ${files(carried)}.`;
     case "retag":
       return retagLine(act.change, carried, batch.folders);
+    case "copy":
+      if (stayed > 0)
+        return `Copied ${formatCount(carried)} of ${files(whole)} to ${act.to}. ${rest}`;
+      return `Copied ${copiedWhat(act, carried)} to ${act.to}.`;
   }
+}
+
+type CopyAct = Extract<Batch["act"], { kind: "copy" }>;
+
+/** What came in at a copy's top: one file, one folder with its files, or folders and files counted. */
+function copiedWhat(act: CopyAct, carried: number) {
+  if (act.one) return act.one;
+  if (act.folder) return carried > 0 ? `${act.folder} and its ${files(carried)}` : act.folder;
+  if (act.folders > 0) return filesAndFolders(carried, act.folders) ?? folders(act.folders);
+  return files(carried);
+}
+
+/**
+ * The line at the foot after a copy that was stopped: what came in, counted against what it
+ * carried. Artboards › Bringing files in.
+ */
+export function copyCancelledLine(batch: Batch, whole: number): string {
+  const to = batch.act.kind === "copy" ? batch.act.to : "";
+  return `Copied ${formatCount(batch.files)} of ${files(whole)} to ${to}.`;
+}
+
+/** The banner's sentence for a copy that left something out: counted, or turned round when none came. */
+export function copiedBannerLine(came: number, whole: number, to: string, one?: string) {
+  if (came > 0) return `${formatCount(came)} of ${files(whole)} came into ${to}`;
+  return `${one ?? `The ${files(whole)}`} could not come into ${to}`;
 }
 
 /** The line after an undo that brought all of its act back. */
@@ -82,6 +111,10 @@ export function undoneLine({ batch }: UndoReport): string {
       return `${act.tag} is back on ${files(carried)}.`;
     case "retag":
       return retagUndone(act.change, carried, batch.folders);
+    case "copy": {
+      const what = copiedWhat(act, carried);
+      return `${what} left ${act.to} for the Trash.`;
+    }
   }
 }
 
@@ -121,6 +154,11 @@ export function undoBannerLine({ batch, filesBack, stayed }: UndoReport): string
       return `${act.tag} could not go back on ${files(carried)}`;
     case "retag":
       return `${changed(act.change).was} could not come back`;
+    case "copy":
+      if (filesBack > 0) {
+        return `${formatCount(filesBack)} of ${files(carried)} left ${act.to} for the Trash`;
+      }
+      return `${copiedWhat(act, carried)} could not leave ${act.to}`;
   }
 }
 
@@ -280,6 +318,8 @@ export function reasonText(reason: Reason): string {
       return reason.more > 0
         ? `Holds ${reason.name} and ${reason.more} more`
         : `Holds ${reason.name}`;
+    case "alreadyIn":
+      return `Already in ${reason.place}`;
     case "other":
       return reason.message.charAt(0).toUpperCase() + reason.message.slice(1);
   }
@@ -295,7 +335,9 @@ export function stayedGroups(stayed: readonly Stayed[]): StayedGroup[] {
   const keyOf = (one: Stayed) =>
     one.at.kind === "trash"
       ? "trash"
-      : `${one.reason.kind === "notOnDisk"}:${one.at.path.join("/")}`;
+      : one.at.kind === "outside"
+        ? `outside:${one.at.dir.toLowerCase()}`
+        : `${one.reason.kind === "notOnDisk"}:${one.at.path.join("/")}`;
   const groups = new Map<string, Stayed[]>();
   for (const one of stayed) groups.set(keyOf(one), [...(groups.get(keyOf(one)) ?? []), one]);
 
@@ -308,6 +350,9 @@ export function stayedGroups(stayed: readonly Stayed[]): StayedGroup[] {
       const [first] = rows;
       if (!first || first.at.kind === "trash")
         return { heading: "Still in the Trash", rows, depth: 0 };
+      // Outside the library a directory goes by its own name, as Explorer's title bar has it.
+      if (first.at.kind === "outside")
+        return { heading: `Still in ${dirName(first.at.dir)}`, rows, depth: 0 };
       const path = first.at.path;
       const place = path.slice(Math.max(Math.min(shared, path.length) - 1, 0)).join(" › ");
       const gone = first.reason.kind === "notOnDisk";
@@ -315,6 +360,12 @@ export function stayedGroups(stayed: readonly Stayed[]): StayedGroup[] {
     })
     .sort((a, b) => a.depth - b.depth)
     .map(({ heading, rows }) => ({ heading, rows }));
+}
+
+/** A directory's last name: `Downloads` for `C:\Users\Ana\Downloads`, or the drive for a root. */
+export function dirName(dir: string) {
+  const parts = dir.split(/[\\/]+/).filter(Boolean);
+  return parts.at(-1) ?? dir;
 }
 
 /** How many leading folders every path shares; a single path shares all of it. */

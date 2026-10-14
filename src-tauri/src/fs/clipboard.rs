@@ -75,6 +75,25 @@ pub fn copy_text(text: &str) -> Result<()> {
     put_text(&mut open()?, text)
 }
 
+/// The files on the clipboard, as Explorer's Copy puts them there; `None` when it holds anything
+/// else. Explorer puts their paths there as text too, which is not read: this is a paste of files.
+#[cfg(windows)]
+pub fn file_list() -> Result<Option<Vec<PathBuf>>> {
+    let _open = open()?;
+    if !raw::is_format_avail(clipboard_win::formats::CF_HDROP) {
+        return Ok(None);
+    }
+    let mut list = Vec::new();
+    raw::get_file_list(&mut list)
+        .map_err(|err| AppError::invalid(format!("the clipboard would not read: {err}")))?;
+    Ok(Some(list.into_iter().map(PathBuf::from).collect()))
+}
+
+#[cfg(not(windows))]
+pub fn file_list() -> Result<Option<Vec<PathBuf>>> {
+    Ok(None)
+}
+
 /// The app ships for Windows only; elsewhere it builds so the tests can run.
 #[cfg(not(windows))]
 pub fn copy_files(_paths: &[PathBuf]) -> Result<()> {
