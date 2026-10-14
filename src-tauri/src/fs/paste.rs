@@ -1191,6 +1191,36 @@ mod tests {
     }
 
     #[test]
+    fn a_folder_crash_the_launchs_walk_found_first_is_made_again_and_undoes_whole() {
+        let (conn, dir, lisbon) = library("crash-folder-then-walk");
+        write(&dir.join("Downloads/Alexandria/a.jpg"), "a");
+        let entries = [dir.join("Downloads/Alexandria")];
+        let batch = journal::new_batch();
+        let before_its_files = Script {
+            at_look: Some(2),
+            ..Script::default()
+        };
+        run(&conn, &batch, lisbon, &entries, &before_its_files).unwrap();
+        let landed = dir.join("library/Trips/Lisbon/Alexandria");
+        std::fs::remove_dir(&landed).unwrap();
+        walk::reconcile(&conn).unwrap();
+
+        let again = run(&conn, &batch, lisbon, &entries, &Script::default()).unwrap();
+        assert!(again.refused.is_empty(), "{:?}", again.refused);
+        assert_eq!((again.done, again.stopped), (1, None));
+        assert_eq!(names_in(&landed), ["a.jpg"]);
+        let described = acts::describe(&conn, &batch).unwrap();
+        assert_eq!((described.files, described.folders), (1, 1));
+
+        let back = undo::undo_batch(&conn, &batch).unwrap();
+        assert!(back.stayed.is_empty(), "{:?}", back.stayed);
+        assert_eq!((back.files_back, back.folders_back), (1, 1));
+        assert!(journal::batch(&conn, &batch).unwrap().is_empty());
+        assert_eq!(names_in(&dir.join("library/Trips/Lisbon")), ["tram.jpg"]);
+        assert_eq!(undo::undo_last(&conn).unwrap(), None);
+    }
+
+    #[test]
     fn a_copy_going_on_while_its_drive_is_away_keeps_what_came_in() {
         let (conn, dir, lisbon) = library("resumed-away");
         let entries: Vec<PathBuf> = (1..=2)
