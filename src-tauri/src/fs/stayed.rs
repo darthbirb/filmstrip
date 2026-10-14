@@ -29,7 +29,8 @@ pub enum Thing {
 }
 
 /// Where something that stayed is now: a folder, named from its source's own folder down, the
-/// app's trash, or a directory outside the library that a copy was bringing it in from.
+/// app's trash, or a directory outside the library that a copy was bringing it in from, with the
+/// folder it was bringing it into.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[ts(export)]
@@ -42,6 +43,7 @@ pub enum Whereabouts {
     Trash,
     Outside {
         dir: String,
+        into: i64,
     },
 }
 
@@ -75,9 +77,9 @@ pub fn folder(conn: &Connection, folder_id: i64, err: &AppError) -> Result<Staye
     })
 }
 
-/// A file or folder a copy did not bring in, still where it was outside the library. It has no row,
-/// so its id is 0.
-pub fn outside(path: &std::path::Path, folder: bool, err: &AppError) -> Stayed {
+/// A file or folder a copy did not bring into `into`, still where it was outside the library. It
+/// has no row, so its id is 0.
+pub fn outside(path: &std::path::Path, into: i64, folder: bool, err: &AppError) -> Stayed {
     Stayed {
         kind: if folder { Thing::Folder } else { Thing::File },
         id: 0,
@@ -90,6 +92,7 @@ pub fn outside(path: &std::path::Path, folder: bool, err: &AppError) -> Stayed {
                 .parent()
                 .map(|dir| dir.to_string_lossy().into_owned())
                 .unwrap_or_default(),
+            into,
         },
         reason: Reason::of(err),
     }

@@ -141,23 +141,19 @@ fn record_file(conn: &Connection, file: &Path, folder_id: i64, source_id: i64) -
     Ok(Outcome::Indexed)
 }
 
-/// A file the app has just put in a folder itself, recorded as a walk would record it. No walk is
-/// sweeping meanwhile: both hold the turn.
+/// A file the app is putting in a folder itself under `name`, recorded as a walk would record it,
+/// from `file` as it is now. No walk is sweeping meanwhile: both hold the turn.
 pub(crate) fn index_arrival(
     conn: &Connection,
     file: &Path,
+    name: &str,
     folder_id: i64,
     source_id: i64,
 ) -> Result<i64> {
-    let name = file
-        .file_name()
-        .ok_or_else(|| crate::error::AppError::invalid("a file with no name"))?
-        .to_string_lossy()
-        .to_string();
     let meta = std::fs::metadata(file)?;
     record_new(
         conn,
-        name,
+        name.to_string(),
         meta.len() as i64,
         mtime_secs(&meta),
         folder_id,

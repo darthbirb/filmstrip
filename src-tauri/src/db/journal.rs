@@ -414,12 +414,14 @@ pub fn record_retag(conn: &Connection, batch_id: &str, retagged: &Retagged) -> R
     record(conn, batch_id, RETAG, retagged, retagged)
 }
 
-pub fn record_item_copy(conn: &Connection, batch_id: &str, copied: &ItemCopied) -> Result<()> {
-    record(conn, batch_id, ITEM_COPY, copied, copied)
+pub fn record_item_copy(conn: &Connection, batch_id: &str, copied: &ItemCopied) -> Result<i64> {
+    record(conn, batch_id, ITEM_COPY, copied, copied)?;
+    Ok(conn.last_insert_rowid())
 }
 
-pub fn record_folder_copy(conn: &Connection, batch_id: &str, made: &FolderCopied) -> Result<()> {
-    record(conn, batch_id, FOLDER_COPY, made, made)
+pub fn record_folder_copy(conn: &Connection, batch_id: &str, made: &FolderCopied) -> Result<i64> {
+    record(conn, batch_id, FOLDER_COPY, made, made)?;
+    Ok(conn.last_insert_rowid())
 }
 
 /// Every row in a batch, newest first: the order an undo applies them in, since a later row can
