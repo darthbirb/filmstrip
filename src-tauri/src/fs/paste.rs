@@ -854,6 +854,53 @@ mod tests {
     }
 
     #[test]
+    fn undo_takes_the_act_before_a_copy_that_has_not_ended() {
+        let (conn, dir, lisbon) = library("undo-while-copying");
+        let entries: Vec<PathBuf> = (1..=4)
+            .map(|n| write(&dir.join(format!("Downloads/IMG_{n}.jpg")), "bytes"))
+            .collect();
+        let batch = journal::new_batch();
+        let payload = crate::jobs::kinds::CopyPayload {
+            batch_id: batch.clone(),
+            folder_id: lisbon,
+            paths: entries
+                .iter()
+                .map(|path| path.to_string_lossy().into_owned())
+                .collect(),
+        };
+        let job = crate::db::jobs::enqueue(
+            &conn,
+            crate::jobs::kinds::COPY_IN,
+            &serde_json::to_string(&payload).unwrap(),
+            0,
+        )
+        .unwrap();
+        let closing = |after| Script {
+            after: Some((after, Halt::Stop)),
+            ..Script::default()
+        };
+        run(&conn, &batch, lisbon, &entries, &closing(1)).unwrap();
+        let made = journal::new_batch();
+        crate::fs::folders::create(&conn, lisbon, "Porto", &made).unwrap();
+        run(&conn, &batch, lisbon, &entries, &closing(2)).unwrap();
+        let lisbon_dir = dir.join("library/Trips/Lisbon");
+
+        let back = undo::undo_last(&conn).unwrap().unwrap();
+        assert_eq!(back.batch.batch_id, made, "the act before the copy");
+        assert_eq!(
+            names_in(&lisbon_dir),
+            ["IMG_1.jpg", "IMG_2.jpg", "tram.jpg"]
+        );
+        assert!(undo::undo_batch(&conn, &batch).is_err());
+
+        run(&conn, &batch, lisbon, &entries, &Script::default()).unwrap();
+        crate::db::jobs::complete(&conn, job).unwrap();
+        let back = undo::undo_last(&conn).unwrap().unwrap();
+        assert_eq!((back.batch.batch_id, back.files_back), (batch, 4));
+        assert_eq!(names_in(&lisbon_dir), ["tram.jpg"]);
+    }
+
+    #[test]
     fn explorer_counts_what_is_on_top() {
         let (_, dir, _) = library("carried");
         let entries = [

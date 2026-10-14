@@ -8,6 +8,7 @@ use ts_rs::TS;
 
 use crate::db::now;
 use crate::error::Result;
+use crate::jobs::kinds::COPY_IN;
 
 pub const FOLDER_CREATE: &str = "folder_create";
 pub const FOLDER_RENAME: &str = "folder_rename";
@@ -448,15 +449,31 @@ pub fn drop_entry(conn: &Connection, entry_id: i64) -> Result<()> {
     Ok(())
 }
 
-/// The batch written last, whenever that was, or nothing when there is nothing left to undo.
+/// The batch written last, whenever that was, or nothing when there is nothing left to undo. A
+/// copy still waiting or running is passed over: its batch is not an act until the copy has ended.
 pub fn latest_batch(conn: &Connection) -> Result<Option<String>> {
     Ok(conn
         .query_row(
-            "SELECT batch_id FROM journal ORDER BY id DESC LIMIT 1",
-            [],
+            "SELECT batch_id FROM journal
+              WHERE batch_id NOT IN (SELECT json_extract(payload, '$.batchId') FROM job
+                                      WHERE kind = ?1 AND status IN ('pending', 'running')
+                                        AND json_extract(payload, '$.batchId') IS NOT NULL)
+              ORDER BY id DESC LIMIT 1",
+            params![COPY_IN],
             |r| r.get(0),
         )
         .optional()?)
+}
+
+/// Whether a copy still waiting or running writes under this batch.
+pub fn copying(conn: &Connection, batch_id: &str) -> Result<bool> {
+    Ok(conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM job
+                        WHERE kind = ?1 AND status IN ('pending', 'running')
+                          AND json_extract(payload, '$.batchId') = ?2)",
+        params![COPY_IN, batch_id],
+        |r| r.get(0),
+    )?)
 }
 
 #[cfg(test)]

@@ -32,6 +32,9 @@ pub struct UndoReport {
 /// Reverses one batch by id.
 pub fn undo_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
     let _turn = super::turn();
+    if journal::copying(conn, batch_id)? {
+        return Err(AppError::invalid("that copy has not ended yet"));
+    }
     reverse_batch(conn, batch_id)
 }
 
