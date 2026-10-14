@@ -23,3 +23,6 @@ Thumbs.db
 
 # The queue's run log, local to this machine. DEVELOPMENT.md "Running the queue".
 /.queue/
+
+# Worktrees, the reviewers' and Claude Code's own, removed when done. DEVELOPMENT.md "Review".
+/.claude/worktrees/
