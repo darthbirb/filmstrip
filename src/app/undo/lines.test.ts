@@ -264,7 +264,7 @@ test("what a copy left outside the library is grouped under the directory it is 
     kind: "file",
     id: 0,
     name,
-    at: { kind: "outside", dir },
+    at: { kind: "outside", dir, into: 1 },
     reason: { kind: "inUse" },
   });
   const groups = stayedGroups([

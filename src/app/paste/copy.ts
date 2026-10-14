@@ -64,9 +64,24 @@ export function refusal(why: CopyRefusal, how: "paste" | "drop"): FootNews {
   }
 }
 
-/** A file or folder a copy left where it was, as the path a second try would carry. */
-function pathOf(row: Stayed) {
-  return row.at.kind === "outside" ? `${row.at.dir.replace(/[\\/]+$/, "")}\\${row.name}` : null;
+/** A file or folder a copy left where it was, as a second try would carry it, and where to. */
+type Again = { into: number; path: string };
+
+/** Nothing for what is already where it would go: a second try could only refuse it again. */
+function againOf(row: Stayed): Again | null {
+  if (row.at.kind !== "outside" || row.reason.kind === "alreadyIn") return null;
+  return { into: row.at.into, path: `${row.at.dir.replace(/[\\/]+$/, "")}\\${row.name}` };
+}
+
+/** Each one carried again into the folder it was going into, so a tree keeps its shape. */
+function retryAll(again: readonly Again[], to: string) {
+  const byFolder = Map.groupBy(again, (one) => one.into);
+  for (const [into, rows] of byFolder) {
+    void dropInto(
+      { id: into, title: to },
+      rows.map((one) => one.path),
+    );
+  }
 }
 
 /**
@@ -78,7 +93,7 @@ export async function afterCopied(copied: Copied) {
   const { batch, refused, whole, to } = copied;
   const came = batch?.files ?? 0;
   if (refused.length > 0) {
-    const again = refused.filter((row) => row.reason.kind !== "alreadyIn").flatMap(pathOf);
+    const again = refused.map(againOf).filter((one): one is Again => one !== null);
     const [only] = refused;
     showReport({
       sentence: copiedBannerLine(
@@ -88,10 +103,7 @@ export async function afterCopied(copied: Copied) {
         came === 0 && refused.length === 1 ? only?.name : undefined,
       ),
       rows: refused,
-      retry:
-        again.length > 0
-          ? () => void dropInto({ id: copied.folderId, title: to }, again as string[])
-          : undefined,
+      retry: again.length > 0 ? () => retryAll(again, to) : undefined,
     });
   }
   // With nothing come in, the banner turns the line round and the foot says nothing.

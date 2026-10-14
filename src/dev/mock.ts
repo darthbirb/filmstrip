@@ -1196,7 +1196,7 @@ function copyIn(folderId: number, paths: readonly string[]): CopyStart {
     kind: isFolderPath(path) ? "folder" : "file",
     id: 0,
     name: lastName(path),
-    at: { kind: "outside", dir: path.replace(/[\\/]+[^\\/]*$/, "") },
+    at: { kind: "outside", dir: path.replace(/[\\/]+[^\\/]*$/, ""), into: folderId },
     reason,
   });
   for (const path of paths) {
