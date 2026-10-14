@@ -1,8 +1,10 @@
 import { type CSSProperties, useId, useLayoutEffect, useRef, useState } from "react";
 
+import type { Copying } from "../../ipc/bindings/Copying";
 import type { LibraryTotals } from "../../ipc/bindings/LibraryTotals";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import type { Tally } from "../../ipc/bindings/Tally";
+import { cancelCopy } from "../../ipc/commands";
 import { formatBytes, formatCount, formatShortDay } from "../../lib/format";
 import { Band } from "../../ui/Band";
 import { Button } from "../../ui/Button";
@@ -27,6 +29,8 @@ export function Foot({ rail = false }: { rail?: boolean }) {
   // Folded, a line that has been answered leaves: the grid is what shows the files are back.
   const shown = news !== null && !(rail && news.kind === "undone");
 
+  // Newest highest, above the walk, as the foot is ordered by permanence from the bottom.
+  const copies = [...(progress?.copies ?? [])].reverse();
   const left = progress ? progress.pending + progress.running : 0;
   const busy = progress !== null && progress.phase !== "idle";
   const done = progress?.completed ?? 0;
@@ -36,6 +40,9 @@ export function Foot({ rail = false }: { rail?: boolean }) {
     // Ordered by permanence from the bottom: the count, the walk, then what waits to be read.
     <div className="w-full shrink-0" style={{ anchorName: anchor } as CSSProperties}>
       <PushDown open={shown}>{shown && <News news={news} rail={rail} />}</PushDown>
+      {copies.map((copy) => (
+        <CopyLine key={copy.jobId} copy={copy} rail={rail} />
+      ))}
       <PushDown open={busy}>
         {rail ? (
           <div className="border-line border-t px-1.5 pt-2 pb-1.5">
@@ -194,6 +201,7 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
   if (news.kind === "keyRefused") {
     return <Band sentence={news.line} detail={news.detail} onDismiss={dismiss} />;
   }
+
   if (rail) {
     return (
       <div className="grid place-items-center border-line border-t py-1.5">
@@ -204,7 +212,7 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
             onClick={() => void undo(news.batchId)}
           />
         ) : (
-          <Nothing />
+          <Nothing noFiles={news.kind === "noFiles"} />
         )}
       </div>
     );
@@ -223,6 +231,9 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
       />
     );
   }
+  if (news.kind === "noFiles") {
+    return <Line glyph="paste" sentence={NO_FILES} onDismiss={dismiss} />;
+  }
   return (
     <Line
       glyph="undo"
@@ -232,8 +243,10 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
   );
 }
 
+const NO_FILES = "The clipboard holds no files.";
+
 /** Folded, the rail has no room for the sentence, so it comes out beside the slot. */
-function Nothing() {
+function Nothing({ noFiles = false }: { noFiles?: boolean }) {
   const line = useRef<HTMLDivElement>(null);
   const anchor = `--nothing-${useId().replace(/[^\w-]/g, "")}`;
   useLayoutEffect(() => {
@@ -244,7 +257,7 @@ function Nothing() {
       style={{ anchorName: anchor } as CSSProperties}
       className="grid size-control place-items-center text-fg-dim text-icon"
     >
-      <Glyph name="undo" />
+      <Glyph name={noFiles ? "paste" : "undo"} />
       <div
         ref={line}
         popover="manual"
@@ -253,9 +266,41 @@ function Nothing() {
         }
         className="m-0 ml-1.5 flex h-control items-center whitespace-nowrap rounded-control border-0 bg-panel px-2.5 text-fg text-ui shadow-overlay inset-ring inset-ring-line-control"
       >
-        Nothing to undo.
+        {noFiles ? NO_FILES : "Nothing to undo."}
       </div>
     </span>
+  );
+}
+
+/**
+ * A copy's own line, the walk's shape: where it is going, how far, and its dismiss, which cancels
+ * it after the file in hand. Artboards › Bringing files in.
+ */
+function CopyLine({ copy, rail }: { copy: Copying; rail: boolean }) {
+  const percent = copy.whole > 0 ? Math.round((copy.done / copy.whole) * 100) : 0;
+  const left = `Copying to ${copy.to} · ${formatCount(copy.whole - copy.done)} of ${formatCount(copy.whole)} left`;
+  if (rail) {
+    return (
+      <div title={left} className="border-line border-t px-1.5 pt-2 pb-1.5">
+        <Bar percent={percent} />
+      </div>
+    );
+  }
+  return (
+    <div title={left} className="flex flex-col gap-1 border-line border-t py-1.5 pr-1.5 pl-2.5">
+      <span className="flex items-center gap-2 text-fg-mid text-small">
+        <span className="min-w-0 flex-1 truncate">Copying to {copy.to}…</span>
+        <span className="text-fg tabular-nums">{percent}%</span>
+        <GlyphButton
+          glyph="close"
+          label="Cancel Copy"
+          onClick={() => void cancelCopy(copy.jobId).catch(() => false)}
+        />
+      </span>
+      <span className="pr-1">
+        <Bar percent={percent} />
+      </span>
+    </div>
   );
 }
 

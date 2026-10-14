@@ -1,12 +1,13 @@
 import { type RefObject, useLayoutEffect, useRef, useState } from "react";
 
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
-import { copyItemPaths, copyItems, openItem, revealItem } from "../../ipc/commands";
+import { copyItemPaths, openItem, revealItem } from "../../ipc/commands";
 import { Button } from "../../ui/Button";
 import { GlyphButton } from "../../ui/GlyphButton";
 import type { GlyphName } from "../../ui/glyphs";
 import { Menu } from "../../ui/Menu";
 import { setFavourite, useFavourite } from "../favourites";
+import { copyFiles } from "../paste/clipboard";
 import { deleteFiles } from "./delete";
 import { openMovePicker } from "./move-picker";
 import { startRename } from "./rename";
@@ -67,7 +68,7 @@ function InLibrary({ item }: { item: ItemDetail }) {
       id: "copy",
       label: "Copy",
       glyph: "copy",
-      run: () => void copyItems([item.id]).catch(() => undefined),
+      run: () => void copyFiles([item.id]).catch(() => undefined),
     },
     {
       id: "copy-path",

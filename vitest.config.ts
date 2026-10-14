@@ -10,7 +10,7 @@ export default mergeConfig(
   defineConfig({
     // Found mid-run on a cold cache, it reloads the page and kills a test in flight.
     // DEVELOPMENT.md "Gotchas".
-    optimizeDeps: { include: ["react-dom/client"] },
+    optimizeDeps: { include: ["react-dom/client", "@tauri-apps/api/webview"] },
     test: {
       include: ["src/**/*.test.{ts,tsx}"],
       setupFiles: ["./src/dev/test-setup.ts"],

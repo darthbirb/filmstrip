@@ -27,6 +27,7 @@ import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
 import { itemMenu, setMenu } from "../menus/item-menu";
 import { setFullScreen } from "../pane/full-screen";
 import { showInPane, usePaneItem } from "../pane/pane-store";
+import { useOutsideDrag } from "../paste/drop";
 import { type Place, setPlace, usePlace } from "../place";
 import { usePreferences } from "../preferences";
 import { useSearchOutcome } from "../search/results";
@@ -82,6 +83,9 @@ export function Grid({ mode }: { mode: LayoutMode }) {
   }, [days, hits, filesLead, view.heading, view.caption, gap]);
   const result = useLayout(items ?? [], view.width - gap * 2, rowHeight, gap, mode, sections);
   const reading = place !== null && items === null;
+  // Files from Explorer over a grid that takes them: its row's ring, inside its edge, and no wash.
+  const outside = useOutsideDrag()?.over;
+  const lit = outside?.rowId === null && outside.landing.kind !== "refuse";
   const selection = useSelection();
   const checked = new Set(selection.ids);
   const checkedRows = useChecked();
@@ -198,7 +202,13 @@ export function Grid({ mode }: { mode: LayoutMode }) {
   }
 
   return (
-    <div ref={scroller} aria-busy={reading || undefined} className="h-full overflow-auto">
+    <div
+      ref={scroller}
+      aria-busy={reading || undefined}
+      // Where a drag from Explorer finds the grid it rests on.
+      data-drop="grid"
+      className={`h-full overflow-auto ${lit ? "rounded-control inset-ring-2 inset-ring-plate" : ""}`}
+    >
       {reading ? (
         <Reading
           width={view.width}
