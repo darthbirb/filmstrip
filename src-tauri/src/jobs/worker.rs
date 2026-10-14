@@ -72,7 +72,12 @@ fn copy_in(
             outcome.halted == Some(Halt::Cancel),
             None,
         ),
-        Err(err) => (paste::whole(&entries), Vec::new(), false, Some(Reason::of(&err))),
+        Err(err) => (
+            paste::whole(&entries),
+            Vec::new(),
+            false,
+            Some(Reason::of(&err)),
+        ),
     };
     let journalled = !journal::batch(conn, &payload.batch_id)?.is_empty();
     let batch = if journalled {

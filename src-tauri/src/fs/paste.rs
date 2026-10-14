@@ -210,7 +210,11 @@ impl<C: Control> Run<'_, C> {
             }
             if already_in(path, &self.dir_of(self.into)?) {
                 let place = self.place.clone();
-                self.refuse(path, self.into, AppError::refused(Reason::AlreadyIn { place }));
+                self.refuse(
+                    path,
+                    self.into,
+                    AppError::refused(Reason::AlreadyIn { place }),
+                );
                 continue;
             }
             self.bring(path, self.into)?;
@@ -591,6 +595,8 @@ mod tests {
         path.to_path_buf()
     }
 
+    type Meanwhile = Box<dyn FnOnce()>;
+
     /// Runs to the end, or halts as told once `after` files have settled, or at its `at_look`th
     /// look, which can fall inside the copy of one file's bytes. `meanwhile` runs once, as the
     /// given number of files have settled.
@@ -601,7 +607,7 @@ mod tests {
         looks: Cell<u32>,
         done: Cell<u32>,
         landed: Cell<u32>,
-        meanwhile: RefCell<Option<(u32, Box<dyn FnOnce()>)>>,
+        meanwhile: RefCell<Option<(u32, Meanwhile)>>,
     }
 
     impl Control for Script {
@@ -996,10 +1002,8 @@ mod tests {
             2,
             Box::new(move || {
                 let other = db::open(&db_path).unwrap();
-                crate::fs::folders::rename(&other, lisbon, "Porto", &journal::new_batch())
-                    .unwrap();
-                crate::fs::folders::create(&other, trips, "Lisbon", &journal::new_batch())
-                    .unwrap();
+                crate::fs::folders::rename(&other, lisbon, "Porto", &journal::new_batch()).unwrap();
+                crate::fs::folders::create(&other, trips, "Lisbon", &journal::new_batch()).unwrap();
             }),
         )));
         let batch = journal::new_batch();
@@ -1067,7 +1071,11 @@ mod tests {
         run(&conn, &batch, lisbon, &entries, &closing).unwrap();
         let landed = dir.join("library/Trips/Lisbon/Alexandria");
         let part = format!(".{batch}.filmstrip-part");
-        for stray in [landed.join("Day 1"), landed.clone(), dir.join("library/Trips/Lisbon")] {
+        for stray in [
+            landed.join("Day 1"),
+            landed.clone(),
+            dir.join("library/Trips/Lisbon"),
+        ] {
             std::fs::write(stray.join(&part), "half").unwrap();
         }
 

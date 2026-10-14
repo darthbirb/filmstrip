@@ -52,7 +52,10 @@ mod tests {
         std::fs::write(dir.join("part"), "new").unwrap();
         rename(&dir.join("part"), &dir.join("IMG_1.jpg")).unwrap();
         assert!(!dir.join("part").exists());
-        assert_eq!(std::fs::read_to_string(dir.join("IMG_1.jpg")).unwrap(), "new");
+        assert_eq!(
+            std::fs::read_to_string(dir.join("IMG_1.jpg")).unwrap(),
+            "new"
+        );
     }
 
     #[test]
@@ -62,7 +65,10 @@ mod tests {
         std::fs::write(dir.join("IMG_1.jpg"), "theirs").unwrap();
         let err = rename(&dir.join("part"), &dir.join("IMG_1.jpg")).unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::AlreadyExists);
-        assert_eq!(std::fs::read_to_string(dir.join("IMG_1.jpg")).unwrap(), "theirs");
+        assert_eq!(
+            std::fs::read_to_string(dir.join("IMG_1.jpg")).unwrap(),
+            "theirs"
+        );
         assert_eq!(std::fs::read_to_string(dir.join("part")).unwrap(), "new");
     }
 
