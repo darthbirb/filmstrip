@@ -1,6 +1,6 @@
 //! What each kind of job does. Runs on a worker thread, never on the window's.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 
 use rusqlite::Connection;
@@ -8,11 +8,14 @@ use rusqlite::Connection;
 use crate::db::jobs::{self as table, QueuedJob};
 use crate::db::{items, journal};
 use crate::error::{AppError, Reason, Result};
+use crate::fs::export as fs_export;
 use crate::fs::paste::{self, Halt};
 use crate::fs::stayed::Stayed;
 use crate::fs::{paths, walk};
-use crate::jobs::kinds::{self, CopyPayload, FolderPayload, ItemPayload};
-use crate::jobs::{Copied, Copying, QueueInner, enqueue_scrub, enqueue_thumb, lock};
+use crate::jobs::kinds::{self, CopyPayload, ExportPayload, FolderPayload, ItemPayload};
+use crate::jobs::{
+    Copied, Copying, Exporting, QueueInner, enqueue_scrub, enqueue_thumb, exported, lock,
+};
 use crate::media::ffmpeg::Ffmpeg;
 use crate::media::probe::Probe;
 use crate::media::{scrub, thumbs};
@@ -36,6 +39,10 @@ pub fn execute(inner: &QueueInner, conn: &mut Connection, job: &QueuedJob) -> Re
         kinds::THUMB => finished(thumb(inner, conn, serde_json::from_str(&job.payload)?)),
         kinds::SCRUB => finished(scrub(inner, conn, serde_json::from_str(&job.payload)?)),
         kinds::COPY_IN => copy_in(inner, conn, job.id, serde_json::from_str(&job.payload)?),
+        kinds::EXPORT => {
+            export(inner, conn, job.id, &serde_json::from_str(&job.payload)?);
+            Ok(Done::Finished)
+        }
         other => Err(AppError::invalid(format!("no job of the kind {other}"))),
     }
 }
@@ -84,6 +91,68 @@ fn copy_in(
     };
     announce(inner, conn, job_id, &payload, ended)?;
     Ok(Done::Finished)
+}
+
+/// An export, its line kept while it runs, and how it ended said once it has. One the app's
+/// closing stopped says nothing, and is not taken up again.
+fn export(inner: &QueueInner, conn: &Connection, job_id: i64, payload: &ExportPayload) {
+    let dest = Path::new(&payload.dest);
+    let line = Exporting {
+        job_id,
+        zip: dest
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+        path: payload.dest.clone(),
+        done: 0,
+        whole: payload.whole,
+    };
+    lock(&inner.exports).insert(job_id, line);
+    let control = ExportControl { inner, job_id };
+    let outcome = fs_export::run(
+        conn,
+        &payload.scope,
+        payload.naming,
+        dest,
+        Path::new(&payload.part),
+        &control,
+    );
+    drop(control);
+    if !outcome.closed {
+        (inner.exported)(&exported(job_id, payload, outcome));
+    }
+}
+
+struct ExportControl<'a> {
+    inner: &'a QueueInner,
+    job_id: i64,
+}
+
+/// An export's line and its Cancel go when it ends, however it ends.
+impl Drop for ExportControl<'_> {
+    fn drop(&mut self) {
+        lock(&self.inner.exports).remove(&self.job_id);
+        lock(&self.inner.cancelled).remove(&self.job_id);
+    }
+}
+
+impl fs_export::Control for ExportControl<'_> {
+    fn halt(&self) -> Option<Halt> {
+        if self.inner.stop.load(Ordering::Relaxed) {
+            Some(Halt::Stop)
+        } else if lock(&self.inner.cancelled).contains(&self.job_id) {
+            Some(Halt::Cancel)
+        } else {
+            None
+        }
+    }
+
+    fn progress(&self, done: u32, whole: u32) {
+        if let Some(line) = lock(&self.inner.exports).get_mut(&self.job_id) {
+            line.done = done;
+            line.whole = whole;
+        }
+    }
 }
 
 /// A copy taken off the queue as it waited, after a restart or before it ever ran: what a crash
@@ -299,6 +368,7 @@ mod tests {
             dir.join("library.db"),
             dir.join("thumbs"),
             Ffmpeg::discover(&tools),
+            Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),
         )

@@ -6,7 +6,7 @@ pub mod worker;
 
 use std::collections::{BTreeMap, HashSet};
 use std::panic::AssertUnwindSafe;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread::JoinHandle;
@@ -19,11 +19,13 @@ use ts_rs::TS;
 use crate::db::{self, jobs as table};
 use crate::error::{Reason, Result};
 use crate::fs::acts::Batch;
+use crate::fs::export::{self, End, Naming, Scope};
 use crate::fs::stayed::Stayed;
 use crate::media::ffmpeg::Ffmpeg;
 
 pub const PROGRESS_EVENT: &str = "job-progress";
 pub const COPIED_EVENT: &str = "copy-done";
+pub const EXPORTED_EVENT: &str = "export-done";
 
 const TICK: Duration = Duration::from_millis(500);
 const IDLE: Duration = Duration::from_millis(150);
@@ -55,6 +57,8 @@ pub struct Progress {
     pub completed: u64,
     /// Each copy running or waiting to, oldest first.
     pub copies: Vec<Copying>,
+    /// Each export running or waiting to, oldest first.
+    pub exports: Vec<Exporting>,
 }
 
 /// A copy in progress: where it is going, and how many of the files it carries are settled.
@@ -87,8 +91,39 @@ pub struct Copied {
     pub stopped: Option<Reason>,
 }
 
+/// An export in progress: the zip it is writing, and how many of its files are settled.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Exporting {
+    pub job_id: i64,
+    pub zip: String,
+    pub path: String,
+    pub done: u32,
+    pub whole: u32,
+}
+
+/// How an export ended, as the foot and the banner say it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Exported {
+    pub job_id: i64,
+    /// The zip, its name, and the folder it went into, by name and in full.
+    pub path: String,
+    pub zip: String,
+    pub place: String,
+    pub dir: String,
+    /// Every file it was asked for, and how many went in.
+    pub whole: u32,
+    pub written: u32,
+    pub skipped: Vec<Stayed>,
+    pub end: End,
+}
+
 pub type Report = Box<dyn Fn(&Progress) + Send + Sync>;
 pub type Announce = Box<dyn Fn(&Copied) + Send + Sync>;
+pub type AnnounceExport = Box<dyn Fn(&Exported) + Send + Sync>;
 
 pub struct QueueInner {
     db_path: PathBuf,
@@ -100,7 +135,9 @@ pub struct QueueInner {
     completed: AtomicU64,
     report: Report,
     announce: Announce,
+    exported: AnnounceExport,
     copies: Mutex<BTreeMap<i64, Copying>>,
+    exports: Mutex<BTreeMap<i64, Exporting>>,
     cancelled: Mutex<HashSet<i64>>,
 }
 
@@ -111,6 +148,7 @@ impl QueueInner {
         ffmpeg: Option<Ffmpeg>,
         report: Report,
         announce: Announce,
+        exported: AnnounceExport,
     ) -> QueueInner {
         QueueInner {
             db_path,
@@ -121,7 +159,9 @@ impl QueueInner {
             completed: AtomicU64::new(0),
             report,
             announce,
+            exported,
             copies: Mutex::new(BTreeMap::new()),
+            exports: Mutex::new(BTreeMap::new()),
             cancelled: Mutex::new(HashSet::new()),
         }
     }
@@ -142,13 +182,14 @@ impl QueueInner {
             failed: counts.failed,
             completed: self.completed.load(Ordering::Relaxed),
             copies: copies(conn, &lock(&self.copies))?,
+            exports: exports(conn, &lock(&self.exports))?,
         })
     }
 }
 
 impl QueueInner {
     fn cancel_copy(&self, conn: &Connection, job_id: i64) -> Result<bool> {
-        if let Some(payload) = table::cancel_pending(conn, job_id)? {
+        if let Some(payload) = table::cancel_pending(conn, job_id, kinds::COPY_IN)? {
             let payload: kinds::CopyPayload = serde_json::from_str(&payload)?;
             worker::cancel_waiting(self, conn, job_id, &payload)?;
             return Ok(true);
@@ -159,6 +200,83 @@ impl QueueInner {
         lock(&self.cancelled).insert(job_id);
         Ok(true)
     }
+
+    fn cancel_export(&self, conn: &Connection, job_id: i64) -> Result<bool> {
+        if let Some(payload) = table::cancel_pending(conn, job_id, kinds::EXPORT)? {
+            let payload: kinds::ExportPayload = serde_json::from_str(&payload)?;
+            (self.exported)(&exported(
+                job_id,
+                &payload,
+                export::Outcome {
+                    whole: payload.whole,
+                    written: 0,
+                    skipped: Vec::new(),
+                    end: End::Cancelled,
+                    closed: false,
+                },
+            ));
+            return Ok(true);
+        }
+        if !lock(&self.exports).contains_key(&job_id) {
+            return Ok(false);
+        }
+        lock(&self.cancelled).insert(job_id);
+        Ok(true)
+    }
+}
+
+/// How an export ended, said of the zip it was writing.
+fn exported(job_id: i64, payload: &kinds::ExportPayload, outcome: export::Outcome) -> Exported {
+    let dest = Path::new(&payload.dest);
+    let (zip, place, dir) = named(dest);
+    Exported {
+        job_id,
+        path: payload.dest.clone(),
+        zip,
+        place,
+        dir,
+        whole: outcome.whole,
+        written: outcome.written,
+        skipped: outcome.skipped,
+        end: outcome.end,
+    }
+}
+
+/// A zip's own name, the name of the folder it is in, and that folder in full.
+pub fn named(dest: &Path) -> (String, String, String) {
+    let name = |path: &Path| {
+        path.file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+    };
+    let dir = dest.parent().unwrap_or(dest);
+    let full = dir.to_string_lossy().into_owned();
+    (
+        name(dest).unwrap_or_default(),
+        name(dir).unwrap_or_else(|| full.clone()),
+        full,
+    )
+}
+
+/// Each export running, and each waiting its turn at none of its files settled, oldest first.
+fn exports(conn: &Connection, running: &BTreeMap<i64, Exporting>) -> Result<Vec<Exporting>> {
+    let mut exports: Vec<Exporting> = running.values().cloned().collect();
+    for (job_id, payload) in table::waiting(conn, kinds::EXPORT)? {
+        if running.contains_key(&job_id) {
+            continue;
+        }
+        let Ok(payload) = serde_json::from_str::<kinds::ExportPayload>(&payload) else {
+            continue;
+        };
+        exports.push(Exporting {
+            job_id,
+            zip: named(Path::new(&payload.dest)).0,
+            path: payload.dest,
+            done: 0,
+            whole: payload.whole,
+        });
+    }
+    exports.sort_by_key(|export| export.job_id);
+    Ok(exports)
 }
 
 /// Each copy running, and each waiting its turn at none of its files settled, oldest first.
@@ -201,8 +319,11 @@ impl JobQueue {
         ffmpeg: Option<Ffmpeg>,
         report: Report,
         announce: Announce,
+        exported: AnnounceExport,
     ) -> JobQueue {
-        let inner = Arc::new(QueueInner::new(db_path, thumbs, ffmpeg, report, announce));
+        let inner = Arc::new(QueueInner::new(
+            db_path, thumbs, ffmpeg, report, announce, exported,
+        ));
         let workers = std::thread::available_parallelism()
             .map_or(MIN_WORKERS, |cores| cores.get().saturating_sub(1))
             .clamp(MIN_WORKERS, MAX_WORKERS);
@@ -227,6 +348,12 @@ impl JobQueue {
     /// in hand. `false` when there was nothing to stop.
     pub fn cancel_copy(&self, conn: &Connection, job_id: i64) -> Result<bool> {
         self.inner.cancel_copy(conn, job_id)
+    }
+
+    /// Stops an export, waiting or running, and leaves nothing of it behind. `false` when there
+    /// was nothing to stop.
+    pub fn cancel_export(&self, conn: &Connection, job_id: i64) -> Result<bool> {
+        self.inner.cancel_export(conn, job_id)
     }
 
     /// Asks every thread to finish, and waits for them no longer than the grace period.
@@ -354,6 +481,40 @@ pub fn enqueue_copy(conn: &Connection, folder_id: i64, paths: &[PathBuf]) -> Res
     )
 }
 
+/// Queues an export of a scope into a zip at `dest`, and returns the job that writes it.
+pub fn enqueue_export(
+    conn: &Connection,
+    scope: &Scope,
+    naming: Naming,
+    dest: &Path,
+) -> Result<i64> {
+    let gathered = export::gather(conn, scope)?;
+    let payload = kinds::ExportPayload {
+        scope: scope.clone(),
+        naming,
+        dest: dest.to_string_lossy().into_owned(),
+        part: export::part_beside(dest).to_string_lossy().into_owned(),
+        whole: u32::try_from(gathered.entries.len() + gathered.away.len()).unwrap_or(u32::MAX),
+    };
+    table::enqueue(
+        conn,
+        kinds::EXPORT,
+        &serde_json::to_string(&payload)?,
+        kinds::PRIORITY_COPY,
+    )
+}
+
+/// An export a crash or a closing left is never taken up again: its job goes, and what it had
+/// written with it.
+pub fn abandon_exports(conn: &Connection) -> Result<()> {
+    for payload in table::take_all(conn, kinds::EXPORT)? {
+        if let Ok(payload) = serde_json::from_str::<kinds::ExportPayload>(&payload) {
+            let _ = std::fs::remove_file(payload.part);
+        }
+    }
+    Ok(())
+}
+
 /// Queues a video's scrub frames, unless they are already waiting.
 pub fn enqueue_scrub(conn: &Connection, item_id: i64) -> Result<()> {
     let payload = serde_json::to_string(&kinds::ItemPayload { item_id })?;
@@ -416,6 +577,7 @@ mod tests {
             Box::new(move |copied| {
                 let _ = said.send(copied.clone());
             }),
+            Box::new(|_| {}),
         );
         let copied = heard.recv_timeout(Duration::from_secs(60)).unwrap();
         let deadline = Instant::now() + Duration::from_secs(10);
@@ -468,6 +630,7 @@ mod tests {
             None,
             Box::new(|_| {}),
             Box::new(|_| {}),
+            Box::new(|_| {}),
         );
         assert_eq!(
             inner.progress(&conn).unwrap().copies,
@@ -497,6 +660,7 @@ mod tests {
             Box::new(move |copied| {
                 let _ = said.send(copied.clone());
             }),
+            Box::new(|_| {}),
         );
         let copied = heard.recv_timeout(Duration::from_secs(60)).unwrap();
         queue.stop();
@@ -508,6 +672,146 @@ mod tests {
                 name: "Trips".into()
             })
         );
+    }
+
+    fn library_to_export(name: &str) -> (Connection, PathBuf, i64) {
+        let dir = scratch(name);
+        std::fs::write(dir.join("library/Trips/IMG_1.jpg"), "one").unwrap();
+        std::fs::write(dir.join("library/Trips/IMG_2.jpg"), "two").unwrap();
+        std::fs::create_dir_all(dir.join("Exports")).unwrap();
+        let mut conn = db::open(&dir.join("library.db")).unwrap();
+        db::migrate(&mut conn).unwrap();
+        sources::add(&conn, &dir.join("library"), "Library", SourceKind::Library).unwrap();
+        crate::fs::walk::reconcile(&conn).unwrap();
+        let root = crate::db::folders::source_root_folder(&conn, 1).unwrap();
+        let trips = crate::db::folders::child_id(&conn, root, "Trips")
+            .unwrap()
+            .unwrap();
+        (conn, dir, trips)
+    }
+
+    fn hearing(dir: &Path, said: mpsc::Sender<Exported>) -> QueueInner {
+        QueueInner::new(
+            dir.join("library.db"),
+            dir.join("thumbs"),
+            None,
+            Box::new(|_| {}),
+            Box::new(|_| {}),
+            Box::new(move |exported| {
+                let _ = said.send(exported.clone());
+            }),
+        )
+    }
+
+    #[test]
+    fn an_export_runs_off_this_thread_with_its_line_and_says_how_it_ended() {
+        let (conn, dir, trips) = library_to_export("export");
+        let dest = dir.join("Exports/Trips.zip");
+        let scope = Scope::Branch { folder_id: trips };
+        let job = enqueue_export(&conn, &scope, Naming::Keep, &dest).unwrap();
+        let (said, heard) = mpsc::channel();
+        assert_eq!(
+            hearing(&dir, said.clone()).progress(&conn).unwrap().exports,
+            [Exporting {
+                job_id: job,
+                zip: "Trips.zip".into(),
+                path: dest.to_string_lossy().into_owned(),
+                done: 0,
+                whole: 2,
+            }],
+            "waiting its turn, at none settled"
+        );
+        assert_eq!(
+            table::counts(&conn).unwrap().pending,
+            0,
+            "the walk's line counts no export"
+        );
+
+        let queue = JobQueue::start(
+            dir.join("library.db"),
+            dir.join("thumbs"),
+            None,
+            Box::new(|_| {}),
+            Box::new(|_| {}),
+            Box::new(move |exported| {
+                let _ = said.send(exported.clone());
+            }),
+        );
+        let exported = heard.recv_timeout(Duration::from_secs(60)).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !queue.progress().unwrap().exports.is_empty() && Instant::now() < deadline {
+            std::thread::sleep(IDLE);
+        }
+        assert!(
+            queue.progress().unwrap().exports.is_empty(),
+            "its line goes"
+        );
+        queue.stop();
+
+        assert_eq!((exported.job_id, exported.end), (job, End::Written));
+        assert_eq!((exported.whole, exported.written), (2, 2));
+        assert_eq!(
+            (exported.zip.as_str(), exported.place.as_str()),
+            ("Trips.zip", "Exports")
+        );
+        assert_eq!(
+            exported.dir,
+            dir.join("Exports").to_string_lossy().into_owned()
+        );
+        assert!(dest.is_file());
+        assert!(
+            !queue.cancel_export(&conn, job).unwrap(),
+            "nothing is left to stop"
+        );
+    }
+
+    #[test]
+    fn cancelling_an_export_waiting_its_turn_ends_its_line_with_nothing_written() {
+        let (conn, dir, trips) = library_to_export("export-cancel-waiting");
+        let dest = dir.join("Exports/Trips.zip");
+        let job = enqueue_export(
+            &conn,
+            &Scope::Branch { folder_id: trips },
+            Naming::Folders,
+            &dest,
+        )
+        .unwrap();
+        let (said, heard) = mpsc::channel();
+        let inner = hearing(&dir, said);
+        assert!(inner.cancel_export(&conn, job).unwrap());
+        let exported = heard.try_recv().expect("its line ends");
+        assert_eq!(
+            (exported.job_id, exported.end, exported.whole),
+            (job, End::Cancelled, 2)
+        );
+        assert!(inner.progress(&conn).unwrap().exports.is_empty());
+        assert!(!dest.exists());
+        assert!(!inner.cancel_export(&conn, job).unwrap());
+    }
+
+    #[test]
+    fn an_export_a_crash_left_is_never_taken_up_again_and_what_it_wrote_goes() {
+        let (mut conn, dir, trips) = library_to_export("export-crash");
+        let dest = dir.join("Exports/Trips.zip");
+        enqueue_export(
+            &conn,
+            &Scope::Branch { folder_id: trips },
+            Naming::Keep,
+            &dest,
+        )
+        .unwrap();
+        let payload: kinds::ExportPayload =
+            serde_json::from_str(&table::waiting(&conn, kinds::EXPORT).unwrap()[0].1).unwrap();
+        std::fs::write(&payload.part, "half a zip").unwrap();
+        assert!(table::claim(&mut conn).unwrap().is_some());
+
+        abandon_exports(&conn).unwrap();
+        assert!(!Path::new(&payload.part).exists());
+        assert!(!dest.exists());
+        let left: i64 = conn
+            .query_row("SELECT COUNT(*) FROM job", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(left, 0);
     }
 
     struct Through;
@@ -543,6 +847,7 @@ mod tests {
             Box::new(move |copied| {
                 let _ = said.send(copied.clone());
             }),
+            Box::new(|_| {}),
         );
         assert!(inner.cancel_copy(&conn, job).unwrap());
         let copied = heard.try_recv().expect("its line ends with what came in");
@@ -573,6 +878,7 @@ mod tests {
             Box::new(move |copied| {
                 let _ = said.send(copied.clone());
             }),
+            Box::new(|_| {}),
         );
         let _ = inner.cancel_copy(&conn, job);
         let copied = heard.try_recv().expect("its line ends");
@@ -602,6 +908,7 @@ mod tests {
             Box::new(move |progress| {
                 let _ = sent.send(progress.clone());
             }),
+            Box::new(|_| {}),
             Box::new(|_| {}),
         );
         let deadline = Instant::now() + Duration::from_secs(60);
@@ -669,6 +976,7 @@ mod tests {
             Box::new(move |progress| {
                 let _ = sent.send(progress.clone());
             }),
+            Box::new(|_| {}),
             Box::new(|_| {}),
         );
         let deadline = Instant::now() + Duration::from_secs(60);

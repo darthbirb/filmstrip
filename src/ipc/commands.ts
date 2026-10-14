@@ -9,6 +9,7 @@ import type { Coverage } from "./bindings/Coverage";
 import type { CoverChoice } from "./bindings/CoverChoice";
 import type { DestinationKey } from "./bindings/DestinationKey";
 import type { EffectiveTag } from "./bindings/EffectiveTag";
+import type { ExportStart } from "./bindings/ExportStart";
 import type { Failure } from "./bindings/Failure";
 import type { FavouritePlace } from "./bindings/FavouritePlace";
 import type { FolderDeleted } from "./bindings/FolderDeleted";
@@ -25,9 +26,12 @@ import type { ItemsTrashed } from "./bindings/ItemsTrashed";
 import type { KeyClashFor } from "./bindings/KeyClashFor";
 import type { LabelOffer } from "./bindings/LabelOffer";
 import type { LibraryTotals } from "./bindings/LibraryTotals";
+import type { Naming } from "./bindings/Naming";
+import type { Plan } from "./bindings/Plan";
 import type { Progress } from "./bindings/Progress";
 import type { Reading } from "./bindings/Reading";
 import type { Reason } from "./bindings/Reason";
+import type { Scope } from "./bindings/Scope";
 import type { SearchOutcome } from "./bindings/SearchOutcome";
 import type { Sort } from "./bindings/Sort";
 import type { SourceKind } from "./bindings/SourceKind";
@@ -37,6 +41,7 @@ import type { TagOffer } from "./bindings/TagOffer";
 import type { Trashed } from "./bindings/Trashed";
 import type { UndoReport } from "./bindings/UndoReport";
 import type { Vocabulary } from "./bindings/Vocabulary";
+import type { ZipPick } from "./bindings/ZipPick";
 import { FIRST_SORT } from "./sort";
 
 // One wrapper per Rust command, each typed invoke on one line: a Rust test reads this file.
@@ -114,6 +119,16 @@ export const dropFiles = (folderId: number, paths: string[]) =>
   invoke<CopyStart>("drop_files", { folderId, paths });
 
 export const cancelCopy = (jobId: number) => invoke<boolean>("cancel_copy", { jobId });
+
+export const exportPlan = (scope: Scope) => invoke<Plan>("export_plan", { scope });
+
+export const pickExportZip = (name: string, dir: string | null) =>
+  invoke<ZipPick>("pick_export_zip", { name, dir });
+
+export const startExport = (scope: Scope, naming: Naming, path: string) =>
+  invoke<ExportStart>("start_export", { scope, naming, path });
+
+export const cancelExport = (jobId: number) => invoke<boolean>("cancel_export", { jobId });
 
 export const revealPath = (path: string) => invoke<void>("reveal_path", { path });
 

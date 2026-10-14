@@ -1793,6 +1793,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     failed: 0,
     completed: 0,
     copies: [],
+    exports: [],
   }),
   index_failures: () => [],
   retry_failed_jobs: () => 0,

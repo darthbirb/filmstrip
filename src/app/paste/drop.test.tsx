@@ -159,6 +159,7 @@ test("a copy under way has its own line at the foot, and its dismiss cancels it"
     failed: 0,
     completed: 0,
     copies: [{ jobId: 7, folderId: 5, to: "People", done: 108, whole: 1200 }],
+    exports: [],
   };
   await emit("job-progress", progress);
   await expect.element(page.getByText("Copying to People…")).toBeVisible();
