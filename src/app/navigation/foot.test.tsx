@@ -11,7 +11,7 @@ import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { getPlace, setPlace } from "../place";
 import { Breadcrumb } from "./Breadcrumb";
 import { Foot } from "./Foot";
-import { setNews } from "./foot-slot";
+import { getNews, sayOnce, setNews } from "./foot-slot";
 import { loadIndex, resetIndex, startIndex } from "./index-store";
 import { Rail } from "./Rail";
 import { setRefused } from "./refusal-store";
@@ -446,4 +446,31 @@ test("the rail's own line for a key that did nothing stays out of sight while th
   expect(lines.length).toBe(1);
   expect(lines.some((line) => line.matches(":popover-open"))).toBe(false);
   setNews(null);
+});
+
+const NO_FILES = "The clipboard holds no files.";
+
+test("a line said once goes at a key pressed the moment it is drawn", async () => {
+  const screen = await render(<Foot />);
+  const drawn = new MutationObserver(() => {
+    if (!document.body.textContent?.includes(NO_FILES)) return;
+    drawn.disconnect();
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown" }));
+  });
+  drawn.observe(document.body, { childList: true, subtree: true, characterData: true });
+  sayOnce({ kind: "noFiles" });
+  await expect.poll(getNews).toBeNull();
+  await expect.element(screen.getByText(NO_FILES)).not.toBeInTheDocument();
+});
+
+test("the key that says a line once is not the one that clears it", async () => {
+  const screen = await render(<Foot />);
+  document.addEventListener("keydown", () => sayOnce({ kind: "noFiles" }), {
+    capture: true,
+    once: true,
+  });
+  await userEvent.keyboard("x");
+  await expect.element(screen.getByText(NO_FILES)).toBeVisible();
+  await userEvent.keyboard("{ArrowDown}");
+  await expect.element(screen.getByText(NO_FILES)).not.toBeInTheDocument();
 });

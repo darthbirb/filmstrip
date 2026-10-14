@@ -34,16 +34,16 @@ export function setNews(next: FootNews | null) {
 /** News that answers a key rather than an act, so it goes at the next key or click. */
 export function sayOnce(next: FootNews) {
   setNews(next);
-  const clear = () => {
+  const said = performance.now();
+  const clear = (event: Event) => {
+    // The key or click that said it may still be on its way through the page.
+    if (event.timeStamp < said) return;
     window.removeEventListener("keydown", clear, true);
     window.removeEventListener("pointerdown", clear, true);
     if (news === next) setNews(null);
   };
-  // After this key has finished, so it is not the one that clears it.
-  setTimeout(() => {
-    window.addEventListener("keydown", clear, true);
-    window.addEventListener("pointerdown", clear, true);
-  });
+  window.addEventListener("keydown", clear, true);
+  window.addEventListener("pointerdown", clear, true);
 }
 
 export function useNews() {
