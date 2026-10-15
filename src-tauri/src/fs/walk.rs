@@ -201,7 +201,8 @@ pub fn reconcile(conn: &Connection) -> Result<WalkReport> {
     reconcile_list(conn, sources::list(conn)?, &|| false).map(Option::unwrap_or_default)
 }
 
-/// As [`reconcile`], stopping between two sources once `halt` says so; `None` when it stopped.
+/// As [`reconcile`], stopping before the next source or directory once `halt` says so, having
+/// retired nothing in the source it stopped in; `None` when it stopped.
 pub fn reconcile_until(conn: &Connection, halt: &dyn Fn() -> bool) -> Result<Option<WalkReport>> {
     reconcile_list(conn, sources::list(conn)?, halt)
 }
@@ -224,10 +225,11 @@ fn reconcile_list(
             continue; // unreachable, so nothing here can be judged
         }
         let turn = super::turn();
-        let walked_one = walk_source(conn, &source, &mut report);
+        let walked_one = walk_source(conn, &source, &mut report, halt);
         drop(turn);
         match walked_one {
-            Ok(()) => walked.push(source.id),
+            Ok(true) => walked.push(source.id),
+            Ok(false) => return Ok(None),
             // Removed while this pass ran: it took its folders with it, and the rest still walk.
             Err(err) => {
                 if sources::get(conn, source.id)?.is_some() {
@@ -242,37 +244,56 @@ fn reconcile_list(
     Ok(Some(report))
 }
 
-/// One source: its directories mirrored, its files recorded, and what vanished retired.
-fn walk_source(conn: &Connection, source: &sources::Source, report: &mut WalkReport) -> Result<()> {
+/// One source: its directories mirrored, its files recorded, and what vanished retired; false when
+/// `halt` stopped it first, with nothing retired.
+fn walk_source(
+    conn: &Connection,
+    source: &sources::Source,
+    report: &mut WalkReport,
+    halt: &dyn Fn() -> bool,
+) -> Result<bool> {
     let root = PathBuf::from(&source.root);
     let root_folder = folders::source_root_folder(conn, source.id)?;
 
     items::begin_sweep(conn)?;
-    record_all(conn, &root, root_folder, source.id, report)?;
+    if !record_all(conn, &root, root_folder, source.id, report, halt)? {
+        return Ok(false);
+    }
     report.items_retired += items::finish_sweep(conn, source.id)?;
-    sources::mark_indexed(conn, source.id)
+    sources::mark_indexed(conn, source.id)?;
+    Ok(true)
 }
 
-/// Every directory under `dir` mirrored into folders under `folder_id`, and every file recorded.
+/// Every directory under `dir` mirrored into folders under `folder_id`, and every file recorded;
+/// false when `halt` stopped it before a directory's files.
 fn record_all(
     conn: &Connection,
     dir: &Path,
     folder_id: i64,
     source_id: i64,
     report: &mut WalkReport,
-) -> Result<()> {
+    halt: &dyn Fn() -> bool,
+) -> Result<bool> {
     let (folder_ids, files) = mirror(conn, dir, folder_id)?;
-    for file in files {
-        let Some(folder_id) = file.parent().and_then(|p| folder_ids.get(p)).copied() else {
+    let mut reading: Option<&Path> = None;
+    for file in &files {
+        let parent = file.parent();
+        if parent != reading {
+            if halt() {
+                return Ok(false);
+            }
+            reading = parent;
+        }
+        let Some(folder_id) = parent.and_then(|p| folder_ids.get(p)).copied() else {
             continue;
         };
-        match record_file(conn, &file, folder_id, source_id) {
+        match record_file(conn, file, folder_id, source_id) {
             Ok(Outcome::Unchanged) => report.unchanged += 1,
             Ok(Outcome::Indexed) => report.indexed += 1,
             Err(err) => eprintln!("could not index {}: {err}", file.display()),
         }
     }
-    Ok(())
+    Ok(true)
 }
 
 /// One folder read again, as the whole walk reads a source, judging nothing outside its subtree.
@@ -293,7 +314,7 @@ pub fn reconcile_folder(conn: &Connection, folder_id: i64) -> Result<WalkReport>
     let dir = paths::folder_dir(conn, folder_id)?;
     items::begin_sweep(conn)?;
     if dir.is_dir() {
-        record_all(conn, &dir, folder_id, source_id, &mut report)?;
+        record_all(conn, &dir, folder_id, source_id, &mut report, &|| false)?;
     }
     report.items_retired += items::finish_sweep_under(conn, folder_id)?;
     report.folders_retired = if dir.is_dir() {
@@ -441,7 +462,7 @@ mod tests {
         let asked = std::cell::Cell::new(0);
         let halt = || {
             asked.set(asked.get() + 1);
-            asked.get() > 1
+            asked.get() > 2
         };
 
         assert_eq!(reconcile_until(&conn, &halt).unwrap(), None);
@@ -454,6 +475,30 @@ mod tests {
         );
         assert!(reconcile_until(&conn, &|| false).unwrap().is_some());
         assert_eq!(live_items(&conn).len(), 2);
+    }
+
+    #[test]
+    fn a_walk_asked_to_halt_stops_before_the_next_directory_and_retires_nothing_unread() {
+        let (conn, root) = library("halted-directory");
+        write(&root.join("A/a.jpg"), "a");
+        write(&root.join("B/b.jpg"), "b");
+        reconcile(&conn).unwrap();
+        write(&root.join("A/a2.jpg"), "a2");
+        write(&root.join("B/b2.jpg"), "b2");
+        std::fs::remove_file(root.join("B/b.jpg")).unwrap();
+        let asked = std::cell::Cell::new(0);
+        let halt = || {
+            asked.set(asked.get() + 1);
+            asked.get() > 2
+        };
+
+        assert_eq!(reconcile_until(&conn, &halt).unwrap(), None);
+        let names: Vec<String> = live_items(&conn).into_iter().map(|(n, _)| n).collect();
+        assert_eq!(
+            names,
+            ["a.jpg", "a2.jpg", "b.jpg"],
+            "A was read and B was not, so nothing in B is judged"
+        );
     }
 
     #[test]
