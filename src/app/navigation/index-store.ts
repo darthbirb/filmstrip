@@ -93,8 +93,12 @@ async function settle(sources: SourceSummary[]) {
 /** Loads what is indexed, and again each time the background work goes quiet. */
 export async function startIndex() {
   await loadIndex().catch(() => undefined);
+  // A copy's or an export's line moves while the walk stays idle; only going quiet reads again.
+  let was: Progress["phase"] | null = null;
   await listen<Progress>("job-progress", (event) => {
-    if (event.payload.phase === "idle") void loadIndex().catch(() => undefined);
+    const { phase } = event.payload;
+    if (phase === "idle" && was !== "idle") void loadIndex().catch(() => undefined);
+    was = phase;
   }).catch(() => undefined);
 }
 

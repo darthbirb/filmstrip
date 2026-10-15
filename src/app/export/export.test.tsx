@@ -10,8 +10,9 @@ import { SelectionBar } from "../grid/SelectionBar";
 import { clearChecked } from "../grid/selection";
 import { Foot } from "../navigation/Foot";
 import { setNews } from "../navigation/foot-slot";
-import { loadIndex, resetIndex } from "../navigation/index-store";
+import { loadIndex, resetIndex, startIndex } from "../navigation/index-store";
 import { Navigation } from "../navigation/Navigation";
+import { setOpenFolders } from "../navigation/open-folders";
 import { watchWork } from "../navigation/work-store";
 import { type Place, setPlace } from "../place";
 import { getPreferences, updatePreferences } from "../preferences";
@@ -35,6 +36,7 @@ const CAIRO: Place = {
 };
 
 beforeAll(async () => {
+  await startIndex();
   await watchWork();
   await watchExports();
 });
@@ -191,6 +193,19 @@ test("Export… on a folder's row takes its branch, and the sheet hangs off the 
   await expect
     .element(page.getByRole("button", { name: "Show in Explorer" }))
     .not.toBeInTheDocument();
+});
+
+test("an export's line moving leaves the tree as it is", async () => {
+  updatePreferences({ exportDir: "D:\\Tree" });
+  const screen = await renderAll();
+  setOpenFolders(new Set([1, 4]));
+  const cairo = screen.getByRole("treeitem", { name: /^Cairo / });
+  await expect.element(cairo).toBeVisible();
+  await exportTwo();
+  await userEvent.click(sheet("Export 2 Files").getByRole("button", { name: "Export" }));
+  await expect.element(page.getByText("Exporting Cairo.zip…")).toBeVisible();
+  await expect.element(page.getByText("Exported 2 files to Cairo.zip.")).toBeVisible();
+  await expect.element(cairo).toBeVisible();
 });
 
 const ARCHIVE: Stayed[] = ["page 001.tif", "page 002.tif"].map((name, at) => ({

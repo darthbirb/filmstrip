@@ -51,6 +51,10 @@ export function ExportSheet({ sheet }: { sheet: Sheet }) {
   const close = () => {
     if (surface.current?.matches(":popover-open")) surface.current.hidePopover();
   };
+  const start = () => {
+    close();
+    void startSheet(sheet, naming);
+  };
 
   return (
     <div
@@ -67,7 +71,14 @@ export function ExportSheet({ sheet }: { sheet: Sheet }) {
           anchor.focus({ preventScroll: true });
         openSheet(null);
       }}
-      onKeyDown={keepEscape}
+      onKeyDown={(event) => {
+        keepEscape(event);
+        // Enter takes the naming shown, from the pair as from Export.
+        if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
+          event.preventDefault();
+          start();
+        }
+      }}
       style={
         {
           positionAnchor: name,
@@ -108,14 +119,7 @@ export function ExportSheet({ sheet }: { sheet: Sheet }) {
       )}
       <hr className={RULE} />
       <div className="flex gap-1.5 p-1">
-        <Button
-          ref={go}
-          glyph="zip"
-          onClick={() => {
-            close();
-            void startSheet(sheet, naming);
-          }}
-        >
+        <Button ref={go} glyph="zip" onClick={start}>
           Export
         </Button>
         <Button tone="quiet" onClick={close}>
