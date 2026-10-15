@@ -154,7 +154,7 @@ export function Grid({ mode }: { mode: LayoutMode }) {
     else toggleChecked(id);
   };
 
-  // The ground between and under the tiles opens the place's own menu; a tile keeps its own.
+  // The place's own menu, on the ground between and under the tiles. DECISIONS.md "Right-click menus".
   const ground = useContextMenu();
   const grounded = place?.kind === "folder" || place?.kind === "sorting";
   const onGround = (event: MouseEvent<HTMLDivElement>) => {
@@ -223,7 +223,7 @@ export function Grid({ mode }: { mode: LayoutMode }) {
       aria-busy={reading || undefined}
       // Where a drag from Explorer finds the grid it rests on.
       data-drop="grid"
-      // A click on the ground holds the focus for the menu key; with no tile to Tab to, so does Tab.
+      // The menu key needs the focus here: a click on the ground keeps it, and Tab when no tile can.
       tabIndex={grounded ? (items?.length ? -1 : 0) : undefined}
       onContextMenu={onGround}
       className={`focus-ring-inset h-full overflow-auto ${lit ? "rounded-control inset-ring-2 inset-ring-plate" : ""}`}
