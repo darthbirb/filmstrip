@@ -1014,6 +1014,47 @@ mod tests {
     }
 
     #[test]
+    fn a_file_caught_halfway_through_a_move_goes_in_once_the_move_has_ended() {
+        let lib = library("mid-move");
+        let pyramid = lib.id("pyramid.jpg");
+        let db = lib.dir.join("library.db");
+        let (from, to) = (
+            lib.dir.join("pictures/Trips/Cairo/pyramid.jpg"),
+            lib.dir.join("pictures/Trips/pyramid.jpg"),
+        );
+        let trips = lib.trips;
+        let mover = std::rc::Rc::new(RefCell::new(None));
+        let joined = mover.clone();
+        let script = meanwhile(1, move || {
+            let (moved, on_disk) = std::sync::mpsc::channel();
+            *mover.borrow_mut() = Some(std::thread::spawn(move || {
+                let _turn = crate::fs::turn();
+                std::fs::rename(&from, &to).unwrap();
+                moved.send(()).unwrap();
+                std::thread::sleep(std::time::Duration::from_millis(300));
+                db::open(&db)
+                    .unwrap()
+                    .execute(
+                        "UPDATE item SET folder_id = ?1 WHERE id = ?2",
+                        params![trips, pyramid],
+                    )
+                    .unwrap();
+            }));
+            on_disk.recv().unwrap();
+        });
+        let (outcome, zip) = lib.export(
+            &Scope::Branch {
+                folder_id: lib.trips,
+            },
+            Naming::Keep,
+            &script,
+        );
+        joined.borrow_mut().take().unwrap().join().unwrap();
+        assert_eq!((outcome.end, outcome.written), (End::Written, 5));
+        assert!(held(&zip).contains(&("Trips/Cairo/pyramid.jpg".into(), "pyramid".into())));
+    }
+
+    #[test]
     fn nothing_read_leaves_no_zip() {
         let lib = library("nothing");
         std::fs::remove_file(lib.dir.join("pictures/cover.jpg")).unwrap();
