@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AddOutcome } from "./bindings/AddOutcome";
+import type { Backup } from "./bindings/Backup";
 import type { Batch } from "./bindings/Batch";
 import type { BranchFile } from "./bindings/BranchFile";
 import type { Carried } from "./bindings/Carried";
@@ -31,8 +32,10 @@ import type { Plan } from "./bindings/Plan";
 import type { Progress } from "./bindings/Progress";
 import type { Reading } from "./bindings/Reading";
 import type { Reason } from "./bindings/Reason";
+import type { Restored } from "./bindings/Restored";
 import type { Scope } from "./bindings/Scope";
 import type { SearchOutcome } from "./bindings/SearchOutcome";
+import type { Shelved } from "./bindings/Shelved";
 import type { Sort } from "./bindings/Sort";
 import type { SourceKind } from "./bindings/SourceKind";
 import type { SourceSummary } from "./bindings/SourceSummary";
@@ -279,3 +282,13 @@ export const uiPreferences = () => invoke<unknown>("ui_preferences");
 
 export const setUiPreferences = (preferences: unknown) =>
   invoke<void>("set_ui_preferences", { preferences });
+
+export const listBackups = () => invoke<Shelved>("list_backups");
+
+export const backUpNow = () => invoke<Backup | null>("back_up_now");
+
+export const restoreBackup = (name: string) => invoke<Restored>("restore_backup", { name });
+
+export const setBackupsKept = (kept: number) => invoke<void>("set_backups_kept", { kept });
+
+export const launchBackupRefusal = () => invoke<Reason | null>("launch_backup_refusal");

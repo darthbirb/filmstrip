@@ -1,5 +1,6 @@
 //! `filmstrip.config.json`: only what has no home in the database — window
-//! placement and interface preferences. DECISIONS.md "Nothing outside the app folder".
+//! placement, interface preferences, and how many backups of the database are kept.
+//! DECISIONS.md "Nothing outside the app folder".
 
 use std::path::{Path, PathBuf};
 
@@ -36,6 +37,9 @@ pub struct Config {
     /// Whatever the interface keeps between sessions. Opaque on purpose: its
     /// shape belongs to the frontend, and nothing in Rust reads inside it.
     pub ui: Option<serde_json::Value>,
+    /// How many of the index's backups are kept. Here rather than in the index, which a restore
+    /// replaces.
+    pub backups_kept: Option<u32>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -86,7 +90,29 @@ impl Config {
         config.ui = Some(preferences);
         config.save()
     }
+
+    /// The number of backups kept: one of the four Settings offers, seven until another is chosen.
+    pub fn backups_kept(&self) -> u32 {
+        self.backups_kept
+            .filter(|kept| BACKUPS_KEPT.contains(kept))
+            .unwrap_or(BACKUPS_KEPT_FIRST)
+    }
+
+    pub fn set_backups_kept(kept: u32) -> Result<()> {
+        if !BACKUPS_KEPT.contains(&kept) {
+            return Err(AppError::invalid(format!(
+                "{kept} is not a number of backups to keep"
+            )));
+        }
+        let mut config = Config::load();
+        config.backups_kept = Some(kept);
+        config.save()
+    }
 }
+
+/// The answers Backups to Keep offers.
+pub const BACKUPS_KEPT: [u32; 4] = [3, 7, 14, 30];
+pub const BACKUPS_KEPT_FIRST: u32 = 7;
 
 #[cfg(test)]
 mod tests {
@@ -108,9 +134,24 @@ mod tests {
         let config = Config {
             window: None,
             ui: Some(ui.clone()),
+            backups_kept: None,
         };
         config.save_to(&path).unwrap();
         assert_eq!(Config::load_from(&path).ui, Some(ui));
+    }
+
+    #[test]
+    fn backups_kept_are_seven_until_one_of_the_four_answers_is_chosen() {
+        let path = scratch("kept").join("filmstrip.config.json");
+        assert_eq!(Config::load_from(&path).backups_kept(), 7);
+        std::fs::write(&path, r#"{ "backupsKept": 14 }"#).unwrap();
+        assert_eq!(Config::load_from(&path).backups_kept(), 14);
+        std::fs::write(&path, r#"{ "backupsKept": 5 }"#).unwrap();
+        assert_eq!(
+            Config::load_from(&path).backups_kept(),
+            7,
+            "not an answer offered"
+        );
     }
 
     #[test]

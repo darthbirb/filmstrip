@@ -1,6 +1,7 @@
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import type { Act } from "../ipc/bindings/Act";
+import type { Backup } from "../ipc/bindings/Backup";
 import type { Batch } from "../ipc/bindings/Batch";
 import type { BranchFile } from "../ipc/bindings/BranchFile";
 import type { Carried } from "../ipc/bindings/Carried";
@@ -39,9 +40,11 @@ import type { Progress } from "../ipc/bindings/Progress";
 import type { QueryTerm } from "../ipc/bindings/QueryTerm";
 import type { Reading } from "../ipc/bindings/Reading";
 import type { Reason } from "../ipc/bindings/Reason";
+import type { Restored } from "../ipc/bindings/Restored";
 import type { Scope } from "../ipc/bindings/Scope";
 import type { SearchOutcome } from "../ipc/bindings/SearchOutcome";
 import type { Shape } from "../ipc/bindings/Shape";
+import type { Shelved } from "../ipc/bindings/Shelved";
 import type { Sort } from "../ipc/bindings/Sort";
 import type { SourceKind } from "../ipc/bindings/SourceKind";
 import type { SourceSummary } from "../ipc/bindings/SourceSummary";
@@ -49,6 +52,7 @@ import type { Stayed } from "../ipc/bindings/Stayed";
 import type { Suggestion } from "../ipc/bindings/Suggestion";
 import type { Suggestions } from "../ipc/bindings/Suggestions";
 import type { TagRow } from "../ipc/bindings/TagRow";
+import type { Taken } from "../ipc/bindings/Taken";
 import type { Tally } from "../ipc/bindings/Tally";
 import type { Trashed } from "../ipc/bindings/Trashed";
 import type { UndoReport } from "../ipc/bindings/UndoReport";
@@ -1380,6 +1384,103 @@ const cancelExports = new Map<number, () => void>();
 
 let storedPreferences: unknown = null;
 
+/** The backups the sheet draws: a week of them, newest first, the 9 October one unreadable. */
+function backupsDrawn(): Backup[] {
+  const day = new Date();
+  day.setHours(0, 0, 0, 0);
+  const at = (daysAgo: number, hours: number, minutes: number) =>
+    Math.floor(day.getTime() / 1000) - daysAgo * 86_400 + hours * 3600 + minutes * 60;
+  const drawn: [number, number, number, Taken, number][] = [
+    [0, 9, 14, "hand", 48],
+    [1, 9, 41, "launch", 48],
+    [3, 9, 5, "launch", 47],
+    [5, 19, 22, "launch", 47],
+    [6, 9, 30, "launch", 46],
+    [7, 8, 47, "launch", 46],
+    [8, 8, 12, "launch", 45],
+  ];
+  return drawn.map(([daysAgo, hours, minutes, how, mb]) => {
+    const takenAt = at(daysAgo, hours, minutes);
+    return { name: `index-${takenAt}000-${how}.db`, takenAt, how, bytes: mb * MB, readable: true };
+  });
+}
+
+const MB = 1024 * 1024;
+const BACKUP_STEP_MS = 300;
+// `?no-backups` empties the folder, `?backup-refused` refuses the launch's and Back Up Now.
+const backupsWanted = () => new URLSearchParams(location.search);
+let backups: Backup[] = backupsWanted().has("no-backups") ? [] : backupsDrawn();
+let backupsKept = 7;
+const unreadable = backupsDrawn()[4]?.name;
+
+let launchRefusal: Reason | null = backupsWanted().has("backup-refused")
+  ? { kind: "diskFull" }
+  : null;
+
+/** Puts the backups back as drawn, for tests, and says how the launch's backup ended. */
+export function resetBackups(refused: Reason | null = null) {
+  backups = backupsDrawn();
+  backupsKept = 7;
+  launchRefusal = refused;
+}
+
+function takeBackup(how: Taken): Backup {
+  const takenAt = Math.max(Math.floor(Date.now() / 1000), (backups[0]?.takenAt ?? 0) + 1);
+  return { name: `index-${takenAt}000-${how}.db`, takenAt, how, bytes: 48 * MB, readable: true };
+}
+
+function rotateBackups(spare?: string) {
+  backups = backups.filter((backup, at) => at < backupsKept || backup.name === spare);
+}
+
+function backUpNow(): Promise<Backup | null> {
+  if (backupsWanted().has("backup-refused")) {
+    const full: AppError = {
+      kind: "refused",
+      message: "the disk is full",
+      reason: { kind: "diskFull" },
+    };
+    return Promise.reject(full);
+  }
+  return new Promise((resolve) =>
+    setTimeout(() => {
+      const taken = takeBackup("hand");
+      backups = [taken, ...backups];
+      rotateBackups();
+      resolve(taken);
+    }, BACKUP_STEP_MS * 3),
+  );
+}
+
+function restoreBackup(name: string): Promise<Restored> | Restored {
+  const from = backups.find((backup) => backup.name === name);
+  if (!from) return invalid(`there is no backup named ${name}`) as never;
+  if (from.name === unreadable || !from.readable) {
+    from.readable = false;
+    return { kind: "unreadable", from };
+  }
+  return new Promise((resolve) => {
+    let percent = 0;
+    const step = () => {
+      percent = Math.min(100, percent + 25);
+      void emit("restore-progress", percent);
+      if (percent < 100) {
+        setTimeout(step, BACKUP_STEP_MS);
+        return;
+      }
+      const back = takeBackup("restore");
+      backups = [back, ...backups];
+      rotateBackups(name);
+      resolve({ kind: "restored", from, back });
+    };
+    setTimeout(step, BACKUP_STEP_MS);
+  });
+}
+
+function shelved(): Shelved {
+  return { backups, keep: backupsKept, dir: "D:\\Filmstrip\\data\\backups", writing: false };
+}
+
 const COMMANDS: Record<string, (args: Args) => unknown> = {
   ui_preferences: () => storedPreferences,
   set_ui_preferences: ({ preferences }) => {
@@ -1952,6 +2053,14 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   }),
   index_failures: () => [],
   retry_failed_jobs: () => 0,
+  list_backups: () => shelved(),
+  back_up_now: () => backUpNow(),
+  restore_backup: ({ name }) => restoreBackup(name as string),
+  set_backups_kept: ({ kept }) => {
+    backupsKept = kept as number;
+    return null;
+  },
+  launch_backup_refusal: (): Reason | null => launchRefusal,
 };
 
 mockWindows("main");

@@ -25,6 +25,10 @@ pub fn trash_dir() -> Result<PathBuf> {
     Ok(config::app_data_dir()?.join("trash"))
 }
 
+pub fn backups_dir() -> Result<PathBuf> {
+    Ok(config::app_data_dir()?.join("backups"))
+}
+
 /// Creates the app-owned tree. Touches nothing inside any source.
 pub fn ensure_app_dirs() -> Result<()> {
     for dir in [
@@ -32,6 +36,7 @@ pub fn ensure_app_dirs() -> Result<()> {
         cache_dir()?,
         thumbs_dir()?,
         trash_dir()?,
+        backups_dir()?,
     ] {
         std::fs::create_dir_all(dir)?;
     }

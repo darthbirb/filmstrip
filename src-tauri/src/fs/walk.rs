@@ -198,15 +198,27 @@ fn record_new(
 
 /// Brings the index back in line with what is on disk.
 pub fn reconcile(conn: &Connection) -> Result<WalkReport> {
-    reconcile_list(conn, sources::list(conn)?)
+    reconcile_list(conn, sources::list(conn)?, &|| false).map(Option::unwrap_or_default)
+}
+
+/// As [`reconcile`], stopping between two sources once `halt` says so; `None` when it stopped.
+pub fn reconcile_until(conn: &Connection, halt: &dyn Fn() -> bool) -> Result<Option<WalkReport>> {
+    reconcile_list(conn, sources::list(conn)?, halt)
 }
 
 /// The pass itself, over the sources it listed when it started.
-fn reconcile_list(conn: &Connection, listed: Vec<sources::Source>) -> Result<WalkReport> {
+fn reconcile_list(
+    conn: &Connection,
+    listed: Vec<sources::Source>,
+    halt: &dyn Fn() -> bool,
+) -> Result<Option<WalkReport>> {
     let mut report = WalkReport::default();
     let mut walked: Vec<i64> = Vec::new();
 
     for source in listed {
+        if halt() {
+            return Ok(None);
+        }
         let root = PathBuf::from(&source.root);
         if !root.is_dir() {
             continue; // unreachable, so nothing here can be judged
@@ -227,7 +239,7 @@ fn reconcile_list(conn: &Connection, listed: Vec<sources::Source>) -> Result<Wal
 
     let _turn = super::turn();
     report.folders_retired = retire_vanished_folders(conn, &walked)?;
-    Ok(report)
+    Ok(Some(report))
 }
 
 /// One source: its directories mirrored, its files recorded, and what vanished retired.
@@ -410,13 +422,38 @@ mod tests {
         let listed = sources::list(&conn).unwrap();
         sources::remove(&conn, doomed.id).unwrap();
 
-        let report = reconcile_list(&conn, listed).unwrap();
+        let report = reconcile_list(&conn, listed, &|| false).unwrap().unwrap();
         assert_eq!(report.indexed, 1);
         assert_eq!(
             live_items(&conn).len(),
             1,
             "the source still there was walked"
         );
+    }
+
+    #[test]
+    fn a_walk_asked_to_halt_stops_before_the_next_source_and_retires_nothing() {
+        let (conn, root) = library("halted");
+        write(&root.join("first.jpg"), "a");
+        let second = scratch("halted-second");
+        write(&second.join("second.jpg"), "b");
+        sources::add(&conn, &second, "Second", SourceKind::Library).unwrap();
+        let asked = std::cell::Cell::new(0);
+        let halt = || {
+            asked.set(asked.get() + 1);
+            asked.get() > 1
+        };
+
+        assert_eq!(reconcile_until(&conn, &halt).unwrap(), None);
+        assert_eq!(
+            live_items(&conn),
+            [(
+                "first.jpg".to_string(),
+                folders::source_root_folder(&conn, 1).unwrap()
+            )]
+        );
+        assert!(reconcile_until(&conn, &|| false).unwrap().is_some());
+        assert_eq!(live_items(&conn).len(), 2);
     }
 
     #[test]

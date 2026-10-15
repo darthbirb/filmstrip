@@ -460,11 +460,46 @@ pub fn latest_batch(conn: &Connection) -> Result<Option<String>> {
               WHERE batch_id NOT IN (SELECT json_extract(payload, '$.batchId') FROM job
                                       WHERE kind = ?1 AND status IN ('pending', 'running')
                                         AND json_extract(payload, '$.batchId') IS NOT NULL)
+                AND id > ?2
               ORDER BY id DESC LIMIT 1",
-            params![COPY_IN],
+            params![COPY_IN, floor(conn)?],
             |r| r.get(0),
         )
         .optional()?)
+}
+
+const FLOOR: &str = "undo_floor";
+
+/// The newest row written before the index was last restored; undo goes no further back.
+pub fn floor(conn: &Connection) -> Result<i64> {
+    Ok(conn
+        .query_row(
+            "SELECT CAST(value AS INTEGER) FROM setting WHERE key = ?1",
+            params![FLOOR],
+            |r| r.get(0),
+        )
+        .optional()?
+        .unwrap_or(0))
+}
+
+/// Ends the way back at the journal as it stands, as a restore does: what it holds describes a
+/// disk the walk has read again since. DECISIONS.md "Backing up the index".
+pub fn set_floor(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "INSERT INTO setting (key, value) SELECT ?1, COALESCE(MAX(id), 0) FROM journal WHERE true
+         ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+        params![FLOOR],
+    )?;
+    Ok(())
+}
+
+/// Whether a batch was written before the index was last restored.
+pub fn below_floor(conn: &Connection, batch_id: &str) -> Result<bool> {
+    Ok(conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM journal WHERE batch_id = ?1 AND id <= ?2)",
+        params![batch_id, floor(conn)?],
+        |r| r.get(0),
+    )?)
 }
 
 /// Whether a copy still waiting or running writes under this batch.
@@ -504,6 +539,28 @@ mod tests {
             drop_entry(&conn, entry.id).unwrap();
         }
         assert_eq!(latest_batch(&conn).unwrap(), Some(first));
+    }
+
+    #[test]
+    fn undo_goes_no_further_back_than_the_floor_a_restore_sets() {
+        let conn = conn();
+        let before = new_batch();
+        record_folder_create(&conn, &before, 7, 1).unwrap();
+        set_floor(&conn).unwrap();
+        assert_eq!(latest_batch(&conn).unwrap(), None);
+        assert!(below_floor(&conn, &before).unwrap());
+
+        let after = new_batch();
+        record_folder_rename(&conn, &after, 7, "Cairo", "Giza").unwrap();
+        assert_eq!(latest_batch(&conn).unwrap(), Some(after.clone()));
+        assert!(!below_floor(&conn, &after).unwrap());
+        for entry in batch(&conn, &after).unwrap() {
+            drop_entry(&conn, entry.id).unwrap();
+        }
+        assert_eq!(latest_batch(&conn).unwrap(), None, "and stops there again");
+
+        set_floor(&conn).unwrap();
+        assert_eq!(floor(&conn).unwrap(), 1, "a second restore moves it");
     }
 
     #[test]

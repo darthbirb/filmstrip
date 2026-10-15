@@ -29,7 +29,7 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 | `folder_tag` | Terms on a folder, added by its title or by hand. |
 | `item_tag` | Tags an item carries itself. |
 | `item_effective_tag` | Everything an item carries once inheritance is resolved. |
-| `setting` | Key-value pairs. |
+| `setting` | Key-value pairs: `undo_floor`, the newest journal row a restore kept. |
 | `journal` | Every change the app made on disk, and every set tagged at once, with what reverses it, grouped into batches. |
 | `job` | Background work: waiting, running, or failed with its error. |
 | `destination_key` | A digit, `0` to `9`, bound to a folder that a press moves files into. |
@@ -45,6 +45,8 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 - An item's path is its folder's path joined with `disk_name`. A trashed item's file is in the
   app's trash instead, at `ab/cd/<uuid>.<ext>`, sharded as thumbnails are
   (`fs::paths::trash_path`); its row keeps the folder and name it left.
+- The index's backups are whole copies of it in `dataackups`, beside the trash, each named
+  `index-<ms>-<how>.db` for when and how it was taken (`fs::backups`).
 - **Every item has a folder.** A file waiting in a sorting source sits in that source's root
   folder or somewhere beneath it.
 - `item.source_id` repeats what the folder's ancestry implies. `items::set_folder` derives it
@@ -126,6 +128,8 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   every `folder_tag` and `item_tag` row it moved onto another term or took away, each with its
   `rowid`, so an undo puts it back in its place.
 - Nothing prunes the journal yet.
+- Undo never reaches a row at or below `setting.undo_floor`, which a restore sets to the newest
+  row the restored journal holds.
 
 ## Destination keys
 

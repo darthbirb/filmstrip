@@ -485,6 +485,30 @@ pub fn restore_retired_with(conn: &Connection, folder_id: i64, at: i64) -> Resul
     Ok(())
 }
 
+/// The child with this title retired last, for a place no live folder holds.
+pub fn retired_child(conn: &Connection, parent_id: i64, title: &str) -> Result<Option<i64>> {
+    Ok(conn
+        .query_row(
+            "SELECT id FROM folder
+              WHERE parent_id = ?1 AND title = ?2 COLLATE NOCASE AND deleted_at IS NOT NULL
+              ORDER BY deleted_at DESC, id DESC LIMIT 1",
+            params![parent_id, title],
+            |r| r.get(0),
+        )
+        .optional()?)
+}
+
+/// A folder made already retired, to name where a trashed file came from.
+pub fn create_retired(conn: &Connection, parent_id: i64, title: &str, at: i64) -> Result<i64> {
+    conn.execute(
+        "INSERT INTO folder (title, parent_id, created_at, deleted_at) VALUES (?1, ?2, ?3, ?3)",
+        params![title, parent_id, at],
+    )?;
+    let id = conn.last_insert_rowid();
+    tags::sync_title_tag(conn, id, title)?;
+    Ok(id)
+}
+
 /// The live folders directly inside one.
 pub fn live_children(conn: &Connection, folder_id: i64) -> Result<Vec<i64>> {
     let mut stmt = conn
