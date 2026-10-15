@@ -150,6 +150,49 @@ test("a folder's grid takes them as its row does, ringed, and copies into the fo
   expect(grid.className).not.toContain("inset-ring-plate");
 });
 
+test("resting near the tree's foot or top scrolls it, a row's height a second, as a move's drag does", async () => {
+  await page.viewport(1200, 800);
+  render(
+    <>
+      <nav style={{ width: 260, height: 160, overflow: "auto" }}>
+        <Navigation />
+      </nav>
+      <Drops />
+    </>,
+  );
+  await expect.element(row("People 0 of 0")).toBeInTheDocument();
+  const scroller = document.querySelector("nav");
+  if (!scroller) throw new Error("no tree");
+  const box = scroller.getBoundingClientRect();
+  const rowHeight = Number.parseFloat(
+    getComputedStyle(document.documentElement).getPropertyValue("--spacing-row"),
+  );
+  const edge = rowHeight * Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+  const scale = window.devicePixelRatio;
+  const at = (y: number) => ({ x: (box.left + 40) * scale, y: y * scale });
+
+  // One event and then stillness: Explorer says nothing while the pointer rests.
+  await emit("tauri://drag-enter", { paths: DOWNLOADS, position: at(box.bottom - edge / 2) });
+  await expect.poll(() => scroller.scrollTop, { timeout: 3000 }).toBeGreaterThan(edge / 4);
+  const started = performance.now();
+  const from = scroller.scrollTop;
+  await new Promise((done) => setTimeout(done, 500));
+  const speed = (scroller.scrollTop - from) / ((performance.now() - started) / 1000);
+  expect(speed).toBeGreaterThan(edge / 3);
+  expect(speed).toBeLessThan(edge * 2);
+
+  await emit("tauri://drag-over", { position: at(box.top + edge / 2) });
+  await expect.poll(() => scroller.scrollTop, { timeout: 5000 }).toBe(0);
+
+  await emit("tauri://drag-leave", null);
+  await emit("tauri://drag-enter", { paths: DOWNLOADS, position: at(box.bottom - edge / 2) });
+  await expect.poll(() => scroller.scrollTop).toBeGreaterThan(0);
+  await emit("tauri://drag-leave", null);
+  const left = scroller.scrollTop;
+  await new Promise((done) => setTimeout(done, 300));
+  expect(scroller.scrollTop).toBe(left);
+});
+
 test("a copy under way has its own line at the foot, and its dismiss cancels it", async () => {
   await renderAll();
   const progress: Progress = {

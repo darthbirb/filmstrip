@@ -7,6 +7,7 @@ import { countCarried } from "../../ipc/commands";
 import { formatCount } from "../../lib/format";
 import { DragGhost } from "../../ui/DragGhost";
 import { ContextMenu } from "../../ui/Menu";
+import { scrollTreeNear } from "../grid/drag";
 import { getIndex } from "../navigation/index-store";
 import { type Crumb, getPlace } from "../place";
 import { counted } from "./clipboard";
@@ -111,6 +112,24 @@ function hold() {
 }
 
 let holding: ReturnType<typeof setTimeout> | undefined;
+let stopScrolling = () => {};
+
+/** Explorer reports the pointer only as it moves, so the tree scrolls on a timer of its own. */
+function startScrolling() {
+  stopScrolling();
+  stopScrolling = scrollTreeNear(
+    () => drag ?? { x: -1, y: -1 },
+    () => {
+      if (drag) track(drag.x, drag.y);
+    },
+  );
+}
+
+function putAway() {
+  clearTimeout(holding);
+  stopScrolling();
+  set(null);
+}
 
 /** Where the pointer rests, in the window's pixels, and what lies there. */
 function track(x: number, y: number) {
@@ -132,8 +151,7 @@ function track(x: number, y: number) {
 function land(x: number, y: number) {
   track(x, y);
   const was = drag;
-  clearTimeout(holding);
-  set(null);
+  putAway();
   const landing = was?.over?.landing;
   if (!was || !landing) return;
   if (landing.kind === "accept") void dropInto(landing.to, was.paths);
@@ -160,14 +178,14 @@ export function useExplorerDrops() {
     void getCurrentWebview()
       .onDragDropEvent(({ payload }) => {
         if (payload.type === "leave") {
-          clearTimeout(holding);
-          set(null);
+          putAway();
           return;
         }
         const [x, y] = at(payload.position);
         if (payload.type === "enter") {
           const paths = [...payload.paths];
           set({ paths, carried: null, x, y, over: null });
+          startScrolling();
           void countCarried(paths)
             .then((carried) => {
               if (drag?.paths === paths) set({ ...drag, carried });
@@ -185,6 +203,7 @@ export function useExplorerDrops() {
     return () => {
       gone = true;
       stop?.();
+      stopScrolling();
     };
   }, []);
 }

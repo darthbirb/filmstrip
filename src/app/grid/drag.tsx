@@ -70,6 +70,29 @@ function treeScroller() {
 }
 
 /**
+ * Near the tree's top or foot the tree scrolls, a row's height a second, for as long as the
+ * pointer rests there; `moved` follows each step. Returns the way to stop it.
+ */
+export function scrollTreeNear(at: () => { x: number; y: number }, moved: () => void) {
+  const scroller = treeScroller();
+  let frame = 0;
+  const scroll = () => {
+    frame = requestAnimationFrame(scroll);
+    if (!scroller) return;
+    const box = scroller.getBoundingClientRect();
+    const edge = token("--spacing-row");
+    const { x, y } = at();
+    if (x < box.left || x > box.right) return;
+    const step = y < box.top + edge ? -1 : y > box.bottom - edge ? 1 : 0;
+    if (step === 0) return;
+    scroller.scrollTop += (step * edge) / 60;
+    moved();
+  };
+  frame = requestAnimationFrame(scroll);
+  return () => cancelAnimationFrame(frame);
+}
+
+/**
  * A press on a tile, which becomes a drag once it has moved a tile-gap; less than that is a click.
  * `carry` is what the drag takes when it starts: the set when the tile is checked, else the tile.
  * The ghost wears the pressed tile's picture, or the first carried file's that has one.
@@ -84,8 +107,7 @@ export function pressTile(
   const slop = token("--spacing-tile-gap");
   let at = start;
   let hold: ReturnType<typeof setTimeout> | undefined;
-  let frame = 0;
-  let scroller: HTMLElement | null = null;
+  let stopScrolling = () => {};
 
   const track = () => {
     if (!drag) return;
@@ -101,26 +123,12 @@ export function pressTile(
     set({ ...drag, x: at.x, y: at.y, over });
   };
 
-  // Near the tree's top or foot the tree scrolls, a row's height a second, while the ghost rests.
-  const scroll = () => {
-    frame = requestAnimationFrame(scroll);
-    if (!scroller) return;
-    const box = scroller.getBoundingClientRect();
-    const edge = token("--spacing-row");
-    if (at.x < box.left || at.x > box.right) return;
-    const step = at.y < box.top + edge ? -1 : at.y > box.bottom - edge ? 1 : 0;
-    if (step === 0) return;
-    scroller.scrollTop += (step * edge) / 60;
-    track();
-  };
-
   const move = (next: PointerEvent) => {
     at = { x: next.clientX, y: next.clientY };
     if (!drag) {
       if (Math.hypot(at.x - start.x, at.y - start.y) < slop) return;
       set({ carried: carry(), pressed, x: at.x, y: at.y, over: null });
-      scroller = treeScroller();
-      frame = requestAnimationFrame(scroll);
+      stopScrolling = scrollTreeNear(() => at, track);
     }
     track();
   };
@@ -131,7 +139,7 @@ export function pressTile(
     window.removeEventListener("pointercancel", cancel);
     window.removeEventListener("keydown", putAway, true);
     clearTimeout(hold);
-    cancelAnimationFrame(frame);
+    stopScrolling();
     const was = drag;
     set(null);
     if (!was) return null;
