@@ -32,7 +32,8 @@ A folder's branch, or any checked files, can be **exported as one zip**. Windows
 where, and the files keep their own names or are named from their folders and when each was
 taken; the tree is kept either way. The library is only read: the export runs in the background
 with a Cancel, files on a drive that is away are skipped and listed, and a zip goes only under a
-name that is free, so nothing is ever replaced.
+name that is free, so nothing is ever replaced. A folder with no files in it says so, and asks
+nothing.
 
 ## The Sorting Box
 
