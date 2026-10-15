@@ -206,4 +206,14 @@ mod tests {
         let other = serde_json::to_value(AppError::invalid("no")).unwrap();
         assert_eq!(other, json!({ "kind": "invalid", "message": "no" }));
     }
+
+    #[test]
+    fn a_disk_with_no_room_left_says_it_is_full() {
+        for code in [39, 112] {
+            let full = AppError::Io(std::io::Error::from_raw_os_error(code));
+            assert_eq!(Reason::of(&full), Reason::DiskFull, "os error {code}");
+        }
+        let full = AppError::Io(std::io::ErrorKind::StorageFull.into());
+        assert_eq!(Reason::of(&full), Reason::DiskFull);
+    }
 }
