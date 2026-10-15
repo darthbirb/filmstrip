@@ -334,6 +334,8 @@ export function useContextMenu() {
     label: string,
     groups: MenuGroups,
     heading?: string,
+    /** Where the keyboard's menu opens, for an element too large to hang one off. */
+    keyed?: MenuAnchor,
   ) => {
     const filled = groups.filter((group) => group.length > 0);
     // An empty menu opens nothing at all; the browser's own stays suppressed.
@@ -342,7 +344,7 @@ export function useContextMenu() {
     event.stopPropagation();
     const anchor =
       event.button === -1
-        ? { element: event.currentTarget }
+        ? (keyed ?? { element: event.currentTarget })
         : { x: event.clientX, y: event.clientY, held: event.buttons !== 0 };
     setOpen({ label, anchor, heading, groups: filled });
   };

@@ -27,6 +27,7 @@ import { type Landing, type Resolver, setDropResolver, useDrag } from "../grid/d
 import { type CheckedFile, checkBranch } from "../grid/selection";
 import { DIGITS } from "../keys";
 import { libraryChanged } from "../library";
+import { type GroundMenu, placeHeader, setGroundMenu } from "../menus/ground";
 import { openMovePicker } from "../pane/move-picker";
 import { counted, getClipboard } from "../paste/clipboard";
 import { openPick, pasteInto, sortingPlaces } from "../paste/copy";
@@ -37,7 +38,7 @@ import {
   sortingLanding,
   useOutsideDrag,
 } from "../paste/drop";
-import { type Place, setPlace, usePlace } from "../place";
+import { type Place, placeFolder, setPlace, usePlace } from "../place";
 import { searchIn } from "../search/SearchField";
 import { openSettings } from "../settings/settings-store";
 import { refusedName } from "../undo/lines";
@@ -52,6 +53,7 @@ import {
   type Draft,
   favouritePlace,
   favouriteRow,
+  folderRowId,
   freshTitle,
   libraries,
   NoSources,
@@ -88,12 +90,16 @@ export function Navigation() {
     () => null,
   );
   landingOutside.current = () => null;
+  const ground = useRef<GroundMenu>(() => ({ groups: [] }));
+  ground.current = () => ({ groups: [] });
   useEffect(() => {
     setDropResolver((id, carried) => landing.current(id, carried));
     setOutsideResolver((id, paths) => landingOutside.current(id, paths));
+    setGroundMenu((at, point) => ground.current(at, point));
     return () => {
       setDropResolver(() => null);
       setOutsideResolver(() => null);
+      setGroundMenu(() => ({ groups: [] }));
     };
   }, []);
 
@@ -200,7 +206,7 @@ export function Navigation() {
   };
 
   /** The Sorting Box's own menu: Paste alone, and only while the clipboard holds files. */
-  const sortingMenu = (): HeadedMenu => {
+  const sortingMenu = (against: Against): HeadedMenu => {
     const held = getClipboard();
     const boxes = sortingPlaces(sources);
     const [one] = boxes;
@@ -220,12 +226,11 @@ export function Navigation() {
         ],
       };
     }
-    // The pick takes the menu's place against the same row, which the menu hands the focus back to.
+    // The pick takes the menu's place, against what it was opened on.
     const ask = () => {
-      const element = document.activeElement;
       openPick({
         heading: `Paste ${what} Into`,
-        anchor: element instanceof HTMLElement ? { element } : { x: 0, y: 0 },
+        anchor: against.anchor(),
         places: boxes,
         onPick: (to) => void pasteInto(to),
       });
@@ -233,17 +238,22 @@ export function Navigation() {
     return { groups: [[{ id: "paste", label: `Paste ${what}…`, glyph: "paste", onSelect: ask }]] };
   };
 
-  const menuFor = (id: string): HeadedMenu => {
-    if (id === SORTING_ID) return sortingMenu();
-    const source = sourceOf(id);
-    const folder = rowFolder(id);
-    if (!source || folder === undefined) return { groups: [] };
+  /** A place's menu, on its row `id` or on the grid's ground, whose verbs open `against` it. */
+  const menuAt = (id: string, at: Place | undefined, against: Against): HeadedMenu => {
+    if (at?.kind === "sorting") return sortingMenu(against);
+    const path = placeFolderPath(at);
+    const source =
+      at?.kind === "folder" ? sources.find((one) => one.id === at.sourceId) : undefined;
+    const folder = path.at(-1)?.id;
+    if (!at || !source || folder === undefined) return { groups: [] };
+    // From the ground the row may be inside a folder that is shut, so its parents open first.
     const rename = () => {
       setTaken(null);
       setDraft(null);
+      if (!rows.some((row) => row.id === id))
+        openFolders(path.slice(0, -1).map((crumb) => crumb.id));
       setRenaming(id);
     };
-    const path = placeFolderPath(places.get(id));
     // The parent opens if it was shut, down from its source, and the row arrives in its field.
     const newFolder: MenuAction = {
       id: "new-folder",
@@ -281,18 +291,13 @@ export function Navigation() {
           .then(() => refreshIndex())
           .catch(() => undefined),
     };
-    // Opens the ten keys against the row, which the menu has handed the focus back to.
     const title = path.at(-1)?.title ?? source.title;
     const assign: MenuAction = {
       id: "assign-key",
       label: "Assign Key…",
       glyph: "keyboard",
       trail: keyOf.get(folder),
-      onSelect: () => {
-        const element = document.activeElement;
-        const anchor = element instanceof HTMLElement ? { element } : { x: 0, y: 0 };
-        setKeying({ folder, title, anchor });
-      },
+      onSelect: () => setKeying({ folder, title, anchor: against.anchor() }),
     };
     // Ctrl+F with the offer taken, for a place you are not in: the scope is written, nothing runs.
     const titles = path.length > 0 ? path.map((crumb) => crumb.title) : [source.title];
@@ -307,25 +312,21 @@ export function Navigation() {
       label: "Select Everything Inside",
       glyph: "checkAll",
       onSelect: () => {
-        const at = places.get(id);
-        if (!at) return;
         setPlace(at);
         void checkBranch().catch(() => undefined);
       },
     };
-    // The menu has handed the focus back to the row by now, and the sheet hangs off it.
     const exportHere: MenuAction = {
       id: "export",
       label: "Export…",
       glyph: "zip",
       onSelect: () => {
-        const element = document.activeElement;
-        const row = element instanceof HTMLElement ? element : null;
+        const anchor = against.sheet();
         void exportFiles({
           scope: { kind: "branch", folderId: folder },
           name: title,
           folder: title,
-          anchor: () => (row?.isConnected ? row : null),
+          anchor: () => (anchor?.isConnected ? anchor : null),
           below: true,
         });
       },
@@ -348,12 +349,13 @@ export function Navigation() {
       id: "move",
       label: "Move to…",
       glyph: "moveTo",
-      // The menu has handed the focus back by now, so the picker opens against the row.
       onSelect: () => {
         const [name, parent] = [path.at(-1)?.title ?? "", path.at(-2)?.id ?? folder];
-        const element = document.activeElement;
-        const anchor = element instanceof HTMLElement ? { element } : { x: 0, y: 0 };
-        openMovePicker({ folder: { id: folder, name }, folderId: parent, anchor });
+        openMovePicker({
+          folder: { id: folder, name },
+          folderId: parent,
+          anchor: against.anchor(),
+        });
       },
     };
     const remove: MenuAction = {
@@ -378,6 +380,19 @@ export function Navigation() {
         [remove],
       ],
     };
+  };
+
+  const menuFor = (id: string) => menuAt(id, places.get(id), FROM_ROW);
+
+  // Its row's menu under its name, since it is not on its row; what it opens, opens where it was.
+  ground.current = (at, point) => {
+    const against: Against = { anchor: () => point, sheet: placeHeader };
+    if (at.kind === "sorting") {
+      return { heading: "Sorting Box", groups: sortingMenu(against).groups };
+    }
+    const folder = placeFolder(at);
+    if (!folder) return { groups: [] };
+    return { heading: folder.title, groups: menuAt(folderRowId(folder.id), at, against).groups };
   };
 
   const stopRenaming = () => {
@@ -546,6 +561,21 @@ function sourceMenu(
 }
 
 const placeFolderPath = (place: Place | undefined) => (place?.kind === "folder" ? place.path : []);
+
+/** What a menu's follow-ups open against: a menu, a picker, and the export sheet hung under it. */
+type Against = { anchor: () => MenuAnchor; sheet: () => HTMLElement | null };
+
+/** A row's menu has handed the focus back to the row by the time a verb runs. */
+const FROM_ROW: Against = {
+  anchor: () => {
+    const element = document.activeElement;
+    return element instanceof HTMLElement ? { element } : { x: 0, y: 0 };
+  },
+  sheet: () => {
+    const element = document.activeElement;
+    return element instanceof HTMLElement ? element : null;
+  },
+};
 
 function revealFolderRow(folder: number): MenuAction {
   return {

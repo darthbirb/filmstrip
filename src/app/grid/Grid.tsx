@@ -24,6 +24,7 @@ import { type HeadedMenu, useContextMenu } from "../../ui/Menu";
 import { SelectBox } from "../../ui/SelectBox";
 import { SkeletonTile } from "../../ui/Skeleton";
 import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
+import { groundMenu } from "../menus/ground";
 import { itemMenu, setMenu } from "../menus/item-menu";
 import { setFullScreen } from "../pane/full-screen";
 import { showInPane, usePaneItem } from "../pane/pane-store";
@@ -153,6 +154,20 @@ export function Grid({ mode }: { mode: LayoutMode }) {
     else toggleChecked(id);
   };
 
+  // The ground between and under the tiles opens the place's own menu; a tile keeps its own.
+  const ground = useContextMenu();
+  const grounded = place?.kind === "folder" || place?.kind === "sorting";
+  const onGround = (event: MouseEvent<HTMLDivElement>) => {
+    if (!place || (event.target as Element).closest("figure, button")) return;
+    const box = event.currentTarget.getBoundingClientRect();
+    const at =
+      event.button === -1
+        ? { x: box.left + gap, y: box.top + gap }
+        : { x: event.clientX, y: event.clientY };
+    const { heading, groups } = groundMenu(place, at);
+    ground.open(event, heading ?? "", groups, heading, at);
+  };
+
   const tiles: ReactElement[] = [];
   if (items && result) {
     const draw = (index: number, row: number) => {
@@ -202,12 +217,16 @@ export function Grid({ mode }: { mode: LayoutMode }) {
   }
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: the ground's menu is its place's row's, which the keyboard reaches there too.
     <div
       ref={scroller}
       aria-busy={reading || undefined}
       // Where a drag from Explorer finds the grid it rests on.
       data-drop="grid"
-      className={`h-full overflow-auto ${lit ? "rounded-control inset-ring-2 inset-ring-plate" : ""}`}
+      // A click on the ground holds the focus for the menu key; with no tile to Tab to, so does Tab.
+      tabIndex={grounded ? (items?.length ? -1 : 0) : undefined}
+      onContextMenu={onGround}
+      className={`focus-ring-inset h-full overflow-auto ${lit ? "rounded-control inset-ring-2 inset-ring-plate" : ""}`}
     >
       {reading ? (
         <Reading
@@ -279,6 +298,7 @@ export function Grid({ mode }: { mode: LayoutMode }) {
           {tiles}
         </div>
       )}
+      {ground.menu}
     </div>
   );
 }
