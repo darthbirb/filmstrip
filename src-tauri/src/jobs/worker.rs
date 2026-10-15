@@ -250,7 +250,7 @@ impl paste::Control for QueueControl<'_> {
 
 /// Walks every source, then queues every picture, and every video once ffmpeg is at hand, that
 /// changed since it was last read or has lost its thumbnail. A hold or the app closing stops it
-/// between sources, to walk again from the start.
+/// before its next directory, to walk again from the start.
 fn index(inner: &QueueInner, conn: &mut Connection) -> Result<Done> {
     table::clear_failed(conn)?;
     inner.walking.store(true, Ordering::Relaxed);

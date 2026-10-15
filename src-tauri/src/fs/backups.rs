@@ -5,6 +5,7 @@
 use std::collections::HashSet;
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -77,7 +78,7 @@ pub struct Shelved {
     pub backups: Vec<Backup>,
     pub keep: u32,
     pub dir: String,
-    /// Whether one is being written now.
+    /// Whether a backup is being written now; never a restore.
     pub writing: bool,
 }
 
@@ -86,6 +87,7 @@ pub struct Shelved {
 pub struct Shelf {
     pub dir: PathBuf,
     writing: Arc<Mutex<()>>,
+    taking: Arc<AtomicBool>,
     refused: Mutex<HashSet<String>>,
     launch: Arc<(Mutex<Option<Option<Reason>>>, Condvar)>,
 }
@@ -95,6 +97,7 @@ impl Shelf {
         Shelf {
             dir,
             writing: Arc::default(),
+            taking: Arc::default(),
             refused: Mutex::default(),
             launch: Arc::default(),
         }
@@ -105,13 +108,18 @@ impl Shelf {
             backups: list(&self.dir, &lock(&self.refused))?,
             keep,
             dir: self.dir.to_string_lossy().into_owned(),
-            writing: self.writing.try_lock().is_err(),
+            writing: self.taking.load(Ordering::Relaxed),
         })
     }
 
     /// The lock one backup or restore at a time holds, shared with the thread that takes one.
     pub fn writing(&self) -> Arc<Mutex<()>> {
         Arc::clone(&self.writing)
+    }
+
+    /// Set while a backup, and not a restore, is being written; see [`Taking`].
+    pub fn taking(&self) -> Arc<AtomicBool> {
+        Arc::clone(&self.taking)
     }
 
     pub fn refuse(&self, name: &str) {
@@ -137,6 +145,22 @@ impl Shelf {
             }
             ended.clone().flatten()
         }
+    }
+}
+
+/// Says a backup is being written for as long as it is kept.
+pub struct Taking(Arc<AtomicBool>);
+
+impl Taking {
+    pub fn new(flag: Arc<AtomicBool>) -> Taking {
+        flag.store(true, Ordering::Relaxed);
+        Taking(flag)
+    }
+}
+
+impl Drop for Taking {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Relaxed);
     }
 }
 
@@ -249,20 +273,23 @@ pub fn take(conn: &Connection, dir: &Path, how: Taken) -> Result<Backup> {
 /// Takes a backup, then removes the oldest past the number kept.
 pub fn back_up(conn: &Connection, dir: &Path, how: Taken, keep: u32) -> Result<Backup> {
     let taken = take(conn, dir, how)?;
-    rotate(dir, keep, None)?;
+    rotate(dir, keep, None);
     Ok(taken)
 }
 
 /// Removes every backup past the newest `keep`, oldest first, but never `spare`: the one a restore
-/// has just restored, which stays past the number until the next backup.
-pub fn rotate(dir: &Path, keep: u32, spare: Option<&str>) -> Result<()> {
+/// has just restored, which stays past the number until the next backup. It never fails what it
+/// follows: a folder it cannot read is rotated at the next backup.
+pub fn rotate(dir: &Path, keep: u32, spare: Option<&str>) {
     let keep = usize::try_from(keep).unwrap_or(usize::MAX);
-    for backup in list(dir, &HashSet::new())?.into_iter().skip(keep).rev() {
+    let Ok(listed) = list(dir, &HashSet::new()) else {
+        return;
+    };
+    for backup in listed.into_iter().skip(keep).rev() {
         if spare != Some(backup.name.as_str()) {
             let _ = std::fs::remove_file(dir.join(&backup.name));
         }
     }
-    Ok(())
 }
 
 /// Whether the launch takes one: none yet, or the newest over a day old, however it was taken.
@@ -326,8 +353,32 @@ pub fn restore<H>(
         let _ = std::fs::remove_file(dir.join(&back.name));
         return Err(err);
     }
-    rotate(dir, keep, Some(name))?;
+    rotate(dir, keep, Some(name));
     Ok(Restored::Restored { from, back })
+}
+
+/// What follows a restore that swapped: a walk queued, and `allow` given the root of every source
+/// the restored index has, so the window may load from a source it brought back. Neither can undo
+/// the restore, so neither fails it.
+pub fn after_swap(live: &Connection, allow: &mut dyn FnMut(&Path) -> Result<()>) {
+    if let Err(err) = crate::jobs::enqueue_index(live) {
+        eprintln!("a restore could not queue the walk: {err}");
+    }
+    let listed = match crate::db::sources::list(live) {
+        Ok(listed) => listed,
+        Err(err) => {
+            eprintln!("a restore could not list the sources: {err}");
+            return;
+        }
+    };
+    for source in listed {
+        if let Err(err) = allow(Path::new(&source.root)) {
+            eprintln!(
+                "a restore could not let the window load from {}: {err}",
+                source.root
+            );
+        }
+    }
 }
 
 fn swap(
@@ -483,7 +534,7 @@ mod tests {
             .collect();
         assert_eq!(list(&backups, &HashSet::new()).unwrap().len(), 5);
 
-        rotate(&backups, 3, Some(&taken[0].name)).unwrap();
+        rotate(&backups, 3, Some(&taken[0].name));
         let left: Vec<String> = list(&backups, &HashSet::new())
             .unwrap()
             .into_iter()
@@ -681,6 +732,8 @@ mod tests {
         let cairo = folder(&conn, &["Trips", "Cairo"]);
         let one = item(&conn, "IMG_1.jpg");
         let two = item(&conn, "IMG_2.jpg");
+        tags::add_item_tag(&conn, two, "kept").unwrap();
+        let two_uuid = uuid(&conn, two);
         items::send_to_trash(&conn, two).unwrap();
         let journalled = journal::new_batch();
         journal::record_folder_create(&conn, &journalled, cairo, 1).unwrap();
@@ -762,16 +815,17 @@ mod tests {
             .collect();
         assert!(carries.contains(&"sunset".to_string()), "{carries:?}");
         assert!(carries.contains(&"later".to_string()), "{carries:?}");
-        let rows: i64 = conn
+        let two_now: (i64, bool) = conn
             .query_row(
-                "SELECT COUNT(*) FROM item WHERE disk_name = 'IMG_2.jpg'",
+                "SELECT id, deleted_at IS NOT NULL FROM item WHERE disk_name = 'IMG_2.jpg'",
                 [],
-                |r| r.get(0),
+                |r| Ok((r.get(0)?, r.get(1)?)),
             )
             .unwrap();
         assert_eq!(
-            rows, 0,
-            "a trashed row whose file left the trash is dropped"
+            (uuid(&conn, two_now.0), two_now.1),
+            (two_uuid.clone(), true),
+            "a trashed row whose file left the trash is retired where it was"
         );
 
         let jobs: i64 = conn
@@ -780,5 +834,156 @@ mod tests {
         assert_eq!(jobs, 0, "the queue starts empty");
         assert_eq!(journal::latest_batch(&conn).unwrap(), None);
         assert_eq!(sources::list(&conn).unwrap().len(), 1);
+
+        walk::reconcile(&conn).unwrap();
+        let revived = item(&conn, "IMG_2.jpg");
+        assert_eq!(
+            uuid(&conn, revived),
+            two_uuid,
+            "and the walk finds it again"
+        );
+        assert!(items::is_live(&conn, revived).unwrap());
+        let carries: Vec<String> = tags::item_effective_tags(&conn, revived)
+            .unwrap()
+            .into_iter()
+            .map(|tag| tag.value)
+            .collect();
+        assert!(carries.contains(&"kept".to_string()), "{carries:?}");
+    }
+
+    #[test]
+    fn a_backup_trashed_row_whose_name_is_taken_again_is_dropped() {
+        let (mut conn, _dir, backups) = library("trash-name-taken");
+        let cairo = folder(&conn, &["Trips", "Cairo"]);
+        items::send_to_trash(&conn, item(&conn, "IMG_1.jpg")).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let then = take(&conn, &backups, Taken::Hand).unwrap();
+
+        restore(
+            &mut conn,
+            &backups,
+            &then.name,
+            7,
+            &|_| false,
+            &|_| {},
+            || Ok(()),
+        )
+        .unwrap();
+        let rows: Vec<(i64, bool)> = {
+            let mut stmt = conn
+                .prepare(
+                    "SELECT folder_id, deleted_at IS NULL FROM item WHERE disk_name = 'IMG_1.jpg'",
+                )
+                .unwrap();
+            stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+                .unwrap()
+                .collect::<rusqlite::Result<_>>()
+                .unwrap()
+        };
+        assert_eq!(rows, [(cairo, true)], "only the file there now");
+    }
+
+    #[test]
+    fn a_trashed_file_from_a_source_added_since_is_left_in_the_trash_untouched() {
+        let (mut conn, dir, backups) = library("trash-orphan");
+        let then = take(&conn, &backups, Taken::Hand).unwrap();
+        std::fs::create_dir_all(dir.join("Phone")).unwrap();
+        std::fs::write(dir.join("Phone/IMG_5.jpg"), "five").unwrap();
+        sources::add(&conn, &dir.join("Phone"), "Phone", SourceKind::Sorting).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let five = item(&conn, "IMG_5.jpg");
+        let five_uuid = uuid(&conn, five);
+        crate::fs::trash::trash_items(&conn, &[five], &journal::new_batch()).unwrap();
+        let file = crate::fs::paths::trash_path(&five_uuid, "IMG_5.jpg").unwrap();
+        assert!(file.is_file());
+
+        let kept = |one: &InTrash| {
+            crate::fs::paths::trash_path(&one.uuid, &one.disk_name).is_ok_and(|f| f.is_file())
+        };
+        restore(
+            &mut conn,
+            &backups,
+            &then.name,
+            7,
+            &kept,
+            &|_| {},
+            || Ok(()),
+        )
+        .unwrap();
+
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "five");
+        assert!(!dir.join("Phone/IMG_5.jpg").exists());
+        let rows: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM item WHERE uuid = ?1",
+                [&five_uuid],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            rows, 0,
+            "the index forgets it; #110 decides what becomes of it"
+        );
+        std::fs::remove_file(&file).unwrap();
+    }
+
+    #[test]
+    fn a_restore_that_fails_after_the_hold_leaves_the_index_and_keeps_no_way_back() {
+        let (mut conn, _dir, backups) = library("failed-after-hold");
+        let cairo = folder(&conn, &["Trips", "Cairo"]);
+        tags::add_folder_tag(&conn, cairo, "dawn").unwrap();
+        let then = take(&conn, &backups, Taken::Hand).unwrap();
+        tags::add_folder_tag(&conn, cairo, "dusk").unwrap();
+        std::fs::create_dir_all(backups.join(format!(".restore{PART}"))).unwrap();
+
+        let held = Cell::new(0);
+        assert!(restoring(&mut conn, &backups, &then.name, 7, &held).is_err());
+        assert_eq!(held.get(), 1, "it got past the hold");
+        assert_eq!(
+            own_tags(&conn, cairo),
+            ["dawn", "dusk"],
+            "the index is as it was"
+        );
+        assert_eq!(kinds(&backups), [Taken::Hand], "and no way back is kept");
+    }
+
+    #[test]
+    fn a_restore_holding_the_folder_is_never_listed_as_a_backup_being_written() {
+        let (_conn, _dir, backups) = library("writing");
+        let shelf = Shelf::new(backups);
+        let writing = shelf.writing();
+        let held = writing.lock().unwrap();
+        assert!(!shelf.shelved(7).unwrap().writing, "a restore");
+        let taking = Taking::new(shelf.taking());
+        assert!(shelf.shelved(7).unwrap().writing, "a backup");
+        drop(taking);
+        drop(held);
+        assert!(!shelf.shelved(7).unwrap().writing);
+    }
+
+    #[test]
+    fn after_a_restore_a_walk_is_queued_and_every_source_it_brought_back_may_load() {
+        let (mut conn, dir, backups) = library("brought-back");
+        std::fs::create_dir_all(dir.join("Phone")).unwrap();
+        let phone = sources::add(&conn, &dir.join("Phone"), "Phone", SourceKind::Sorting).unwrap();
+        let then = take(&conn, &backups, Taken::Hand).unwrap();
+        sources::remove(&conn, phone.id).unwrap();
+
+        let held = Cell::new(0);
+        restoring(&mut conn, &backups, &then.name, 7, &held).unwrap();
+        let mut allowed = Vec::new();
+        after_swap(&conn, &mut |root| {
+            allowed.push(root.to_path_buf());
+            Err(AppError::invalid("refused, and the restore stands"))
+        });
+
+        assert!(allowed.contains(&dir.join("Phone")), "{allowed:?}");
+        assert_eq!(allowed.len(), 2);
+        let walks: i64 = conn
+            .query_row("SELECT COUNT(*) FROM job WHERE kind = 'index'", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(walks, 1);
     }
 }

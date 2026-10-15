@@ -127,9 +127,9 @@ pub fn in_trash(conn: &Connection) -> Result<Vec<InTrash>> {
         .collect()
 }
 
-/// Makes a restored index fit what is true now before it is copied over the live one: the live
-/// Trash, its folders retired where missing; no jobs; undo ending here.
-/// DECISIONS.md "Backing up the index".
+/// Makes a restored index fit what is true now: the live Trash, its folders retired where missing;
+/// the rest of its own Trash retired in place, or dropped where the name is taken; no jobs; undo
+/// ending here. DECISIONS.md "Backing up the index".
 pub fn settle(
     restored: &mut Connection,
     live: &Connection,
@@ -178,11 +178,23 @@ pub fn settle(
         .collect::<rusqlite::Result<_>>()?;
     drop(stmt);
     for id in trashed.into_iter().filter(|id| !placed.contains(id)) {
-        tx.execute(
-            "UPDATE folder SET cover_item_id = NULL WHERE cover_item_id = ?1",
-            params![id],
+        let retired = tx.execute(
+            "UPDATE item SET trashed_at = NULL, deleted_at = COALESCE(deleted_at, ?2)
+              WHERE id = ?1
+                AND NOT EXISTS (
+                    SELECT 1 FROM item other
+                     WHERE other.folder_id = item.folder_id AND other.id <> item.id
+                       AND other.disk_name = item.disk_name COLLATE NOCASE
+                       AND other.trashed_at IS NULL)",
+            params![id, at],
         )?;
-        tx.execute("DELETE FROM item WHERE id = ?1", params![id])?;
+        if retired == 0 {
+            tx.execute(
+                "UPDATE folder SET cover_item_id = NULL WHERE cover_item_id = ?1",
+                params![id],
+            )?;
+            tx.execute("DELETE FROM item WHERE id = ?1", params![id])?;
+        }
         search::index_item(&tx, id)?;
     }
     tx.execute("DELETE FROM job", [])?;

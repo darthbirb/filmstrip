@@ -6,6 +6,6 @@ import type { Backup } from "./Backup";
  */
 export type Shelved = { backups: Array<Backup>, keep: number, dir: string, 
 /**
- * Whether one is being written now.
+ * Whether a backup is being written now; never a restore.
  */
 writing: boolean, };

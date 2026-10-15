@@ -47,7 +47,7 @@ pub struct AppState {
 
 /// How far a restore has got, from 0 to 100, as its row's bar shows it.
 pub const RESTORE_PROGRESS_EVENT: &str = "restore-progress";
-/// A backup was taken without being asked for from Settings: the launch's.
+/// The launch's backup has ended, taken, refused or not due, so a list showing it writing is stale.
 pub const BACKUPS_CHANGED_EVENT: &str = "backups-changed";
 
 /// What came of offering the app a folder. A refusal is an answer, not an error:
@@ -1424,11 +1424,13 @@ pub async fn list_backups(state: State<'_, AppState>) -> Result<Shelved> {
 #[tauri::command]
 pub async fn back_up_now(state: State<'_, AppState>) -> Result<Option<Backup>> {
     let writing = state.backups.writing();
+    let taking = state.backups.taking();
     let dir = state.backups.dir.clone();
     run(&state, move |conn| {
         let Ok(_writing) = writing.try_lock() else {
             return Ok(None);
         };
+        let _taking = backups::Taking::new(taking);
         let keep = crate::config::Config::load().backups_kept();
         backups::back_up(conn, &dir, Taken::Hand, keep).map(Some)
     })
@@ -1436,7 +1438,8 @@ pub async fn back_up_now(state: State<'_, AppState>) -> Result<Option<Backup>> {
 }
 
 /// Restores a backup over the index, keeping the index as it was as the newest backup; the queue
-/// is held meanwhile and a walk queued after. DECISIONS.md "Backing up the index".
+/// is held meanwhile, then a walk queued and every source the restored index has let load.
+/// DECISIONS.md "Backing up the index".
 #[tauri::command]
 pub async fn restore_backup(
     app: AppHandle,
@@ -1460,7 +1463,8 @@ pub async fn restore_backup(
         let hold = || Ok((queue.hold()?, crate::fs::turn()));
         let restored = backups::restore(&mut live, &dir, &name, keep, &kept, &progress, hold)?;
         if matches!(restored, Restored::Restored { .. }) {
-            jobs::enqueue_index(&live)?;
+            let scope = app.asset_protocol_scope();
+            backups::after_swap(&live, &mut |root| Ok(scope.allow_directory(root, true)?));
         }
         Ok::<_, AppError>(restored)
     })

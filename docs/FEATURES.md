@@ -23,7 +23,7 @@ drawn. **Not started** — neither.
 | Reveal a source in Explorer | Built | `reveal_source` |
 | Remember the interface's own state | Built | `ui_preferences` |
 | Back up the index beside it, at launch once a day and by hand, the newest kept | Built | `list_backups`, `back_up_now`, `set_backups_kept`, `launch_backup_refusal`; DECISIONS.md "Backing up the index". Filmstrip's own change: SQLite's online backup while the app runs, not a file copy as it closes, and the number kept is a setting |
-| Restore the index from a backup | Built | `restore_backup`, on the backup's row in Settings › Backups; the Trash stays as it is now, and undo stops at the restore |
+| Restore the index from a backup | Built | `restore_backup`, on the backup's row in Settings › Backups; the Trash stays as it is now, and undo stops at the restore. A trashed file from a source added since is left in `data\trash` with no row, as removing a source leaves one, until #110 |
 | First-import review, then a move | **Dropped on purpose.** A folder is read where it stands, so there is nothing to review and nothing to move. |
 
 ## Reading what is there

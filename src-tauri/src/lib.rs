@@ -210,25 +210,25 @@ fn back_up_at_launch(
 ) {
     let dir = shelf.dir.clone();
     let writing = shelf.writing();
+    let taking = shelf.taking();
     let launched = shelf.launched();
     std::thread::spawn(move || {
-        let taken = (|| -> error::Result<bool> {
+        let taken = (|| -> error::Result<()> {
             fs::backups::clear_parts(&dir)?;
             if !fs::backups::due(&dir)? {
-                return Ok(false);
+                return Ok(());
             }
             let _writing = writing
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let _taking = fs::backups::Taking::new(taking);
             let conn = db::open(&db_path)?;
             let keep = config::Config::load().backups_kept();
             fs::backups::back_up(&conn, &dir, fs::backups::Taken::Launch, keep)?;
-            Ok(true)
+            Ok(())
         })();
-        launched(taken.as_ref().err().map(error::Reason::of));
-        if matches!(taken, Ok(true)) {
-            let _ = app.emit(commands::BACKUPS_CHANGED_EVENT, ());
-        }
+        launched(taken.err().as_ref().map(error::Reason::of));
+        let _ = app.emit(commands::BACKUPS_CHANGED_EVENT, ());
     });
 }
 

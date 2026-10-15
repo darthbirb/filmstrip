@@ -1047,20 +1047,26 @@ does not: tags, labels, notes, statuses, covers, favourites, keys and the undo j
   oldest past it, so a slip of the dropdown is put back before it costs anything.
 - **A restore checks the chosen backup whole first**, every page read, and refuses one that cannot
   be read, or that a later build wrote, before anything is written. Then the queue is held: each
-  copy and export is stopped as its Cancel would, a walk stops before its next source, and the
-  restore waits for every job in flight. Then the index as it is is backed up, "before restore";
+  copy and export is stopped as its Cancel would, a walk stops before its next directory, and
+  the restore waits for every job in flight. Then the index as it is is backed up, "before restore";
   then the chosen one is copied aside, brought to this build's schema, settled, and copied over the
   live index by the backup API in one write, so one that fails part way leaves the index as it
   was. Only once that has succeeded do the oldest go, and never the one restored: had it been the
-  oldest, it stays past the number until the next backup.
+  oldest, it stays past the number until the next backup. Rotating, queueing the walk and letting
+  the window load from every source the restored index has follow it, and none of them can fail a
+  restore that has swapped.
 - **What a restore leaves as it is now.** The index goes back; the disk does not. The Trash is kept
   as it is now: a file in it since the backup is in it again from the folder it left, found by its
   source's root and the titles below it, with the folders on the way made retired where the
-  backup has none; one from a source added since goes as that source's other rows do; a trashed
-  row whose file is no longer in `data\trash` is dropped, the walk finding the file wherever it
-  went. The job queue starts empty but for the walk, which runs at once, so a copy or an export
-  waiting in the backup never runs again and files moved or added since are found where they are.
-  A source added since is forgotten, never its files.
+  backup has none. One from a source added since, or from a place the backup cannot find, loses
+  its row as that source's other rows do, and its file is left in `data\trash` untouched: never
+  shown, never restorable and never expiring, as when a source is removed, until #110 settles what
+  becomes of such files. A row the backup has in the Trash whose file is no longer in
+  `data\trash` is retired where it was, keeping its tags and uuid for the walk to find again, or
+  dropped where a file there now has its name. The job queue starts empty but for the walk, which
+  runs at once, so a copy or an export waiting in the backup never runs again and files moved or
+  added since are found where they are. A source added since is forgotten, and its files on disk
+  are left as they are.
 - **Undo goes no further back than a restore.** The journal comes back as it was then, so restoring
   the "before restore" backup puts the index back whole, but what it holds describes a disk the
   walk has read again since. A restore records the newest journal row it kept in `setting`, and

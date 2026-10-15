@@ -131,7 +131,8 @@ pub struct QueueInner {
     /// Videos are only read while this is here. DECISIONS.md "Video and ffmpeg".
     ffmpeg: Option<Ffmpeg>,
     stop: AtomicBool,
-    /// Set while the index is being restored: no job starts, and a walk stops between sources.
+    /// Set while the index is being restored: no job starts, and a walk stops before its next
+    /// directory.
     held: AtomicBool,
     /// Each job runs holding it to read; a hold takes it to write, so it waits out the jobs in flight.
     gate: RwLock<()>,
@@ -363,7 +364,7 @@ impl JobQueue {
     }
 
     /// Stops the queue for as long as the hold is kept: each copy and export is cancelled as its
-    /// Cancel would, a walk stops before its next source, and the hold waits for every job in
+    /// Cancel would, a walk stops before its next directory, and the hold waits for every job in
     /// flight to end. Nothing starts again until it is dropped.
     pub fn hold(&self) -> Result<Hold<'_>> {
         let inner = &*self.inner;
