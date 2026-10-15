@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockWriteGuard};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -131,6 +131,11 @@ pub struct QueueInner {
     /// Videos are only read while this is here. DECISIONS.md "Video and ffmpeg".
     ffmpeg: Option<Ffmpeg>,
     stop: AtomicBool,
+    /// Set while the index is being restored: no job starts, and a walk stops before its next
+    /// directory.
+    held: AtomicBool,
+    /// Each job runs holding it to read; a hold takes it to write, so it waits out the jobs in flight.
+    gate: RwLock<()>,
     walking: AtomicBool,
     completed: AtomicU64,
     report: Report,
@@ -155,6 +160,8 @@ impl QueueInner {
             thumbs,
             ffmpeg,
             stop: AtomicBool::new(false),
+            held: AtomicBool::new(false),
+            gate: RwLock::new(()),
             walking: AtomicBool::new(false),
             completed: AtomicU64::new(0),
             report,
@@ -356,6 +363,25 @@ impl JobQueue {
         self.inner.cancel_export(conn, job_id)
     }
 
+    /// Stops the queue for as long as the hold is kept: each copy and export is cancelled as its
+    /// Cancel would, a walk stops before its next directory, and the hold waits for every job in
+    /// flight to end. Nothing starts again until it is dropped.
+    pub fn hold(&self) -> Result<Hold<'_>> {
+        let inner = &*self.inner;
+        inner.held.store(true, Ordering::Relaxed);
+        let mut hold = Hold { inner, _gate: None };
+        let conn = db::open(&inner.db_path)?;
+        let progress = inner.progress(&conn)?;
+        for copy in &progress.copies {
+            inner.cancel_copy(&conn, copy.job_id)?;
+        }
+        for export in &progress.exports {
+            inner.cancel_export(&conn, export.job_id)?;
+        }
+        hold._gate = Some(inner.gate.write().unwrap_or_else(PoisonError::into_inner));
+        Ok(hold)
+    }
+
     /// Asks every thread to finish, and waits for them no longer than the grace period.
     pub fn stop(&self) {
         self.inner.stop.store(true, Ordering::Relaxed);
@@ -374,19 +400,41 @@ impl JobQueue {
     }
 }
 
+/// The queue stopped while the index is restored; it starts again when this is dropped.
+pub struct Hold<'a> {
+    inner: &'a QueueInner,
+    _gate: Option<RwLockWriteGuard<'a, ()>>,
+}
+
+impl Drop for Hold<'_> {
+    fn drop(&mut self) {
+        self.inner.held.store(false, Ordering::Relaxed);
+    }
+}
+
 fn work(inner: &QueueInner) {
     let Ok(mut conn) = db::open(&inner.db_path) else {
         eprintln!("a job worker could not open the database");
         return;
     };
     while !inner.stop.load(Ordering::Relaxed) {
+        if inner.held.load(Ordering::Relaxed) {
+            std::thread::sleep(IDLE);
+            continue;
+        }
+        let open = inner.gate.read().unwrap_or_else(PoisonError::into_inner);
+        if inner.held.load(Ordering::Relaxed) {
+            continue;
+        }
         let job = match table::claim(&mut conn) {
             Ok(Some(job)) => job,
             Ok(None) => {
+                drop(open);
                 std::thread::sleep(IDLE);
                 continue;
             }
             Err(err) => {
+                drop(open);
                 eprintln!("a job worker could not claim a job: {err}");
                 std::thread::sleep(TICK);
                 continue;
@@ -407,6 +455,7 @@ fn work(inner: &QueueInner) {
             }
             Err(_) => table::fail(&conn, job.id, "the worker stopped on this file", false),
         };
+        drop(open);
     }
 }
 
@@ -938,6 +987,42 @@ mod tests {
             thumbnails, 1,
             "one picture, one thumbnail; the text file gets none"
         );
+    }
+
+    #[test]
+    fn a_held_queue_starts_nothing_until_the_hold_is_dropped() {
+        let dir = scratch("held");
+        std::fs::write(dir.join("library/Trips/IMG_1.jpg"), "one").unwrap();
+        let db_path = dir.join("library.db");
+        let mut conn = db::open(&db_path).unwrap();
+        db::migrate(&mut conn).unwrap();
+        sources::add(&conn, &dir.join("library"), "Library", SourceKind::Library).unwrap();
+        let queue = JobQueue::start(
+            db_path,
+            dir.join("thumbs"),
+            None,
+            Box::new(|_| {}),
+            Box::new(|_| {}),
+            Box::new(|_| {}),
+        );
+
+        let hold = queue.hold().unwrap();
+        enqueue_index(&conn).unwrap();
+        std::thread::sleep(Duration::from_secs(1));
+        assert_eq!(table::counts(&conn).unwrap().pending, 1, "nothing starts");
+        drop(hold);
+
+        let deadline = Instant::now() + Duration::from_secs(60);
+        while table::counts(&conn).unwrap().pending + table::counts(&conn).unwrap().running > 0
+            && Instant::now() < deadline
+        {
+            std::thread::sleep(IDLE);
+        }
+        queue.stop();
+        let walked: i64 = conn
+            .query_row("SELECT COUNT(*) FROM item", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(walked, 1, "and it starts again once the hold goes");
     }
 
     #[test]

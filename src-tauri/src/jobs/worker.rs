@@ -30,7 +30,7 @@ pub enum Done {
 pub fn execute(inner: &QueueInner, conn: &mut Connection, job: &QueuedJob) -> Result<Done> {
     let finished = |result: Result<()>| result.map(|()| Done::Finished);
     match job.kind.as_str() {
-        kinds::INDEX => finished(index(inner, conn)),
+        kinds::INDEX => index(inner, conn),
         kinds::INDEX_FOLDER => finished(index_folder(
             inner,
             conn,
@@ -249,14 +249,19 @@ impl paste::Control for QueueControl<'_> {
 }
 
 /// Walks every source, then queues every picture, and every video once ffmpeg is at hand, that
-/// changed since it was last read or has lost its thumbnail.
-fn index(inner: &QueueInner, conn: &mut Connection) -> Result<()> {
+/// changed since it was last read or has lost its thumbnail. A hold or the app closing stops it
+/// before its next directory, to walk again from the start.
+fn index(inner: &QueueInner, conn: &mut Connection) -> Result<Done> {
     table::clear_failed(conn)?;
     inner.walking.store(true, Ordering::Relaxed);
-    let walked = walk::reconcile(conn);
+    let halt = || inner.held.load(Ordering::Relaxed) || inner.stop.load(Ordering::Relaxed);
+    let walked = walk::reconcile_until(conn, &halt);
     inner.walking.store(false, Ordering::Relaxed);
-    walked?;
-    queue_thumbs(inner, conn)
+    if walked?.is_none() {
+        return Ok(Done::Paused);
+    }
+    queue_thumbs(inner, conn)?;
+    Ok(Done::Finished)
 }
 
 /// One folder's subtree walked again, then the same thumbnails queued as after a whole walk.

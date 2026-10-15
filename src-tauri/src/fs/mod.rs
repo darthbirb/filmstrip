@@ -1,4 +1,5 @@
 pub mod acts;
+pub mod backups;
 pub mod clipboard;
 pub mod export;
 pub mod folders;

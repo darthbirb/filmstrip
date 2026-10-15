@@ -6,9 +6,11 @@ import { GlyphButton } from "../../ui/GlyphButton";
 import type { GlyphName } from "../../ui/glyphs";
 import { DEFAULT_LAYOUT, type LayoutMode } from "../grid/layout";
 import { SCALES, updatePreferences, usePreferences } from "../preferences";
+import { Backups } from "./Backups";
 import { Keys } from "./Keys";
 import { Caption, type Row, Rows } from "./Rows";
 import { Sources } from "./Sources";
+import { settingsHeld, useRestore } from "./settings-store";
 import { Tags } from "./Tags";
 
 type Section = {
@@ -97,6 +99,15 @@ function useSections(asking?: number): Section[] {
       body: <Tags />,
       fill: true,
     },
+    {
+      id: "backups",
+      group: "Library",
+      title: "Backups",
+      glyph: "backups",
+      rows: [],
+      body: <Backups />,
+      fill: true,
+    },
   ];
 }
 
@@ -127,9 +138,12 @@ export function Settings({ open, onClose, section, asking }: Props) {
       ref={dialog}
       aria-labelledby="settings-title"
       onClose={onClose}
+      onCancel={(event) => {
+        if (settingsHeld()) event.preventDefault();
+      }}
       // A click on the backdrop lands on the dialog itself, never on the panel inside it.
       onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget && !settingsHeld()) onClose();
       }}
       className="m-auto h-dialog-height w-dialog overflow-hidden rounded-control border-0 bg-panel p-0 text-fg shadow-overlay inset-ring inset-ring-line-control backdrop:bg-scrim"
     >
@@ -141,6 +155,7 @@ export function Settings({ open, onClose, section, asking }: Props) {
 function Body({ onClose, section, asking }: Omit<Props, "open">) {
   const [query, setQuery] = useState("");
   const [chosen, setChosen] = useState<string | null>(section ?? null);
+  const held = useRestore().restoring !== null;
   const term = query.trim().toLowerCase();
   const found = useSections(asking)
     .map((section) => ({
@@ -159,7 +174,13 @@ function Body({ onClose, section, asking }: Omit<Props, "open">) {
         <h2 id="settings-title" className="m-0 min-w-0 flex-1 truncate text-fg-hi text-title">
           Settings
         </h2>
-        <GlyphButton glyph="close" label="Close Settings" onClick={onClose} />
+        <GlyphButton
+          glyph="close"
+          label="Close Settings"
+          onClick={() => {
+            if (!settingsHeld()) onClose();
+          }}
+        />
       </header>
       <div className="flex min-h-0 flex-1">
         <nav
@@ -175,9 +196,10 @@ function Body({ onClose, section, asking }: Omit<Props, "open">) {
             <input
               type="search"
               value={query}
+              disabled={held}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Find a setting"
-              className="focus-ring h-control w-full min-w-0 rounded-nested bg-ground pr-2 pl-7 text-fg text-ui inset-ring inset-ring-line-control placeholder:text-fg-dim"
+              className="focus-ring h-control w-full min-w-0 rounded-nested bg-ground pr-2 pl-7 text-fg text-ui inset-ring inset-ring-line-control placeholder:text-fg-dim disabled:text-fg-faint disabled:placeholder:text-fg-faint"
             />
           </label>
           {groups.map((group) => (
@@ -192,8 +214,9 @@ function Body({ onClose, section, asking }: Omit<Props, "open">) {
                       key={section.id}
                       type="button"
                       aria-current={current || undefined}
+                      disabled={held}
                       onClick={() => setChosen(section.id)}
-                      className={`focus-ring flex h-row shrink-0 items-center gap-2 rounded-nested px-2 text-left text-ui transition-colors duration-(--motion-quick) motion-reduce:transition-none ${current ? "bg-raised-hi text-fg-hi" : "text-fg-mid hover:bg-wash hover:text-fg"}`}
+                      className={`focus-ring flex h-row shrink-0 items-center gap-2 rounded-nested px-2 text-left text-ui transition-colors duration-(--motion-quick) motion-reduce:transition-none ${current ? "bg-raised-hi text-fg-hi" : "text-fg-mid enabled:hover:bg-wash enabled:hover:text-fg disabled:text-fg-faint"}`}
                     >
                       <Glyph
                         name={section.glyph}

@@ -1,6 +1,7 @@
 //! Connections and migrations. **All SQL lives under this module** — callers
 //! use functions, never queries.
 
+pub mod backup;
 pub mod details;
 pub mod folders;
 pub mod items;
@@ -38,6 +39,11 @@ type Rewrite = fn(&Connection) -> Result<()>;
 /// Rewrites of stored rows that SQL cannot express, applied in order after every SQL migration,
 /// so each runs against the latest schema. Never edited once shipped. SCHEMA.md "Migrations".
 const DATA_MIGRATIONS: &[(i64, Rewrite)] = &[(1, tags::refold)];
+
+/// The schema this build writes. An index from a later one is not a backup it can restore.
+pub fn latest_schema() -> i64 {
+    MIGRATIONS.last().map_or(0, |(version, _)| *version)
+}
 
 /// A connection with the app's pragmas. One per thread: WAL allows one writer
 /// beside any number of readers.

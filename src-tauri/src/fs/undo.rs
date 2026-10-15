@@ -35,6 +35,11 @@ pub fn undo_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
     if journal::copying(conn, batch_id)? {
         return Err(AppError::invalid("that copy has not ended yet"));
     }
+    if journal::below_floor(conn, batch_id)? {
+        return Err(AppError::invalid(
+            "that act came before the index was restored",
+        ));
+    }
     reverse_batch(conn, batch_id)
 }
 
@@ -238,6 +243,20 @@ mod tests {
         assert!(!dir.join("library/Trips/Lisbon").exists());
         assert_eq!(rows::title(&conn, made).unwrap(), None);
         assert_eq!(undo_last(&conn).unwrap(), None, "nothing is left to undo");
+    }
+
+    #[test]
+    fn an_act_from_before_a_restore_is_never_undone_even_by_name() {
+        let dir = scratch("floor");
+        let (conn, trips) = library(&dir);
+        let cairo = rows::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        let batch = journal::new_batch();
+        folders::rename(&conn, cairo, "Giza", &batch).unwrap();
+        journal::set_floor(&conn).unwrap();
+
+        assert_eq!(undo_last(&conn).unwrap(), None);
+        assert!(undo_batch(&conn, &batch).is_err());
+        assert!(dir.join("library/Trips/Giza").is_dir());
     }
 
     #[test]

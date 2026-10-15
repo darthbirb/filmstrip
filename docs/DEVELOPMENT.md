@@ -221,7 +221,7 @@ Its interface is never read for the look, which comes from Claude Design (DECISI
 | Search and the query language | `query/`, `db/search.rs`, `commands/search.rs`, `lib/queryTerm.ts` | search |
 | The tags screen | `commands/tags.rs` | settings and the tags screen |
 | Import, paste, export | `fs/import.rs`, `fs/paste.rs`, `fs/clipboard.rs`, `fs/export.rs` | not yet scheduled |
-| Backups | `db/backup.rs` | not yet scheduled |
+| Backups | `db/backup.rs` | backing up the index |
 
 ## Keeping the docs true
 

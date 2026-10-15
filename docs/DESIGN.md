@@ -133,6 +133,7 @@ spacing:
   heading: 1.5rem
   tile-caption: 1.3125rem
   count: 3.25rem
+  row-action: 4.25rem
   ghost-thumb: 1.5rem
   card: 17rem
   card-cover: 5rem
@@ -596,7 +597,9 @@ toward the rest surface.
   One that destroys or forgets is `danger` ink on `danger-tint` in a `line-danger` ring, filled
   `danger` under the pointer. Its label is Title Case, as every label is: "Words" above.
   A label never wraps: too little room ends it in an ellipsis, and the panel it sits in stops
-  before it comes to that. DECISIONS.md "The frame".
+  before it comes to that. DECISIONS.md "The frame". A row's own button, as a backup's Restore…
+  is, is the small raised one: `chip`-tall at the `nested` corner, `small` text in `fg-mid` until
+  the pointer brings `fg`.
 - **Glyph button.** A `control` square on `raised` with a `line-control` ring. Disabled, it sinks
   to `inset` on a `line` ring, its glyph `fg-faint`. The one that destroys or forgets takes the
   button's `danger` colours.
@@ -923,7 +926,8 @@ toward the rest surface.
   its control. A section whose body is its own, as Sources is, can close with a caption of its
   own over such rows. One that heads itself, as Tags does, fills the section: its name in semibold
   `row` with what it holds after it in `small` `fg-dim`, and a list that scrolls inside it, so the
-  dialog never grows; its Line stands at the section's foot.
+  dialog never grows; its Line stands at the section's foot. Backups heads itself the same way,
+  with Back Up Now at the head's end, and its Band stands where the Line does.
 - **Filter field.** Narrows the list under it as you type: `bar-field` tall on `ground` at the
   `nested` corner in a `line-control` ring, `line-strong` while it has the focus, the search glyph
   before it in `fg-dim` and "3 of 228" at its end in `small` tabular figures once something is
@@ -944,6 +948,17 @@ toward the rest surface.
   cannot be taken turns the ring `line-danger` and says why underneath in `key` `danger`, and so
   does Enter on a word nothing offered begins with. While its row asks to merge, the
   field's shape holds what was typed, as it was typed.
+- **Backup table.** Settings › Backups' list, in the settings' `inset` group: a heading row in
+  `eyebrow` capitals, Taken and Size, over a `line` rule; then rows `row` tall, each when it was
+  taken in `ui` `fg`, never cut, and how after it in `small` `fg-dim`, the first to give way, then
+  its size right-aligned in the `count` column in `small` `fg-mid` tabular figures, then the small
+  Restore… in a `row-action` column, which a row without one keeps empty. A row that will go at
+  the next backup says so where how it was taken goes, its time in `fg-mid`; one that cannot be
+  read says unreadable and has no Restore…; one being written arrives at the top as a push-down,
+  "backing up…" and the `progress` bar in place of its size. Restore… asks in the row question's
+  shape, and while it restores the answers give way to the walk's line and bar inside the same
+  ring, and Settings holds still: the rail's sections and its filter field are disabled, those
+  not shown in `fg-faint`, and Escape and the close wait. The list scrolls inside the group, and No Backups Yet takes its place when there are none.
 - **Row question.** A question on the row it is about, in the source row's remove shape: the row
   and the question inside one `line-danger` ring, the `warning` glyph in `danger` at `icon` and the
   question in `ui` `fg-mid` with the terms it names in `fg`, over its answers at the question's

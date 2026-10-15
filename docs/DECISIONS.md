@@ -1024,6 +1024,54 @@ journal, has no Undo, never waits for a walk and never makes a move wait for it.
   replaced and cannot be told not to (tauri-plugin-dialog 2.8.2). No keeps the dialog open for
   another name; a Yes comes back and is refused in the band, and the sheet never opens.
 
+## Backing up the index
+
+**The index is backed up beside it, in `data\backups`, and any backup can be restored from
+Settings**, built on 15 October 2026 from Artboards › Backing up the index, and ported from
+ggallery's `db/backup.rs` with most of it changed on the way. The index holds everything the disk
+does not: tags, labels, notes, statuses, covers, favourites, keys and the undo journal.
+
+- **SQLite's own online backup, never a copy of the file.** ggallery copied `library.db` as it
+  closed, after a checkpoint; here a backup is taken while the app runs and writes, so it is read
+  in one step of the backup API, as of one moment, and whole even while a walk writes. Each is
+  written under a hidden name beside its own and given it by `fs::noclobber::rename` only once
+  whole, so a failed one leaves nothing half written. It keeps its own rollback journal, so it
+  stands as one file.
+- **One a day at launch, and by hand.** At launch, once the library has opened and off the
+  window's thread, when the newest backup, however it was taken, is over a day old; Back Up Now
+  takes one at once. The name records when and how: `index-<ms>-launch.db`, `-hand`, `-restore`.
+  One refused at launch says so at the foot of navigation, and the app opens as ever.
+- **The newest are kept, to a number Settings sets**: 3, 7, 14 or 30, seven until another is
+  chosen. ggallery kept five, fixed. The number lives in `filmstrip.config.json`, not the index,
+  which a restore replaces. Lowering it removes nothing until the next backup, which removes the
+  oldest past it, so a slip of the dropdown is put back before it costs anything.
+- **A restore checks the chosen backup whole first**, every page read, and refuses one that cannot
+  be read, or that a later build wrote, before anything is written. Then the queue is held: each
+  copy and export is stopped as its Cancel would, a walk stops before its next directory, and
+  the restore waits for every job in flight. Then the index as it is is backed up, "before restore";
+  then the chosen one is copied aside, brought to this build's schema, settled, and copied over the
+  live index by the backup API in one write, so one that fails part way leaves the index as it
+  was. Only once that has succeeded do the oldest go, and never the one restored: had it been the
+  oldest, it stays past the number until the next backup. Rotating, queueing the walk and letting
+  the window load from every source the restored index has follow it, and none of them can fail a
+  restore that has swapped.
+- **What a restore leaves as it is now.** The index goes back; the disk does not. The Trash is kept
+  as it is now: a file in it since the backup is in it again from the folder it left, found by its
+  source's root and the titles below it, with the folders on the way made retired where the
+  backup has none. One from a source added since, or from a place the backup cannot find, loses
+  its row as that source's other rows do, and its file is left in `data\trash` untouched: never
+  shown, never restorable and never expiring, as when a source is removed, until #110 settles what
+  becomes of such files. A row the backup has in the Trash whose file is no longer in
+  `data\trash` is retired where it was, keeping its tags and uuid for the walk to find again, or
+  dropped where a file there now has its name. The job queue starts empty but for the walk, which
+  runs at once, so a copy or an export waiting in the backup never runs again and files moved or
+  added since are found where they are. A source added since is forgotten, and its files on disk
+  are left as they are.
+- **Undo goes no further back than a restore.** The journal comes back as it was then, so restoring
+  the "before restore" backup puts the index back whole, but what it holds describes a disk the
+  walk has read again since. A restore records the newest journal row it kept in `setting`, and
+  Ctrl+Z and Undo stop there.
+
 ## Expiry goes to the Recycle Bin
 
 **An item that expires from the trash goes to the Windows Recycle Bin**, as the owner decided on

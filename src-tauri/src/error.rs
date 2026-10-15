@@ -103,6 +103,11 @@ impl Reason {
         match err {
             AppError::Refused(reason) => reason.clone(),
             AppError::Io(io) => Reason::of_io(io),
+            AppError::Db(rusqlite::Error::SqliteFailure(failure, _))
+                if failure.code == rusqlite::ErrorCode::DiskFull =>
+            {
+                Reason::DiskFull
+            }
             other => Reason::Other {
                 message: other.to_string(),
             },
@@ -215,5 +220,14 @@ mod tests {
         }
         let full = AppError::Io(std::io::ErrorKind::StorageFull.into());
         assert_eq!(Reason::of(&full), Reason::DiskFull);
+        let full = AppError::Db(rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_FULL),
+            None,
+        ));
+        assert_eq!(
+            Reason::of(&full),
+            Reason::DiskFull,
+            "SQLite's own word for it"
+        );
     }
 }

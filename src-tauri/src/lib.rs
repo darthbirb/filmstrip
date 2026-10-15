@@ -65,10 +65,13 @@ pub fn run() {
                     let _ = exporter.emit(jobs::EXPORTED_EVENT, exported);
                 }),
             );
+            let backups = fs::backups::Shelf::new(fs::paths::backups_dir()?);
+            back_up_at_launch(app.handle().clone(), &backups, db_path.clone());
             app.manage(commands::AppState {
                 db: db_path,
                 thumbs,
-                queue,
+                queue: std::sync::Arc::new(queue),
+                backups,
             });
 
             // Beside the executable, never in the user's profile.
@@ -178,6 +181,11 @@ pub fn run() {
             commands::index_progress,
             commands::index_failures,
             commands::retry_failed_jobs,
+            commands::list_backups,
+            commands::back_up_now,
+            commands::restore_backup,
+            commands::set_backups_kept,
+            commands::launch_backup_refusal,
             commands::ui_preferences,
             commands::set_ui_preferences,
         ])
@@ -190,6 +198,37 @@ pub fn run() {
         {
             state.queue.stop();
         }
+    });
+}
+
+/// Once the library has opened, a backup when the newest is over a day old, off the window's
+/// thread. A refusal is said at the foot of navigation, and the app opens as ever.
+fn back_up_at_launch(
+    app: tauri::AppHandle,
+    shelf: &fs::backups::Shelf,
+    db_path: std::path::PathBuf,
+) {
+    let dir = shelf.dir.clone();
+    let writing = shelf.writing();
+    let taking = shelf.taking();
+    let launched = shelf.launched();
+    std::thread::spawn(move || {
+        let taken = (|| -> error::Result<()> {
+            fs::backups::clear_parts(&dir)?;
+            if !fs::backups::due(&dir)? {
+                return Ok(());
+            }
+            let _writing = writing
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let _taking = fs::backups::Taking::new(taking);
+            let conn = db::open(&db_path)?;
+            let keep = config::Config::load().backups_kept();
+            fs::backups::back_up(&conn, &dir, fs::backups::Taken::Launch, keep)?;
+            Ok(())
+        })();
+        launched(taken.err().as_ref().map(error::Reason::of));
+        let _ = app.emit(commands::BACKUPS_CHANGED_EVENT, ());
     });
 }
 

@@ -8,6 +8,7 @@ import type { Tally } from "../../ipc/bindings/Tally";
 import { cancelCopy, cancelExport, revealPath } from "../../ipc/commands";
 import { formatBytes, formatCount, formatShortDay } from "../../lib/format";
 import { Band } from "../../ui/Band";
+import { Bar } from "../../ui/Bar";
 import { Button } from "../../ui/Button";
 import { FirstFit } from "../../ui/FirstFit";
 import { Glyph } from "../../ui/Glyph";
@@ -374,17 +375,5 @@ function ExportLine({ job, rail }: { job: Exporting; rail: boolean }) {
         <Bar percent={percent} />
       </span>
     </div>
-  );
-}
-
-/** How far along the walk is. Pewter, because progress states a fact rather than raising an alarm. */
-function Bar({ percent }: { percent: number }) {
-  return (
-    <span className="block h-progress overflow-hidden rounded-full bg-raised">
-      <span
-        className="block h-full bg-plate transition-[width] duration-(--motion-size) ease-out motion-reduce:transition-none"
-        style={{ width: `${percent}%` }}
-      />
-    </span>
   );
 }

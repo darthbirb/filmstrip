@@ -3,10 +3,11 @@
 
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf};
+use std::sync::{Arc, PoisonError};
 
 use rusqlite::Connection;
 use serde::Serialize;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 use ts_rs::TS;
@@ -22,8 +23,9 @@ use crate::db::sources::{self, Refusal, Source, SourceKind};
 use crate::db::suggest::{self, Suggestion};
 use crate::db::tags::{self, EffectiveTag};
 use crate::db::vocabulary::{self, KeyClashFor, Vocabulary};
-use crate::error::{AppError, Result};
+use crate::error::{AppError, Reason, Result};
 use crate::fs::acts::{self, Batch};
+use crate::fs::backups::{self, Backup, Restored, Shelf, Shelved, Taken};
 use crate::fs::clipboard;
 use crate::fs::export::{self, Naming, Plan, Scope};
 use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
@@ -39,8 +41,14 @@ use crate::query::{self, QueryFault, QueryTerm, Reading};
 pub struct AppState {
     pub db: PathBuf,
     pub thumbs: PathBuf,
-    pub queue: JobQueue,
+    pub queue: Arc<JobQueue>,
+    pub backups: Shelf,
 }
+
+/// How far a restore has got, from 0 to 100, as its row's bar shows it.
+pub const RESTORE_PROGRESS_EVENT: &str = "restore-progress";
+/// The launch's backup has ended, taken, refused or not due, so a list showing it writing is stale.
+pub const BACKUPS_CHANGED_EVENT: &str = "backups-changed";
 
 /// What came of offering the app a folder. A refusal is an answer, not an error:
 /// nothing is added, nothing is selected, and the band says which of the four it
@@ -1401,6 +1409,83 @@ pub async fn ui_preferences() -> Result<Option<serde_json::Value>> {
 #[tauri::command]
 pub async fn set_ui_preferences(preferences: serde_json::Value) -> Result<()> {
     crate::config::Config::set_ui(preferences)
+}
+
+/// The index's backups, newest first, with the number kept. DECISIONS.md "Backing up the index".
+#[tauri::command]
+pub async fn list_backups(state: State<'_, AppState>) -> Result<Shelved> {
+    state
+        .backups
+        .shelved(crate::config::Config::load().backups_kept())
+}
+
+/// Backs the index up now, then removes the oldest past the number kept; `None` when one is
+/// already being written, since the new row is already on its way.
+#[tauri::command]
+pub async fn back_up_now(state: State<'_, AppState>) -> Result<Option<Backup>> {
+    let writing = state.backups.writing();
+    let taking = state.backups.taking();
+    let dir = state.backups.dir.clone();
+    run(&state, move |conn| {
+        let Ok(_writing) = writing.try_lock() else {
+            return Ok(None);
+        };
+        let _taking = backups::Taking::new(taking);
+        let keep = crate::config::Config::load().backups_kept();
+        backups::back_up(conn, &dir, Taken::Hand, keep).map(Some)
+    })
+    .await
+}
+
+/// Restores a backup over the index, keeping the index as it was as the newest backup; the queue
+/// is held meanwhile, then a walk queued and every source the restored index has let load.
+/// DECISIONS.md "Backing up the index".
+#[tauri::command]
+pub async fn restore_backup(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    name: String,
+) -> Result<Restored> {
+    let writing = state.backups.writing();
+    let dir = state.backups.dir.clone();
+    let queue = Arc::clone(&state.queue);
+    let path = state.db.clone();
+    let restored = tauri::async_runtime::spawn_blocking(move || {
+        let _writing = writing.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut live = crate::db::open(&path)?;
+        let keep = crate::config::Config::load().backups_kept();
+        let kept = |one: &crate::db::backup::InTrash| {
+            paths::trash_path(&one.uuid, &one.disk_name).is_ok_and(|file| file.is_file())
+        };
+        let progress = |done: f64| {
+            let _ = app.emit(RESTORE_PROGRESS_EVENT, (done * 100.0).round() as u32);
+        };
+        let hold = || Ok((queue.hold()?, crate::fs::turn()));
+        let restored = backups::restore(&mut live, &dir, &name, keep, &kept, &progress, hold)?;
+        if matches!(restored, Restored::Restored { .. }) {
+            let scope = app.asset_protocol_scope();
+            backups::after_swap(&live, &mut |root| Ok(scope.allow_directory(root, true)?));
+        }
+        Ok::<_, AppError>(restored)
+    })
+    .await??;
+    if let Restored::Unreadable { from } = &restored {
+        state.backups.refuse(&from.name);
+    }
+    Ok(restored)
+}
+
+/// How many backups are kept. Lowering it removes nothing until the next backup.
+#[tauri::command]
+pub async fn set_backups_kept(kept: u32) -> Result<()> {
+    crate::config::Config::set_backups_kept(kept)
+}
+
+/// Why the launch's backup was refused, once it has ended; nothing when it was taken or not due.
+#[tauri::command]
+pub async fn launch_backup_refusal(state: State<'_, AppState>) -> Result<Option<Reason>> {
+    let launch = state.backups.launch_refusal_waiter();
+    Ok(tauri::async_runtime::spawn_blocking(launch).await?)
 }
 
 /// Off the main thread, which a synchronous command would block.
