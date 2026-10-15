@@ -556,7 +556,10 @@ pub enum ExportStart {
         #[serde(rename = "jobId")]
         job_id: i64,
     },
-    Taken { zip: String, place: String },
+    Taken {
+        zip: String,
+        place: String,
+    },
 }
 
 /// Queues the export, unless its zip's name was taken since the dialog closed.
