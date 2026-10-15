@@ -120,7 +120,11 @@ export async function exportFiles(asked: Asked) {
   asking = true;
   try {
     const plan = await exportPlan(asked.scope).catch(() => null);
-    if (!plan || plan.kind === "empty") return;
+    if (!plan) return;
+    if (plan.kind === "empty") {
+      setNews({ kind: "keyRefused", line: `${asked.folder ?? asked.name} has no files to export.` });
+      return;
+    }
     if (plan.kind === "away") {
       setNews({ kind: "keyRefused", line: awayLine(plan.offline, plan.files) });
       return;

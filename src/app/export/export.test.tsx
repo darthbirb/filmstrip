@@ -196,6 +196,18 @@ test("Export… on a folder's row takes its branch, and the sheet hangs off the 
     .not.toBeInTheDocument();
 });
 
+test("Export… on a folder with no files in it says so, and asks nothing", async () => {
+  const screen = await renderAll();
+  setOpenFolders(new Set([1]));
+  await recording(async (calls) => {
+    await screen.getByRole("treeitem", { name: /^People / }).click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Export…" }).click();
+    await expect.element(page.getByText("People has no files to export.")).toBeVisible();
+    expect(calls.some(([cmd]) => cmd === "pick_export_zip")).toBe(false);
+  });
+  await expect.element(page.getByRole("dialog")).not.toBeInTheDocument();
+});
+
 test("an export's line moving leaves the tree as it is", async () => {
   updatePreferences({ exportDir: "D:\\Tree" });
   const screen = await renderAll();
