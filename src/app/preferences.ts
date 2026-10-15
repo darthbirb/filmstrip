@@ -1,5 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react";
 
+import type { Naming } from "../ipc/bindings/Naming";
 import type { Sort } from "../ipc/bindings/Sort";
 import { setUiPreferences, uiPreferences } from "../ipc/commands";
 import { isSortKey } from "../ipc/sort";
@@ -22,6 +23,10 @@ export type Preferences = {
   deleteInto?: number;
   /** The order last chosen in each kind of place that has one. */
   sort?: Partial<Record<SortPlace, Sort>>;
+  /** The folder the last zip went into, where the save dialog opens next. */
+  exportDir?: string;
+  /** How the last export named its files. */
+  exportNaming?: Naming;
 };
 
 /** The kinds of place that keep an order of their own; the Trash runs by its days. */
@@ -94,8 +99,19 @@ function applyScale() {
 
 function validated(value: unknown): Partial<Preferences> {
   if (typeof value !== "object" || value === null) return {};
-  const { scale, widths, hidden, tile, layout, details, recent, deleteInto, sort } =
-    value as Record<string, unknown>;
+  const {
+    scale,
+    widths,
+    hidden,
+    tile,
+    layout,
+    details,
+    recent,
+    deleteInto,
+    sort,
+    exportDir,
+    exportNaming,
+  } = value as Record<string, unknown>;
   const valid: Partial<Preferences> = {};
   if (typeof scale === "number" && Number.isFinite(scale)) valid.scale = nearestScale(scale);
   const savedWidths = pair<number>(widths, "number");
@@ -109,6 +125,8 @@ function validated(value: unknown): Partial<Preferences> {
   if (typeof deleteInto === "number" && Number.isInteger(deleteInto)) valid.deleteInto = deleteInto;
   const sorts = sortsOf(sort);
   if (sorts) valid.sort = sorts;
+  if (typeof exportDir === "string" && exportDir !== "") valid.exportDir = exportDir;
+  if (exportNaming === "keep" || exportNaming === "folders") valid.exportNaming = exportNaming;
   return valid;
 }
 

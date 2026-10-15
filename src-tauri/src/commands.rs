@@ -552,7 +552,10 @@ pub fn zip_pick(path: PathBuf) -> ZipPick {
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[ts(export)]
 pub enum ExportStart {
-    Started { job_id: i64 },
+    Started {
+        #[serde(rename = "jobId")]
+        job_id: i64,
+    },
     Taken { zip: String, place: String },
 }
 

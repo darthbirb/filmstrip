@@ -12,6 +12,7 @@ import { Button } from "../../ui/Button";
 import { DismissButton } from "../../ui/DismissButton";
 import { Menu, type MenuAction } from "../../ui/Menu";
 import { PushDown } from "../../ui/PushDown";
+import { exportChecked } from "../export/export";
 import { setFavourites, useEveryFavourite } from "../favourites";
 import { deleteFiles } from "../pane/delete";
 import { openMovePicker } from "../pane/move-picker";
@@ -108,6 +109,7 @@ function InLibrary({ rows }: { rows: readonly CheckedFile[] }) {
   const run = {
     favourite: () => setFavourites(ids, !favourite),
     copy: () => void copyFiles(ids).catch(() => undefined),
+    export: () => exportChecked(ids),
     delete: () => void deleteFiles(ids),
   };
   // Written in the bar's order; `sheds` is the order they leave it for More.
@@ -172,6 +174,16 @@ function InLibrary({ rows }: { rows: readonly CheckedFile[] }) {
       action: { id: "copy", label: "Copy", glyph: "copy", onSelect: run.copy },
     },
     {
+      id: "export",
+      group: 1,
+      node: (
+        <Button glyph="zip" onClick={run.export}>
+          Export…
+        </Button>
+      ),
+      action: { id: "export", label: "Export…", glyph: "zip", onSelect: run.export },
+    },
+    {
       id: "rule",
       node: <span aria-hidden="true" className="mx-0.5 h-badge w-px shrink-0 bg-line-control" />,
     },
@@ -192,7 +204,7 @@ function InLibrary({ rows }: { rows: readonly CheckedFile[] }) {
         ref={bar}
         rows={rows}
         pieces={pieces}
-        sheds={["size", "selectAll", "copy", "tag", "favourite", "delete"]}
+        sheds={["size", "selectAll", "export", "copy", "tag", "favourite", "delete"]}
       />
       {sheet && (
         <TagSheet

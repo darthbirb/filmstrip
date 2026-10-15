@@ -9,6 +9,8 @@ export type Report = {
   /** A move's rows sit under one heading of their own; everything else is grouped by place. */
   heading?: string;
   retry?: () => void;
+  /** What an export left out: each place is "Skipped in", named from its source. */
+  skipped?: boolean;
   /** What a row still in the Trash offers: going to look at it, or, after Restore, Restore to…. */
   inTrash?: "show" | "restoreTo";
 };

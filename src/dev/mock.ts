@@ -13,6 +13,10 @@ import type { Covered } from "../ipc/bindings/Covered";
 import type { Crumb } from "../ipc/bindings/Crumb";
 import type { DestinationKey } from "../ipc/bindings/DestinationKey";
 import type { EffectiveTag } from "../ipc/bindings/EffectiveTag";
+import type { End } from "../ipc/bindings/End";
+import type { Exported } from "../ipc/bindings/Exported";
+import type { Exporting } from "../ipc/bindings/Exporting";
+import type { ExportStart } from "../ipc/bindings/ExportStart";
 import type { Fault } from "../ipc/bindings/Fault";
 import type { FavouritePlace } from "../ipc/bindings/FavouritePlace";
 import type { FolderDetail } from "../ipc/bindings/FolderDetail";
@@ -30,10 +34,12 @@ import type { KeyClash } from "../ipc/bindings/KeyClash";
 import type { KeyClashFor } from "../ipc/bindings/KeyClashFor";
 import type { KeyRow } from "../ipc/bindings/KeyRow";
 import type { LibraryTotals } from "../ipc/bindings/LibraryTotals";
+import type { Plan } from "../ipc/bindings/Plan";
 import type { Progress } from "../ipc/bindings/Progress";
 import type { QueryTerm } from "../ipc/bindings/QueryTerm";
 import type { Reading } from "../ipc/bindings/Reading";
 import type { Reason } from "../ipc/bindings/Reason";
+import type { Scope } from "../ipc/bindings/Scope";
 import type { SearchOutcome } from "../ipc/bindings/SearchOutcome";
 import type { Shape } from "../ipc/bindings/Shape";
 import type { Sort } from "../ipc/bindings/Sort";
@@ -47,6 +53,7 @@ import type { Tally } from "../ipc/bindings/Tally";
 import type { Trashed } from "../ipc/bindings/Trashed";
 import type { UndoReport } from "../ipc/bindings/UndoReport";
 import type { Vocabulary } from "../ipc/bindings/Vocabulary";
+import type { ZipPick } from "../ipc/bindings/ZipPick";
 import type { AppError } from "../ipc/commands";
 import { FIRST_SORT, isSortKey } from "../ipc/sort";
 import { fold } from "../lib/queryTerm";
@@ -1238,6 +1245,139 @@ function copyIn(folderId: number, paths: readonly string[]): CopyStart {
   return { kind: "started", jobId, to, carried };
 }
 
+/** The zips exports have written, so a second to the same name is refused as Rust refuses it. */
+const ZIPS = new Set<string>();
+let nextExportJob = 9000;
+const exporting = new Map<number, Exporting>();
+
+/** A moment as an export names it: a camera's clock as written, any other in the local zone. */
+function exportStamp(at: number, floating: boolean) {
+  const time = new Date(at * 1000);
+  const part = (local: number, utc: number) => String(floating ? utc : local).padStart(2, "0");
+  return [
+    floating ? time.getUTCFullYear() : time.getFullYear(),
+    part(time.getMonth() + 1, time.getUTCMonth() + 1),
+    part(time.getDate(), time.getUTCDate()),
+    part(time.getHours(), time.getUTCHours()),
+    part(time.getMinutes(), time.getUTCMinutes()),
+    part(time.getSeconds(), time.getUTCSeconds()),
+  ].join("-");
+}
+
+/** A scope's files as an export gathers them, in the zip's order, and those on a drive that is away. */
+function gatherExport(scope: Scope) {
+  const rows =
+    scope.kind === "branch"
+      ? branch(scope.folderId)
+      : everyItem().filter((row) => scope.itemIds.includes(row.id));
+  const entries: { row: ItemRow; dir: string[]; keep: string; folders: string }[] = [];
+  const away: Stayed[] = [];
+  const offline: string[] = [];
+  for (const row of rows) {
+    const { folders, home } = crumbs(row.folderId);
+    if (!home) continue;
+    const titles = folders.map((crumb) => crumb.title);
+    if (!home.reachable) {
+      if (!offline.includes(home.title)) offline.push(home.title);
+      away.push({
+        kind: "file",
+        id: row.id,
+        name: row.diskName,
+        at: { kind: "folder", folderId: row.folderId, path: titles },
+        reason: { kind: "offline", source: home.title },
+      });
+      continue;
+    }
+    const from =
+      scope.kind === "branch"
+        ? Math.max(
+            folders.findIndex((c) => c.id === scope.folderId),
+            0,
+          )
+        : 0;
+    const named =
+      folders.length > 1
+        ? (titles.at(-1) ?? "")
+        : home.kind === "sorting"
+          ? "Sorting Box"
+          : home.title;
+    const taken = takenAt(row);
+    const stamp = exportStamp(taken ?? row.mtime, taken !== null && row.kind !== "video");
+    entries.push({
+      row,
+      dir: titles.slice(from),
+      keep: row.diskName,
+      folders: `${named} - ${stamp}.${row.ext}`,
+    });
+  }
+  const key = (entry: (typeof entries)[number]) =>
+    [...entry.dir.map((title) => `1${title.toLowerCase()}`), `0${entry.keep.toLowerCase()}`].join(
+      "\u0000",
+    );
+  entries.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : a.row.id - b.row.id));
+  return { entries, away, offline };
+}
+
+function exportPlanOf(scope: Scope): Plan {
+  const { entries, away, offline } = gatherExport(scope);
+  const [first] = entries;
+  if (!first)
+    return away.length > 0 ? { kind: "away", files: away.length, offline } : { kind: "empty" };
+  return {
+    kind: "ready",
+    whole: entries.length + away.length,
+    away: away.length,
+    offline,
+    first: { dir: `${first.dir.join("/")}/`, keep: first.keep, folders: first.folders },
+  };
+}
+
+function zipNamed(path: string) {
+  const dir = path.replace(/[\\/][^\\/]*$/, "");
+  return { zip: lastName(path), place: lastName(dir), dir };
+}
+
+function sendExports() {
+  void emit("job-progress", {
+    ...(COMMANDS.index_progress?.({}) as Progress),
+    exports: [...exporting.values()],
+  });
+}
+
+/** An export that takes a few moments, its line moving, so its Cancel can be reached. */
+function startExportJob(scope: Scope, path: string): ExportStart {
+  const named = zipNamed(path);
+  if (ZIPS.has(path)) return { kind: "taken", zip: named.zip, place: named.place };
+  const { entries, away } = gatherExport(scope);
+  const jobId = nextExportJob++;
+  const whole = entries.length + away.length;
+  exporting.set(jobId, { jobId, zip: named.zip, path, done: away.length, whole });
+  const ended = (end: End, written: number) => {
+    exporting.delete(jobId);
+    sendExports();
+    const done: Exported = { jobId, path, ...named, whole, written, skipped: away, end };
+    void emit("export-done", done);
+  };
+  const step = () => {
+    const line = exporting.get(jobId);
+    if (!line) return;
+    if (line.done >= whole) {
+      ZIPS.add(path);
+      ended({ kind: entries.length > 0 ? "written" : "nothing" }, entries.length);
+      return;
+    }
+    exporting.set(jobId, { ...line, done: line.done + 1 });
+    sendExports();
+    setTimeout(step, EXPORT_STEP_MS);
+  };
+  setTimeout(step, EXPORT_STEP_MS);
+  cancelExports.set(jobId, () => ended({ kind: "cancelled" }, 0));
+  return { kind: "started", jobId };
+}
+
+const EXPORT_STEP_MS = 600;
+const cancelExports = new Map<number, () => void>();
+
 let storedPreferences: unknown = null;
 
 const COMMANDS: Record<string, (args: Args) => unknown> = {
@@ -1783,6 +1923,21 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   paste_files: ({ folderId }) => copyIn(folderId as number, clipboard),
   drop_files: ({ folderId, paths }) => copyIn(folderId as number, paths as string[]),
   cancel_copy: () => false,
+  export_plan: ({ scope }) => exportPlanOf(scope as Scope),
+  pick_export_zip: ({ name, dir }): ZipPick => {
+    const path = `${(dir as string | null) ?? "D:\\Exports"}\\${name as string}.zip`;
+    const named = zipNamed(path);
+    return ZIPS.has(path)
+      ? { kind: "taken", zip: named.zip, place: named.place }
+      : { kind: "picked", path, ...named };
+  },
+  start_export: ({ scope, path }) => startExportJob(scope as Scope, path as string),
+  cancel_export: ({ jobId }) => {
+    const cancel = cancelExports.get(jobId as number);
+    if (!cancel || !exporting.has(jobId as number)) return false;
+    cancel();
+    return true;
+  },
   reveal_path: () => null,
   copy_item_paths: () => null,
   start_index: () => null,

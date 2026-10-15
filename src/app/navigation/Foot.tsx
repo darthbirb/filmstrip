@@ -1,10 +1,11 @@
 import { type CSSProperties, useId, useLayoutEffect, useRef, useState } from "react";
 
 import type { Copying } from "../../ipc/bindings/Copying";
+import type { Exporting } from "../../ipc/bindings/Exporting";
 import type { LibraryTotals } from "../../ipc/bindings/LibraryTotals";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import type { Tally } from "../../ipc/bindings/Tally";
-import { cancelCopy } from "../../ipc/commands";
+import { cancelCopy, cancelExport, revealPath } from "../../ipc/commands";
 import { formatBytes, formatCount, formatShortDay } from "../../lib/format";
 import { Band } from "../../ui/Band";
 import { Button } from "../../ui/Button";
@@ -27,10 +28,15 @@ export function Foot({ rail = false }: { rail?: boolean }) {
   const news = useNews();
   const anchor = `--foot-${useId().replace(/[^\w-]/g, "")}`;
   // Folded, a line that has been answered leaves: the grid is what shows the files are back.
-  const shown = news !== null && !(rail && news.kind === "undone");
+  const shown =
+    news !== null &&
+    !(rail && (news.kind === "undone" || (news.kind === "exported" && !news.path)));
 
   // Newest highest, above the walk, as the foot is ordered by permanence from the bottom.
-  const copies = [...(progress?.copies ?? [])].reverse();
+  const jobs: Job[] = [
+    ...(progress?.copies ?? []).map((copy) => ({ kind: "copy" as const, ...copy })),
+    ...(progress?.exports ?? []).map((one) => ({ kind: "export" as const, ...one })),
+  ].sort((a, b) => b.jobId - a.jobId);
   const left = progress ? progress.pending + progress.running : 0;
   const busy = progress !== null && progress.phase !== "idle";
   const done = progress?.completed ?? 0;
@@ -40,9 +46,13 @@ export function Foot({ rail = false }: { rail?: boolean }) {
     // Ordered by permanence from the bottom: the count, the walk, then what waits to be read.
     <div className="w-full shrink-0" style={{ anchorName: anchor } as CSSProperties}>
       <PushDown open={shown}>{shown && <News news={news} rail={rail} />}</PushDown>
-      {copies.map((copy) => (
-        <CopyLine key={copy.jobId} copy={copy} rail={rail} />
-      ))}
+      {jobs.map((job) =>
+        job.kind === "copy" ? (
+          <CopyLine key={job.jobId} copy={job} rail={rail} />
+        ) : (
+          <ExportLine key={job.jobId} job={job} rail={rail} />
+        ),
+      )}
       <PushDown open={busy}>
         {rail ? (
           <div className="border-line border-t px-1.5 pt-2 pb-1.5">
@@ -64,6 +74,9 @@ export function Foot({ rail = false }: { rail?: boolean }) {
     </div>
   );
 }
+
+/** A copy's or an export's line, by the job that runs it. */
+type Job = (Copying & { kind: "copy" }) | (Exporting & { kind: "export" });
 
 const NONE: Tally = { count: 0, bytes: 0 };
 const NOTHING: LibraryTotals = {
@@ -199,8 +212,10 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
     return <Band sentence={refusalSentence(why, clash)} path={path} onDismiss={dismiss} />;
   }
   if (news.kind === "keyRefused") {
-    return <Band sentence={news.line} detail={news.detail} onDismiss={dismiss} />;
+    return <Band sentence={news.line} detail={news.detail} path={news.path} onDismiss={dismiss} />;
   }
+  const exported = news.kind === "exported" ? news : null;
+  const reveal = exported?.path;
 
   if (rail) {
     return (
@@ -210,6 +225,12 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
             glyph="undo"
             label={`Undo · ${news.line} · Ctrl+Z`}
             onClick={() => void undo(news.batchId)}
+          />
+        ) : reveal ? (
+          <GlyphButton
+            glyph="folderOpen"
+            label={`Show in Explorer · ${exported?.line}`}
+            onClick={() => void revealPath(reveal).catch(() => undefined)}
           />
         ) : (
           <Nothing noFiles={news.kind === "noFiles"} />
@@ -226,6 +247,25 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
           <Button glyph="undo" title="Undo · Ctrl+Z" onClick={() => void undo(news.batchId)}>
             Undo
           </Button>
+        }
+        onDismiss={dismiss}
+      />
+    );
+  }
+  if (news.kind === "exported") {
+    return (
+      <Line
+        glyph="done"
+        sentence={news.line}
+        action={
+          reveal && (
+            <Button
+              glyph="folderOpen"
+              onClick={() => void revealPath(reveal).catch(() => undefined)}
+            >
+              Show in Explorer
+            </Button>
+          )
         }
         onDismiss={dismiss}
       />
@@ -296,6 +336,38 @@ function CopyLine({ copy, rail }: { copy: Copying; rail: boolean }) {
           glyph="close"
           label="Cancel Copy"
           onClick={() => void cancelCopy(copy.jobId).catch(() => false)}
+        />
+      </span>
+      <span className="pr-1">
+        <Bar percent={percent} />
+      </span>
+    </div>
+  );
+}
+
+/**
+ * An export's own line, as a copy's: the zip it is writing, how far, and its dismiss, which
+ * cancels it and leaves no zip. Artboards › Exporting a zip.
+ */
+function ExportLine({ job, rail }: { job: Exporting; rail: boolean }) {
+  const percent = job.whole > 0 ? Math.round((job.done / job.whole) * 100) : 0;
+  const left = `Exporting to ${job.path} · ${formatCount(job.whole - job.done)} of ${formatCount(job.whole)} left`;
+  if (rail) {
+    return (
+      <div title={left} className="border-line border-t px-1.5 pt-2 pb-1.5">
+        <Bar percent={percent} />
+      </div>
+    );
+  }
+  return (
+    <div title={left} className="flex flex-col gap-1 border-line border-t py-1.5 pr-1.5 pl-2.5">
+      <span className="flex items-center gap-2 text-fg-mid text-small">
+        <span className="min-w-0 flex-1 truncate">Exporting {job.zip}…</span>
+        <span className="text-fg tabular-nums">{percent}%</span>
+        <GlyphButton
+          glyph="close"
+          label="Cancel Export"
+          onClick={() => void cancelExport(job.jobId).catch(() => false)}
         />
       </span>
       <span className="pr-1">

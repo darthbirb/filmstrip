@@ -51,6 +51,7 @@ export const GLYPHS = {
   moveTo: { icon: "folder-simple-plus", code: 0xe25e },
   newFolder: { icon: "folder-plus", code: 0xe258 },
   paste: { icon: "clipboard", code: 0xe196 },
+  zip: { icon: "file-zip", code: 0xe958 },
   putBack: { icon: "arrow-u-up-left", code: 0xe08a },
   checkAll: { icon: "checks", code: 0xe53a },
   prohibit: { icon: "prohibit", code: 0xe3de },

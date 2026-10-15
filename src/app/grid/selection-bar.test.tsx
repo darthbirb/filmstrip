@@ -197,7 +197,7 @@ test("at the grid's narrowest the count, Move to… and × stay, and the rest wa
 
   await userEvent.click(bar().getByRole("button", { name: "More" }).last());
   const rows = page.getByRole("menuitem").elements().map(words);
-  expect(rows).toEqual(["Select All", "Favourite", "Tag…", "Copy", "Delete 3 Files"]);
+  expect(rows).toEqual(["Select All", "Favourite", "Tag…", "Copy", "Export…", "Delete 3 Files"]);
 });
 
 const tile = (name: string) => page.getByRole("button", { name, exact: true });
@@ -217,6 +217,7 @@ test("right-clicking a checked tile opens the set's menu, counted, with the verb
     "Move to…",
     "Copy",
     "Copy Path",
+    "Export…",
     "Delete 2 Files",
   ]);
   await recording(async (calls) => {
