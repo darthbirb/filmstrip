@@ -45,7 +45,7 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 - An item's path is its folder's path joined with `disk_name`. A trashed item's file is in the
   app's trash instead, at `ab/cd/<uuid>.<ext>`, sharded as thumbnails are
   (`fs::paths::trash_path`); its row keeps the folder and name it left.
-- The index's backups are whole copies of it in `dataackups`, beside the trash, each named
+- The index's backups are whole copies of it in `data\backups`, beside the trash, each named
   `index-<ms>-<how>.db` for when and how it was taken (`fs::backups`).
 - **Every item has a folder.** A file waiting in a sorting source sits in that source's root
   folder or somewhere beneath it.
