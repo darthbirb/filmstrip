@@ -12,6 +12,8 @@ type Props = {
   detail?: ReactNode;
   /** Raised carries the move worth making; quiet stands beside it as the lesser one; danger destroys or forgets. */
   tone?: "raised" | "quiet" | "danger";
+  /** A raised button a row offers, a chip high in `small` `fg-mid` until the pointer is on it. */
+  small?: boolean;
   expanded?: boolean;
   /** A tooltip, for a button whose key is worth knowing. */
   title?: string;
@@ -23,6 +25,9 @@ type Props = {
 // A label never wraps, and a panel stops before it would. DECISIONS.md "The frame".
 const SHAPE =
   "focus-ring flex h-control max-w-full shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control px-2.5 text-ui transition-colors duration-(--motion-quick) motion-reduce:transition-none";
+
+const SMALL =
+  "focus-ring flex h-chip max-w-full shrink-0 items-center gap-1.5 whitespace-nowrap rounded-nested bg-raised px-2 text-fg-mid text-small inset-ring inset-ring-line-control transition-colors duration-(--motion-quick) hover:bg-raised-hi hover:text-fg motion-reduce:transition-none";
 
 const TONES = {
   raised:
@@ -39,6 +44,7 @@ export function Button({
   filled,
   detail,
   tone = "raised",
+  small = false,
   expanded,
   title,
   onClick,
@@ -51,7 +57,7 @@ export function Button({
       title={title}
       aria-expanded={expanded}
       onClick={onClick}
-      className={`${SHAPE} ${TONES[tone]}`}
+      className={small ? SMALL : `${SHAPE} ${TONES[tone]}`}
     >
       {glyph && <Glyph name={glyph} filled={filled} className="text-fg-dim text-glyph" />}
       <span className="min-w-0 truncate">{children}</span>

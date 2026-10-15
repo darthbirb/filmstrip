@@ -6,9 +6,11 @@ import { GlyphButton } from "../../ui/GlyphButton";
 import type { GlyphName } from "../../ui/glyphs";
 import { DEFAULT_LAYOUT, type LayoutMode } from "../grid/layout";
 import { SCALES, updatePreferences, usePreferences } from "../preferences";
+import { Backups } from "./Backups";
 import { Keys } from "./Keys";
 import { Caption, type Row, Rows } from "./Rows";
 import { Sources } from "./Sources";
+import { settingsHeld } from "./settings-store";
 import { Tags } from "./Tags";
 
 type Section = {
@@ -97,6 +99,15 @@ function useSections(asking?: number): Section[] {
       body: <Tags />,
       fill: true,
     },
+    {
+      id: "backups",
+      group: "Library",
+      title: "Backups",
+      glyph: "backups",
+      rows: [],
+      body: <Backups />,
+      fill: true,
+    },
   ];
 }
 
@@ -127,9 +138,12 @@ export function Settings({ open, onClose, section, asking }: Props) {
       ref={dialog}
       aria-labelledby="settings-title"
       onClose={onClose}
+      onCancel={(event) => {
+        if (settingsHeld()) event.preventDefault();
+      }}
       // A click on the backdrop lands on the dialog itself, never on the panel inside it.
       onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget && !settingsHeld()) onClose();
       }}
       className="m-auto h-dialog-height w-dialog overflow-hidden rounded-control border-0 bg-panel p-0 text-fg shadow-overlay inset-ring inset-ring-line-control backdrop:bg-scrim"
     >
@@ -159,7 +173,13 @@ function Body({ onClose, section, asking }: Omit<Props, "open">) {
         <h2 id="settings-title" className="m-0 min-w-0 flex-1 truncate text-fg-hi text-title">
           Settings
         </h2>
-        <GlyphButton glyph="close" label="Close Settings" onClick={onClose} />
+        <GlyphButton
+          glyph="close"
+          label="Close Settings"
+          onClick={() => {
+            if (!settingsHeld()) onClose();
+          }}
+        />
       </header>
       <div className="flex min-h-0 flex-1">
         <nav

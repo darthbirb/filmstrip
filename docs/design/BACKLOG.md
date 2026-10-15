@@ -41,21 +41,3 @@ Issue #112. Issue #63 built the rest; two parts of Artboards › Bringing files 
 ground, between the tiles or under the last row, opens its place's menu under the place's name, with
 Paste, as the place's row does; the Sorting Box's ground has Paste alone. And a drag from Explorer
 near the tree's top or foot scrolls the tree, as a move's drag does.
-
-## Backing up the index · DRAWN
-
-Issue #65. The index holds everything the disk does not, and nothing keeps a copy of it.
-
-Artboards › Backing up the index. Settings › Library › Backups, after Tags: its name, how many are
-kept and what they weigh, and Back Up Now; Backups to Keep, 3, 7, 14 or 30; then the backups newest
-first, each with when, how it was taken (at launch, by hand, before restore), its size and
-Restore…. Restore… asks on the row, in the row question's shape, and keeps the index as it was as a
-backup first; a backup that cannot be read is refused at the section's foot and the index is
-untouched. The chosen one is checked before the current index is backed up, and the oldest go only
-once the swap has succeeded, never the one restored. A restore keeps the Trash as it is now, each
-trashed item with its chain of folders, retired, and one from a source added since goes as that
-source's other rows do; it starts the job queue empty but for the walk. Lowering the number
-removes nothing until the next backup, and marks every row that will not be among the newest after
-it. Drawn: the whole dialog, asking, restoring, restored with the way back on top, unreadable, the
-dropdown open, lowered, the 640px window, thirty kept, none yet, one being written, and a backup
-refused in Settings and at launch.

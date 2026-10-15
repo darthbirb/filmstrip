@@ -28,6 +28,7 @@ import { usePasteKey } from "./paste/keys";
 import { usePreferences, useScaleHotkeys } from "./preferences";
 import { useSearchKeys } from "./search/keys";
 import { SearchField } from "./search/SearchField";
+import { useLaunchBackup } from "./settings/backup-words";
 import { Settings } from "./settings/Settings";
 import { closeSettings, openSettings, useSettingsRequest } from "./settings/settings-store";
 import { ReportBanner } from "./undo/ReportBanner";
@@ -45,6 +46,7 @@ export function App() {
   useSearchKeys();
   usePasteKey();
   useExplorerDrops();
+  useLaunchBackup();
 
   return (
     <div className="flex h-dvh flex-col bg-ground text-fg">

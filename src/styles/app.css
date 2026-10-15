@@ -196,6 +196,8 @@
   --spacing-tile-caption: 1.3125rem;
   /* The column a list's counts stand in, right-aligned, so they line up from row to row. */
   --spacing-count: 3.25rem;
+  /* The column a row's one worded button stands in, so the rows without one still line up. */
+  --spacing-row-action: 4.25rem;
   /* A dragged ghost's picture. */
   --spacing-ghost-thumb: 1.5rem;
   /* A folder a search found: the card, and the picture that stands for it. */

@@ -12,8 +12,19 @@ export function openSettings(next: SettingsRequest = {}) {
   for (const listener of listeners) listener();
 }
 
+// Set while a restore runs: Escape and the close wait for it. Artboards › Backing up the index.
+let held = false;
+
+export function holdSettings(on: boolean) {
+  held = on;
+}
+
+export function settingsHeld() {
+  return held;
+}
+
 export function closeSettings() {
-  if (request === null) return;
+  if (request === null || held) return;
   request = null;
   for (const listener of listeners) listener();
 }
