@@ -28,6 +28,7 @@ pub fn run() {
             let thumbs = fs::paths::thumbs_dir()?;
             let mut conn = db::open(&db_path)?;
             db::migrate(&mut conn)?;
+            jobs::abandon_exports(&conn)?;
             db::jobs::requeue_running(&conn)?;
             jobs::enqueue_index(&conn)?;
 
@@ -49,6 +50,7 @@ pub fn run() {
 
             let handle = app.handle().clone();
             let announcer = app.handle().clone();
+            let exporter = app.handle().clone();
             let queue = jobs::JobQueue::start(
                 db_path.clone(),
                 thumbs.clone(),
@@ -58,6 +60,9 @@ pub fn run() {
                 }),
                 Box::new(move |copied| {
                     let _ = announcer.emit(jobs::COPIED_EVENT, copied);
+                }),
+                Box::new(move |exported| {
+                    let _ = exporter.emit(jobs::EXPORTED_EVENT, exported);
                 }),
             );
             app.manage(commands::AppState {
@@ -111,6 +116,10 @@ pub fn run() {
             commands::paste_files,
             commands::drop_files,
             commands::cancel_copy,
+            commands::export_plan,
+            commands::pick_export_zip,
+            commands::start_export,
+            commands::cancel_export,
             commands::reveal_path,
             commands::remove_source,
             commands::folder_children,

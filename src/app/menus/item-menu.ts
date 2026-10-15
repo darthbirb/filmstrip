@@ -1,6 +1,7 @@
 import { copyItemPaths, openItem, revealItem } from "../../ipc/commands";
 import { formatCount } from "../../lib/format";
 import type { HeadedMenu, MenuAction, MenuGroups } from "../../ui/Menu";
+import { exportChecked } from "../export/export";
 import { isFavourite, setFavourite, setFavourites } from "../favourites";
 import { oneFolder } from "../grid/selection";
 import { deleteFiles } from "../pane/delete";
@@ -82,6 +83,7 @@ export function setMenu(items: readonly Item[], trash: boolean): HeadedMenu {
           glyph: "copy",
           onSelect: () => void copyItemPaths(ids).catch(() => undefined),
         },
+        { id: "export", label: "Export…", glyph: "zip", onSelect: () => exportChecked(ids) },
       ],
       [
         {

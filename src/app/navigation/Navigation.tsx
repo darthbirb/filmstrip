@@ -22,6 +22,7 @@ import {
   type MenuGroups,
 } from "../../ui/Menu";
 import { Tree, type TreeRow } from "../../ui/Tree";
+import { exportFiles } from "../export/export";
 import { type Landing, type Resolver, setDropResolver, useDrag } from "../grid/drag";
 import { type CheckedFile, checkBranch } from "../grid/selection";
 import { DIGITS } from "../keys";
@@ -312,11 +313,33 @@ export function Navigation() {
         void checkBranch().catch(() => undefined);
       },
     };
+    // The menu has handed the focus back to the row by now, and the sheet hangs off it.
+    const exportHere: MenuAction = {
+      id: "export",
+      label: "Export…",
+      glyph: "zip",
+      onSelect: () => {
+        const element = document.activeElement;
+        const row = element instanceof HTMLElement ? element : null;
+        void exportFiles({
+          scope: { kind: "branch", folderId: folder },
+          name: title,
+          folder: title,
+          anchor: () => (row?.isConnected ? row : null),
+          below: true,
+        });
+      },
+    };
     if (folder === source.rootFolderId) {
       const search = searchHere("Search in Source");
       return {
         heading: "Source",
-        groups: sourceMenu(source, rename, { newFolder, star, assign, search, inside }, pasteHere),
+        groups: sourceMenu(
+          source,
+          rename,
+          { newFolder, star, assign, search, inside, exportHere },
+          pasteHere,
+        ),
       };
     }
     // A folder whose drive is away keeps what only the index holds, as its source's row does.
@@ -348,6 +371,7 @@ export function Navigation() {
           searchHere("Search in Folder"),
           inside,
           revealFolderRow(folder),
+          exportHere,
           renameRow(rename),
           readAgainRow(folder),
         ],
@@ -485,10 +509,10 @@ function keyGroups(keys: readonly DestinationKey[], folder: number): MenuGroups 
 function sourceMenu(
   source: SourceSummary,
   rename: () => void,
-  rows: Record<"newFolder" | "star" | "assign" | "search" | "inside", MenuAction>,
+  rows: Record<"newFolder" | "star" | "assign" | "search" | "inside" | "exportHere", MenuAction>,
   paste: readonly MenuAction[],
 ): MenuGroups {
-  const { newFolder, star, assign, search, inside } = rows;
+  const { newFolder, star, assign, search, inside, exportHere } = rows;
   const folder = source.rootFolderId;
   const reveal: MenuAction = {
     id: "reveal",
@@ -500,7 +524,9 @@ function sourceMenu(
   // New Folder is on it because a source's row is the only row that stands for its top level.
   return [
     source.reachable ? [newFolder, ...paste, star, assign] : [star, assign],
-    source.reachable ? [search, inside, reveal, naming, readAgainRow(folder)] : [inside, naming],
+    source.reachable
+      ? [search, inside, reveal, exportHere, naming, readAgainRow(folder)]
+      : [inside, naming],
     [
       {
         id: "manage",

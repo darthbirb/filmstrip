@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "./app/App";
 import { suppressBrowserMenu } from "./app/browser-menu";
+import { watchExports } from "./app/export/export";
 import { startIndex } from "./app/navigation/index-store";
 import { watchWork } from "./app/navigation/work-store";
 import { watchClipboard } from "./app/paste/clipboard";
@@ -19,6 +20,7 @@ await loadPreferences();
 void startIndex();
 void watchWork();
 void watchCopies();
+void watchExports();
 watchClipboard();
 
 const root = document.getElementById("root");

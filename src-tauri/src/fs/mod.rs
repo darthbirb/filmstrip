@@ -1,5 +1,6 @@
 pub mod acts;
 pub mod clipboard;
+pub mod export;
 pub mod folders;
 pub mod items;
 pub mod noclobber;

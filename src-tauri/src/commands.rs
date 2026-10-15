@@ -25,12 +25,13 @@ use crate::db::vocabulary::{self, KeyClashFor, Vocabulary};
 use crate::error::{AppError, Result};
 use crate::fs::acts::{self, Batch};
 use crate::fs::clipboard;
+use crate::fs::export::{self, Naming, Plan, Scope};
 use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
 use crate::fs::items::{self as fs_items, MoveReport};
 use crate::fs::paste::{self, Carried, CopyRefusal};
-use crate::fs::paths;
 use crate::fs::trash::{self, Origin, RestoreReport, TrashReport, Trashed};
 use crate::fs::undo::{self, UndoReport};
+use crate::fs::{paths, sanitize};
 use crate::jobs::{self, JobQueue, Progress};
 use crate::media::scrub;
 use crate::query::{self, QueryFault, QueryTerm, Reading};
@@ -466,6 +467,127 @@ pub fn start_copy(conn: &Connection, folder_id: i64, entries: &[PathBuf]) -> Res
 pub async fn cancel_copy(state: State<'_, AppState>, job_id: i64) -> Result<bool> {
     let conn = crate::db::open(&state.db)?;
     state.queue.cancel_copy(&conn, job_id)
+}
+
+/// What an export of a branch or a set would hold, read before the save dialog opens.
+/// DECISIONS.md "Exporting a zip".
+#[tauri::command]
+pub async fn export_plan(state: State<'_, AppState>, scope: Scope) -> Result<Plan> {
+    run(&state, move |conn| export::plan(conn, &scope)).await
+}
+
+/// Where Windows' save dialog said the zip goes, or that a name chosen there is taken: the dialog
+/// asks before replacing a name and cannot be told not to, so a Yes is refused here.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(export)]
+pub enum ZipPick {
+    Cancelled,
+    Taken {
+        zip: String,
+        place: String,
+    },
+    Picked {
+        path: String,
+        zip: String,
+        place: String,
+        dir: String,
+    },
+}
+
+/// The system's own save dialog, named after what is exported, in the last export's folder or
+/// Documents.
+#[tauri::command]
+pub async fn pick_export_zip(app: AppHandle, name: String, dir: Option<String>) -> Result<ZipPick> {
+    let start = dir
+        .map(PathBuf::from)
+        .filter(|dir| dir.is_dir())
+        .or_else(|| app.path().document_dir().ok());
+    let mut dialog = app
+        .dialog()
+        .file()
+        .set_file_name(sanitize::file_name(&format!("{name}.zip")))
+        .add_filter("Zip", &["zip"]);
+    if let Some(start) = start {
+        dialog = dialog.set_directory(start);
+    }
+    let (tx, rx) = std::sync::mpsc::channel();
+    dialog.save_file(move |picked| {
+        let _ = tx.send(picked);
+    });
+    let picked = tauri::async_runtime::spawn_blocking(move || rx.recv())
+        .await?
+        .map_err(AppError::invalid)?;
+    let Some(picked) = picked else {
+        return Ok(ZipPick::Cancelled);
+    };
+    Ok(zip_pick(picked.into_path().map_err(AppError::invalid)?))
+}
+
+/// A path the dialog gave, ending in `.zip`, and whether something already has that name.
+pub fn zip_pick(path: PathBuf) -> ZipPick {
+    let zipped = path
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("zip"));
+    let path = if zipped {
+        path
+    } else {
+        let mut named = path.into_os_string();
+        named.push(".zip");
+        PathBuf::from(named)
+    };
+    let (zip, place, dir) = jobs::named(&path);
+    if std::fs::symlink_metadata(&path).is_ok() {
+        return ZipPick::Taken { zip, place };
+    }
+    ZipPick::Picked {
+        path: path.to_string_lossy().into_owned(),
+        zip,
+        place,
+        dir,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(export)]
+pub enum ExportStart {
+    Started {
+        #[serde(rename = "jobId")]
+        job_id: i64,
+    },
+    Taken {
+        zip: String,
+        place: String,
+    },
+}
+
+/// Queues the export, unless its zip's name was taken since the dialog closed.
+#[tauri::command]
+pub async fn start_export(
+    state: State<'_, AppState>,
+    scope: Scope,
+    naming: Naming,
+    path: String,
+) -> Result<ExportStart> {
+    run(&state, move |conn| {
+        let dest = PathBuf::from(path);
+        if std::fs::symlink_metadata(&dest).is_ok() {
+            let (zip, place, _) = jobs::named(&dest);
+            return Ok(ExportStart::Taken { zip, place });
+        }
+        Ok(ExportStart::Started {
+            job_id: jobs::enqueue_export(conn, &scope, naming, &dest)?,
+        })
+    })
+    .await
+}
+
+/// Stops an export, waiting or running; nothing of its zip is left.
+#[tauri::command]
+pub async fn cancel_export(state: State<'_, AppState>, job_id: i64) -> Result<bool> {
+    let conn = crate::db::open(&state.db)?;
+    state.queue.cancel_export(&conn, job_id)
 }
 
 /// A file outside the library selected in Explorer, as a copy that left it there reports it.
@@ -1458,6 +1580,34 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn a_zip_picked_in_the_save_dialog_ends_in_zip_and_a_name_there_already_is_refused() {
+        let dir = scratch("zip-pick");
+        let exports = dir.join("Exports");
+        std::fs::create_dir_all(&exports).unwrap();
+        assert_eq!(
+            zip_pick(exports.join("Trips")),
+            ZipPick::Picked {
+                path: exports.join("Trips.zip").to_string_lossy().into_owned(),
+                zip: "Trips.zip".into(),
+                place: "Exports".into(),
+                dir: exports.to_string_lossy().into_owned(),
+            }
+        );
+        std::fs::write(exports.join("Cairo.ZIP"), "theirs").unwrap();
+        assert_eq!(
+            zip_pick(exports.join("Cairo.ZIP")),
+            ZipPick::Taken {
+                zip: "Cairo.ZIP".into(),
+                place: "Exports".into(),
+            }
+        );
+        assert_eq!(
+            std::fs::read_to_string(exports.join("Cairo.ZIP")).unwrap(),
+            "theirs"
+        );
     }
 
     /// A stand-in for the app folder, so no test goes near the real one.

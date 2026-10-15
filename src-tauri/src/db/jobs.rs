@@ -6,7 +6,7 @@ use ts_rs::TS;
 
 use crate::db::now;
 use crate::error::Result;
-use crate::jobs::kinds::{COPY_IN, WALKS};
+use crate::jobs::kinds::{COPY_IN, EXPORT, WALKS};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QueuedJob {
@@ -109,13 +109,13 @@ pub fn release(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
-/// Takes a copy off the queue while it waits, and returns what it carries; nothing when it is
-/// running or gone.
-pub fn cancel_pending(conn: &Connection, id: i64) -> Result<Option<String>> {
+/// Takes a copy or an export off the queue while it waits, and returns its payload; nothing when
+/// it is running or gone.
+pub fn cancel_pending(conn: &Connection, id: i64, kind: &str) -> Result<Option<String>> {
     Ok(conn
         .query_row(
             "DELETE FROM job WHERE id = ?1 AND kind = ?2 AND status = 'pending' RETURNING payload",
-            params![id, COPY_IN],
+            params![id, kind],
             |r| r.get(0),
         )
         .optional()?)
@@ -123,21 +123,35 @@ pub fn cancel_pending(conn: &Connection, id: i64) -> Result<Option<String>> {
 
 /// Each copy not yet started, oldest first, with what it carries.
 pub fn waiting_copies(conn: &Connection) -> Result<Vec<(i64, String)>> {
+    waiting(conn, COPY_IN)
+}
+
+/// Each job of a kind not yet started, oldest first, with its payload.
+pub fn waiting(conn: &Connection, kind: &str) -> Result<Vec<(i64, String)>> {
     let mut stmt = conn.prepare(
         "SELECT id, payload FROM job WHERE kind = ?1 AND status = 'pending' ORDER BY id",
     )?;
     let rows = stmt
-        .query_map([COPY_IN], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .query_map([kind], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<rusqlite::Result<_>>()?;
     Ok(rows)
 }
 
-/// The walk's work and what it queues: a copy counts itself.
+/// Takes every job of a kind off the table, whatever its state, and returns their payloads.
+pub fn take_all(conn: &Connection, kind: &str) -> Result<Vec<String>> {
+    let mut stmt = conn.prepare("DELETE FROM job WHERE kind = ?1 RETURNING payload")?;
+    let rows = stmt
+        .query_map([kind], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(rows)
+}
+
+/// The walk's work and what it queues: a copy and an export count themselves.
 pub fn counts(conn: &Connection) -> Result<Counts> {
     let mut counts = Counts::default();
-    let mut stmt =
-        conn.prepare("SELECT status, COUNT(*) FROM job WHERE kind <> ?1 GROUP BY status")?;
-    let rows = stmt.query_map([COPY_IN], |r| {
+    let mut stmt = conn
+        .prepare("SELECT status, COUNT(*) FROM job WHERE kind NOT IN (?1, ?2) GROUP BY status")?;
+    let rows = stmt.query_map([COPY_IN, EXPORT], |r| {
         Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
     })?;
     for row in rows {

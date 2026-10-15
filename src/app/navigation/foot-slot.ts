@@ -9,9 +9,11 @@ export type Refused = { why: Refusal; clash: string | null; path: string };
 export type FootNews =
   | { kind: "refused"; refused: Refused }
   /** A destination key that moved nothing, and why. */
-  | { kind: "keyRefused"; line: string; detail?: string }
+  | { kind: "keyRefused"; line: string; detail?: string; path?: string }
   /** An act that changed the disk, and the batch its Undo takes back. */
   | { kind: "done"; line: string; batchId: string }
+  /** An export that ended, and the zip it wrote, which Explorer can show; nothing to undo. */
+  | { kind: "exported"; line: string; path?: string }
   /** What an undo brought back, and the batch it took back. */
   | { kind: "undone"; line: string; batchId?: string }
   | { kind: "nothing" }

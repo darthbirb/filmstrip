@@ -42,29 +42,6 @@ ground, between the tiles or under the last row, opens its place's menu under th
 Paste, as the place's row does; the Sorting Box's ground has Paste alone. And a drag from Explorer
 near the tree's top or foot scrolls the tree, as a move's drag does.
 
-## Exporting a zip · DRAWN
-
-Issue #64. A branch or a selection cannot leave the library as one file.
-
-Artboards › Exporting a zip. Export… follows Show in Explorer on a folder's and a source's menu,
-and Copy Path on the set's menu and Copy on the selection bar, shedding behind More after Select
-All. Windows' save dialog comes first, then a sheet in the menu's surface and width, against what
-asked, says how the files are named: Keep Names or From Folders, a segmented pair, with the first
-file as it will be in the zip, the zip it will write, and Export and Cancel. The tree is kept
-either way; From Folders names a file from its folder and when it was taken, (2) and (3) after a
-name already given in that folder, in the order the library read them; a source's own files are
-named for the source, a sorting source's for the Sorting Box. A file on a drive that is away is
-said before and skipped; a set wholly away is refused before the dialog. The export is a job with
-its own line and Cancel, and a cancelled or failed one leaves no zip. The app never replaces a
-file. Windows' save dialog asks whether to replace a name that exists, which the dialog plugin
-cannot turn off; No keeps it open for another name, and a Yes is refused in the band, Filmstrip
-never replaces a file. Trips.zip is already in Exports. For #64, the finished zip goes into place
-by a step that refuses an existing name: std::fs::hard_link then removing the temporary file, or
-MoveFileExW without MOVEFILE_REPLACE_EXISTING, never std::fs::rename, which replaces on Windows.
-Drawn: the sheet on the bar, From Folders, from a folder's menu, part away, all away, a name taken,
-exporting, exported with Show in Explorer, cancelled, the zip not written, exported in part with
-the banner, and what the zip holds.
-
 ## Backing up the index · DRAWN
 
 Issue #65. The index holds everything the disk does not, and nothing keeps a copy of it.

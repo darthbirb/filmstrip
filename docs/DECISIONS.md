@@ -401,11 +401,11 @@ checked.
 **What a set can do is a bar along the grid's foot**, a row of the grid's own column rather than
 a tray over the pictures, since nothing in this app stands on a photograph but a tile's two marks.
 It holds the count and its size, Select All, and the set's verbs in its menu's order, Favourite,
-Move to…, Copy and Delete with the count again, so the bar and the menu never hold different sets;
-in the Trash, Restore and Restore to…, as its pane's bar has them. Favourite reads Remove Favourite
-only when every checked file is one already, so a mixed set is never half-toggled. As the grid
-narrows the size goes first, then Select All, Copy, Favourite and Delete behind More; the count,
-Move to… and the clear stay. The pane's bar acts on the pane's file alone, checked or not. **What
+Move to…, Copy, Export… and Delete with the count again, so the bar and the menu never hold
+different sets; in the Trash, Restore and Restore to…, as its pane's bar has them. Favourite reads
+Remove Favourite only when every checked file is one already, so a mixed set is never
+half-toggled. As the grid narrows the size goes first, then Select All, Export…, Copy, Tag…,
+Favourite and Delete behind More; the count, Move to… and the clear stay. The pane's bar acts on the pane's file alone, checked or not. **What
 a move or a delete could not carry stays checked**, so the bar counts what the banner lists and
 the next act takes exactly them, and after a delete the pane shows the tile after the last one
 gone.
@@ -682,8 +682,8 @@ Shift+F10 did nothing at all.
   a menu row must not do that in one press when the section that owns it asks first.
 - **A checked tile opens the set's menu, and right-clicking never changes the set.** It is counted
   at its head, since it is the one menu that acts on more than one file, and holds the verbs that
-  mean something for a set: Favourite, Move to…, Copy, Copy Path, and Delete with the count again;
-  in the Trash, Restore and Restore to…. A tile with no check opens its own menu and the set stays
+  mean something for a set: Favourite, Move to…, Copy, Copy Path, Export…, and Delete with the
+  count again; in the Trash, Restore and Restore to…. A tile with no check opens its own menu and the set stays
   checked, as a drag from it would, and that menu acts on that tile alone, so its Delete never
   reaches a tile out of sight.
 - **Opening a menu changes nothing.** The pane keeps what it shows until a verb in the menu says
@@ -983,6 +983,46 @@ arrive, and the originals stay as Explorer left them.
 - **The clipboard is read when it may have changed**: as the window takes the focus, as a right
   button goes down, and after the app's own Copy. A menu reads that reading, since a menu opens
   at once and cannot wait on the clipboard.
+
+## Exporting a zip
+
+**A branch or a set leaves the library as one zip, and the library is only read**, built on 15
+October 2026 from Artboards › Exporting a zip, and ported from ggallery's `fs/export.rs` with its
+naming kept as one of two choices. An export moves, renames and tags nothing, so it is not in the
+journal, has no Undo, never waits for a walk and never makes a move wait for it.
+
+- **Windows' own save dialog comes first**, then one short sheet for the naming: a choice about
+  names is only worth making once there is somewhere to write. The dialog opens in the last
+  export's folder, or Documents, named after what is exported: the folder, or for a set the place
+  it was checked in (Search Results for a search).
+- **Keep Names or From Folders, and the tree either way.** ggallery only named from folders, and
+  flattened a selection; here a branch is under its folder and a set under each file's path from
+  its source, so two files of one name never meet. From Folders gives `Cairo - 2024-06-12-10-25-21`
+  with the file's own extension: when it was taken, as the pane shows it (a camera's clock as
+  written, a container's time in the local zone, DECISIONS.md "Capture dates"), or when it was
+  modified with no date taken. A file at a source's top level is named for the source, and one at
+  a sorting source's top level for the Sorting Box, as ggallery named an unfiled file. A name
+  given twice in one folder of the zip, whatever the case, takes (2), (3) in the order the library
+  read the files, so the same files always get the same names; Keep Names goes through the same
+  step, which only two sources of one title can reach.
+- **Entries go in path order**, a folder's own files before its folders, names A to Z whatever the
+  case, and each is dated as its file is.
+- **Stored, never compressed.** Pictures and videos are compressed already, so deflating them
+  spends minutes to save nothing; a zip past 4 GB is still one file (zip64).
+- **A drive that is away is never waited for.** Its files are counted on the sheet before anything
+  is written and listed after in the banner, with no Retry, since the zip is finished; a set
+  wholly away is refused before the dialog. A file that cannot be read when its turn comes, gone,
+  open in another app or denied, is listed the same way and the rest go in. A file moved in the
+  app while the export runs is read from where it went: a move changes the disk and then the index
+  in one turn, so an export that finds a file gone takes the turn once and asks again.
+- **No half zip is ever left.** The zip is written under a hidden name beside its own and given
+  that name only once whole, by `fs::noclobber::rename` (DECISIONS.md "Bringing files in"), so a
+  name taken meanwhile is refused and what was written removed. Cancel stops at once, mid-file,
+  and removes it too, as does a failure. The app closing gives the export up: it is not taken up
+  again at the next launch, and the launch removes what a crash left of one.
+- **The app never replaces a file**, and Windows' dialog asks before a name that exists is
+  replaced and cannot be told not to (tauri-plugin-dialog 2.8.2). No keeps the dialog open for
+  another name; a Yes comes back and is refused in the band, and the sheet never opens.
 
 ## Expiry goes to the Recycle Bin
 

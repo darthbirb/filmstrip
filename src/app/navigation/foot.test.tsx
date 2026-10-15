@@ -77,6 +77,7 @@ const IDLE: Progress = {
   failed: 0,
   completed: 0,
   copies: [],
+  exports: [],
 };
 
 /** Answers as the app would, over these sources and totals. */

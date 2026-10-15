@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { GlyphButton } from "../ui/GlyphButton";
+import { ExportSheetHost } from "./export/ExportSheet";
 import { Frame } from "./frame/Frame";
 import { Dragging } from "./grid/drag";
 import { FolderBand } from "./grid/FolderBand";
@@ -92,6 +93,7 @@ export function App() {
       <Dragging />
       <ExplorerGhost />
       <PickHost />
+      <ExportSheetHost />
       <Settings
         open={settings !== null}
         onClose={closeSettings}

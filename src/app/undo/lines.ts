@@ -320,6 +320,10 @@ export function reasonText(reason: Reason): string {
         : `Holds ${reason.name}`;
     case "alreadyIn":
       return `Already in ${reason.place}`;
+    case "offline":
+      return `${reason.source} is offline`;
+    case "diskFull":
+      return "The disk is full";
     case "other":
       return reason.message.charAt(0).toUpperCase() + reason.message.slice(1);
   }
@@ -329,9 +333,11 @@ export type StayedGroup = { heading: string; rows: Stayed[] };
 
 /**
  * The rows under the place each is still in, one heading per place. Places are named from the
- * nearest folder they share, so "Inbox" and "Inbox › Day 2" read as where they are.
+ * nearest folder they share, so "Inbox" and "Inbox › Day 2" read as where they are. What an export
+ * `skipped` is placed from its source, since an export reaches across the library.
  */
-export function stayedGroups(stayed: readonly Stayed[]): StayedGroup[] {
+export function stayedGroups(stayed: readonly Stayed[], skipped = false): StayedGroup[] {
+  const still = skipped ? "Skipped in" : "Still in";
   const keyOf = (one: Stayed) =>
     one.at.kind === "trash"
       ? "trash"
@@ -352,11 +358,12 @@ export function stayedGroups(stayed: readonly Stayed[]): StayedGroup[] {
         return { heading: "Still in the Trash", rows, depth: 0 };
       // Outside the library a directory goes by its own name, as Explorer's title bar has it.
       if (first.at.kind === "outside")
-        return { heading: `Still in ${dirName(first.at.dir)}`, rows, depth: 0 };
+        return { heading: `${still} ${dirName(first.at.dir)}`, rows, depth: 0 };
       const path = first.at.path;
-      const place = path.slice(Math.max(Math.min(shared, path.length) - 1, 0)).join(" › ");
+      const from = skipped ? 0 : Math.max(Math.min(shared, path.length) - 1, 0);
+      const place = path.slice(from).join(" › ");
       const gone = first.reason.kind === "notOnDisk";
-      return { heading: `${gone ? "Gone from" : "Still in"} ${place}`, rows, depth: path.length };
+      return { heading: `${gone ? "Gone from" : still} ${place}`, rows, depth: path.length };
     })
     .sort((a, b) => a.depth - b.depth)
     .map(({ heading, rows }) => ({ heading, rows }));

@@ -26,6 +26,7 @@ const IDLE: Progress = {
   failed: 0,
   completed: 0,
   copies: [],
+  exports: [],
 };
 
 let served: Failure[] = FAILURES;

@@ -61,6 +61,11 @@ pub enum Reason {
     AlreadyIn {
         place: String,
     },
+    /// Its source's drive is away, so it was never read.
+    Offline {
+        source: String,
+    },
+    DiskFull,
     /// Anything else, in the words it came with.
     Other {
         message: String,
@@ -85,6 +90,8 @@ impl fmt::Display for Reason {
             Reason::Holds { name, more: 0 } => write!(f, "it holds {name}"),
             Reason::Holds { name, more } => write!(f, "it holds {name} and {more} more"),
             Reason::AlreadyIn { place } => write!(f, "it is already in {place}"),
+            Reason::Offline { source } => write!(f, "{source} is offline"),
+            Reason::DiskFull => f.write_str("the disk is full"),
             Reason::Other { message } => f.write_str(message),
         }
     }
@@ -106,6 +113,9 @@ impl Reason {
         // Windows' sharing and lock violations: another program holds the file open.
         match err.raw_os_error() {
             Some(32 | 33) => Reason::InUse,
+            // ERROR_HANDLE_DISK_FULL and ERROR_DISK_FULL.
+            Some(39 | 112) => Reason::DiskFull,
+            _ if err.kind() == std::io::ErrorKind::StorageFull => Reason::DiskFull,
             _ if err.kind() == std::io::ErrorKind::PermissionDenied => Reason::PermissionDenied,
             _ => Reason::Other {
                 message: err.to_string(),
@@ -158,6 +168,15 @@ impl From<image::ImageError> for AppError {
     }
 }
 
+impl From<zip::result::ZipError> for AppError {
+    fn from(e: zip::result::ZipError) -> Self {
+        match e {
+            zip::result::ZipError::Io(io) => AppError::Io(io),
+            other => AppError::Invalid(other.to_string()),
+        }
+    }
+}
+
 impl From<tauri::Error> for AppError {
     fn from(e: tauri::Error) -> Self {
         AppError::Invalid(e.to_string())
@@ -186,5 +205,15 @@ mod tests {
         );
         let other = serde_json::to_value(AppError::invalid("no")).unwrap();
         assert_eq!(other, json!({ "kind": "invalid", "message": "no" }));
+    }
+
+    #[test]
+    fn a_disk_with_no_room_left_says_it_is_full() {
+        for code in [39, 112] {
+            let full = AppError::Io(std::io::Error::from_raw_os_error(code));
+            assert_eq!(Reason::of(&full), Reason::DiskFull, "os error {code}");
+        }
+        let full = AppError::Io(std::io::ErrorKind::StorageFull.into());
+        assert_eq!(Reason::of(&full), Reason::DiskFull);
     }
 }

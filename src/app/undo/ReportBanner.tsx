@@ -23,7 +23,7 @@ function Shown({ report }: { report: Report }) {
   const [open, setOpen] = useState(true);
   const groups = report.heading
     ? [{ heading: report.heading, rows: report.rows }]
-    : stayedGroups(report.rows);
+    : stayedGroups(report.rows, report.skipped);
   return (
     <Banner
       sentence={report.sentence}
@@ -64,8 +64,9 @@ const GO =
   "focus-ring grid size-control place-items-center justify-self-end rounded-control text-fg-dim text-glyph transition-colors duration-(--motion-quick) hover:bg-wash hover:text-fg motion-reduce:transition-none";
 
 function Row({ row, inTrash }: { row: Stayed; inTrash: "show" | "restoreTo" }) {
-  // Explorer has nothing to show for a file gone from disk, or one under the trash's own name.
-  const showable = row.at.kind !== "trash" && row.reason.kind !== "notOnDisk";
+  // Explorer has nothing to show for a file gone from disk or away, or one under the trash's own name.
+  const showable =
+    row.at.kind !== "trash" && row.reason.kind !== "notOnDisk" && row.reason.kind !== "offline";
   return (
     <div className={`${COLUMNS} ${LIST_ROW}`}>
       <span className="flex min-w-0 items-center gap-2 text-fg">
