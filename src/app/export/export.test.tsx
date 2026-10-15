@@ -1,10 +1,11 @@
+import { emit } from "@tauri-apps/api/event";
 import { beforeAll, beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { recording } from "../../dev/recording";
 import type { Stayed } from "../../ipc/bindings/Stayed";
-import { folderItems } from "../../ipc/commands";
+import { createFolder, folderItems, indexProgress } from "../../ipc/commands";
 import { Grid } from "../grid/Grid";
 import { SelectionBar } from "../grid/SelectionBar";
 import { clearChecked } from "../grid/selection";
@@ -205,6 +206,21 @@ test("an export's line moving leaves the tree as it is", async () => {
   await userEvent.click(sheet("Export 2 Files").getByRole("button", { name: "Export" }));
   await expect.element(page.getByText("Exporting Cairo.zip…")).toBeVisible();
   await expect.element(page.getByText("Exported 2 files to Cairo.zip.")).toBeVisible();
+  await expect.element(cairo).toBeVisible();
+});
+
+test("a job that ends between two of the walk's ticks reads the tree again, and leaves it open", async () => {
+  const screen = await renderAll();
+  const idle = await indexProgress();
+  await emit("job-progress", idle);
+  await loadIndex();
+  setOpenFolders(new Set([1, 4]));
+  const cairo = screen.getByRole("treeitem", { name: /^Cairo / });
+  await expect.element(cairo).toBeVisible();
+
+  await createFolder(4, "Lisbon");
+  await emit("job-progress", { ...idle, completed: idle.completed + 1 });
+  await expect.element(screen.getByRole("treeitem", { name: /^Lisbon / })).toBeVisible();
   await expect.element(cairo).toBeVisible();
 });
 
