@@ -118,7 +118,7 @@ drawn. **Not started** — neither.
 
 | Capability | Filmstrip | Where |
 | --- | --- | --- |
-| Export a folder's subtree or a selection as a zip, as a job | Not started | Filmstrip's own change: renaming the files or keeping their own names is chosen at export |
+| Export a folder's subtree or a selection as a zip, as a job | Built | `export_plan`, `pick_export_zip`, `start_export`, `cancel_export`; DECISIONS.md "Exporting a zip". Filmstrip's own change: renaming the files or keeping their own names is chosen at export |
 | An undo journal that survives a restart | Built | `journal`, DECISIONS.md "Undo"; the line at the foot of navigation, Ctrl+Z |
 | Undo the last batch, or a named one | Built | Ctrl+Z takes the last, the line's Undo its own batch; no list of batches yet |
 

@@ -872,6 +872,16 @@ toward the rest surface.
   every checked file keep their heading and the rest gather under From N Folders. While it is
   read, chip-shaped stand-ins on `inset` hold the places, under Their Own and under the source's
   own folder. It scrolls past half the grid's height, as tall as the grid is now.
+- **Export sheet.** After Windows' save dialog, in the menu's surface and width: against Export…
+  on the selection bar a `tile-gap` above it, or against More while Export… waits there, and off a
+  folder's row a `tile-gap` under it, flipping above when there is no room, left edges met either
+  way. Its head counts the files in `eyebrow` capitals ("Export 5 Files", or "Trips · 1,240 Files"
+  for a branch); then Keep Names | From Folders as a segmented pair across the sheet, the first
+  file as it will be in the zip under it, its folders in `small` `fg-dim` and its name in
+  `fg-mid`; a `line` rule; the zip's row, the zip glyph, its name, and its folder in `small`
+  `fg-dim`, the whole path in the tooltip; for files on a drive that is away, the unplugged glyph
+  in `fg-faint` and the count skipped in `small` `fg-dim`; a rule; then Export, focused, and a
+  quiet Cancel.
 - **Set chip.** A tag across a set of files: the chip's own shape with "3 of 5" after the name in
   `key` `fg-dim` tabular figures when only some of the set carry it, and nothing when all do. It
   never searches. The set's own lift as the details' chips do and show a + before the × under the
@@ -955,11 +965,17 @@ toward the rest surface.
   keeps the bar alone. One that stops on its own says why: in the Line after what came in, or in
   the Band when nothing did. What it left out before it stopped is still in the banner, and then
   the Band gives the reason alone.
+- **Export line.** An export's line is the copy's: "Exporting Trips.zip…", its figure, Cancel
+  Export on its dismiss, and the bar, its tooltip the whole path and what is left. Copies and
+  exports stack together, the newest highest. It ends with the Line and Show in Explorer where
+  Undo would be, a raised button with the open folder glyph; folded, the rail keeps that glyph
+  button, and a Line with nothing to show leaves the rail. A zip that could not be written is the
+  Band, its folder under the sentence in the mono a path takes.
 - **Segmented.** A value with few enough answers to show them all at once, the one it is on filled
   on `raised-hi` inside an `inset` trough. Real radios, so the arrow keys move between them. Its
   segments sit flush in the trough, so the keyboard's ring is drawn inside the segment. In a
   row of the details it is a `chip` high, its segments at the `badge` corner in `small`, `fg-dim`
-  until chosen.
+  until chosen. In a sheet it fills the width, its segments sharing it, each label centred.
 - **Source row.** In Settings, two lines: the source's glyph, its name as a field where it stands,
   its count — or the walk, while one runs — its kind as a segmented group, then reveal and remove;
   its path beneath in `--font-mono`. One that cannot be read keeps its remove and loses its reveal.
