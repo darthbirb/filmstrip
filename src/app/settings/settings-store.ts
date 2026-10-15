@@ -12,19 +12,57 @@ export function openSettings(next: SettingsRequest = {}) {
   for (const listener of listeners) listener();
 }
 
-// Set while a restore runs: Escape and the close wait for it. Artboards › Backing up the index.
-let held = false;
+/** A restore running, by the backup's name, and how far it has got. */
+export type Restoring = { name: string; percent: number };
+/** How a restore ended, kept until Backups is there to say it and put the focus back. */
+export type RestoreEnd = { kind: "line" | "band"; sentence: string; focus: string };
+type Restore = { restoring: Restoring | null; ended: RestoreEnd | null };
 
-export function holdSettings(on: boolean) {
-  held = on;
+// Outside the tree, so Backups left and opened again finds a restore still running, or how it
+// ended; while one runs Settings holds still. Artboards › Backing up the index.
+let restore: Restore = { restoring: null, ended: null };
+const restoreListeners = new Set<() => void>();
+
+function setRestore(next: Restore) {
+  restore = next;
+  for (const listener of restoreListeners) listener();
+}
+
+export function startRestore(name: string) {
+  setRestore({ restoring: { name, percent: 0 }, ended: null });
+}
+
+export function restoreProgress(name: string, percent: number) {
+  if (restore.restoring?.name !== name) return;
+  setRestore({ ...restore, restoring: { name, percent } });
+}
+
+export function finishRestore(ended: RestoreEnd) {
+  setRestore({ restoring: null, ended });
+}
+
+/** Takes how the last restore ended, once it has been said. */
+export function takeRestoreEnd() {
+  if (restore.ended) setRestore({ ...restore, ended: null });
+}
+
+export function useRestore() {
+  return useSyncExternalStore(subscribeRestore, () => restore);
+}
+
+function subscribeRestore(listener: () => void) {
+  restoreListeners.add(listener);
+  return () => {
+    restoreListeners.delete(listener);
+  };
 }
 
 export function settingsHeld() {
-  return held;
+  return restore.restoring !== null;
 }
 
 export function closeSettings() {
-  if (request === null || held) return;
+  if (request === null || settingsHeld()) return;
   request = null;
   for (const listener of listeners) listener();
 }

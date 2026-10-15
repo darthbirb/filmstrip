@@ -26,7 +26,15 @@ import { setNews } from "../navigation/foot-slot";
 import { useWork } from "../navigation/work-store";
 import { backupWhen, howTaken, notBackedUp, whyFailed } from "./backup-words";
 import { Rows } from "./Rows";
-import { holdSettings } from "./settings-store";
+import {
+  finishRestore,
+  type RestoreEnd,
+  restoreProgress,
+  settingsHeld,
+  startRestore,
+  takeRestoreEnd,
+  useRestore,
+} from "./settings-store";
 
 // The index's backups, taken by hand and restored on their row. Artboards › Backing up the index;
 // DECISIONS.md "Backing up the index".
@@ -42,7 +50,7 @@ export function Backups() {
   const [shelved, setShelved] = useState<Shelved | null>(null);
   const [writing, setWriting] = useState<number | null>(null);
   const [asking, setAsking] = useState<string | null>(null);
-  const [restoring, setRestoring] = useState<{ name: string; percent: number } | null>(null);
+  const { restoring, ended } = useRestore();
   const [said, setSaid] = useState<Said | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
   const buttons = useRef(new Map<string, HTMLButtonElement>());
@@ -61,6 +69,16 @@ export function Backups() {
       void heard.then((unlisten) => unlisten?.());
     };
   }, [load]);
+
+  useEffect(() => {
+    if (!ended) return;
+    takeRestoreEnd();
+    setSaid({ kind: ended.kind, sentence: ended.sentence });
+    void listBackups()
+      .then(setShelved)
+      .catch(() => undefined)
+      .finally(() => setFocus(ended.focus));
+  }, [ended]);
 
   useEffect(() => {
     if (focus === null || asking || restoring) return;
@@ -88,41 +106,10 @@ export function Backups() {
       });
   };
 
-  const restore = async (backup: Backup) => {
-    const when = backupWhen(backup);
+  const restore = (backup: Backup) => {
     setAsking(null);
     setSaid(null);
-    setRestoring({ name: backup.name, percent: 0 });
-    holdSettings(true);
-    const heard = listen<number>("restore-progress", (event) =>
-      setRestoring((now) => now && { ...now, percent: event.payload }),
-    ).catch(() => undefined);
-    try {
-      const restored = await restoreBackup(backup.name);
-      if (restored.kind === "unreadable") {
-        setSaid({
-          kind: "band",
-          sentence: `The backup from ${when} could not be read. The index is as it was.`,
-        });
-        setFocus(backup.name);
-      } else {
-        setNews(null);
-        setSaid({ kind: "line", sentence: `Restored the index from ${when}.` });
-        setFocus(restored.back.name);
-        await libraryChanged();
-      }
-    } catch (error) {
-      setSaid({
-        kind: "band",
-        sentence: `The index could not be restored. ${whyFailed(error)}. The index is as it was.`,
-      });
-      setFocus(backup.name);
-    } finally {
-      void heard.then((unlisten) => unlisten?.());
-      holdSettings(false);
-      setRestoring(null);
-      load();
-    }
+    void restoreIndex(backup);
   };
 
   const cancel = (name: string) => {
@@ -162,7 +149,7 @@ export function Backups() {
         <RowQuestion
           answers={
             <>
-              <Button tone="danger" glyph="undo" onClick={() => void restore(backup)}>
+              <Button tone="danger" glyph="undo" onClick={() => restore(backup)}>
                 Restore Index
               </Button>
               <Button tone="quiet" onClick={() => cancel(backup.name)}>
@@ -258,6 +245,44 @@ export function Backups() {
       )}
     </div>
   );
+}
+
+/** A restore, run outside the section so that leaving it and coming back loses nothing. */
+async function restoreIndex(backup: Backup) {
+  if (settingsHeld()) return;
+  const when = backupWhen(backup);
+  startRestore(backup.name);
+  const heard = listen<number>("restore-progress", (event) =>
+    restoreProgress(backup.name, event.payload),
+  ).catch(() => undefined);
+  let ended: RestoreEnd;
+  try {
+    const restored = await restoreBackup(backup.name);
+    if (restored.kind === "unreadable") {
+      ended = {
+        kind: "band",
+        sentence: `The backup from ${when} could not be read. The index is as it was.`,
+        focus: backup.name,
+      };
+    } else {
+      setNews(null);
+      await libraryChanged().catch(() => undefined);
+      ended = {
+        kind: "line",
+        sentence: `Restored the index from ${when}.`,
+        focus: restored.back.name,
+      };
+    }
+  } catch (error) {
+    ended = {
+      kind: "band",
+      sentence: `The index could not be restored. ${whyFailed(error)}. The index is as it was.`,
+      focus: backup.name,
+    };
+  } finally {
+    void heard.then((unlisten) => unlisten?.());
+  }
+  finishRestore(ended);
 }
 
 /** What a restore stops first, said on its question while it runs. */

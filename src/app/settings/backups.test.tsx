@@ -67,6 +67,49 @@ test("a restore holds Settings open, then keeps the way back on top with the foc
   expect((await listBackups()).backups).toHaveLength(7);
 });
 
+test("leaving Backups mid-restore and coming back finds it running, and only then is the rail let go", async () => {
+  const first = await opened();
+  await expect.poll(() => rows().length).toBe(7);
+  const when = rowText(2).split("\n")[0];
+  await userEvent.click(restoreOn(2) as HTMLElement);
+  await userEvent.click(page.getByRole("button", { name: "Restore Index" }));
+  await expect.poll(() => rowText(2)).toContain(`Restoring the index from ${when}…`);
+  const tags = page.getByRole("button", { name: "Tags", exact: true });
+  const find = page.getByRole("searchbox", { name: "Find a setting" });
+  await expect.element(tags).toBeDisabled();
+  await expect.element(find).toBeDisabled();
+
+  await first.unmount();
+  await opened();
+  await expect.poll(() => rowText(2)).toContain(`Restoring the index from ${when}…`);
+  expect(rows()).toHaveLength(7);
+  expect(list()?.textContent).not.toContain("backing up…");
+  await userEvent.click(restoreOn(0) as HTMLElement);
+  expect(page.getByRole("button", { name: "Restore Index" }).query()).toBeNull();
+
+  await expect.element(page.getByText(`Restored the index from ${when}.`)).toBeVisible();
+  expect(settingsHeld()).toBe(false);
+  await expect.poll(() => document.activeElement).toBe(restoreOn(0));
+  await expect.element(tags).toBeEnabled();
+  await expect.element(find).toBeEnabled();
+});
+
+test("a restore that ends while Backups is away is said when it is opened again", async () => {
+  const first = await opened();
+  await expect.poll(() => rows().length).toBe(7);
+  const when = rowText(3).split("\n")[0];
+  await userEvent.click(restoreOn(3) as HTMLElement);
+  await userEvent.click(page.getByRole("button", { name: "Restore Index" }));
+  await expect.poll(() => rowText(3)).toContain(`Restoring the index from ${when}…`);
+  await first.unmount();
+  await expect.poll(settingsHeld, { timeout: 5000 }).toBe(false);
+
+  await opened();
+  await expect.element(page.getByText(`Restored the index from ${when}.`)).toBeVisible();
+  expect(rowText(0)).toMatch(/before restore/);
+  await expect.poll(() => document.activeElement).toBe(restoreOn(0));
+});
+
 test("a backup that cannot be read is refused at the section's foot, and its row loses Restore…", async () => {
   await opened();
   await expect.poll(() => rows().length).toBe(7);

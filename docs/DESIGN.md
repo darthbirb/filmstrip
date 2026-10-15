@@ -957,7 +957,8 @@ toward the rest surface.
   read says unreadable and has no Restore…; one being written arrives at the top as a push-down,
   "backing up…" and the `progress` bar in place of its size. Restore… asks in the row question's
   shape, and while it restores the answers give way to the walk's line and bar inside the same
-  ring. The list scrolls inside the group, and No Backups Yet takes its place when there are none.
+  ring, and Settings holds still: the rail's sections and its filter field are disabled, those
+  not shown in `fg-faint`, and Escape and the close wait. The list scrolls inside the group, and No Backups Yet takes its place when there are none.
 - **Row question.** A question on the row it is about, in the source row's remove shape: the row
   and the question inside one `line-danger` ring, the `warning` glyph in `danger` at `icon` and the
   question in `ui` `fg-mid` with the terms it names in `fg`, over its answers at the question's
