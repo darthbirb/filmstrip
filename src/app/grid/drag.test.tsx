@@ -11,7 +11,7 @@ import { openFolders, setOpenFolders } from "../navigation/open-folders";
 import { getPaneItem, showInPane } from "../pane/pane-store";
 import { type Place, setPlace } from "../place";
 import { showReport } from "../undo/report-store";
-import { Dragging } from "./drag";
+import { Dragging, scrollTreeNear } from "./drag";
 import { Grid } from "./Grid";
 import { clearChecked, getSelection } from "./selection";
 
@@ -199,4 +199,50 @@ test("a branch dragged by a tile it lists wears that tile's picture", async () =
   expect(ghost()?.textContent).toBe("Move 6 files to People");
   expect(ghost()?.querySelector("img")?.getAttribute("src")).toBe(picture);
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+});
+
+test("near the tree's foot it scrolls a row's height a second, at 60 Hz as at 144 Hz", async () => {
+  await page.viewport(1200, 800);
+  render(
+    <nav style={{ width: 260, height: 160, overflow: "auto" }}>
+      <Navigation />
+    </nav>,
+  );
+  await expect.element(row("People 0 of 0")).toBeInTheDocument();
+  const scroller = document.querySelector("nav");
+  if (!scroller) throw new Error("no tree");
+  const root = getComputedStyle(document.documentElement);
+  const edge =
+    Number.parseFloat(root.getPropertyValue("--spacing-row")) * Number.parseFloat(root.fontSize);
+  const box = scroller.getBoundingClientRect();
+  const foot = { x: box.left + 40, y: box.bottom - edge / 2 };
+
+  const [request, cancel] = [window.requestAnimationFrame, window.cancelAnimationFrame];
+  const scrolled = (hz: number) => {
+    scroller.scrollTop = 0;
+    let queued: FrameRequestCallback[] = [];
+    window.requestAnimationFrame = (callback) => queued.push(callback);
+    window.cancelAnimationFrame = () => {
+      queued = [];
+    };
+    try {
+      const stop = scrollTreeNear(
+        () => foot,
+        () => {},
+      );
+      for (let frame = 0; frame <= hz; frame += 1) {
+        const due = queued;
+        queued = [];
+        for (const callback of due) callback((frame * 1000) / hz);
+      }
+      stop();
+    } finally {
+      window.requestAnimationFrame = request;
+      window.cancelAnimationFrame = cancel;
+    }
+    return scroller.scrollTop;
+  };
+
+  expect(Math.abs(scrolled(60) - edge)).toBeLessThanOrEqual(1);
+  expect(Math.abs(scrolled(144) - edge)).toBeLessThanOrEqual(1);
 });

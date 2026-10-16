@@ -76,16 +76,26 @@ function treeScroller() {
 export function scrollTreeNear(at: () => { x: number; y: number }, moved: () => void) {
   const scroller = treeScroller();
   let frame = 0;
-  const scroll = () => {
+  let last: number | undefined;
+  let owed = 0;
+  const scroll = (now: number) => {
     frame = requestAnimationFrame(scroll);
+    const since = last === undefined ? 0 : Math.min(now - last, 100) / 1000;
+    last = now;
     if (!scroller) return;
     const box = scroller.getBoundingClientRect();
     const edge = token("--spacing-row");
     const { x, y } = at();
-    if (x < box.left || x > box.right) return;
-    const step = y < box.top + edge ? -1 : y > box.bottom - edge ? 1 : 0;
+    const inside = x >= box.left && x <= box.right;
+    const step = !inside ? 0 : y < box.top + edge ? -1 : y > box.bottom - edge ? 1 : 0;
+    if (step === 0 || Math.sign(owed) === -step) owed = 0;
     if (step === 0) return;
-    scroller.scrollTop += (step * edge) / 60;
+    // Whole pixels only, so a frame's fraction is never rounded away at a high refresh rate.
+    owed += step * edge * since;
+    const whole = Math.trunc(owed);
+    if (whole === 0) return;
+    owed -= whole;
+    scroller.scrollTop += whole;
     moved();
   };
   frame = requestAnimationFrame(scroll);

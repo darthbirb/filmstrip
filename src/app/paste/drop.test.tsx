@@ -52,6 +52,19 @@ beforeEach(async () => {
   setPlace(CAIRO);
 });
 
+/** Waits out `count` frames, and says when the last of them began. */
+function frames(count: number) {
+  return new Promise<number>((done) => {
+    let left = count;
+    const next = (now: number) => {
+      left -= 1;
+      if (left > 0) requestAnimationFrame(next);
+      else done(now);
+    };
+    requestAnimationFrame(next);
+  });
+}
+
 function Drops() {
   useExplorerDrops();
   return <ExplorerGhost />;
@@ -174,10 +187,10 @@ test("resting near the tree's foot or top scrolls it, a row's height a second, a
   // One event and then stillness: Explorer says nothing while the pointer rests.
   await emit("tauri://drag-enter", { paths: DOWNLOADS, position: at(box.bottom - edge / 2) });
   await expect.poll(() => scroller.scrollTop, { timeout: 3000 }).toBeGreaterThan(edge / 4);
-  const started = performance.now();
+  const started = await frames(1);
   const from = scroller.scrollTop;
-  await new Promise((done) => setTimeout(done, 500));
-  const speed = (scroller.scrollTop - from) / ((performance.now() - started) / 1000);
+  const ended = await frames(30);
+  const speed = (scroller.scrollTop - from) / ((ended - started) / 1000);
   expect(speed).toBeGreaterThan(edge / 3);
   expect(speed).toBeLessThan(edge * 2);
 
@@ -189,7 +202,7 @@ test("resting near the tree's foot or top scrolls it, a row's height a second, a
   await expect.poll(() => scroller.scrollTop).toBeGreaterThan(0);
   await emit("tauri://drag-leave", null);
   const left = scroller.scrollTop;
-  await new Promise((done) => setTimeout(done, 300));
+  await frames(20);
   expect(scroller.scrollTop).toBe(left);
 });
 
