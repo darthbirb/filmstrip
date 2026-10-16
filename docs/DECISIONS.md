@@ -696,11 +696,13 @@ Shift+F10 did nothing at all.
   Escape closes it and puts the focus back; a verb that takes the focus, as Rename does, keeps it.
 - **The grid's ground opens its place's menu, under the place's name**, since it is not on the
   place's row: a folder's or a source's grid has the rows its row has, the Sorting Box's has Paste
-  alone while the clipboard holds files, and a search and the Trash open nothing. A tile keeps its
-  own. What a verb there opens, the keys, the picker or the Sorting Box's pick, opens where the
-  menu did; Export…'s sheet hangs under the place's header, and Rename opens the place's own row in
-  the tree, the folders above it opening first. A click on the ground keeps the focus there for the
-  menu key, and a grid with no tile is a tab stop of its own, so the keyboard reaches the menu too.
+  alone while the clipboard holds files, and a search and the Trash open nothing. A sorting
+  source's folder, on its ground and on its favourite row, has Paste alone, plus its favourite
+  verb, as its band does. A tile keeps its own. What a verb there opens, the keys, the picker or
+  the Sorting Box's pick, opens where the menu did; Export…'s sheet hangs under the place's
+  header, and Rename opens the place's own row in the tree, the folders above it opening first. A
+  click on the ground keeps the focus there for the menu key, and a grid with no tile is a tab
+  stop of its own, so the keyboard reaches the menu too.
 - **A source is renamed on its own row**, with the same keys as its name field in Settings:
   sending someone to Settings to rename the row they are on would be the menu pointing at a place
   instead of doing the act. It edits the app's label for the source, never the folder.

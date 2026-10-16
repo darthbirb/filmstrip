@@ -279,7 +279,6 @@ export function Navigation() {
           },
         ]
       : [];
-    if (source.kind === "sorting") return { groups: pasteHere.length > 0 ? [pasteHere] : [] };
     // A favourite changes nothing on disk, so it is there whether the drive is or not.
     const favourite = favourites.some((one) => one.folderId === folder);
     const star: MenuAction = {
@@ -292,6 +291,7 @@ export function Navigation() {
           .then(() => refreshIndex())
           .catch(() => undefined),
     };
+    if (source.kind === "sorting") return { groups: [[...pasteHere, star]] };
     const title = path.at(-1)?.title ?? source.title;
     const assign: MenuAction = {
       id: "assign-key",

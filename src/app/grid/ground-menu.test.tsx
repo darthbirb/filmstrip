@@ -211,17 +211,19 @@ test("Rename from the ground puts the folder's row in its field, opening the fol
   await expect.element(page.getByRole("textbox", { name: "Rename Cairo" })).toHaveFocus();
 });
 
-test("a folder in a sorting source, as a search's folder card opens it, offers Paste alone", async () => {
+test("a folder in a sorting source, as a search's folder card opens it, offers Paste and Favourite alone", async () => {
   const incoming: Place = { kind: "folder", sourceId: 2, path: [{ id: 2, title: "Incoming" }] };
   await renderAt(incoming);
   await expect.element(page.getByRole("button", { name: "DSC_0001.jpg" })).toBeVisible();
   await rightClickGround();
-  expect(document.querySelector("[role=menu]")).toBeNull();
+  await expect.element(menu()).toBeVisible();
+  expect(read()).toEqual({ heading: "Incoming", rows: ["Favourite"] });
+  await userEvent.keyboard("{Escape}");
 
   await copyCover();
   await rightClickGround();
   await expect.element(menu()).toBeVisible();
-  expect(read()).toEqual({ heading: "Incoming", rows: ["Paste 1 File"] });
+  expect(read()).toEqual({ heading: "Incoming", rows: ["Paste 1 File", "Favourite"] });
   await recording(async (calls) => {
     await page.getByRole("menuitem", { name: "Paste 1 File" }).click();
     await expect.poll(() => calls).toContainEqual(["paste_files", { folderId: 2 }]);
