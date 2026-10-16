@@ -95,7 +95,7 @@ export function Navigation() {
   useEffect(() => {
     setDropResolver((id, carried) => landing.current(id, carried));
     setOutsideResolver((id, paths) => landingOutside.current(id, paths));
-    setGroundMenu((at, point) => ground.current(at, point));
+    setGroundMenu((place, at) => ground.current(place, at));
     return () => {
       setDropResolver(() => null);
       setOutsideResolver(() => null);
@@ -239,13 +239,13 @@ export function Navigation() {
   };
 
   /** A place's menu, on its row `id` or on the grid's ground, whose verbs open `against` it. */
-  const menuAt = (id: string, at: Place | undefined, against: Against): HeadedMenu => {
-    if (at?.kind === "sorting") return sortingMenu(against);
-    const path = placeFolderPath(at);
+  const menuAt = (id: string, place: Place | undefined, against: Against): HeadedMenu => {
+    if (place?.kind === "sorting") return sortingMenu(against);
+    const path = placeFolderPath(place);
     const source =
-      at?.kind === "folder" ? sources.find((one) => one.id === at.sourceId) : undefined;
+      place?.kind === "folder" ? sources.find((one) => one.id === place.sourceId) : undefined;
     const folder = path.at(-1)?.id;
-    if (!at || !source || folder === undefined) return { groups: [] };
+    if (!place || !source || folder === undefined) return { groups: [] };
     // From the ground the row may be inside a folder that is shut, so its parents open first.
     const rename = () => {
       setTaken(null);
@@ -279,6 +279,7 @@ export function Navigation() {
           },
         ]
       : [];
+    if (source.kind === "sorting") return { groups: pasteHere.length > 0 ? [pasteHere] : [] };
     // A favourite changes nothing on disk, so it is there whether the drive is or not.
     const favourite = favourites.some((one) => one.folderId === folder);
     const star: MenuAction = {
@@ -312,7 +313,7 @@ export function Navigation() {
       label: "Select Everything Inside",
       glyph: "checkAll",
       onSelect: () => {
-        setPlace(at);
+        setPlace(place);
         void checkBranch().catch(() => undefined);
       },
     };
@@ -385,14 +386,14 @@ export function Navigation() {
   const menuFor = (id: string) => menuAt(id, places.get(id), FROM_ROW);
 
   // Its row's menu under its name, since it is not on its row; what it opens, opens where it was.
-  ground.current = (at, point) => {
-    const against: Against = { anchor: () => point, sheet: placeHeader };
-    if (at.kind === "sorting") {
+  ground.current = (place, at) => {
+    const against: Against = { anchor: () => at, sheet: placeHeader };
+    if (place.kind === "sorting") {
       return { heading: "Sorting Box", groups: sortingMenu(against).groups };
     }
-    const folder = placeFolder(at);
+    const folder = placeFolder(place);
     if (!folder) return { groups: [] };
-    return { heading: folder.title, groups: menuAt(folderRowId(folder.id), at, against).groups };
+    return { heading: folder.title, groups: menuAt(folderRowId(folder.id), place, against).groups };
   };
 
   const stopRenaming = () => {
