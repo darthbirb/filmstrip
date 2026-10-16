@@ -16,6 +16,14 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
+## The grid's ground in Components › Right-click · DEFECT
+
+Components › Right-click, under "Where there is no menu, nothing opens", still says the grid's
+bare ground offers no menu of its own, while Artboards › Bringing files in draws the place's menu
+on it, with Paste, and the app builds that. The artboard wins: take the grid's bare ground out of
+that sentence, and draw the ground's menu there beside the rows' as the place's own, under its
+name.
+
 ## Scrubbing a video's tile · DRAWN
 
 A video's tile shows one frame. In ggallery, running the pointer across a video's tile scrubbed
