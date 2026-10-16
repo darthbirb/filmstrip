@@ -158,7 +158,7 @@ export function Grid({ mode }: { mode: LayoutMode }) {
   const ground = useContextMenu();
   const grounded = place?.kind === "folder" || place?.kind === "sorting";
   const onGround = (event: MouseEvent<HTMLDivElement>) => {
-    if (!place || (event.target as Element).closest("figure, button")) return;
+    if (!place || (event.target as Element).closest("figure, button, [role=menu]")) return;
     const box = event.currentTarget.getBoundingClientRect();
     const at =
       event.button === -1
