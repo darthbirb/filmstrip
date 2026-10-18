@@ -884,9 +884,11 @@ it.
   `std::fs::copy` replace a file on Windows. So every move, rename, trash, restore and undo of
   one goes through `fs::relocate`, which renames with `fs::noclobber::rename` and copies between
   drives with `fs::noclobber::copy`, `CopyFileW` told to fail on an existing target; an undone
-  folder delete makes its directory with `fs::noclobber::make_dir`. Each refuses a name taken in
-  the same call that would write, and the refusal is reported as the name taken, as a check
-  ahead of it would have been. No check is made ahead of it: it would only repeat the refusal.
+  folder delete makes its directory with `fs::noclobber::make_dir`, and never its parent's: a
+  parent removed in Explorer stays removed, and the undo stays, saying it is gone. Each refuses
+  a name taken in the same call that would write, and the refusal is reported as the name taken,
+  as a check ahead of it would have been. No check is made ahead of it: it would only repeat the
+  refusal.
 - **A file keeps its own name wherever it moves.** ggallery suffixed a clashing name
   ("IMG_0031 (2).jpg"); Filmstrip refuses that one file and says where the name is taken, and the
   rest of the selection still moves. The picker drawn on the Pane sheet reports a clash and never
