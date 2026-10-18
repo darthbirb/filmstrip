@@ -1009,7 +1009,7 @@ mod tests {
     #[test]
     fn a_random_order_holds_for_its_seed_and_a_new_seed_draws_another() {
         let (conn, root) = library();
-        let tx = conn.unchecked_transaction().unwrap();
+        let tx = crate::db::begin(&conn).unwrap();
         for n in 0..300 {
             upsert(&tx, &sample(1, root, &format!("{n:03}.jpg"))).unwrap();
         }
@@ -1322,7 +1322,7 @@ mod tests {
 
         /// An eight-level branch of 40,000 files, five side folders at each level; its top folder.
         fn forty_thousand_deep(conn: &Connection, root: i64) -> i64 {
-            let tx = conn.unchecked_transaction().unwrap();
+            let tx = crate::db::begin(conn).unwrap();
             let mut parent = root;
             let mut at = Vec::new();
             for depth in 0..8 {
@@ -1380,7 +1380,7 @@ mod tests {
         #[ignore = "timing: runs alone, one test at a time"]
         fn forty_thousand_in_one_folder_reorder_by_every_key_well_inside_a_second() {
             let (conn, root) = library();
-            let tx = conn.unchecked_transaction().unwrap();
+            let tx = crate::db::begin(&conn).unwrap();
             for n in 0..40_000_i64 {
                 let item = NewItem {
                     captured_at: (n % 3 != 0).then_some(n * 7 % 40_000),

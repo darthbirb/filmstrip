@@ -136,7 +136,7 @@ pub fn settle(
     trash: &[InTrash],
     kept: &dyn Fn(&InTrash) -> bool,
 ) -> Result<()> {
-    let tx = restored.transaction()?;
+    let tx = super::begin(restored)?;
     let at = now();
     let mut placed = HashSet::new();
     for one in trash.iter().filter(|one| kept(one)) {

@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::db::sources::{self, SourceKind};
-use crate::db::{folders, items, journal, now, tags};
+use crate::db::{folders, in_transaction, items, journal, now, tags};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::stayed::{self, Stayed};
 use crate::fs::{items as fs_items, noclobber, paths, relocate, sanitize, trash, walk};
@@ -417,13 +417,6 @@ fn taken(conn: &Connection, parent_id: i64, title: &str) -> AppError {
         name: title.to_string(),
         folder: true,
     })
-}
-
-fn in_transaction<T>(conn: &Connection, work: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
-    let tx = conn.unchecked_transaction()?;
-    let out = work(&tx)?;
-    tx.commit()?;
-    Ok(out)
 }
 
 #[cfg(test)]

@@ -8,7 +8,7 @@ use ts_rs::TS;
 
 use crate::db::items::ItemRow;
 use crate::db::journal::ItemRestored;
-use crate::db::{folders, items, journal, tags};
+use crate::db::{folders, in_transaction, items, journal, tags};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::stayed::{self, Stayed};
 use crate::fs::{paths, relocate};
@@ -243,13 +243,6 @@ fn place_name(conn: &Connection, folder_id: i64) -> String {
         .and_then(|mut crumbs| crumbs.pop())
         .map(|crumb| crumb.title)
         .unwrap_or_default()
-}
-
-fn in_transaction<T>(conn: &Connection, work: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
-    let tx = conn.unchecked_transaction()?;
-    let out = work(&tx)?;
-    tx.commit()?;
-    Ok(out)
 }
 
 #[cfg(test)]

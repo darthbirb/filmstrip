@@ -6,7 +6,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::db::{folders, items, journal, tags};
+use crate::db::{folders, in_transaction, items, journal, tags};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::stayed::{self, Stayed};
 use crate::fs::{paths, relocate, sanitize};
@@ -152,13 +152,6 @@ pub(super) fn rename_unjournalled(
         let _ = relocate::relocate(&to, &from);
     }
     recorded
-}
-
-fn in_transaction<T>(conn: &Connection, work: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
-    let tx = conn.unchecked_transaction()?;
-    let out = work(&tx)?;
-    tx.commit()?;
-    Ok(out)
 }
 
 #[cfg(test)]

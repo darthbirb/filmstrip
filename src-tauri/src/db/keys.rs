@@ -55,7 +55,7 @@ pub fn set(conn: &Connection, key: &str, folder_id: i64) -> Result<()> {
     if !folders::is_live(conn, folder_id)? {
         return Err(AppError::invalid("that folder is no longer in the index"));
     }
-    let tx = conn.unchecked_transaction()?;
+    let tx = super::begin(conn)?;
     tx.execute(
         "DELETE FROM destination_key WHERE key = ?1 OR folder_id = ?2",
         params![key, folder_id],

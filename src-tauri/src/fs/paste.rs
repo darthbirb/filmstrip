@@ -11,7 +11,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::db::journal::{self, FolderCopied, ItemCopied};
-use crate::db::{folders, items, now, sources};
+use crate::db::{folders, in_transaction, items, now, sources};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::stayed::{self, Stayed};
 use crate::fs::{acts, noclobber, paths, walk};
@@ -640,13 +640,6 @@ fn taken(conn: &Connection, folder_id: i64, name: &str, folder: bool) -> AppErro
     })
 }
 
-fn in_transaction<T>(conn: &Connection, work: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
-    let tx = conn.unchecked_transaction()?;
-    let out = work(&tx)?;
-    tx.commit()?;
-    Ok(out)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -759,6 +752,25 @@ mod tests {
             }
         );
         assert_eq!(described.files, 2);
+    }
+
+    #[test]
+    fn a_file_waits_out_another_connection_writing_rather_than_being_refused() {
+        let (conn, dir, lisbon) = library("busy");
+        let a = write(&dir.join("Downloads/IMG_5001.jpg"), "a");
+
+        db::hold_write_lock(&dir.join("library.db"), &conn);
+        let outcome = run(
+            &conn,
+            &journal::new_batch(),
+            lisbon,
+            &[a],
+            &Script::default(),
+        )
+        .unwrap();
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert_eq!(outcome.done, 1);
+        assert!(dir.join("library/Trips/Lisbon/IMG_5001.jpg").is_file());
     }
 
     #[test]
