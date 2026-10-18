@@ -76,10 +76,7 @@ pub(super) fn move_unjournalled(
     }
     let from = paths::item_path(conn, file.folder_id, &file.disk_name)?;
     let to = paths::folder_dir(conn, folder_id)?.join(&file.disk_name);
-    if to.exists() {
-        return Err(taken());
-    }
-    relocate::relocate(&from, &to)?;
+    relocate::relocate(&from, &to).map_err(relocate::taken_as(taken))?;
 
     let recorded = in_transaction(conn, |tx| {
         // A retired row holding the name describes a file that is gone; the arriving one takes it.
@@ -132,8 +129,6 @@ pub(super) fn rename_unjournalled(
             folder: false,
         })
     };
-    // A change of case alone is still this file's own name, not a clash with itself.
-    let own_name = name.to_lowercase() == file.disk_name.to_lowercase();
     let held =
         items::existing_by_disk_name(conn, file.folder_id, &name)?.filter(|row| row.id != item_id);
     if held.as_ref().is_some_and(|row| !row.deleted) {
@@ -141,10 +136,7 @@ pub(super) fn rename_unjournalled(
     }
     let from = paths::item_path(conn, file.folder_id, &file.disk_name)?;
     let to = paths::item_path(conn, file.folder_id, &name)?;
-    if !own_name && to.exists() {
-        return Err(taken());
-    }
-    std::fs::rename(&from, &to)?;
+    relocate::relocate(&from, &to).map_err(relocate::taken_as(taken))?;
 
     let recorded = in_transaction(conn, |tx| {
         if let Some(stale) = &held {
@@ -157,7 +149,7 @@ pub(super) fn rename_unjournalled(
         Ok(true)
     });
     if recorded.is_err() {
-        let _ = std::fs::rename(&to, &from);
+        let _ = relocate::relocate(&to, &from);
     }
     recorded
 }
@@ -307,6 +299,90 @@ mod tests {
         assert_eq!(report.moved, 0);
         assert_eq!(report.refused[0].reason, Reason::InUse);
         assert!(root.join("Trips/Cairo/pyramid.jpg").is_file());
+    }
+
+    fn theirs_appears_just_before_the_move() {
+        crate::fs::noclobber::just_before_the_next(|to| std::fs::write(to, "theirs").unwrap());
+    }
+
+    #[test]
+    fn a_move_onto_a_name_that_appeared_just_before_it_is_refused_and_theirs_kept() {
+        let (conn, root, cairo, people) = library("late-move");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+
+        theirs_appears_just_before_the_move();
+        let report = move_items(&conn, &[pyramid], people, &journal::new_batch()).unwrap();
+        assert_eq!(report.moved, 0);
+        assert_eq!(
+            report.refused[0].reason,
+            Reason::NameTaken {
+                place: "People".into(),
+                name: "pyramid.jpg".into(),
+                folder: false
+            }
+        );
+        let theirs = std::fs::read_to_string(root.join("People/pyramid.jpg")).unwrap();
+        assert_eq!(theirs, "theirs");
+        let ours = std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap();
+        assert_eq!(ours, "p");
+        assert_eq!(items::folder_of(&conn, pyramid).unwrap(), Some(cairo));
+    }
+
+    #[test]
+    fn a_rename_onto_a_name_that_appeared_just_before_it_is_refused_and_theirs_kept() {
+        let (conn, root, cairo, _) = library("late-rename");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+
+        theirs_appears_just_before_the_move();
+        let err = rename(&conn, pyramid, "giza.jpg", &journal::new_batch()).unwrap_err();
+        assert_eq!(
+            Reason::of(&err),
+            Reason::NameTaken {
+                place: "Cairo".into(),
+                name: "giza.jpg".into(),
+                folder: false
+            }
+        );
+        let theirs = std::fs::read_to_string(root.join("Trips/Cairo/giza.jpg")).unwrap();
+        assert_eq!(theirs, "theirs");
+        let ours = std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap();
+        assert_eq!(ours, "p");
+        let file = items::file_of(&conn, pyramid).unwrap().unwrap();
+        assert_eq!(file.disk_name, "pyramid.jpg");
+    }
+
+    #[test]
+    fn undoing_a_move_onto_a_name_that_appeared_just_before_it_stays_and_theirs_is_kept() {
+        let (conn, root, cairo, people) = library("late-undo");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let batch = journal::new_batch();
+        move_items(&conn, &[pyramid], people, &batch).unwrap();
+
+        theirs_appears_just_before_the_move();
+        let back = crate::fs::undo::undo_batch(&conn, &batch).unwrap();
+        assert_eq!((back.files_back, back.stayed.len()), (0, 1));
+        assert!(matches!(back.stayed[0].reason, Reason::NameTaken { .. }));
+        let theirs = std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap();
+        assert_eq!(theirs, "theirs");
+        let ours = std::fs::read_to_string(root.join("People/pyramid.jpg")).unwrap();
+        assert_eq!(ours, "p");
+        assert_eq!(items::folder_of(&conn, pyramid).unwrap(), Some(people));
+    }
+
+    #[test]
+    fn undoing_a_rename_onto_a_name_that_appeared_just_before_it_stays_and_theirs_is_kept() {
+        let (conn, root, cairo, _) = library("late-undo-rename");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let batch = journal::new_batch();
+        rename(&conn, pyramid, "giza.jpg", &batch).unwrap();
+
+        theirs_appears_just_before_the_move();
+        let back = crate::fs::undo::undo_batch(&conn, &batch).unwrap();
+        assert_eq!((back.files_back, back.stayed.len()), (0, 1));
+        let theirs = std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap();
+        assert_eq!(theirs, "theirs");
+        let ours = std::fs::read_to_string(root.join("Trips/Cairo/giza.jpg")).unwrap();
+        assert_eq!(ours, "p");
     }
 
     #[test]
