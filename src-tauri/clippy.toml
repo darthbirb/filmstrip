@@ -1,0 +1,4 @@
+disallowed-methods = [
+    { path = "rusqlite::Connection::transaction", reason = "begins deferred: use db::begin or db::in_transaction, DECISIONS.md \"Background work\"" },
+    { path = "rusqlite::Connection::unchecked_transaction", reason = "begins deferred: use db::begin or db::in_transaction, DECISIONS.md \"Background work\"" },
+]

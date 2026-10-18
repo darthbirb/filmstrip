@@ -6,7 +6,7 @@ use std::sync::atomic::Ordering;
 use rusqlite::Connection;
 
 use crate::db::jobs::{self as table, QueuedJob};
-use crate::db::{items, journal};
+use crate::db::{self, items, journal};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::export as fs_export;
 use crate::fs::paste::{self, Halt};
@@ -277,7 +277,7 @@ fn index_folder(inner: &QueueInner, conn: &mut Connection, payload: FolderPayloa
 /// and every video read since, with its thumbnail, still missing its scrub frames.
 fn queue_thumbs(inner: &QueueInner, conn: &mut Connection) -> Result<()> {
     let media = items::live_media(conn, inner.ffmpeg.is_some())?;
-    let tx = conn.transaction()?;
+    let tx = db::begin(conn)?;
     for one in media {
         let cached = |rel: String| inner.thumbs.join(rel).is_file();
         if !one.read || !cached(paths::thumb_rel(&one.uuid)) {

@@ -9,7 +9,7 @@ use ts_rs::TS;
 
 use crate::db::folders::{self, Crumb};
 use crate::db::journal::{self, ItemsTagged, ItemsUntagged, Untagged};
-use crate::db::{fold, now, search};
+use crate::db::{fold, in_transaction, now, search};
 use crate::error::{AppError, Result};
 
 pub fn get_or_create_tag(conn: &Connection, key: Option<&str>, value: &str) -> Result<i64> {
@@ -742,6 +742,9 @@ fn give(conn: &Connection, tag_id: i64, items: &[(i64, i64)]) -> Result<()> {
 
 /// Runs `work` whole or not at all, inside a transaction already open or on its own.
 pub(crate) fn atomically(conn: &Connection, work: impl FnOnce() -> Result<()>) -> Result<()> {
+    if conn.is_autocommit() {
+        return in_transaction(conn, |_| work());
+    }
     conn.execute_batch("SAVEPOINT tags")?;
     match work() {
         Ok(()) => Ok(conn.execute_batch("RELEASE tags")?),
@@ -1753,10 +1756,27 @@ mod tests {
     }
 
     #[test]
+    fn on_its_own_a_change_waits_out_another_connection_writing() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-tags/busy");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("library.db");
+        let mut conn = db::open(&path).unwrap();
+        db::migrate(&mut conn).unwrap();
+
+        let held = db::hold_write_lock(&path, 300);
+        let made = atomically(&conn, || {
+            get_or_create_tag(&conn, None, "felucca").map(|_| ())
+        });
+        held.join().unwrap();
+        made.unwrap();
+    }
+
+    #[test]
     fn five_thousand_files_take_and_lose_a_tag_in_one_row_each() {
         let (conn, root) = library();
         let trips = folders::create(&conn, root, "Trips").unwrap();
-        let tx = conn.unchecked_transaction().unwrap();
+        let tx = crate::db::begin(&conn).unwrap();
         let set: Vec<i64> = (0..5_000)
             .map(|n| item(&tx, trips, &format!("{n:04}.jpg")))
             .collect();

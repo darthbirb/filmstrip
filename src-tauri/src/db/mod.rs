@@ -17,7 +17,7 @@ pub mod vocabulary;
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use rusqlite::Connection;
+use rusqlite::{Connection, Transaction, TransactionBehavior};
 
 use crate::error::Result;
 
@@ -59,6 +59,26 @@ pub fn open(path: &Path) -> Result<Connection> {
     Ok(conn)
 }
 
+/// A transaction holding the write lock from its first statement, so another connection's write
+/// makes it wait out the busy timeout instead of refusing it. DECISIONS.md "Background work".
+pub fn begin(conn: &Connection) -> Result<Transaction<'_>> {
+    Ok(Transaction::new_unchecked(
+        conn,
+        TransactionBehavior::Immediate,
+    )?)
+}
+
+/// Runs `work` in a transaction from `begin`, committed only if it succeeds.
+pub fn in_transaction<T>(
+    conn: &Connection,
+    work: impl FnOnce(&Connection) -> Result<T>,
+) -> Result<T> {
+    let tx = begin(conn)?;
+    let out = work(&tx)?;
+    tx.commit()?;
+    Ok(out)
+}
+
 /// **Foreign keys are off for the duration, and restored on every exit path.**
 /// DEVELOPMENT.md "Gotchas".
 pub fn migrate(conn: &mut Connection) -> Result<()> {
@@ -80,7 +100,7 @@ fn migrate_inner(conn: &mut Connection) -> Result<()> {
         if *version <= current {
             continue;
         }
-        let tx = conn.transaction()?;
+        let tx = begin(conn)?;
         tx.execute_batch(sql)?;
         tx.execute(
             "INSERT INTO schema_version (version) VALUES (?1)",
@@ -99,7 +119,7 @@ fn migrate_inner(conn: &mut Connection) -> Result<()> {
         if *version <= current {
             continue;
         }
-        let tx = conn.transaction()?;
+        let tx = begin(conn)?;
         rewrite(&tx)?;
         tx.execute("INSERT INTO data_version (version) VALUES (?1)", [version])?;
         tx.commit()?;
@@ -128,6 +148,18 @@ pub fn now() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0)
+}
+
+/// Another connection holding the write lock on the index at `path`, as a claiming worker does,
+/// let go after `ms` milliseconds.
+#[cfg(test)]
+pub(crate) fn hold_write_lock(path: &Path, ms: u64) -> std::thread::JoinHandle<()> {
+    let other = open(path).unwrap();
+    other.execute_batch("BEGIN IMMEDIATE").unwrap();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(ms));
+        other.execute_batch("COMMIT").unwrap();
+    })
 }
 
 #[cfg(test)]

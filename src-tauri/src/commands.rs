@@ -14,6 +14,7 @@ use ts_rs::TS;
 
 use crate::db::details::{self, FolderDetail};
 use crate::db::folders::{self, FolderEntry, FolderNode};
+use crate::db::in_transaction;
 use crate::db::items::{self, ItemDetail, ItemRow, Scrub, Sort};
 use crate::db::jobs::{self as job_table, Failure};
 use crate::db::journal;
@@ -1495,13 +1496,6 @@ async fn run<T: Send + 'static>(
 ) -> Result<T> {
     let path = state.db.clone();
     tauri::async_runtime::spawn_blocking(move || work(&crate::db::open(&path)?)).await?
-}
-
-fn in_transaction<T>(conn: &Connection, work: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
-    let tx = conn.unchecked_transaction()?;
-    let out = work(&tx)?;
-    tx.commit()?;
-    Ok(out)
 }
 
 /// Fills in each row's thumbnail, and a video's scrub frames, wherever they have been made.
