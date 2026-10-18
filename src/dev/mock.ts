@@ -1721,7 +1721,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   },
   favourite_places: (): FavouritePlace[] =>
     [
-      ...SOURCES.filter((one) => one.kind === "library" && one.favorite).map((one) => ({
+      ...SOURCES.filter((one) => one.favorite).map((one) => ({
         folderId: one.rootFolderId,
         itemCount: ITEMS[one.rootFolderId]?.length ?? 0,
       })),

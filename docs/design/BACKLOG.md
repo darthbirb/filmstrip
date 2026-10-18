@@ -16,6 +16,14 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
+## The grid's ground in Components › Right-click · DEFECT
+
+Components › Right-click, under "Where there is no menu, nothing opens", still says the grid's
+bare ground offers no menu of its own, while Artboards › Bringing files in draws the place's menu
+on it, with Paste, and the app builds that. The artboard wins: take the grid's bare ground out of
+that sentence, and draw the ground's menu there beside the rows' as the place's own, under its
+name.
+
 ## Scrubbing a video's tile · DRAWN
 
 A video's tile shows one frame. In ggallery, running the pointer across a video's tile scrubbed
@@ -34,10 +42,3 @@ Consider the old drawing's scrubber: a 16px channel at the grid's edge with a sq
 to jump anywhere; the position is the information. Investigate whether it replaces the
 scrollbar or sits beside it. The pass that drew it recommends building the other ten first, and
 only building this if the largest folders still feel unnavigable afterwards.
-
-## Bringing files in from Explorer · DRAWN
-
-Issue #112. Issue #63 built the rest; two parts of Artboards › Bringing files in wait. The grid's
-ground, between the tiles or under the last row, opens its place's menu under the place's name, with
-Paste, as the place's row does; the Sorting Box's ground has Paste alone. And a drag from Explorer
-near the tree's top or foot scrolls the tree, as a move's drag does.

@@ -16,7 +16,7 @@ const PICTURES: Place = { kind: "folder", sourceId: 1, path: [{ id: 1, title: "P
 
 beforeEach(async () => {
   while (await undoLast()) {}
-  for (const id of [1, 3, 4, 5, 6]) await setFolderFavorite(id, false);
+  for (const id of [1, 2, 3, 4, 5, 6]) await setFolderFavorite(id, false);
   resetDeleteQuestion();
   setPlace(PICTURES);
   resetIndex();
@@ -104,6 +104,20 @@ test("a source's favourite names no parent and counts itself, and one that is aw
   await expect.poll(() => rows(screen).slice(2, 4)).toEqual(["Archive offline", "Pictures 1 of 6"]);
   const archive = screen.getByRole("treeitem").elements()[2];
   expect(archive?.getAttribute("aria-description")).toBeNull();
+});
+
+test("a sorting source's folder kept as a favourite is unstarred from its own row", async () => {
+  await setFolderFavorite(2, true);
+  resetIndex();
+  await loadIndex();
+  const screen = await render(<Navigation />);
+  const row = screen.getByRole("treeitem", { name: /^Incoming / });
+  await expect.element(row).toBeVisible();
+  await row.click({ button: "right" });
+  const menu = screen.getByRole("menu", { name: "Incoming" });
+  await expect.element(menu).toBeVisible();
+  await menu.getByRole("menuitem", { name: "Remove Favourite" }).click();
+  await expect.poll(() => rows(screen).some((one) => one?.startsWith("Incoming "))).toBe(false);
 });
 
 test("a favourite deleted leaves the group, and undoing the delete brings it back", async () => {

@@ -790,8 +790,10 @@ toward the rest surface.
   that cannot be taken back is `danger`, over `danger-tint` under the pointer. It opens from a glyph button, anchored to it, or from a
   right-click: at the pointer, or, from the menu key or Shift+F10, one `tile-gap` clear of the
   focused element's ring, left edges met, flipping above when there is no room below and sliding
-  along the window's edge rather than shrinking. A dropdown offers a choice and marks the one taken;
-  a menu marks nothing, because every row in it is a thing to do rather than a thing to be.
+  along the window's edge rather than shrinking. From the grid's ground, which is too large to
+  hang off, it opens a `tile-gap` inside the grid's top-left corner. A dropdown offers a choice
+  and marks the one taken; a menu marks nothing, because every row in it is a thing to do rather
+  than a thing to be.
 - **Name field.** A file's name as a field where it stands: `bar-field` tall on `ground` at the
   `nested` corner with a `line-control` ring, the text in `fg-hi` and the selection on `plate`.
   At rest the row is the name, and the `rename` glyph in `fg-dim` shows beside it under the
