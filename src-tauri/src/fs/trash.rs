@@ -105,7 +105,9 @@ pub(super) fn trash_unjournalled(
     if let Some(shard) = to.parent() {
         std::fs::create_dir_all(shard)?;
     }
-    relocate::relocate(&from, &to)?;
+    relocate::relocate(&from, &to).map_err(relocate::taken_as(|| {
+        AppError::invalid(format!("{} is already there", to.display()))
+    }))?;
 
     let recorded = in_transaction(conn, |tx| {
         items::send_to_trash(tx, item_id)?;
@@ -185,11 +187,8 @@ pub(super) fn restore_unjournalled(
     }
     let from = paths::trash_path(&file.uuid, &file.disk_name)?;
     let dest = paths::item_path(conn, home, &file.disk_name)?;
-    if dest.exists() {
-        return Err(taken());
-    }
     let trashed_at = items::trashed_at(conn, item_id)?.unwrap_or_default();
-    relocate::relocate(&from, &dest)?;
+    relocate::relocate(&from, &dest).map_err(relocate::taken_as(taken))?;
 
     let recorded = in_transaction(conn, |tx| {
         // A retired row holding the name describes a file that is gone; the returning one takes it.
@@ -444,6 +443,76 @@ mod tests {
         assert_eq!(
             listing(&conn).unwrap()[0].from.path,
             ["Library", "Trips", "Cairo"]
+        );
+    }
+
+    fn theirs_appears_just_before_the_move() {
+        crate::fs::noclobber::just_before_the_next(|to| std::fs::write(to, "theirs").unwrap());
+    }
+
+    #[test]
+    fn a_file_sent_to_the_trash_onto_a_name_that_appeared_just_before_it_stays() {
+        let (conn, root, cairo) = library("late-trash");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let kept = trash_file(&conn, pyramid);
+
+        theirs_appears_just_before_the_move();
+        let report = trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+        assert_eq!((report.trashed, report.refused.len()), (0, 1));
+        assert_eq!(
+            report.refused[0].reason,
+            Reason::Other {
+                message: format!("{} is already there", kept.display())
+            }
+        );
+        assert_eq!(std::fs::read_to_string(&kept).unwrap(), "theirs");
+        let ours = std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap();
+        assert_eq!(ours, "p");
+        assert!(items::is_live(&conn, pyramid).unwrap());
+        std::fs::remove_file(kept).unwrap();
+    }
+
+    #[test]
+    fn a_restore_onto_a_name_that_appeared_just_before_it_is_refused_and_theirs_kept() {
+        let (conn, root, cairo) = library("late-restore");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+
+        theirs_appears_just_before_the_move();
+        let report = restore_items(&conn, &[pyramid], None, &journal::new_batch()).unwrap();
+        assert_eq!(report.restored, 0);
+        assert_eq!(
+            report.refused[0].reason,
+            Reason::NameTaken {
+                place: "Cairo".into(),
+                name: "pyramid.jpg".into(),
+                folder: false
+            }
+        );
+        let theirs = std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap();
+        assert_eq!(theirs, "theirs");
+        assert_eq!(
+            std::fs::read_to_string(trash_file(&conn, pyramid)).unwrap(),
+            "p"
+        );
+        assert!(items::is_trashed(&conn, pyramid).unwrap());
+    }
+
+    #[test]
+    fn undoing_a_trash_onto_a_name_that_appeared_just_before_it_stays_and_theirs_is_kept() {
+        let (conn, root, cairo) = library("late-untrash");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let batch = journal::new_batch();
+        trash_items(&conn, &[pyramid], &batch).unwrap();
+
+        theirs_appears_just_before_the_move();
+        let back = undo::undo_batch(&conn, &batch).unwrap();
+        assert_eq!((back.files_back, back.stayed.len()), (0, 1));
+        let theirs = std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap();
+        assert_eq!(theirs, "theirs");
+        assert_eq!(
+            std::fs::read_to_string(trash_file(&conn, pyramid)).unwrap(),
+            "p"
         );
     }
 

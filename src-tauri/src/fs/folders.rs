@@ -12,7 +12,7 @@ use crate::db::sources::{self, SourceKind};
 use crate::db::{folders, items, journal, now, tags};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::stayed::{self, Stayed};
-use crate::fs::{items as fs_items, paths, relocate, sanitize, trash, walk};
+use crate::fs::{items as fs_items, noclobber, paths, relocate, sanitize, trash, walk};
 
 /// Makes a folder inside `parent_id` under `title`, as a directory and then a row.
 pub fn create(conn: &Connection, parent_id: i64, title: &str, batch_id: &str) -> Result<i64> {
@@ -73,10 +73,8 @@ pub(super) fn rename_unjournalled(
 
     let from = paths::folder_dir(conn, folder_id)?;
     let to = from.with_file_name(&title);
-    if old.to_lowercase() != title.to_lowercase() && to.exists() {
-        return Err(taken(conn, parent_id, &title));
-    }
-    std::fs::rename(&from, &to)?;
+    relocate::relocate(&from, &to)
+        .map_err(relocate::taken_as(|| taken(conn, parent_id, &title)))?;
 
     let recorded = in_transaction(conn, |tx| {
         folders::set_title(tx, folder_id, &title)?;
@@ -87,7 +85,7 @@ pub(super) fn rename_unjournalled(
         Ok(true)
     });
     if recorded.is_err() {
-        let _ = std::fs::rename(&to, &from);
+        let _ = relocate::relocate(&to, &from);
     }
     recorded
 }
@@ -129,10 +127,8 @@ pub(super) fn move_unjournalled(
 
     let from = paths::folder_dir(conn, folder_id)?;
     let to = paths::folder_dir(conn, parent_id)?.join(&title);
-    if to.exists() {
-        return Err(taken(conn, parent_id, &title));
-    }
-    relocate::relocate(&from, &to)?;
+    relocate::relocate(&from, &to)
+        .map_err(relocate::taken_as(|| taken(conn, parent_id, &title)))?;
 
     let recorded = in_transaction(conn, |tx| {
         folders::set_parent(tx, folder_id, parent_id)?;
@@ -270,15 +266,24 @@ pub(super) fn undelete(conn: &Connection, folder_id: i64, retired_at: i64) -> Re
     let title = folders::title(conn, folder_id)?.unwrap_or_default();
     let parent = folders::parent(conn, folder_id)?
         .ok_or_else(|| AppError::invalid("a source's own folder is never deleted"))?;
-    if !folders::is_live(conn, parent)? {
-        return Err(AppError::refused(Reason::FolderGone {
+    let gone = || -> Result<AppError> {
+        Ok(AppError::refused(Reason::FolderGone {
             name: folders::title(conn, parent)?.unwrap_or_default(),
-        }));
+        }))
+    };
+    if !folders::is_live(conn, parent)? {
+        return Err(gone()?);
     }
     refuse_clash(conn, parent, &title, Some(folder_id))?;
     let top = paths::folder_dir(conn, folder_id)?;
-    if top.exists() {
-        return Err(taken(conn, parent, &title));
+    match noclobber::make_dir(&top) {
+        Ok(()) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Err(gone()?),
+        Err(err) => {
+            return Err(relocate::taken_as(|| taken(conn, parent, &title))(
+                err.into(),
+            ));
+        }
     }
     for id in &back {
         std::fs::create_dir_all(paths::folder_dir(conn, *id)?)?;
@@ -610,6 +615,117 @@ mod tests {
         crate::fs::undo::undo_batch(&conn, &batch).unwrap();
         assert!(root.join("Trips/Lisbon").is_dir());
         assert!(folders::is_live(&conn, made).unwrap());
+    }
+
+    fn theirs_appears_just_before_the_move() {
+        crate::fs::noclobber::just_before_the_next(|to| {
+            std::fs::create_dir(to).unwrap();
+            std::fs::write(to.join("theirs.jpg"), "theirs").unwrap();
+        });
+    }
+
+    fn names_in(dir: &Path) -> Vec<String> {
+        let mut names: Vec<String> = std::fs::read_dir(dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        names
+    }
+
+    #[test]
+    fn a_rename_onto_a_folder_that_appeared_just_before_it_is_refused_and_both_stay() {
+        let (conn, root, _, trips) = library("late-rename");
+        let cairo = folders::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+
+        theirs_appears_just_before_the_move();
+        let err = rename(&conn, cairo, "Giza", &journal::new_batch()).unwrap_err();
+        assert!(matches!(
+            Reason::of(&err),
+            Reason::NameTaken { folder: true, .. }
+        ));
+        assert_eq!(names_in(&root.join("Trips/Giza")), ["theirs.jpg"]);
+        assert_eq!(names_in(&root.join("Trips/Cairo")), ["pyramid.jpg"]);
+        assert_eq!(
+            folders::title(&conn, cairo).unwrap().as_deref(),
+            Some("Cairo")
+        );
+    }
+
+    #[test]
+    fn a_move_onto_a_folder_that_appeared_just_before_it_is_refused_and_both_stay() {
+        let (conn, root, top, trips) = library("late-move");
+        std::fs::create_dir(root.join("People")).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let people = folders::child_id(&conn, top, "People").unwrap().unwrap();
+        let cairo = folders::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+
+        theirs_appears_just_before_the_move();
+        let err = move_into(&conn, cairo, people, &journal::new_batch()).unwrap_err();
+        assert!(matches!(
+            Reason::of(&err),
+            Reason::NameTaken { folder: true, .. }
+        ));
+        assert_eq!(names_in(&root.join("People/Cairo")), ["theirs.jpg"]);
+        assert_eq!(names_in(&root.join("Trips/Cairo")), ["pyramid.jpg"]);
+        assert_eq!(folders::parent(&conn, cairo).unwrap(), Some(trips));
+    }
+
+    #[test]
+    fn undoing_a_rename_onto_a_folder_that_appeared_just_before_it_stays_and_both_are_kept() {
+        let (conn, root, _, trips) = library("late-undo-rename");
+        let cairo = folders::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        let batch = journal::new_batch();
+        rename(&conn, cairo, "Giza", &batch).unwrap();
+
+        theirs_appears_just_before_the_move();
+        let back = crate::fs::undo::undo_batch(&conn, &batch).unwrap();
+        assert_eq!((back.folders_back, back.stayed.len()), (0, 1));
+        assert!(matches!(
+            back.stayed[0].reason,
+            Reason::NameTaken { folder: true, .. }
+        ));
+        assert_eq!(names_in(&root.join("Trips/Cairo")), ["theirs.jpg"]);
+        assert_eq!(names_in(&root.join("Trips/Giza")), ["pyramid.jpg"]);
+    }
+
+    #[test]
+    fn undoing_a_delete_onto_a_folder_that_appeared_just_before_it_stays_and_theirs_is_kept() {
+        let (conn, root, _, trips) = library("late-undelete");
+        let made = create(&conn, trips, "Lisbon", &journal::new_batch()).unwrap();
+        let batch = journal::new_batch();
+        delete(&conn, made, None, &batch).unwrap();
+
+        theirs_appears_just_before_the_move();
+        let back = crate::fs::undo::undo_batch(&conn, &batch).unwrap();
+        assert_eq!((back.folders_back, back.stayed.len()), (0, 1));
+        assert!(matches!(
+            back.stayed[0].reason,
+            Reason::NameTaken { folder: true, .. }
+        ));
+        assert_eq!(names_in(&root.join("Trips/Lisbon")), ["theirs.jpg"]);
+        assert!(!folders::is_live(&conn, made).unwrap());
+    }
+
+    #[test]
+    fn undoing_a_delete_whose_parent_is_gone_from_the_disk_stays_and_never_remakes_it() {
+        let (conn, root, _, trips) = library("undelete-parent-gone");
+        let spain = create(&conn, trips, "Spain", &journal::new_batch()).unwrap();
+        let lisbon = create(&conn, spain, "Lisbon", &journal::new_batch()).unwrap();
+        let batch = journal::new_batch();
+        delete(&conn, lisbon, None, &batch).unwrap();
+        std::fs::remove_dir(root.join("Trips/Spain")).unwrap();
+
+        let back = crate::fs::undo::undo_batch(&conn, &batch).unwrap();
+        assert_eq!((back.folders_back, back.stayed.len()), (0, 1));
+        assert_eq!(
+            back.stayed[0].reason,
+            Reason::FolderGone {
+                name: "Spain".into()
+            }
+        );
+        assert!(!root.join("Trips/Spain").exists());
+        assert!(!folders::is_live(&conn, lisbon).unwrap());
     }
 
     #[test]

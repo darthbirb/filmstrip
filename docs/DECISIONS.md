@@ -876,7 +876,19 @@ it.
 - **A move between drives is a copy, checked, and only then the original's removal.** ggallery
   renamed, which cannot cross from one drive to another. A copy cut short is removed and the
   original stays whole; an original that will not go once its copy is whole is left for the next
-  walk, so the index follows the copy and no file loses its identity.
+  walk, so the index follows the copy and no file loses its identity. Both removals take only
+  what the copy read and wrote, each directory only once empty: a file someone put in either
+  meanwhile stays.
+- **No move, rename or restore ever replaces what is there.** Checking a name and then moving
+  onto it leaves a moment in which another program can take it, and `std::fs::rename` and
+  `std::fs::copy` replace a file on Windows. So every move, rename, trash, restore and undo of
+  one goes through `fs::relocate`, which renames with `fs::noclobber::rename` and copies between
+  drives with `fs::noclobber::copy`, `CopyFileW` told to fail on an existing target; an undone
+  folder delete makes its directory with `fs::noclobber::make_dir`, and never its parent's: a
+  parent removed in Explorer stays removed, and the undo stays, saying it is gone. Each refuses
+  a name taken in the same call that would write, and the refusal is reported as the name taken,
+  as a check ahead of it would have been. No check is made ahead of it: it would only repeat the
+  refusal.
 - **A file keeps its own name wherever it moves.** ggallery suffixed a clashing name
   ("IMG_0031 (2).jpg"); Filmstrip refuses that one file and says where the name is taken, and the
   rest of the selection still moves. The picker drawn on the Pane sheet reports a clash and never
@@ -969,7 +981,7 @@ arrive, and the originals stay as Explorer left them.
   `std::fs` gives its own, so a name past the old 260-character limit moves as any other. The form
   is built from the absolute path, not from `canonicalize`, which opens the folder and fails on
   drives that cannot say where a handle points, as some RAM disks and encrypted volumes. The
-  rename lives in `fs/noclobber.rs` for the app's other renames to share.
+  rename lives in `fs/noclobber.rs`, and every other move in the app goes through it ("Undo").
 - **Where the copy goes is read again for each file.** A long copy outlives the folder's name: the
   app can rename or move it meanwhile, so each file and folder finds its folder's directory from
   its id in the turn, and its part is opened there in the turn too.
