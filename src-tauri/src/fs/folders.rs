@@ -266,16 +266,25 @@ pub(super) fn undelete(conn: &Connection, folder_id: i64, retired_at: i64) -> Re
     let title = folders::title(conn, folder_id)?.unwrap_or_default();
     let parent = folders::parent(conn, folder_id)?
         .ok_or_else(|| AppError::invalid("a source's own folder is never deleted"))?;
-    if !folders::is_live(conn, parent)? {
-        return Err(AppError::refused(Reason::FolderGone {
+    let gone = || -> Result<AppError> {
+        Ok(AppError::refused(Reason::FolderGone {
             name: folders::title(conn, parent)?.unwrap_or_default(),
-        }));
+        }))
+    };
+    if !folders::is_live(conn, parent)? {
+        return Err(gone()?);
     }
     refuse_clash(conn, parent, &title, Some(folder_id))?;
     let top = paths::folder_dir(conn, folder_id)?;
-    noclobber::make_dir(&top)
-        .map_err(AppError::from)
-        .map_err(relocate::taken_as(|| taken(conn, parent, &title)))?;
+    match noclobber::make_dir(&top) {
+        Ok(()) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Err(gone()?),
+        Err(err) => {
+            return Err(relocate::taken_as(|| taken(conn, parent, &title))(
+                err.into(),
+            ));
+        }
+    }
     for id in &back {
         std::fs::create_dir_all(paths::folder_dir(conn, *id)?)?;
     }
@@ -672,6 +681,10 @@ mod tests {
         theirs_appears_just_before_the_move();
         let back = crate::fs::undo::undo_batch(&conn, &batch).unwrap();
         assert_eq!((back.folders_back, back.stayed.len()), (0, 1));
+        assert!(matches!(
+            back.stayed[0].reason,
+            Reason::NameTaken { folder: true, .. }
+        ));
         assert_eq!(names_in(&root.join("Trips/Cairo")), ["theirs.jpg"]);
         assert_eq!(names_in(&root.join("Trips/Giza")), ["pyramid.jpg"]);
     }
@@ -692,6 +705,27 @@ mod tests {
         ));
         assert_eq!(names_in(&root.join("Trips/Lisbon")), ["theirs.jpg"]);
         assert!(!folders::is_live(&conn, made).unwrap());
+    }
+
+    #[test]
+    fn undoing_a_delete_whose_parent_is_gone_from_the_disk_stays_and_never_remakes_it() {
+        let (conn, root, _, trips) = library("undelete-parent-gone");
+        let spain = create(&conn, trips, "Spain", &journal::new_batch()).unwrap();
+        let lisbon = create(&conn, spain, "Lisbon", &journal::new_batch()).unwrap();
+        let batch = journal::new_batch();
+        delete(&conn, lisbon, None, &batch).unwrap();
+        std::fs::remove_dir(root.join("Trips/Spain")).unwrap();
+
+        let back = crate::fs::undo::undo_batch(&conn, &batch).unwrap();
+        assert_eq!((back.folders_back, back.stayed.len()), (0, 1));
+        assert_eq!(
+            back.stayed[0].reason,
+            Reason::FolderGone {
+                name: "Spain".into()
+            }
+        );
+        assert!(!root.join("Trips/Spain").exists());
+        assert!(!folders::is_live(&conn, lisbon).unwrap());
     }
 
     #[test]

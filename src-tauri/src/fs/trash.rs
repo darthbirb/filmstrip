@@ -105,7 +105,9 @@ pub(super) fn trash_unjournalled(
     if let Some(shard) = to.parent() {
         std::fs::create_dir_all(shard)?;
     }
-    relocate::relocate(&from, &to)?;
+    relocate::relocate(&from, &to).map_err(relocate::taken_as(|| {
+        AppError::invalid(format!("{} is already there", to.display()))
+    }))?;
 
     let recorded = in_transaction(conn, |tx| {
         items::send_to_trash(tx, item_id)?;
@@ -457,6 +459,12 @@ mod tests {
         theirs_appears_just_before_the_move();
         let report = trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
         assert_eq!((report.trashed, report.refused.len()), (0, 1));
+        assert_eq!(
+            report.refused[0].reason,
+            Reason::Other {
+                message: format!("{} is already there", kept.display())
+            }
+        );
         assert_eq!(std::fs::read_to_string(&kept).unwrap(), "theirs");
         let ours = std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap();
         assert_eq!(ours, "p");

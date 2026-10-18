@@ -159,6 +159,36 @@ mod tests {
     }
 
     #[test]
+    fn a_copy_across_given_up_keeps_what_others_put_in_the_folders_it_made() {
+        let dir = scratch("given-up");
+        std::fs::create_dir_all(dir.join("from/Cairo/Night")).unwrap();
+        std::fs::write(dir.join("from/Cairo/Night/stars.jpg"), "stars").unwrap();
+        let cairo = dir.join("Cairo");
+        noclobber::just_before_the_next(move |_| {
+            noclobber::just_before_the_next(move |_| {
+                noclobber::just_before_the_next(move |to| {
+                    std::fs::write(cairo.join("theirs.jpg"), "theirs").unwrap();
+                    std::fs::write(to, "their stars").unwrap();
+                });
+            });
+        });
+
+        assert!(copy_across(&dir.join("from/Cairo"), &dir.join("Cairo")).is_err());
+        assert_eq!(
+            std::fs::read_to_string(dir.join("Cairo/theirs.jpg")).unwrap(),
+            "theirs"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join("Cairo/Night/stars.jpg")).unwrap(),
+            "their stars"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join("from/Cairo/Night/stars.jpg")).unwrap(),
+            "stars"
+        );
+    }
+
+    #[test]
     fn a_file_that_arrives_in_a_folder_while_it_is_copied_across_is_never_removed_with_it() {
         let dir = scratch("arrives");
         std::fs::create_dir_all(dir.join("from/Cairo/Night")).unwrap();
