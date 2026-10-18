@@ -1764,12 +1764,11 @@ mod tests {
         let mut conn = db::open(&path).unwrap();
         db::migrate(&mut conn).unwrap();
 
-        let held = db::hold_write_lock(&path, 300);
-        let made = atomically(&conn, || {
+        db::hold_write_lock(&path, &conn);
+        atomically(&conn, || {
             get_or_create_tag(&conn, None, "felucca").map(|_| ())
-        });
-        held.join().unwrap();
-        made.unwrap();
+        })
+        .unwrap();
     }
 
     #[test]

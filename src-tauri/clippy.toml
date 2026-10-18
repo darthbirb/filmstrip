@@ -1,4 +1,11 @@
 disallowed-methods = [
     { path = "rusqlite::Connection::transaction", reason = "begins deferred: use db::begin or db::in_transaction, DECISIONS.md \"Background work\"" },
     { path = "rusqlite::Connection::unchecked_transaction", reason = "begins deferred: use db::begin or db::in_transaction, DECISIONS.md \"Background work\"" },
+    { path = "rusqlite::Connection::transaction_with_behavior", reason = "may begin deferred: use db::begin or db::in_transaction, DECISIONS.md \"Background work\"" },
+    { path = "rusqlite::Transaction::new", reason = "may begin deferred: use db::begin or db::in_transaction, DECISIONS.md \"Background work\"" },
+    { path = "rusqlite::Transaction::new_unchecked", reason = "may begin deferred: use db::begin or db::in_transaction, DECISIONS.md \"Background work\"" },
+    { path = "rusqlite::Connection::savepoint", reason = "outermost, begins deferred: use db::begin or db::in_transaction, DECISIONS.md \"Background work\"" },
+    { path = "rusqlite::Connection::savepoint_with_name", reason = "outermost, begins deferred: use db::begin or db::in_transaction, DECISIONS.md \"Background work\"" },
+    { path = "rusqlite::Savepoint::new", reason = "outermost, begins deferred: use db::begin or db::in_transaction, DECISIONS.md \"Background work\"" },
+    { path = "rusqlite::Savepoint::with_name", reason = "outermost, begins deferred: use db::begin or db::in_transaction, DECISIONS.md \"Background work\"" },
 ]

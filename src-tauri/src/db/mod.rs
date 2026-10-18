@@ -61,6 +61,7 @@ pub fn open(path: &Path) -> Result<Connection> {
 
 /// A transaction holding the write lock from its first statement, so another connection's write
 /// makes it wait out the busy timeout instead of refusing it. DECISIONS.md "Background work".
+#[expect(clippy::disallowed_methods)]
 pub fn begin(conn: &Connection) -> Result<Transaction<'_>> {
     Ok(Transaction::new_unchecked(
         conn,
@@ -151,15 +152,25 @@ pub fn now() -> i64 {
 }
 
 /// Another connection holding the write lock on the index at `path`, as a claiming worker does,
-/// let go after `ms` milliseconds.
+/// let go only once SQLite makes `waiting` wait for it. `waiting` refused at once, without
+/// waiting, finds the lock still held.
 #[cfg(test)]
-pub(crate) fn hold_write_lock(path: &Path, ms: u64) -> std::thread::JoinHandle<()> {
+pub(crate) fn hold_write_lock(path: &Path, waiting: &Connection) {
+    use std::cell::RefCell;
+
+    thread_local! {
+        static HELD: RefCell<Option<Connection>> = const { RefCell::new(None) };
+    }
+    fn release(_: i32) -> bool {
+        HELD.with_borrow_mut(|held| held.take())
+            .map(|other| other.execute_batch("COMMIT").unwrap())
+            .is_some()
+    }
+
     let other = open(path).unwrap();
     other.execute_batch("BEGIN IMMEDIATE").unwrap();
-    std::thread::spawn(move || {
-        std::thread::sleep(Duration::from_millis(ms));
-        other.execute_batch("COMMIT").unwrap();
-    })
+    HELD.set(Some(other));
+    waiting.busy_handler(Some(release)).unwrap();
 }
 
 #[cfg(test)]

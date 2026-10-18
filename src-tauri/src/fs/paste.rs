@@ -759,16 +759,15 @@ mod tests {
         let (conn, dir, lisbon) = library("busy");
         let a = write(&dir.join("Downloads/IMG_5001.jpg"), "a");
 
-        let held = db::hold_write_lock(&dir.join("library.db"), 300);
+        db::hold_write_lock(&dir.join("library.db"), &conn);
         let outcome = run(
             &conn,
             &journal::new_batch(),
             lisbon,
             &[a],
             &Script::default(),
-        );
-        held.join().unwrap();
-        let outcome = outcome.unwrap();
+        )
+        .unwrap();
         assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
         assert_eq!(outcome.done, 1);
         assert!(dir.join("library/Trips/Lisbon/IMG_5001.jpg").is_file());

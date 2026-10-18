@@ -1,10 +1,10 @@
 //! The job table: what is waiting, what is running, and what failed. The runner is `crate::jobs`.
 
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::db::now;
+use crate::db::{begin, now};
 use crate::error::Result;
 use crate::jobs::kinds::{COPY_IN, EXPORT, WALKS};
 
@@ -56,7 +56,7 @@ pub fn is_pending(conn: &Connection, kind: &str, payload: &str) -> Result<bool> 
 /// Takes the most urgent waiting job and marks it running. The immediate transaction stops two
 /// workers from taking the same one, and a walk waits while another walk runs.
 pub fn claim(conn: &mut Connection) -> Result<Option<QueuedJob>> {
-    let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let tx = begin(conn)?;
     let job = tx
         .query_row(
             "SELECT id, kind, payload, attempts + 1 FROM job

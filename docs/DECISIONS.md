@@ -112,8 +112,12 @@ decoder that panics on one file fails that job and nothing else.
 `db::in_transaction`, and `tags::atomically` does the same when no transaction is open. Idle
 workers claim in `BEGIN IMMEDIATE` several times a second. A deferred transaction that has read
 and then meets that lock as it writes is refused at once, without waiting out the busy timeout,
-so an act would fail with "database is locked". Clippy refuses rusqlite's deferred `transaction`
-and `unchecked_transaction`, so a new one cannot slip in.
+so an act would fail with "database is locked". Clippy refuses every rusqlite call that can open
+a transaction outside `db::begin`: `Connection::transaction`, `unchecked_transaction`,
+`transaction_with_behavior`, `savepoint` and `savepoint_with_name`, `Transaction::new` and
+`new_unchecked`, and `Savepoint::new` and `with_name`. It cannot see SQL, so a raw `BEGIN` or an
+outermost `SAVEPOINT` passed to `execute_batch` still gets past it; `tags::atomically` issues its
+`SAVEPOINT` only inside a transaction already open.
 
 **Progress is pushed**, one `job-progress` event per half second and only when something
 changed, so a queue that empties within a tick still says so.
