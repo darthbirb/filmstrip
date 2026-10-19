@@ -6,7 +6,7 @@ set -euo pipefail
 [ $# -eq 1 ] && [ -d "$1" ] || { echo "usage: $0 <existing temp folder>" >&2; exit 2; }
 script="$(cd "$(dirname "$0")" && pwd)/review-worktree.sh"
 repo=$(git -C "$(dirname "$script")" rev-parse --show-toplevel)
-tmp=$(cygpath -m "$(mktemp -d "$(cygpath -m "$1")/rwt.XXXXXX")")
+tmp=$(cygpath -aml "$(mktemp -d "$(cygpath -aml "$1")/rwt.XXXXXX")")
 
 cleanup() {
   [ -e "$tmp" ] || return 0
@@ -17,7 +17,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-git clone --quiet --no-hardlinks "$repo" "$tmp/clone"
+git -c advice.detachedHead=false clone --quiet --no-hardlinks "$repo" "$tmp/clone"
 main=$(dirname "$(git -C "$tmp/clone" rev-parse --path-format=absolute --git-common-dir)")
 [ "$main" = "$(git -C "$tmp/clone" rev-parse --show-toplevel)" ] && [ "${main#"$tmp"/}" != "$main" ] ||
   { echo "the clone at $tmp/clone resolves to $main, not to itself" >&2; exit 1; }
