@@ -272,9 +272,7 @@ function Asking({ source, onCancel }: { source: SourceSummary; onCancel: () => v
           <Button
             tone="danger"
             onClick={() => {
-              void removeNow(source).then((kept) => {
-                if (kept) onCancel();
-              });
+              void removeNow(source, onCancel);
             }}
           >
             Remove Source
@@ -290,10 +288,10 @@ function Asking({ source, onCancel }: { source: SourceSummary; onCancel: () => v
 
 /**
  * Removes a source once its files in the Trash have gone to the Recycle Bin, run outside the row
- * so Settings holds still meanwhile. True when it was kept. Artboards › Sources.
+ * so Settings holds still meanwhile; one kept puts its row back. Artboards › Sources.
  */
-async function removeNow(source: SourceSummary): Promise<boolean> {
-  if (settingsHeld()) return false;
+async function removeNow(source: SourceSummary, onKept: () => void) {
+  if (settingsHeld()) return;
   setRefused(null);
   startRemove(source.id);
   const heard = listen<number>("remove-progress", (event) =>
@@ -311,6 +309,6 @@ async function removeNow(source: SourceSummary): Promise<boolean> {
     void heard.then((unlisten) => unlisten?.());
   }
   await libraryChanged().catch(() => undefined);
+  if (ended) onKept();
   finishRemove(ended);
-  return ended !== null;
 }
