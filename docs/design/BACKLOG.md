@@ -27,8 +27,8 @@ name.
 ## A removed source's trashed files · DRAWN
 
 Removing a source forgets its rows, the trashed ones too, and leaves their files in `data\trash`
-where nothing shows, restores or expires them (#110). A restore that forgets a source added
-since leaves the same.
+where nothing shows, restores or expires them (#110). A restore that drops a trashed row, from
+a source added since or any place the backup cannot find, leaves the same.
 
 By DECISIONS.md "Expiry goes to the Recycle Bin", they go to the Windows Recycle Bin. Draw the
 remove question in Settings › Sources saying so with a count, and the restore question when the
@@ -43,13 +43,25 @@ restore's question in Artboards › Backing up the index:
   counting the source's trashed rows, offline or not. With none it is unchanged.
 - Remove Source sends each file, its row going with it, under the restore's line and bar
   ("Removing Pictures…", the share sent), Settings holding still; then the source goes.
-- A file the Recycle Bin cannot take is never sent: it stays in the Trash under its row, the
-  source is not removed, and the section's band says "Pictures was not removed. The Recycle Bin
-  could not take 1 of its files, so it stays in the Trash." over `D:\Filmstrip\data\trash`.
-- A restore's question adds "Archive was added since, so it is forgotten, and its 1 file in the
-  Trash goes to the Recycle Bin.", naming several in a list with one count. The files go after
-  the check and the hold, before the "before restore" backup; one refused stops the restore
-  there, nothing swapped, with the band "The index was not restored. …".
+- A file the Recycle Bin cannot take is never sent: it stays in the Trash under its row, and
+  the rest are still sent. With any refused the source is not removed, and the section's band
+  counts them all: "Pictures was not removed. The Recycle Bin could not take 1 of its files, so
+  it stays in the Trash." over `D:\Filmstrip\data\trash`.
+- Every trashed row the restore would drop has its file sent, not only a source added since:
+  any whose place the backup cannot find by its source's root (`place` in
+  `src-tauri/src/db/backup.rs`). The question adds "Archive was added since, so it is forgotten,
+  and its 3 files in the Trash go to the Recycle Bin.", naming several in a list with one count
+  that takes in every row it drops.
+- The files go after the check and the hold, before the "before restore" backup, under the
+  restore's own line, the bar's share covering them with the other steps. The restore carries on
+  past a refusal as a remove does; with any refused it stops before that backup, nothing
+  swapped, with the band "The index was not restored. The Recycle Bin could not take 2 of
+  Archive's 3 files in the Trash, so they stay there."
+- The sends stand if the backup or the swap fails after them. The failure line adds what went:
+  "The index could not be restored. The disk is full. Archive's 3 files in the Trash went to the
+  Recycle Bin; the index is otherwise as it was." When this is built, DECISIONS.md "Backing up
+  the index", which says a restore that fails part way leaves the index as it was, and the
+  failure message in `src/app/settings/Backups.tsx` change with it.
 
 ## Scrubbing a video's tile · DRAWN
 
