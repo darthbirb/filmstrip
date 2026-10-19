@@ -654,6 +654,8 @@ mod tests {
         let sphinx = id_of(&conn, cairo, "sphinx.jpg");
         trash_items(&conn, &[pyramid, sphinx], &journal::new_batch()).unwrap();
         let (one, two) = (trash_file(&conn, pyramid), trash_file(&conn, sphinx));
+        let elsewhere = root.parent().unwrap().join("sphinx-elsewhere.jpg");
+        std::fs::hard_link(&two, &elsewhere).unwrap();
         let mut bin = Fake::new(Stand::Recycles(root.parent().unwrap().join("bin")));
         bin.deletes = vec![two.file_name().unwrap().to_string_lossy().into_owned()];
 

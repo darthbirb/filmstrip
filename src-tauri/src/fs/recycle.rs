@@ -22,18 +22,17 @@ pub enum Sent {
     Recycled,
     /// Nothing was there to send.
     Gone,
-    /// The bin could not take it, so it is where it was.
+    /// The bin could not take it, so it is where it was, or under its second name beside it.
     Refused,
 }
 
 /// Sends a file to the Recycle Bin. A second name for it is made beside it first, so whatever the
-/// shell does the file outlives it: recycled, the second name goes; deleted outright, the file is
-/// given its own name back and the send is refused.
+/// shell does the file outlives it, and its count of names says what happened: the same, the bin
+/// holds it under another and the second name goes; one fewer, it was deleted outright and is given
+/// its own name back. Anything else is refused with the second name kept.
 pub fn send(bin: &dyn Bin, file: &Path) -> io::Result<Sent> {
     let hold = hold_of(file);
-    if let Some(sent) = settle(file, &hold)? {
-        return Ok(sent);
-    }
+    settle(file, &hold)?;
     match std::fs::symlink_metadata(file) {
         Ok(meta) if meta.is_file() => {}
         Ok(_) => return Ok(Sent::Refused),
@@ -43,16 +42,20 @@ pub fn send(bin: &dyn Bin, file: &Path) -> io::Result<Sent> {
     if std::fs::hard_link(file, &hold).is_err() {
         return Ok(Sent::Refused);
     }
+    let held = identity(&hold)?.links;
     let _ = bin.take(file);
     if std::fs::symlink_metadata(file).is_ok() {
         drop_hold(file, &hold)?;
         return Ok(Sent::Refused);
     }
-    if identity(&hold)?.links >= 2 {
+    let left = identity(&hold)?.links;
+    if left == held {
         std::fs::remove_file(&hold)?;
         return Ok(Sent::Recycled);
     }
-    noclobber::rename(&hold, file)?;
+    if left + 1 == held {
+        noclobber::rename(&hold, file)?;
+    }
     Ok(Sent::Refused)
 }
 
@@ -62,21 +65,53 @@ fn hold_of(file: &Path) -> PathBuf {
     file.with_file_name(format!(".{name}.recycling"))
 }
 
-/// Settles a hold a send cut short left behind. `Some` when that send is found to have finished.
-fn settle(file: &Path, hold: &Path) -> io::Result<Option<Sent>> {
-    let Ok(held) = identity(hold) else {
-        return Ok(None);
-    };
+/// The file a hold is the second name of, when `path` is one.
+fn held_by(path: &Path) -> Option<PathBuf> {
+    let name = path.file_name()?.to_str()?;
+    let file = name.strip_prefix('.')?.strip_suffix(".recycling")?;
+    (!file.is_empty()).then(|| path.with_file_name(file))
+}
+
+/// Settles a hold a send cut short left behind. Its count of names then is unknown, so it is never
+/// taken for the bin's: a hold left alone is the file again, and goes on to be sent.
+fn settle(file: &Path, hold: &Path) -> io::Result<()> {
+    if identity(hold).is_err() {
+        return Ok(());
+    }
     if std::fs::symlink_metadata(file).is_ok() {
-        drop_hold(file, hold)?;
-        return Ok(None);
+        return drop_hold(file, hold);
     }
-    if held.links >= 2 {
-        std::fs::remove_file(hold)?;
-        return Ok(Some(Sent::Recycled));
+    noclobber::rename(hold, file)
+}
+
+/// Puts back each hold under `dir` that no row `needs` as the file it holds, where that name is
+/// free, and says how many; nothing is ever removed. One a row needs waits for that row's send.
+pub fn sweep(dir: &Path, needs: &dyn Fn(&Path) -> bool) -> u32 {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return 0;
+    };
+    let mut put = 0;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
+        if kind.is_dir() {
+            put += sweep(&path, needs);
+            continue;
+        }
+        let Some(file) = held_by(&path) else {
+            continue;
+        };
+        if !kind.is_file() || needs(&file) || std::fs::symlink_metadata(&file).is_ok() {
+            continue;
+        }
+        match noclobber::rename(&path, &file) {
+            Ok(()) => put += 1,
+            Err(err) => eprintln!("recycle: {} was not put back: {err}", path.display()),
+        }
     }
-    noclobber::rename(hold, file)?;
-    Ok(None)
+    put
 }
 
 /// Removes the hold only while it is a second name of the file itself, never the last of one.
@@ -154,6 +189,12 @@ impl Bin for RecycleBin {
             FO_DELETE, FOF_ALLOWUNDO, FOF_NO_UI, SHFILEOPSTRUCTW, SHFileOperationW,
         };
 
+        const FLAGS: u16 = {
+            let flags = FOF_ALLOWUNDO | FOF_NO_UI;
+            assert!(flags >> 16 == 0, "the shell's flags fit its 16 bits");
+            flags as u16
+        };
+
         let full = std::path::absolute(file)?;
         let mut from: Vec<u16> = full.as_os_str().encode_wide().collect();
         // The shell takes no verbatim path, and its list ends in two NULs.
@@ -165,7 +206,7 @@ impl Bin for RecycleBin {
         let mut op = SHFILEOPSTRUCTW {
             wFunc: FO_DELETE,
             pFrom: from.as_ptr(),
-            fFlags: u16::try_from(FOF_ALLOWUNDO | FOF_NO_UI).unwrap_or_default(),
+            fFlags: FLAGS,
             ..Default::default()
         };
         // SAFETY: `from` is a double-NUL-terminated wide list that outlives the call.
@@ -199,6 +240,8 @@ pub(crate) mod tests {
         Deletes,
         /// Leaves it where it is and says so.
         Fails,
+        /// Moves it as [`Stand::Recycles`] does, while something else gives it one more name there.
+        Relinks(PathBuf),
     }
 
     pub(crate) struct Fake {
@@ -232,6 +275,12 @@ pub(crate) mod tests {
                 }
                 Stand::Deletes => std::fs::remove_file(file),
                 Stand::Fails => Err(io::Error::other("refused")),
+                Stand::Relinks(bin) => {
+                    std::fs::create_dir_all(bin)?;
+                    let name = file.file_name().unwrap_or_default();
+                    std::fs::rename(file, bin.join(name))?;
+                    std::fs::hard_link(bin.join(name), bin.join("another"))
+                }
             }
         }
     }
@@ -255,19 +304,31 @@ pub(crate) mod tests {
         found
     }
 
-    #[test]
-    fn a_file_the_bin_takes_is_in_it_and_nothing_is_left_beside_where_it_was() {
-        let dir = scratch("recycled");
+    /// `trash/one.jpg`, with `others` more names for it in `elsewhere/`, as a dedup tool or a
+    /// link-based backup leaves a file.
+    fn one_with_names(dir: &Path, others: u32) -> PathBuf {
         let file = dir.join("trash/one.jpg");
         std::fs::write(&file, "one").unwrap();
-        let bin = Fake::new(Stand::Recycles(dir.join("bin")));
+        std::fs::create_dir_all(dir.join("elsewhere")).unwrap();
+        for other in 0..others {
+            std::fs::hard_link(&file, dir.join(format!("elsewhere/{other}.jpg"))).unwrap();
+        }
+        file
+    }
 
-        assert_eq!(send(&bin, &file).unwrap(), Sent::Recycled);
-        assert_eq!(
-            std::fs::read_to_string(dir.join("bin/one.jpg")).unwrap(),
-            "one"
-        );
-        assert!(names(&dir.join("trash")).is_empty());
+    #[test]
+    fn a_file_the_bin_takes_is_in_it_and_nothing_is_left_beside_where_it_was() {
+        for others in [0, 1, 2] {
+            let dir = scratch(&format!("recycled-{others}"));
+            let file = one_with_names(&dir, others);
+            let bin = Fake::new(Stand::Recycles(dir.join("bin")));
+
+            assert_eq!(send(&bin, &file).unwrap(), Sent::Recycled, "{others}");
+            let recycled = dir.join("bin/one.jpg");
+            assert_eq!(std::fs::read_to_string(&recycled).unwrap(), "one");
+            assert_eq!(identity(&recycled).unwrap().links, others + 1);
+            assert!(names(&dir.join("trash")).is_empty());
+        }
     }
 
     #[test]
@@ -285,17 +346,56 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn a_file_the_shell_leaves_is_refused_and_untouched() {
-        let dir = scratch("left");
-        let file = dir.join("trash/one.jpg");
-        std::fs::write(&file, "one").unwrap();
+    fn a_file_with_another_name_elsewhere_the_shell_deletes_outright_is_put_back_and_refused() {
+        for others in [1, 2] {
+            let dir = scratch(&format!("deleted-linked-{others}"));
+            let file = one_with_names(&dir, others);
 
+            assert_eq!(
+                send(&Fake::new(Stand::Deletes), &file).unwrap(),
+                Sent::Refused
+            );
+            assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
+            assert_eq!(names(&dir.join("trash")), ["one.jpg"]);
+            assert_eq!(identity(&file).unwrap().links, others + 1);
+        }
+    }
+
+    #[test]
+    fn a_file_the_shell_leaves_is_refused_and_untouched() {
+        for others in [0, 1] {
+            let dir = scratch(&format!("left-{others}"));
+            let file = one_with_names(&dir, others);
+
+            assert_eq!(
+                send(&Fake::new(Stand::Fails), &file).unwrap(),
+                Sent::Refused
+            );
+            assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
+            assert_eq!(names(&dir.join("trash")), ["one.jpg"]);
+            assert_eq!(identity(&file).unwrap().links, others + 1);
+        }
+    }
+
+    #[test]
+    fn a_file_whose_names_change_otherwise_is_refused_and_kept_under_its_second_name() {
+        let dir = scratch("relinked");
+        let file = one_with_names(&dir, 1);
+        let hold = hold_of(&file);
+
+        let bin = Fake::new(Stand::Relinks(dir.join("bin")));
+        assert_eq!(send(&bin, &file).unwrap(), Sent::Refused);
+        assert_eq!(names(&dir.join("trash")), [".one.jpg.recycling"]);
+        assert_eq!(std::fs::read_to_string(&hold).unwrap(), "one");
+
+        let again = Fake::new(Stand::Recycles(dir.join("bin-again")));
+        assert_eq!(send(&again, &file).unwrap(), Sent::Recycled);
+        assert_eq!(again.asked.borrow().as_slice(), std::slice::from_ref(&file));
+        assert!(names(&dir.join("trash")).is_empty());
         assert_eq!(
-            send(&Fake::new(Stand::Fails), &file).unwrap(),
-            Sent::Refused
+            std::fs::read_to_string(dir.join("bin-again/one.jpg")).unwrap(),
+            "one"
         );
-        assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
-        assert_eq!(names(&dir.join("trash")), ["one.jpg"]);
     }
 
     #[test]
@@ -328,17 +428,34 @@ pub(crate) mod tests {
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "two");
         assert_eq!(names(&dir.join("trash")), ["one.jpg"]);
 
-        // Cut short after the bin took it: the hold is its second name.
+        // Cut short after the bin took it: the hold is the file again, and is sent once more.
         std::fs::hard_link(&file, &hold).unwrap();
         std::fs::rename(&file, dir.join("bin/two.jpg")).unwrap();
-        let untouched = Fake::new(Stand::Deletes);
-        assert_eq!(send(&untouched, &file).unwrap(), Sent::Recycled);
-        assert!(untouched.asked.borrow().is_empty());
+        let again = Fake::new(Stand::Recycles(dir.join("bin")));
+        assert_eq!(send(&again, &file).unwrap(), Sent::Recycled);
+        assert_eq!(again.asked.borrow().as_slice(), std::slice::from_ref(&file));
         assert!(names(&dir.join("trash")).is_empty());
+        for twin in ["bin/two.jpg", "bin/one.jpg"] {
+            assert_eq!(std::fs::read_to_string(dir.join(twin)).unwrap(), "two");
+        }
+    }
+
+    #[test]
+    fn a_lone_hold_with_another_name_elsewhere_is_put_back_never_taken_for_the_bins() {
+        let dir = scratch("lone-linked");
+        let file = dir.join("trash/one.jpg");
+        let hold = hold_of(&file);
+        std::fs::write(&hold, "one").unwrap();
+        std::fs::create_dir_all(dir.join("elsewhere")).unwrap();
+        std::fs::hard_link(&hold, dir.join("elsewhere/one.jpg")).unwrap();
+
         assert_eq!(
-            std::fs::read_to_string(dir.join("bin/two.jpg")).unwrap(),
-            "two"
+            send(&Fake::new(Stand::Fails), &file).unwrap(),
+            Sent::Refused
         );
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
+        assert_eq!(names(&dir.join("trash")), ["one.jpg"]);
+        assert_eq!(identity(&file).unwrap().links, 2);
     }
 
     #[test]
@@ -351,5 +468,35 @@ pub(crate) mod tests {
         assert!(send(&Fake::new(Stand::Deletes), &file).is_err());
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
         assert_eq!(std::fs::read_to_string(hold_of(&file)).unwrap(), "another");
+    }
+
+    #[test]
+    fn the_sweep_puts_back_holds_no_row_needs_and_removes_nothing() {
+        let dir = scratch("sweep");
+        let shard = dir.join("trash/ab/cd");
+        std::fs::create_dir_all(&shard).unwrap();
+        let orphan = shard.join("orphan.jpg");
+        std::fs::write(hold_of(&orphan), "orphan").unwrap();
+        let needed = shard.join("needed.jpg");
+        std::fs::write(hold_of(&needed), "needed").unwrap();
+        let beside = shard.join("beside.jpg");
+        std::fs::write(&beside, "beside").unwrap();
+        std::fs::hard_link(&beside, hold_of(&beside)).unwrap();
+        std::fs::write(shard.join(".recycling"), "not a hold").unwrap();
+
+        let put = sweep(&dir.join("trash"), &|file| file == needed);
+
+        assert_eq!(put, 1);
+        assert_eq!(std::fs::read_to_string(&orphan).unwrap(), "orphan");
+        assert_eq!(
+            names(&shard),
+            [
+                ".beside.jpg.recycling",
+                ".needed.jpg.recycling",
+                ".recycling",
+                "beside.jpg",
+                "orphan.jpg"
+            ]
+        );
     }
 }

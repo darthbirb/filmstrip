@@ -1143,22 +1143,35 @@ every file: a drive with none, such as a removable one or a network share, the b
 or a file over its quota. There the shell deletes it outright, and asking it not to means a
 dialog, which the app never shows on its behalf.
 
-- **A second name first, then the shell.** Before the shell is asked, the file is given a second
-  name beside it by a hard link. The bin moves a file within its own volume, so a file it took
-  still has two names, one in the bin; a file the shell deleted outright lost only one, and is
-  given its own back. Whatever the shell answers, the disk says which happened, so a refusal is
-  never mistaken for a send. A file that cannot be given a second name, on a drive without hard
-  links, is never sent.
-- **What a cut-short send left is settled at the next.** A crash between the steps leaves the
-  second name: beside the file it is removed, and alone it is the file itself, put back, or the
-  bin's second name, and the file counts as sent. A second name that is not the same file is
+- **A second name first, then the shell, then the count of names.** Before the shell is asked,
+  the file is given a second name beside it by a hard link, and its count of names is read. The
+  bin moves a file within its own volume, so a file it took keeps that count; a file the shell
+  deleted outright has one fewer, and is given its own name back. Anything else, something on the
+  disk naming the file meanwhile, is refused with the second name kept. Whatever the shell
+  answers, the disk says which happened, so a refusal is never mistaken for a send. The count is
+  compared with itself, never with two: a user's file can already have other names, from a dedup
+  tool or a link-based backup, and keeps them into the Trash, since trashing within a volume is a
+  rename. A file that cannot be given a second name, on a drive without hard links, is never sent.
+- **What a cut-short send left is settled at the next, and never counted as sent.** A crash
+  between the steps leaves the second name. Beside the file it is removed. Alone, the count it
+  was read at is gone with the crash, and a lone second name with other names cannot be told from
+  the bin's twin, so it is the file again, put back and sent once more; at worst the bin then
+  holds the same file twice. Keeping the count durably, in the second name or the index, was not
+  chosen: the disk can change while the app is closed, so a count kept from before is no better
+  than none, and it would be one more thing to settle. A second name that is not the same file is
   never removed.
+- **A second name no row will settle is put back at launch.** One whose row was forgotten or
+  restored before its send ran again would otherwise wait unseen in the trash forever. At launch,
+  every second name under `data\trash` that no trashed row needs, alone where its file's name is
+  free, is given that name back; nothing there is removed. One a row needs waits for that row's
+  next send.
 - **`SHFileOperationW`, not `IFileOperation`.** The newer interface can refuse an outright delete
   before it happens, but only through a COM sink the app would have to implement; the second name
   gets the same promise from one flat call. The reason a file was refused is not told apart: all
-  three are the Recycle Bin refusing.
+  three are the Recycle Bin refusing, and a send that fails on the disk is said in the log.
 - **Tests never reach the real bin.** The shell is behind the `Bin` trait, and the tests' stand-in
-  recycles, deletes outright or refuses, while the second name and the link count are real.
+  recycles, deletes outright or refuses, while the second name and the link count are real. Its
+  files start with one name and with several, since a count compared with two only failed there.
 
 ## Settings
 
