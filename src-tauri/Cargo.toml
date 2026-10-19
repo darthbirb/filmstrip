@@ -42,8 +42,9 @@ chrono = { version = "=0.4.45", default-features = false, features = ["clock"] }
 # A real CF_HDROP copy, so pasting into Explorer produces the file and not its path.
 [target.'cfg(windows)'.dependencies]
 clipboard-win = "5"
-# MoveFileExW, for a rename that refuses a name already taken where std's replaces it.
-windows-sys = { version = "=0.61.2", features = ["Win32_Storage_FileSystem"] }
+# MoveFileExW, for a rename that refuses a name already taken where std's replaces it; the file's
+# link count, and SHFileOperationW, for a send to the Recycle Bin that never destroys a file.
+windows-sys = { version = "=0.61.2", features = ["Win32_Storage_FileSystem", "Win32_UI_Shell"] }
 
 [profile.release]
 opt-level = 3

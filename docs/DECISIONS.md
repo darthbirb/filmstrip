@@ -1123,6 +1123,31 @@ promise the person has to keep in mind.
 - **An item over the per-item size goes where an expiry would**: refused by the trash, the delete
   offers to send it to the Recycle Bin instead.
 
+## Sending to the Recycle Bin
+
+**`fs::recycle::send` hands a file to the shell's Recycle Bin and never lets it be destroyed**,
+built on 20 October 2026 for #110 and meant for expiry (#70) too. The Recycle Bin cannot take
+every file: a drive with none, such as a removable one or a network share, the bin turned off,
+or a file over its quota. There the shell deletes it outright, and asking it not to means a
+dialog, which the app never shows on its behalf.
+
+- **A second name first, then the shell.** Before the shell is asked, the file is given a second
+  name beside it by a hard link. The bin moves a file within its own volume, so a file it took
+  still has two names, one in the bin; a file the shell deleted outright lost only one, and is
+  given its own back. Whatever the shell answers, the disk says which happened, so a refusal is
+  never mistaken for a send. A file that cannot be given a second name, on a drive without hard
+  links, is never sent.
+- **What a cut-short send left is settled at the next.** A crash between the steps leaves the
+  second name: beside the file it is removed, and alone it is the file itself, put back, or the
+  bin's second name, and the file counts as sent. A second name that is not the same file is
+  never removed.
+- **`SHFileOperationW`, not `IFileOperation`.** The newer interface can refuse an outright delete
+  before it happens, but only through a COM sink the app would have to implement; the second name
+  gets the same promise from one flat call. The reason a file was refused is not told apart: all
+  three are the Recycle Bin refusing.
+- **Tests never reach the real bin.** The shell is behind the `Bin` trait, and the tests' stand-in
+  recycles, deletes outright or refuses, while the second name and the link count are real.
+
 ## Settings
 
 **A dialog over the window**, drawn by Claude Design and built on 14 September 2026. The frame is
