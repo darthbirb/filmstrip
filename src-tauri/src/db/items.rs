@@ -388,6 +388,20 @@ pub fn forget_retired(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
+/// Forgets a trashed item outright, once its file has left the trash for the Recycle Bin. Covers
+/// point in from outside the cascade, so go first.
+pub fn forget_trashed(conn: &Connection, id: i64) -> Result<()> {
+    conn.execute(
+        "UPDATE folder SET cover_item_id = NULL WHERE cover_item_id = ?1",
+        params![id],
+    )?;
+    conn.execute(
+        "DELETE FROM item WHERE id = ?1 AND trashed_at IS NOT NULL",
+        params![id],
+    )?;
+    crate::db::search::index_item(conn, id)
+}
+
 /// Retires an item whose file is gone. It keeps its name, so the file coming back is the same item.
 pub fn retire(conn: &Connection, id: i64) -> Result<()> {
     conn.execute(

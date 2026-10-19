@@ -184,6 +184,7 @@ pub fn run() {
             commands::list_backups,
             commands::back_up_now,
             commands::restore_backup,
+            commands::restore_forgets,
             commands::set_backups_kept,
             commands::launch_backup_refusal,
             commands::ui_preferences,

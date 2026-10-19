@@ -9,8 +9,15 @@ import {
 } from "react";
 
 import type { Backup } from "../../ipc/bindings/Backup";
+import type { Forgets } from "../../ipc/bindings/Forgets";
 import type { Shelved } from "../../ipc/bindings/Shelved";
-import { backUpNow, listBackups, restoreBackup, setBackupsKept } from "../../ipc/commands";
+import {
+  backUpNow,
+  listBackups,
+  restoreBackup,
+  restoreForgets,
+  setBackupsKept,
+} from "../../ipc/commands";
 import { formatBytes, formatCount, formatWhen } from "../../lib/format";
 import { BackupGroup, BackupRow, RowProgress } from "../../ui/BackupTable";
 import { Band } from "../../ui/Band";
@@ -24,8 +31,10 @@ import { RowQuestion } from "../../ui/TermTable";
 import { libraryChanged } from "../library";
 import { setNews } from "../navigation/foot-slot";
 import { useWork } from "../navigation/work-store";
+import { reasonText } from "../undo/lines";
 import { backupWhen, howTaken, notBackedUp, whyFailed } from "./backup-words";
 import { Rows } from "./Rows";
+import { listed, notRestored, trashGoes, wentBefore } from "./recycle-words";
 import {
   finishRestore,
   type RestoreEnd,
@@ -50,6 +59,7 @@ export function Backups() {
   const [shelved, setShelved] = useState<Shelved | null>(null);
   const [writing, setWriting] = useState<number | null>(null);
   const [asking, setAsking] = useState<string | null>(null);
+  const [forgets, setForgets] = useState<Forgets | null>(null);
   const { restoring, ended } = useRestore();
   const [said, setSaid] = useState<Said | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
@@ -73,7 +83,11 @@ export function Backups() {
   useEffect(() => {
     if (!ended) return;
     takeRestoreEnd();
-    setSaid({ kind: ended.kind, sentence: ended.sentence });
+    setSaid(
+      ended.kind === "band"
+        ? { kind: "band", sentence: ended.sentence, path: ended.path }
+        : { kind: "line", sentence: ended.sentence },
+    );
     void listBackups()
       .then(setShelved)
       .catch(() => undefined)
@@ -159,8 +173,9 @@ export function Backups() {
           }
         >
           Restore the index from <Term>{when}</Term>? Tags, labels, notes, statuses, covers,
-          favourites, keys and the undo journal go back to then. The index as it is now is kept as a
-          backup first.{stopping(progress?.copies.length ?? 0, progress?.exports.length ?? 0)}
+          favourites, keys and the undo journal go back to then.
+          <Forgotten forgets={forgets} /> The index as it is now is kept as a backup first.
+          {stopping(progress?.copies.length ?? 0, progress?.exports.length ?? 0)}
         </RowQuestion>
       );
     }
@@ -182,7 +197,13 @@ export function Backups() {
                 else buttons.current.delete(backup.name);
               }}
               onClick={() => {
-                if (!busy) setAsking(backup.name);
+                if (busy) return;
+                void restoreForgets(backup.name)
+                  .catch(() => null)
+                  .then((forgotten) => {
+                    setForgets(forgotten);
+                    setAsking(backup.name);
+                  });
               }}
             >
               Restore…
@@ -264,6 +285,21 @@ async function restoreIndex(backup: Backup) {
         sentence: `The backup from ${when} could not be read. The index is as it was.`,
         focus: backup.name,
       };
+    } else if (restored.kind === "kept") {
+      await libraryChanged().catch(() => undefined);
+      ended = {
+        kind: "band",
+        sentence: notRestored(restored.forgets, restored.refused),
+        path: restored.trash,
+        focus: backup.name,
+      };
+    } else if (restored.kind === "failed") {
+      await libraryChanged().catch(() => undefined);
+      ended = {
+        kind: "band",
+        sentence: `The index could not be restored. ${reasonText(restored.reason)}. ${wentBefore(restored.forgets)}`,
+        focus: backup.name,
+      };
     } else {
       setNews(null);
       await libraryChanged().catch(() => undefined);
@@ -283,6 +319,24 @@ async function restoreIndex(backup: Backup) {
     void heard.then((unlisten) => unlisten?.());
   }
   finishRestore(ended);
+}
+
+/**
+ * What a restore forgets of the Trash, said on its question: the sources added since that have
+ * files there, and every file there it forgets, which go to the Recycle Bin.
+ */
+function Forgotten({ forgets }: { forgets: Forgets | null }) {
+  const goes = trashGoes(forgets?.files ?? 0);
+  if (!forgets || !goes) return null;
+  const one = forgets.sources.length === 1;
+  return (
+    <>
+      {" "}
+      <Term>{listed(forgets.sources)}</Term> {one ? "was" : "were"} added since, so{" "}
+      {one ? "it is" : "they are"} forgotten, and {one ? "its" : "their"} <Term>{goes.files}</Term>{" "}
+      {goes.verb} to the Recycle Bin.
+    </>
+  );
 }
 
 /** What a restore stops first, said on its question while it runs. */

@@ -8,8 +8,9 @@ use ts_rs::TS;
 
 use crate::db::items::ItemRow;
 use crate::db::journal::ItemRestored;
-use crate::db::{folders, in_transaction, items, journal, tags};
+use crate::db::{folders, in_transaction, items, journal, sources, tags};
 use crate::error::{AppError, Reason, Result};
+use crate::fs::recycle::{self, Bin, Sent};
 use crate::fs::stayed::{self, Stayed};
 use crate::fs::{paths, relocate};
 
@@ -236,6 +237,78 @@ pub(super) fn unrestore(conn: &Connection, restored: &ItemRestored) -> Result<()
     })
 }
 
+/// What sending trashed files on to the Recycle Bin did: how many went, each row with it, and how
+/// many the bin could not take, which stay under their rows.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Recycled {
+    pub sent: u32,
+    pub refused: u32,
+}
+
+/// Sends each trashed item's file to the Recycle Bin and forgets its row once it has gone; one
+/// already gone from the trash counts as sent. The caller holds the disk's turn.
+/// DECISIONS.md "Expiry goes to the Recycle Bin".
+pub fn recycle_items(
+    conn: &Connection,
+    bin: &dyn Bin,
+    item_ids: &[i64],
+    progress: &dyn Fn(f64),
+) -> Result<Recycled> {
+    let mut recycled = Recycled::default();
+    for (at, &item_id) in item_ids.iter().enumerate() {
+        let went = match items::file_of(conn, item_id)? {
+            None => true,
+            Some(_) if !items::is_trashed(conn, item_id)? => false,
+            Some(file) => {
+                let path = paths::trash_path(&file.uuid, &file.disk_name)?;
+                matches!(recycle::send(bin, &path), Ok(Sent::Recycled | Sent::Gone))
+            }
+        };
+        if went {
+            in_transaction(conn, |tx| items::forget_trashed(tx, item_id))?;
+            recycled.sent += 1;
+        } else {
+            recycled.refused += 1;
+        }
+        progress((at + 1) as f64 / item_ids.len() as f64);
+    }
+    Ok(recycled)
+}
+
+/// What came of removing a source.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(export)]
+pub enum Removal {
+    Removed,
+    /// Kept, since the Recycle Bin could not take `refused` of its files, which stay in `trash`.
+    Kept {
+        refused: u32,
+        trash: String,
+    },
+}
+
+/// Removes a source once its files in the Trash have gone to the Recycle Bin; with any the bin
+/// cannot take, the source stays, and so do they. Its folder on disk is never touched.
+pub fn remove_source(
+    conn: &Connection,
+    bin: &dyn Bin,
+    source_id: i64,
+    progress: &dyn Fn(f64),
+) -> Result<Removal> {
+    let _turn = super::turn();
+    let trashed = sources::trashed(conn, source_id)?;
+    let recycled = recycle_items(conn, bin, &trashed, progress)?;
+    if recycled.refused > 0 {
+        return Ok(Removal::Kept {
+            refused: recycled.refused,
+            trash: paths::trash_dir()?.to_string_lossy().into_owned(),
+        });
+    }
+    in_transaction(conn, |tx| sources::remove(tx, source_id))?;
+    Ok(Removal::Removed)
+}
+
 /// A folder as navigation names it: a source's own folder goes by the source's title.
 fn place_name(conn: &Connection, folder_id: i64) -> String {
     folders::ancestry(conn, folder_id)
@@ -250,6 +323,7 @@ mod tests {
     use super::*;
     use crate::db::sources::{self, SourceKind};
     use crate::db::{self, journal};
+    use crate::fs::recycle::tests::{Fake, Stand};
     use crate::fs::{undo, walk};
     use std::path::{Path, PathBuf};
 
@@ -533,6 +607,88 @@ mod tests {
         let report = restore_items(&conn, &[pyramid], None, &journal::new_batch()).unwrap();
         assert_eq!(report.restored, 1, "{:?}", report.refused);
         assert!(root.join("Trips/Cairo/pyramid.jpg").is_file());
+    }
+
+    fn rows(conn: &Connection) -> i64 {
+        conn.query_row("SELECT COUNT(*) FROM item", [], |r| r.get(0))
+            .unwrap()
+    }
+
+    #[test]
+    fn removing_a_source_sends_its_trashed_files_to_the_recycle_bin_and_leaves_its_folder() {
+        let (conn, root, cairo) = library("remove-recycles");
+        let dir = root.parent().unwrap().to_path_buf();
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        trash_items(&conn, &[pyramid, sphinx], &journal::new_batch()).unwrap();
+        let (one, two) = (trash_file(&conn, pyramid), trash_file(&conn, sphinx));
+        std::fs::remove_file(&two).unwrap();
+        let bin = Fake::new(Stand::Recycles(dir.join("bin")));
+        let shares = std::cell::RefCell::new(Vec::new());
+
+        let removal =
+            remove_source(&conn, &bin, 1, &|done| shares.borrow_mut().push(done)).unwrap();
+
+        assert_eq!(removal, Removal::Removed);
+        assert_eq!(*shares.borrow(), [0.5, 1.0]);
+        assert_eq!(
+            bin.asked.borrow().as_slice(),
+            std::slice::from_ref(&one),
+            "one already gone from the trash counts as sent"
+        );
+        assert!(!one.exists());
+        let recycled = dir.join("bin").join(one.file_name().unwrap());
+        assert_eq!(std::fs::read_to_string(recycled).unwrap(), "p");
+        assert!(sources::list(&conn).unwrap().is_empty());
+        assert_eq!(rows(&conn), 0);
+        assert!(
+            root.join("Trips/Cairo").is_dir(),
+            "its folder stays on disk"
+        );
+    }
+
+    #[test]
+    fn a_file_the_recycle_bin_cannot_take_keeps_the_source_and_stays_in_the_trash() {
+        let (conn, root, cairo) = library("remove-refused");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        trash_items(&conn, &[pyramid, sphinx], &journal::new_batch()).unwrap();
+        let (one, two) = (trash_file(&conn, pyramid), trash_file(&conn, sphinx));
+        let mut bin = Fake::new(Stand::Recycles(root.parent().unwrap().join("bin")));
+        bin.deletes = vec![two.file_name().unwrap().to_string_lossy().into_owned()];
+
+        let removal = remove_source(&conn, &bin, 1, &|_| {}).unwrap();
+
+        assert_eq!(
+            removal,
+            Removal::Kept {
+                refused: 1,
+                trash: paths::trash_dir().unwrap().to_string_lossy().into_owned()
+            }
+        );
+        assert!(!one.exists(), "a refusal stops nothing");
+        assert!(!items::is_trashed(&conn, pyramid).unwrap());
+        assert_eq!(std::fs::read_to_string(&two).unwrap(), "s");
+        assert_eq!(
+            listing(&conn).unwrap()[0].row.id,
+            sphinx,
+            "it stays in the Trash under its row"
+        );
+        assert_eq!(sources::list(&conn).unwrap().len(), 1);
+        assert_eq!(sources::item_stats(&conn, 1).unwrap().0, 0);
+        std::fs::remove_file(two).unwrap();
+    }
+
+    #[test]
+    fn a_source_with_nothing_in_the_trash_goes_without_asking_the_bin() {
+        let (conn, _, _) = library("remove-none");
+        let bin = Fake::new(Stand::Deletes);
+        assert_eq!(
+            remove_source(&conn, &bin, 1, &|_| panic!("nothing to send")).unwrap(),
+            Removal::Removed
+        );
+        assert!(bin.asked.borrow().is_empty());
+        assert!(sources::list(&conn).unwrap().is_empty());
     }
 
     #[test]

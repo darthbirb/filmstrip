@@ -34,6 +34,7 @@ const SOURCES: SourceSummary[] = [
     itemCount: 41_236,
     rootCount: 0,
     totalBytes: 0,
+    trashCount: 0,
     favorite: false,
   },
   {
@@ -48,6 +49,7 @@ const SOURCES: SourceSummary[] = [
     itemCount: 3,
     rootCount: 3,
     totalBytes: 0,
+    trashCount: 0,
     favorite: false,
   },
 ];

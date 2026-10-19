@@ -21,6 +21,7 @@ function source(id: number, title: string): SourceSummary {
     itemCount: 2,
     rootCount: 0,
     totalBytes: 2,
+    trashCount: 0,
     favorite: false,
   };
 }

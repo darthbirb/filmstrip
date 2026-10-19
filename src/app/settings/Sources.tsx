@@ -1,3 +1,4 @@
+import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
 
 import type { SourceKind } from "../../ipc/bindings/SourceKind";
@@ -5,18 +6,30 @@ import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { removeSource, renameSource, revealSource, setSourceKind } from "../../ipc/commands";
 import { formatCount } from "../../lib/format";
 import { Band } from "../../ui/Band";
+import { Bar } from "../../ui/Bar";
 import { Button } from "../../ui/Button";
 import { Dropdown } from "../../ui/Dropdown";
 import { EmptyState } from "../../ui/EmptyState";
 import { Glyph } from "../../ui/Glyph";
 import { GlyphButton } from "../../ui/GlyphButton";
 import { Segmented } from "../../ui/Segmented";
+import { libraryChanged } from "../library";
 import { addFolder, refusalSentence } from "../navigation/add-source";
 import { loadIndex, useIndex } from "../navigation/index-store";
 import { setRefused, useRefused } from "../navigation/refusal-store";
 import { useWork } from "../navigation/work-store";
 import { updatePreferences, usePreferences } from "../preferences";
+import { whyFailed } from "./backup-words";
 import { Caption, Rows } from "./Rows";
+import { notRemoved, trashGoes } from "./recycle-words";
+import {
+  finishRemove,
+  type RemoveEnd,
+  removeProgress,
+  settingsHeld,
+  startRemove,
+  useRemove,
+} from "./settings-store";
 
 const KINDS: readonly { value: SourceKind; label: string }[] = [
   { value: "library", label: "Library" },
@@ -27,7 +40,12 @@ const KINDS: readonly { value: SourceKind; label: string }[] = [
 export function Sources({ asking }: { asking?: number }) {
   const { sources } = useIndex();
   const refused = useRefused();
+  const { ended } = useRemove();
   const held = sources ?? [];
+  // There is only ever one band: a folder refused since takes the remove's place.
+  useEffect(() => {
+    if (refused) finishRemove(null);
+  }, [refused]);
 
   return (
     <div className="flex flex-col gap-2">
@@ -48,6 +66,9 @@ export function Sources({ asking }: { asking?: number }) {
           path={refused.path}
           onDismiss={() => setRefused(null)}
         />
+      )}
+      {!refused && ended && (
+        <Band sentence={ended.sentence} path={ended.path} onDismiss={() => finishRemove(null)} />
       )}
       <div className="flex">
         <Button glyph="plus" onClick={() => void addFolder("library")}>
@@ -204,6 +225,9 @@ function Settled({ source, onRemove }: { source: SourceSummary; onRemove: () => 
  */
 function Asking({ source, onCancel }: { source: SourceSummary; onCancel: () => void }) {
   const cancel = useRef<HTMLButtonElement>(null);
+  const { removing } = useRemove();
+  const here = removing?.id === source.id ? removing : null;
+  const goes = trashGoes(source.trashCount);
   // The remove button that had the focus has just gone, so the focus goes to the answer that keeps.
   useEffect(() => {
     cancel.current?.focus();
@@ -214,7 +238,7 @@ function Asking({ source, onCancel }: { source: SourceSummary; onCancel: () => v
       onKeyDown={(event) => {
         if (event.key !== "Escape") return;
         event.preventDefault();
-        onCancel();
+        if (!here) onCancel();
       }}
       className="m-0 flex min-w-0 flex-col gap-1.5 rounded-control border-0 bg-inset px-2.5 py-2 inset-ring inset-ring-line-danger"
     >
@@ -228,22 +252,65 @@ function Asking({ source, onCancel }: { source: SourceSummary; onCancel: () => v
       </div>
       <p className="m-0 pl-7 text-fg-mid text-small">
         The folder stays on disk. Its tags and notes are lost.
+        {goes && (
+          <>
+            {" "}
+            Its <span className="text-fg">{goes.files}</span> {goes.verb} to the Recycle Bin.
+          </>
+        )}
       </p>
-      <div className="flex gap-1.5 pl-7">
-        <Button
-          tone="danger"
-          onClick={() => {
-            void removeSource(source.id)
-              .then(() => loadIndex())
-              .catch(() => undefined);
-          }}
-        >
-          Remove Source
-        </Button>
-        <Button ref={cancel} tone="quiet" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
+      {here ? (
+        <div className="flex flex-col gap-1.5 pl-7">
+          <span className="flex items-baseline gap-2 text-fg-mid text-small">
+            <span className="min-w-0 flex-1 truncate">Removing {source.title}…</span>
+            <span className="text-fg tabular-nums">{here.percent}%</span>
+          </span>
+          <Bar percent={here.percent} />
+        </div>
+      ) : (
+        <div className="flex gap-1.5 pl-7">
+          <Button
+            tone="danger"
+            onClick={() => {
+              void removeNow(source).then((kept) => {
+                if (kept) onCancel();
+              });
+            }}
+          >
+            Remove Source
+          </Button>
+          <Button ref={cancel} tone="quiet" onClick={onCancel}>
+            Cancel
+          </Button>
+        </div>
+      )}
     </fieldset>
   );
+}
+
+/**
+ * Removes a source once its files in the Trash have gone to the Recycle Bin, run outside the row
+ * so Settings holds still meanwhile. True when it was kept. Artboards › Sources.
+ */
+async function removeNow(source: SourceSummary): Promise<boolean> {
+  if (settingsHeld()) return false;
+  setRefused(null);
+  startRemove(source.id);
+  const heard = listen<number>("remove-progress", (event) =>
+    removeProgress(source.id, event.payload),
+  ).catch(() => undefined);
+  let ended: RemoveEnd | null = null;
+  try {
+    const removal = await removeSource(source.id);
+    if (removal.kind === "kept") {
+      ended = { sentence: notRemoved(source.title, removal.refused), path: removal.trash };
+    }
+  } catch (error) {
+    ended = { sentence: `${source.title} was not removed. ${whyFailed(error)}.` };
+  } finally {
+    void heard.then((unlisten) => unlisten?.());
+  }
+  await libraryChanged().catch(() => undefined);
+  finishRemove(ended);
+  return ended !== null;
 }

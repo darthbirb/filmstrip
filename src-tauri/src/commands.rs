@@ -26,13 +26,14 @@ use crate::db::tags::{self, EffectiveTag};
 use crate::db::vocabulary::{self, KeyClashFor, Vocabulary};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::acts::{self, Batch};
-use crate::fs::backups::{self, Backup, Restored, Shelf, Shelved, Taken};
+use crate::fs::backups::{self, Backup, Forgets, Restored, Shelf, Shelved, Taken};
 use crate::fs::clipboard;
 use crate::fs::export::{self, Naming, Plan, Scope};
 use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
 use crate::fs::items::{self as fs_items, MoveReport};
 use crate::fs::paste::{self, Carried, CopyRefusal};
-use crate::fs::trash::{self, Origin, RestoreReport, TrashReport, Trashed};
+use crate::fs::recycle::RecycleBin;
+use crate::fs::trash::{self, Origin, Removal, RestoreReport, TrashReport, Trashed};
 use crate::fs::undo::{self, UndoReport};
 use crate::fs::{paths, sanitize};
 use crate::jobs::{self, JobQueue, Progress};
@@ -48,6 +49,8 @@ pub struct AppState {
 
 /// How far a restore has got, from 0 to 100, as its row's bar shows it.
 pub const RESTORE_PROGRESS_EVENT: &str = "restore-progress";
+/// How far removing a source has got in sending its files in the Trash, from 0 to 100.
+pub const REMOVE_PROGRESS_EVENT: &str = "remove-progress";
 /// The launch's backup has ended, taken, refused or not due, so a list showing it writing is stale.
 pub const BACKUPS_CHANGED_EVENT: &str = "backups-changed";
 
@@ -76,6 +79,8 @@ pub struct SourceSummary {
     pub item_count: i64,
     pub root_count: i64,
     pub total_bytes: i64,
+    /// Its files in the Trash, which go to the Recycle Bin when it is removed.
+    pub trash_count: i64,
     /// Whether its own folder is a favourite place.
     pub favorite: bool,
 }
@@ -616,10 +621,15 @@ pub async fn read_folder_again(state: State<'_, AppState>, folder_id: i64) -> Re
     .await
 }
 
+/// Removes a source once its files in the Trash have gone to the Recycle Bin; one the bin cannot
+/// take keeps it. DECISIONS.md "Expiry goes to the Recycle Bin".
 #[tauri::command]
-pub async fn remove_source(state: State<'_, AppState>, id: i64) -> Result<()> {
+pub async fn remove_source(app: AppHandle, state: State<'_, AppState>, id: i64) -> Result<Removal> {
     run(&state, move |conn| {
-        in_transaction(conn, |tx| sources::remove(tx, id))
+        let progress = |done: f64| {
+            let _ = app.emit(REMOVE_PROGRESS_EVENT, (done * 100.0).round() as u32);
+        };
+        trash::remove_source(conn, &RecycleBin, id, &progress)
     })
     .await
 }
@@ -1462,7 +1472,11 @@ pub async fn restore_backup(
             let _ = app.emit(RESTORE_PROGRESS_EVENT, (done * 100.0).round() as u32);
         };
         let hold = || Ok((queue.hold()?, crate::fs::turn()));
-        let restored = backups::restore(&mut live, &dir, &name, keep, &kept, &progress, hold)?;
+        let trash = backups::Trash {
+            kept: &kept,
+            bin: &RecycleBin,
+        };
+        let restored = backups::restore(&mut live, &dir, &name, keep, &trash, &progress, hold)?;
         if matches!(restored, Restored::Restored { .. }) {
             let scope = app.asset_protocol_scope();
             backups::after_swap(&live, &mut |root| Ok(scope.allow_directory(root, true)?));
@@ -1474,6 +1488,13 @@ pub async fn restore_backup(
         state.backups.refuse(&from.name);
     }
     Ok(restored)
+}
+
+/// What restoring a backup would forget of the Trash, which its question says first.
+#[tauri::command]
+pub async fn restore_forgets(state: State<'_, AppState>, name: String) -> Result<Forgets> {
+    let dir = state.backups.dir.clone();
+    run(&state, move |conn| backups::forgets(conn, &dir, &name)).await
 }
 
 /// How many backups are kept. Lowering it removes nothing until the next backup.
@@ -1576,6 +1597,7 @@ pub fn source_summaries(conn: &Connection) -> Result<Vec<SourceSummary>> {
                 item_count,
                 root_count: folders::own_count(conn, root_folder_id)?,
                 total_bytes,
+                trash_count: sources::trashed(conn, source.id)?.len() as i64,
                 source,
             })
         })
