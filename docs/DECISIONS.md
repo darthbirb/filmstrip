@@ -1160,11 +1160,13 @@ dialog, which the app never shows on its behalf.
   chosen: the disk can change while the app is closed, so a count kept from before is no better
   than none, and it would be one more thing to settle. A second name that is not the same file is
   never removed.
-- **A second name no row will settle is put back at launch.** One whose row was forgotten or
-  restored before its send ran again would otherwise wait unseen in the trash forever. At launch,
-  every second name under `data\trash` that no trashed row needs, alone where its file's name is
-  free, is given that name back; nothing there is removed. One a row needs waits for that row's
-  next send.
+- **Every lone second name is put back at launch.** A lone one is never counted as sent, so
+  putting it back then is what its row's next send would do, only sooner. Waiting for that send
+  left a crash during Remove Source with an item in the Trash and no file under it: not
+  restorable, not shown, and dropped by a restore of the index, which keeps only the trashed rows
+  whose files it finds. One whose row was forgotten would wait unseen forever. At launch, every
+  second name under `data\trash` alone where its file's name is free is given that name back,
+  whatever the index holds; nothing there is removed.
 - **`SHFileOperationW`, not `IFileOperation`.** The newer interface can refuse an outright delete
   before it happens, but only through a COM sink the app would have to implement; the second name
   gets the same promise from one flat call. The reason a file was refused is not told apart: all

@@ -31,10 +31,9 @@ pub fn run() {
             jobs::abandon_exports(&conn)?;
             db::jobs::requeue_running(&conn)?;
             jobs::enqueue_index(&conn)?;
-            match fs::trash::sweep_holds(&conn, &fs::paths::trash_dir()?) {
-                Ok(0) => {}
-                Ok(put) => eprintln!("trash: {put} held files put back"),
-                Err(err) => eprintln!("trash: held files were not swept: {err}"),
+            let put = fs::recycle::sweep(&fs::paths::trash_dir()?);
+            if put > 0 {
+                eprintln!("trash: {put} held files put back");
             }
 
             // The window may load files from the sources, the thumbnail cache and the trash, where

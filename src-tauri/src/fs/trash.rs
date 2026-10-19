@@ -2,9 +2,6 @@
 //! taken back. Sending one there is a move like any other, journalled, so it can be undone.
 //! DECISIONS.md "Undo".
 
-use std::collections::HashSet;
-use std::path::{Path, PathBuf};
-
 use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
@@ -282,16 +279,6 @@ pub fn recycle_items(
         progress((at + 1) as f64 / item_ids.len() as f64);
     }
     Ok(recycled)
-}
-
-/// Puts back, at launch, each second name a cut-short send left under `dir` that no row in the
-/// Trash will settle. DECISIONS.md "Sending to the Recycle Bin".
-pub fn sweep_holds(conn: &Connection, dir: &Path) -> Result<u32> {
-    let needed: HashSet<PathBuf> = crate::db::backup::in_trash(conn)?
-        .iter()
-        .map(|one| paths::trash_path(&one.uuid, &one.disk_name))
-        .collect::<Result<_>>()?;
-    Ok(recycle::sweep(dir, &|file| needed.contains(file)))
 }
 
 /// What came of removing a source.
@@ -700,35 +687,54 @@ mod tests {
         std::fs::remove_file(two).unwrap();
     }
 
+    fn hold_of(file: &Path) -> PathBuf {
+        file.with_file_name(format!(
+            ".{}.recycling",
+            file.file_name().unwrap().to_string_lossy()
+        ))
+    }
+
     #[test]
-    fn at_launch_a_second_name_no_row_needs_is_put_back_and_one_a_row_needs_waits() {
+    fn at_launch_every_lone_second_name_is_put_back_whether_or_not_a_row_has_it() {
         let (conn, _, cairo) = library("sweep-holds");
         let pyramid = id_of(&conn, cairo, "pyramid.jpg");
         trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
         let needed = trash_file(&conn, pyramid);
         let shard = needed.parent().unwrap().to_path_buf();
-        let held = shard.join(".needed.recycling");
-        let hold = shard.join(format!(
-            ".{}.recycling",
-            needed.file_name().unwrap().to_string_lossy()
-        ));
-        std::fs::rename(&needed, &hold).unwrap();
+        std::fs::rename(&needed, hold_of(&needed)).unwrap();
         let orphan = shard.join("orphan.jpg");
-        std::fs::write(&held, "unrelated").unwrap();
-        std::fs::write(shard.join(".orphan.jpg.recycling"), "orphan").unwrap();
+        std::fs::write(hold_of(&orphan), "orphan").unwrap();
+        std::fs::write(shard.join(".unrelated.recycling"), "unrelated").unwrap();
 
-        assert_eq!(sweep_holds(&conn, &shard).unwrap(), 2);
+        assert_eq!(recycle::sweep(&shard), 3);
 
+        assert_eq!(std::fs::read_to_string(&needed).unwrap(), "p");
         assert_eq!(std::fs::read_to_string(&orphan).unwrap(), "orphan");
         assert_eq!(
-            std::fs::read_to_string(shard.join("needed")).unwrap(),
+            std::fs::read_to_string(shard.join("unrelated")).unwrap(),
             "unrelated"
         );
-        assert!(!needed.exists(), "its row's next send settles it");
-        assert_eq!(std::fs::read_to_string(&hold).unwrap(), "p");
-        for file in [orphan, shard.join("needed"), hold] {
+        for file in [needed, orphan, shard.join("unrelated")] {
             std::fs::remove_file(file).unwrap();
         }
+    }
+
+    #[test]
+    fn a_trashed_file_a_crash_left_under_its_second_name_is_back_at_launch_to_restore() {
+        let (conn, root, cairo) = library("sweep-crashed-removal");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+        let file = trash_file(&conn, pyramid);
+        let hold = hold_of(&file);
+        std::fs::rename(&file, &hold).unwrap();
+
+        assert_eq!(recycle::sweep(file.parent().unwrap()), 1);
+
+        assert!(!hold.exists());
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "p");
+        let report = restore_items(&conn, &[pyramid], None, &journal::new_batch()).unwrap();
+        assert_eq!(report.restored, 1, "{:?}", report.refused);
+        assert!(root.join("Trips/Cairo/pyramid.jpg").is_file());
     }
 
     #[test]

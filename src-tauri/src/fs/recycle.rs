@@ -83,9 +83,9 @@ fn settle(file: &Path, hold: &Path) -> io::Result<()> {
     noclobber::rename(hold, file)
 }
 
-/// Puts back each hold under `dir` that no row `needs` as the file it holds, where that name is
-/// free, and says how many; nothing is ever removed. One a row needs waits for that row's send.
-pub fn sweep(dir: &Path, needs: &dyn Fn(&Path) -> bool) -> u32 {
+/// Puts back each lone hold under `dir` as the file it holds, where that name is free, and says
+/// how many; nothing is ever removed. DECISIONS.md "Sending to the Recycle Bin".
+pub fn sweep(dir: &Path) -> u32 {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return 0;
     };
@@ -96,13 +96,13 @@ pub fn sweep(dir: &Path, needs: &dyn Fn(&Path) -> bool) -> u32 {
             continue;
         };
         if kind.is_dir() {
-            put += sweep(&path, needs);
+            put += sweep(&path);
             continue;
         }
         let Some(file) = held_by(&path) else {
             continue;
         };
-        if !kind.is_file() || needs(&file) || std::fs::symlink_metadata(&file).is_ok() {
+        if !kind.is_file() || std::fs::symlink_metadata(&file).is_ok() {
             continue;
         }
         match noclobber::rename(&path, &file) {
@@ -470,30 +470,34 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn the_sweep_puts_back_holds_no_row_needs_and_removes_nothing() {
+    fn the_sweep_puts_back_every_lone_hold_and_removes_nothing() {
         let dir = scratch("sweep");
         let shard = dir.join("trash/ab/cd");
         std::fs::create_dir_all(&shard).unwrap();
         let orphan = shard.join("orphan.jpg");
         std::fs::write(hold_of(&orphan), "orphan").unwrap();
-        let needed = shard.join("needed.jpg");
-        std::fs::write(hold_of(&needed), "needed").unwrap();
+        let linked = shard.join("linked.jpg");
+        std::fs::write(hold_of(&linked), "linked").unwrap();
+        std::fs::create_dir_all(dir.join("elsewhere")).unwrap();
+        std::fs::hard_link(hold_of(&linked), dir.join("elsewhere/linked.jpg")).unwrap();
         let beside = shard.join("beside.jpg");
         std::fs::write(&beside, "beside").unwrap();
         std::fs::hard_link(&beside, hold_of(&beside)).unwrap();
         std::fs::write(shard.join(".recycling"), "not a hold").unwrap();
 
-        let put = sweep(&dir.join("trash"), &|file| file == needed);
+        let put = sweep(&dir.join("trash"));
 
-        assert_eq!(put, 1);
+        assert_eq!(put, 2);
         assert_eq!(std::fs::read_to_string(&orphan).unwrap(), "orphan");
+        assert_eq!(std::fs::read_to_string(&linked).unwrap(), "linked");
+        assert_eq!(identity(&linked).unwrap().links, 2);
         assert_eq!(
             names(&shard),
             [
                 ".beside.jpg.recycling",
-                ".needed.jpg.recycling",
                 ".recycling",
                 "beside.jpg",
+                "linked.jpg",
                 "orphan.jpg"
             ]
         );
