@@ -24,7 +24,7 @@ on it, with Paste, and the app builds that. The artboard wins: take the grid's b
 that sentence, and draw the ground's menu there beside the rows' as the place's own, under its
 name.
 
-## A removed source's trashed files
+## A removed source's trashed files · DRAWN
 
 Removing a source forgets its rows, the trashed ones too, and leaves their files in `data\trash`
 where nothing shows, restores or expires them (#110). A restore that forgets a source added
@@ -35,6 +35,21 @@ remove question in Settings › Sources saying so with a count, and the restore 
 backup forgets a source. Where the Recycle Bin cannot take a file, the file stays in the Trash
 and the app says where, as #70 has it for expiry. Draw none trashed, some, a refused file and an
 offline source.
+
+Drawn in Artboards › Sources, "What removing does with its trashed files", and beside the
+restore's question in Artboards › Backing up the index:
+
+- The question adds "Its 2 files in the Trash go to the Recycle Bin." ("Its 1 file … goes"),
+  counting the source's trashed rows, offline or not. With none it is unchanged.
+- Remove Source sends each file, its row going with it, under the restore's line and bar
+  ("Removing Pictures…", the share sent), Settings holding still; then the source goes.
+- A file the Recycle Bin cannot take is never sent: it stays in the Trash under its row, the
+  source is not removed, and the section's band says "Pictures was not removed. The Recycle Bin
+  could not take 1 of its files, so it stays in the Trash." over `D:\Filmstrip\data\trash`.
+- A restore's question adds "Archive was added since, so it is forgotten, and its 1 file in the
+  Trash goes to the Recycle Bin.", naming several in a list with one count. The files go after
+  the check and the hold, before the "before restore" backup; one refused stops the restore
+  there, nothing swapped, with the band "The index was not restored. …".
 
 ## Scrubbing a video's tile · DRAWN
 
