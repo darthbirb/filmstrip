@@ -24,6 +24,18 @@ on it, with Paste, and the app builds that. The artboard wins: take the grid's b
 that sentence, and draw the ground's menu there beside the rows' as the place's own, under its
 name.
 
+## A removed source's trashed files
+
+Removing a source forgets its rows, the trashed ones too, and leaves their files in `data\trash`
+where nothing shows, restores or expires them (#110). A restore that forgets a source added
+since leaves the same.
+
+By DECISIONS.md "Expiry goes to the Recycle Bin", they go to the Windows Recycle Bin. Draw the
+remove question in Settings › Sources saying so with a count, and the restore question when the
+backup forgets a source. Where the Recycle Bin cannot take a file, the file stays in the Trash
+and the app says where, as #70 has it for expiry. Draw none trashed, some, a refused file and an
+offline source.
+
 ## Scrubbing a video's tile · DRAWN
 
 A video's tile shows one frame. In ggallery, running the pointer across a video's tile scrubbed
