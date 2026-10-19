@@ -1597,7 +1597,7 @@ pub fn source_summaries(conn: &Connection) -> Result<Vec<SourceSummary>> {
                 item_count,
                 root_count: folders::own_count(conn, root_folder_id)?,
                 total_bytes,
-                trash_count: sources::trashed(conn, source.id)?.len() as i64,
+                trash_count: sources::trashed_count(conn, source.id)?,
                 source,
             })
         })
@@ -1952,6 +1952,28 @@ mod tests {
         assert_eq!((spaced.from, spaced.rows.len()), (4, 0));
         let unscoped = suggestions_with(&conn, Some("(a or b)"), "cai").unwrap();
         assert_eq!(unscoped.rows[1].text, "path:library/Trips/Cairo");
+    }
+
+    #[test]
+    fn a_source_counts_its_files_in_the_trash() {
+        let base = scratch("trash-count");
+        let app = app_dir(&base);
+        let library = base.join("library");
+        std::fs::create_dir_all(&library).unwrap();
+        for name in ["one.jpg", "two.jpg", "three.jpg"] {
+            std::fs::write(library.join(name), name).unwrap();
+        }
+        let conn = conn();
+        register(&conn, &library, &app).unwrap();
+        walk::reconcile(&conn).unwrap();
+        conn.execute(
+            "UPDATE item SET trashed_at = 1 WHERE disk_name IN ('one.jpg', 'two.jpg')",
+            [],
+        )
+        .unwrap();
+
+        let [summary] = source_summaries(&conn).unwrap().try_into().unwrap();
+        assert_eq!(summary.trash_count, 2);
     }
 
     #[test]
