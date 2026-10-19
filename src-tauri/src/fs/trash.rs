@@ -2,6 +2,9 @@
 //! taken back. Sending one there is a move like any other, journalled, so it can be undone.
 //! DECISIONS.md "Undo".
 
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+
 use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
@@ -261,7 +264,13 @@ pub fn recycle_items(
             Some(_) if !items::is_trashed(conn, item_id)? => false,
             Some(file) => {
                 let path = paths::trash_path(&file.uuid, &file.disk_name)?;
-                matches!(recycle::send(bin, &path), Ok(Sent::Recycled | Sent::Gone))
+                match recycle::send(bin, &path) {
+                    Ok(sent) => matches!(sent, Sent::Recycled | Sent::Gone),
+                    Err(err) => {
+                        eprintln!("recycle: {} was kept: {err}", path.display());
+                        false
+                    }
+                }
             }
         };
         if went {
@@ -273,6 +282,16 @@ pub fn recycle_items(
         progress((at + 1) as f64 / item_ids.len() as f64);
     }
     Ok(recycled)
+}
+
+/// Puts back, at launch, each second name a cut-short send left under `dir` that no row in the
+/// Trash will settle. DECISIONS.md "Sending to the Recycle Bin".
+pub fn sweep_holds(conn: &Connection, dir: &Path) -> Result<u32> {
+    let needed: HashSet<PathBuf> = crate::db::backup::in_trash(conn)?
+        .iter()
+        .map(|one| paths::trash_path(&one.uuid, &one.disk_name))
+        .collect::<Result<_>>()?;
+    Ok(recycle::sweep(dir, &|file| needed.contains(file)))
 }
 
 /// What came of removing a source.
@@ -679,6 +698,37 @@ mod tests {
         assert_eq!(sources::list(&conn).unwrap().len(), 1);
         assert_eq!(sources::item_stats(&conn, 1).unwrap().0, 0);
         std::fs::remove_file(two).unwrap();
+    }
+
+    #[test]
+    fn at_launch_a_second_name_no_row_needs_is_put_back_and_one_a_row_needs_waits() {
+        let (conn, _, cairo) = library("sweep-holds");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+        let needed = trash_file(&conn, pyramid);
+        let shard = needed.parent().unwrap().to_path_buf();
+        let held = shard.join(".needed.recycling");
+        let hold = shard.join(format!(
+            ".{}.recycling",
+            needed.file_name().unwrap().to_string_lossy()
+        ));
+        std::fs::rename(&needed, &hold).unwrap();
+        let orphan = shard.join("orphan.jpg");
+        std::fs::write(&held, "unrelated").unwrap();
+        std::fs::write(shard.join(".orphan.jpg.recycling"), "orphan").unwrap();
+
+        assert_eq!(sweep_holds(&conn, &shard).unwrap(), 2);
+
+        assert_eq!(std::fs::read_to_string(&orphan).unwrap(), "orphan");
+        assert_eq!(
+            std::fs::read_to_string(shard.join("needed")).unwrap(),
+            "unrelated"
+        );
+        assert!(!needed.exists(), "its row's next send settles it");
+        assert_eq!(std::fs::read_to_string(&hold).unwrap(), "p");
+        for file in [orphan, shard.join("needed"), hold] {
+            std::fs::remove_file(file).unwrap();
+        }
     }
 
     #[test]
