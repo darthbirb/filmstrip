@@ -174,6 +174,9 @@ review. The ruleset takes Review from any source, so it is as trustworthy as the
 workflows that can set it, as Gates is. The reviewer runs the branch in a worktree of its own
 under the main checkout's git-ignored `.claude/worktrees/`, never in the author's checkout or a
 folder beside it, and removes it when the review ends, both with `scripts/review-worktree.sh`.
+`scripts/review-worktree.test.sh` tests that script in CI's Gates job, against a throwaway clone
+under the runner's temp folder: it never follows a junction, refuses a locked worktree, and
+leaves nothing registered or on disk. Locally, pass it a folder under `.claude/worktrees/`.
 The dev server ignores that folder. Cargo in a nested worktree also reads the main
 checkout's `.cargo/config.toml`, so a key the worktree's own file drops still applies there.
 
