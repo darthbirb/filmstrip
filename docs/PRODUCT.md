@@ -15,7 +15,9 @@ indexes the filesystem rather than replacing it. Moving an item moves the file; 
 folder renames the directory.
 
 A **source** is a folder the user adds to the app. There can be several, and one source may
-not sit inside another. Removing a source forgets the index and never the files.
+not sit inside another. Removing a source forgets the index and never the files in its folder;
+its files in the trash go to the Windows Recycle Bin, as an expired item does, and one the Recycle
+Bin cannot take keeps the source.
 
 Deleting a folder asks: move what is inside to the Sorting Box, or send it to the trash as
 well. An empty folder goes without asking. Each sorting source is its own answer, and one can be kept

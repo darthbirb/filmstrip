@@ -672,7 +672,8 @@ Shift+F10 did nothing at all.
   between two groups that both hold rows, so an absent verb leaves no stray line, and a menu with
   nothing in it opens nothing.
 - **What a drive that is away cannot do is absent too.** An offline source keeps Rename, Manage
-  Sources and Remove Source, which touch only the index; it and its folders keep Favourite, Assign
+  Sources and Remove Source, which touch only the index and the app's own Trash, never the drive;
+  it and its folders keep Favourite, Assign
   Key… and Select Everything Inside, as their band keeps what the index holds, and lose every verb
   that needs the folder on disk.
 - **Favourite is on a folder's and a source's menu**, reading Remove Favourite when on, from
@@ -1083,22 +1084,25 @@ does not: tags, labels, notes, statuses, covers, favourites, keys and the undo j
 - **A restore checks the chosen backup whole first**, every page read, and refuses one that cannot
   be read, or that a later build wrote, before anything is written. Then the queue is held: each
   copy and export is stopped as its Cancel would, a walk stops before its next directory, and
-  the restore waits for every job in flight. Then the index as it is is backed up, "before restore";
+  the restore waits for every job in flight. Then each file in the Trash the restore would forget
+  goes to the Recycle Bin, its row with it; with any the bin cannot take, the restore stops there,
+  nothing backed up and nothing swapped. Then the index as it is is backed up, "before restore";
   then the chosen one is copied aside, brought to this build's schema, settled, and copied over the
   live index by the backup API in one write, so one that fails part way leaves the index as it
-  was. Only once that has succeeded do the oldest go, and never the one restored: had it been the
+  was but for the files already sent, which stand and which the failure names. Only once that has
+  succeeded do the oldest go, and never the one restored: had it been the
   oldest, it stays past the number until the next backup. Rotating, queueing the walk and letting
   the window load from every source the restored index has follow it, and none of them can fail a
   restore that has swapped.
 - **What a restore leaves as it is now.** The index goes back; the disk does not. The Trash is kept
   as it is now: a file in it since the backup is in it again from the folder it left, found by its
   source's root and the titles below it, with the folders on the way made retired where the
-  backup has none. One from a source added since, or from a place the backup cannot find, loses
-  its row as that source's other rows do, and its file is left in `data\trash` untouched: never
-  shown, never restorable and never expiring, as when a source is removed, until #110 settles what
-  becomes of such files. A row the backup has in the Trash whose file is no longer in
-  `data\trash` is retired where it was, keeping its tags and uuid for the walk to find again, or
-  dropped where a file there now has its name. The job queue starts empty but for the walk, which
+  backup has none. One from a source added since, or from a place the backup cannot find, is
+  forgotten as that source's other rows are, so its file goes to the Recycle Bin first, as a
+  removed source's do, and the question names the sources and counts the files beforehand. A row
+  the backup has in the Trash whose file is no longer in `data\trash` is retired where it was,
+  keeping its tags and uuid for the walk to find again, or dropped where a file there now has its
+  name. The job queue starts empty but for the walk, which
   runs at once, so a copy or an export waiting in the backup never runs again and files moved or
   added since are found where they are. A source added since is forgotten, and its files on disk
   are left as they are.
@@ -1122,6 +1126,14 @@ promise the person has to keep in mind.
   trash deletes outright, and it asks first.
 - **An item over the per-item size goes where an expiry would**: refused by the trash, the delete
   offers to send it to the Recycle Bin instead.
+- **A removed source's trashed files go there too**, and so does each trashed file a restore of
+  the index would forget (#110). Removing a source forgets its rows, the trashed ones with them,
+  and a file left in `data\trash` with no row would never be shown, restored or expired. The
+  files go first, each row with its file, one already gone counting as sent, and the source only
+  once every one has gone; a file the Recycle Bin cannot take stays in the Trash under its row,
+  the rest still go, and the source stays with it. Nothing is predicted: the question says what
+  happens if nothing refuses, and the band says what did when something does. Artboards ›
+  Sources, "What removing does with its trashed files".
 
 ## Sending to the Recycle Bin
 

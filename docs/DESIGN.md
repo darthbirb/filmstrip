@@ -958,7 +958,8 @@ toward the rest surface.
   the next backup says so where how it was taken goes, its time in `fg-mid`; one that cannot be
   read says unreadable and has no Restore…; one being written arrives at the top as a push-down,
   "backing up…" and the `progress` bar in place of its size. Restore… asks in the row question's
-  shape, and while it restores the answers give way to the walk's line and bar inside the same
+  shape, naming in `fg` each source it forgets with files in the Trash and counting the files,
+  which go to the Recycle Bin, and while it restores the answers give way to the walk's line and bar inside the same
   ring, and Settings holds still: the rail's sections and its filter field are disabled, those
   not shown in `fg-faint`, and Escape and the close wait. The list scrolls inside the group, and No Backups Yet takes its place when there are none.
 - **Row question.** A question on the row it is about, in the source row's remove shape: the row
@@ -998,7 +999,11 @@ toward the rest surface.
   its path beneath in `--font-mono`. One that cannot be read keeps its remove and loses its reveal.
   Remove asks on the row: a `line-danger` ring, the glyph becomes the warning, the kind and the
   buttons give up their space, and the path gives way to what removing forgets, over **Remove
-  source** and **Cancel**. The name and the count stay, and Escape puts the row back.
+  source** and **Cancel**. The name and the count stay, and Escape puts the row back. A source
+  with files in the Trash adds that they go to the Recycle Bin, their count in `fg`; Remove
+  source gives the answers' place to the walk's line and bar, "Removing Pictures…", as a restore
+  does, and Settings holds still until it ends. A file the bin refused is counted in the Band at
+  the section's foot, over the Trash's folder.
 - **Push-down.** A box arriving under the row above it: it grows from no height, lifts the
   `--push-lift` it started above where it settles, and fades, all as one move. Closed, it is out of
   sight and out of the tab order rather than sitting at no height. The pane's details and the
