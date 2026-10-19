@@ -149,6 +149,17 @@ test("a restore that forgets a source names it, and counts its files in the Tras
   );
 });
 
+test("a restore whose files to forget cannot be counted still says they go to the Recycle Bin", async () => {
+  forgetOnRestore({ forgets: ARCHIVE, refused: 0, failed: false, unknown: true });
+  await opened();
+  await expect.poll(() => rows().length).toBe(7);
+  await userEvent.click(restoreOn(2) as HTMLElement);
+  await expect.element(page.getByRole("button", { name: "Restore Index" })).toBeVisible();
+  expect(rowText(2)).toContain(
+    "go back to then. Any source added since is forgotten, and its files in the Trash go to the Recycle Bin. The index as it is now is kept as a backup first.",
+  );
+});
+
 test("a restore with nothing in the Trash to forget asks as ever", async () => {
   await opened();
   await expect.poll(() => rows().length).toBe(7);

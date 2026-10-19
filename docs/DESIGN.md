@@ -959,7 +959,8 @@ toward the rest surface.
   read says unreadable and has no Restore…; one being written arrives at the top as a push-down,
   "backing up…" and the `progress` bar in place of its size. Restore… asks in the row question's
   shape, naming in `fg` each source it forgets with files in the Trash and counting the files,
-  which go to the Recycle Bin, and while it restores the answers give way to the walk's line and bar inside the same
+  which go to the Recycle Bin; when what it forgets cannot be read, it says any source added since
+  is forgotten and its files there go, with no names or count, and while it restores the answers give way to the walk's line and bar inside the same
   ring, and Settings holds still: the rail's sections and its filter field are disabled, those
   not shown in `fg-faint`, and Escape and the close wait. The list scrolls inside the group, and No Backups Yet takes its place when there are none.
 - **Row question.** A question on the row it is about, in the source row's remove shape: the row

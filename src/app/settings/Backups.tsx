@@ -59,7 +59,7 @@ export function Backups() {
   const [shelved, setShelved] = useState<Shelved | null>(null);
   const [writing, setWriting] = useState<number | null>(null);
   const [asking, setAsking] = useState<string | null>(null);
-  const [forgets, setForgets] = useState<Forgets | null>(null);
+  const [forgets, setForgets] = useState<Forgets | "unknown" | null>(null);
   const { restoring, ended } = useRestore();
   const [said, setSaid] = useState<Said | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
@@ -199,7 +199,7 @@ export function Backups() {
               onClick={() => {
                 if (busy) return;
                 void restoreForgets(backup.name)
-                  .catch(() => null)
+                  .catch(() => "unknown" as const)
                   .then((forgotten) => {
                     setForgets(forgotten);
                     setAsking(backup.name);
@@ -325,7 +325,12 @@ async function restoreIndex(backup: Backup) {
  * What a restore forgets of the Trash, said on its question: the sources added since that have
  * files there, and every file there it forgets, which go to the Recycle Bin.
  */
-function Forgotten({ forgets }: { forgets: Forgets | null }) {
+function Forgotten({ forgets }: { forgets: Forgets | "unknown" | null }) {
+  if (forgets === "unknown") {
+    return (
+      <> Any source added since is forgotten, and its files in the Trash go to the Recycle Bin.</>
+    );
+  }
   const goes = trashGoes(forgets?.files ?? 0);
   if (!forgets || !goes) return null;
   const one = forgets.sources.length === 1;

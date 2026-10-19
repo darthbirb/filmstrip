@@ -1461,8 +1461,9 @@ const TRASH_DIR = "D:\\Filmstrip\\data\\trash";
 // two of the three a restore forgets; `?restore-forgets` has every restore forget Archive's three.
 const recycleRefused = () => backupsWanted().has("recycle-refused");
 
-/** What every restore forgets of the Trash, as Archive added since with three files there. */
-type Forgetting = { forgets: Forgets; refused: number; failed: boolean };
+/** What every restore forgets of the Trash, as Archive added since with three files there;
+ * `unknown` has asking what it forgets fail. */
+type Forgetting = { forgets: Forgets; refused: number; failed: boolean; unknown?: boolean };
 let forgetting: Forgetting | null = backupsWanted().has("restore-forgets")
   ? {
       forgets: { sources: ["Archive"], files: 3 },
@@ -2134,7 +2135,10 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   list_backups: () => shelved(),
   back_up_now: () => backUpNow(),
   restore_backup: ({ name }) => restoreBackup(name as string),
-  restore_forgets: (): Forgets => forgetting?.forgets ?? { sources: [], files: 0 },
+  restore_forgets: (): Promise<Forgets> | Forgets =>
+    forgetting?.unknown
+      ? (invalid("the index could not be read") as never)
+      : (forgetting?.forgets ?? { sources: [], files: 0 }),
   set_backups_kept: ({ kept }) => {
     backupsKept = kept as number;
     return null;
