@@ -42,7 +42,6 @@ export function Sources({ asking }: { asking?: number }) {
   const refused = useRefused();
   const { ended } = useRemove();
   const held = sources ?? [];
-  // There is only ever one band: a folder refused since takes the remove's place.
   useEffect(() => {
     if (refused) finishRemove(null);
   }, [refused]);
