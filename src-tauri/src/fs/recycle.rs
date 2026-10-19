@@ -26,10 +26,9 @@ pub enum Sent {
     Refused,
 }
 
-/// Sends a file to the Recycle Bin. A second name for it is made beside it first, so whatever the
-/// shell does the file outlives it, and its count of names says what happened: the same, the bin
-/// holds it under another and the second name goes; one fewer, it was deleted outright and is given
-/// its own name back. Anything else is refused with the second name kept.
+/// Sends a file to the Recycle Bin. A second name made beside it first outlives whatever the shell
+/// does, and its count of names says what that was: unchanged, recycled; one fewer, deleted
+/// outright and given its name back. DECISIONS.md "Sending to the Recycle Bin".
 pub fn send(bin: &dyn Bin, file: &Path) -> io::Result<Sent> {
     let hold = hold_of(file);
     settle(file, &hold)?;
