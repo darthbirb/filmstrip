@@ -659,6 +659,29 @@ thumbnail, at the size the original would fit at, from the shape the index read 
 rotated recording's true shape are read when the thumbnail is made; "Capture dates" and "Video
 and ffmpeg" above say how.
 
+## Several files in the pane
+
+**Files dragged onto the pane are drawn at one scale**, drawn by Claude Design on Pane › several
+and built on 20 October 2026: one picture made of several, in the same pane and the same mode.
+**"One scale" is one pixel scale**, the figure the zoom plate reads, so a 640-wide clip stands a
+tenth as wide as a 6000-wide photograph beside it. Equal cells are the tiled compare PRD.md drops,
+and one height in justified rows is equal cells by another measure.
+
+- **The pane tries every split of the files, in the order added, into rows** and keeps the one
+  that draws them largest. Scales within a millionth of the largest count as equal, which only
+  absorbs rounding; of equal splits it keeps the fewest rows, then the earlier rows fuller, as
+  text wraps. Ties are routine, since rows of one height reorder freely, and the rule leaves every
+  set exactly one layout. The search is a table of the least height each run of files can take in
+  so many rows, bisected on the scale, so it costs the same for every split there is.
+- **The scale stops at 100%**, as a lone picture's does, and never draws any file past the media
+  area. **One floor outranks the stop**, `pane-set-least`: no file is drawn under a badge and two
+  insets on its shorter side, or two badges and three on its longer, so its × and a video's mute
+  always fit. **The room outranks the floor**: a file the floor would push past the area is drawn
+  at the most the area holds, in a band the floor's size across its row. The cap cuts back only
+  the floor's lift; the set's scale already keeps every file inside the area.
+- **Each file draws its original, never its thumbnail.** A 320px thumbnail swapped for the
+  original as the room grows is the stand-in "The pane" turned down.
+
 ## Right-click menus
 
 **A right-click is a shortcut to what the interface already does**, drawn by Claude Design and
