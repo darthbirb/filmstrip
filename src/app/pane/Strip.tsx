@@ -16,7 +16,7 @@ import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
 import { useGridItems } from "../grid/useGridItems";
 import { itemMenu } from "../menus/item-menu";
 import type { Place } from "../place";
-import { showInPane, usePaneItem, usePaneOrigin } from "./pane-store";
+import { showInPane, usePaneItem, usePaneOrigin, usePaneSet } from "./pane-store";
 
 /** A frame for each item in the place the shown one was chosen in, stepped through in order. */
 export function Strip() {
@@ -35,6 +35,8 @@ function Track({ items, current, from }: TrackProps) {
   const cellProbe = useRef<HTMLSpanElement>(null);
   const gapProbe = useRef<HTMLSpanElement>(null);
   const view = useTrackView(scroller, cellProbe, gapProbe);
+  // Every file the pane shows wears the ring; the first is the one the strip stands on.
+  const inPane = new Set(usePaneSet());
   const refocus = useRef(false);
   // A frame is a tile, and gets the tile's menu.
   const context = useContextMenu();
@@ -112,11 +114,11 @@ function Track({ items, current, from }: TrackProps) {
                 itemMenu(item, () => show(at)),
               )
             }
-            className={`focus-ring block size-full ${THUMB_FRAME} transition-opacity duration-(--motion-quick) ease-out motion-reduce:transition-none ${at === index ? "" : "opacity-(--strip-rest) hover:opacity-100"}`}
+            className={`focus-ring block size-full ${THUMB_FRAME} transition-opacity duration-(--motion-quick) ease-out motion-reduce:transition-none ${inPane.has(item.id) ? "" : "opacity-(--strip-rest) hover:opacity-100"}`}
           >
             <ThumbFace
               src={item.thumb ? convertFileSrc(item.thumb) : undefined}
-              current={at === index}
+              current={inPane.has(item.id)}
               badge={false}
             />
           </button>

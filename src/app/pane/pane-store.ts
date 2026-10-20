@@ -59,6 +59,15 @@ export function getPaneSet() {
   return shown?.set ?? NOTHING;
 }
 
+/**
+ * Whether these files going takes the pane on to the next file in its place: when they hold the
+ * file it shows alone, or every file of its set. Otherwise those of a set leave it as they go.
+ */
+export function paneMovesOn(going: readonly number[]) {
+  if (!shown) return false;
+  return shown.set.every((id) => going.includes(id));
+}
+
 /** Where a file in the pane was carried from, which it takes with it when it is shown alone. */
 export function paneFileOrigin(itemId: number) {
   return shown?.places.get(itemId) ?? shown?.from ?? null;

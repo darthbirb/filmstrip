@@ -183,6 +183,36 @@ function fitsRows(boxes: readonly Size[], rows: readonly number[], area: Size, g
 }
 
 /**
+ * Where each file's band stands in the area: its rows centred and stacked a gap apart, the whole
+ * centred in the area's height while it fits, each band on its row's middle line. `height` is all
+ * of it, which is more than the area's only when the set runs past it.
+ */
+export function arrange(layout: SetLayout, area: Size, gap: number) {
+  const at: { left: number; top: number }[] = [];
+  const rows: { start: number; count: number; width: number; height: number }[] = [];
+  let start = 0;
+  for (const count of layout.rows) {
+    const boxes = layout.files.slice(start, start + count).map((one) => one.box);
+    const width = boxes.reduce((sum, box) => sum + box.width, gap * (count - 1));
+    const height = Math.max(0, ...boxes.map((box) => box.height));
+    rows.push({ start, count, width, height });
+    start += count;
+  }
+  const height = rows.reduce((sum, row) => sum + row.height, gap * Math.max(0, rows.length - 1));
+  let top = Math.max(0, (area.height - height) / 2);
+  for (const row of rows) {
+    let left = Math.max(0, (area.width - row.width) / 2);
+    for (let index = row.start; index < row.start + row.count; index += 1) {
+      const box = layout.files[index]?.box ?? { width: 0, height: 0 };
+      at[index] = { left, top: top + (row.height - box.height) / 2 };
+      left += box.width + gap;
+    }
+    top += row.height + gap;
+  }
+  return { at, height };
+}
+
+/**
  * The files, in the order added, at the one scale that draws them largest in the area, broken into
  * the rows that allow it. DECISIONS.md "Several files in the pane".
  */

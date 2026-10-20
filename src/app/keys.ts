@@ -7,7 +7,7 @@ import { setNews } from "./navigation/foot-slot";
 import { getIndex } from "./navigation/index-store";
 import { neighbour } from "./pane/delete";
 import { moveFiles } from "./pane/move-picker";
-import { getPaneItem, getPaneOrigin, showInPane } from "./pane/pane-store";
+import { getPaneItem, getPaneOrigin, getPaneSet, showInPane } from "./pane/pane-store";
 import { getPlace } from "./place";
 
 // Destination keys: the ten digits, each bound to a folder a press moves files into.
@@ -61,6 +61,8 @@ export async function press(digit: string) {
     return;
   }
   const { checked, listed } = getChecked();
+  // A pane showing several has no one file for a key to move, as it has no bar.
+  if (checked.length === 0 && getPaneSet().length > 1) return;
   const shown = getPaneItem();
   const files =
     checked.length > 0

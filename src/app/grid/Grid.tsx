@@ -27,7 +27,7 @@ import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
 import { groundMenu } from "../menus/ground";
 import { itemMenu, setMenu } from "../menus/item-menu";
 import { setFullScreen } from "../pane/full-screen";
-import { showInPane, usePaneItem } from "../pane/pane-store";
+import { showInPane, usePaneItem, usePaneSet } from "../pane/pane-store";
 import { useOutsideDrag } from "../paste/drop";
 import { type Place, setPlace, usePlace } from "../place";
 import { usePreferences } from "../preferences";
@@ -56,6 +56,8 @@ export function Grid({ mode }: { mode: LayoutMode }) {
   const place = usePlace();
   const items = useGridItems(place);
   const inPane = usePaneItem();
+  const paneSet = usePaneSet();
+  const shownHere = useMemo(() => new Set(paneSet), [paneSet]);
   const { tile } = usePreferences();
   const scroller = useRef<HTMLDivElement>(null);
   const view = useViewport(scroller);
@@ -178,7 +180,7 @@ export function Grid({ mode }: { mode: LayoutMode }) {
           key={item.id}
           item={item}
           from={place}
-          shown={item.id === inPane}
+          shown={shownHere.has(item.id)}
           checked={checked.has(item.id)}
           boxes={checked.size > 0}
           ringed={item.id === ring}
