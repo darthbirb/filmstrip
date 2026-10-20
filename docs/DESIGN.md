@@ -146,6 +146,8 @@ spacing:
   strip-step: 1.5rem
   strip-step-height: 3.25rem
   strip-fade: 3rem
+  pane-set-least: 2.25rem
+  pane-set-least-long: 4rem
   menu: 14rem
   dialog: 41rem
   dialog-height: 27rem
