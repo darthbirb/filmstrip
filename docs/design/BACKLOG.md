@@ -107,58 +107,6 @@ Drawn in Pane › 02, the column beside "A video", in the built plate's own valu
   speed without wrapping, Space plays and pauses, `M` mutes. The video takes the focus as a
   zoomable picture does.
 
-## Several files in the pane · DRAWN
-
-Dragging files onto the pane adds them to what it shows, scaled together so all are in sight
-(#66, PRODUCT.md "The three panels").
-
-Drawn in Pane › several:
-
-- One scale for all, the scale the zoom plate reads: each file at its own shape against its own
-  pixels. The pane tries every split of the files, in the order added, into rows and keeps the
-  one drawing them largest. Scales within a millionth of the largest count as equal, which only
-  absorbs rounding. Of equal splits it keeps the fewest rows, then the earlier rows fuller, as
-  text wraps: at the first row where two differ, the one holding more files. Ties are routine,
-  since rows of one height reorder freely: Twelve's files draw as large in 3+1+3+2+3 as in
-  3+2+3+3+1, and the pane keeps 3+2+3+3+1. Rows centred, each file on its row's middle line,
-  `tile-gap` apart. Recomputed for any change of room. Not one height in justified rows: that
-  draws a 640-wide clip as tall as a 6000-wide photograph, equal cells by another measure.
-- The scale stops at 100%, as `fitScale` stops a lone picture: a 160px and a 96px sticker draw
-  at their own pixels in one row, with room to spare. One floor outranks it, `pane-set-least`: no
-  file is drawn under 2.25rem on its shorter side or 4rem on its longer, so its × and a video's
-  mute both fit a `tile-inset` in. A 640 × 360 clip before two 6000 × 4000 photographs draws at
-  64 × 36 while they draw at 4.2%, and the split search counts it at that size.
-- The room outranks the floor: no file is drawn past the media area. The set's scale itself never
-  draws a file past the area; the cap cuts back only the floor's lift. A file the floor would push
-  past it is drawn at the most the area holds, and its row keeps the floor across it, 2.25rem
-  tall for a wide file or wide for a tall one, the file centred in that band. Its × and a video's
-  mute sit a `tile-inset` in from the band's corners, over the file and the band's bare margin,
-  never on another file; the split search counts the band. A 12000 × 1000 panorama in the 14rem
-  pane draws at 208 × 17.33 in a 36px band, not 432 × 36, and sets the scale for the set.
-- Each file draws its original, as it does alone, never its thumbnail: that is 320px, and
-  swapping one for the other as the room grows is the stand-in DECISIONS.md "The pane" turned
-  down. Videos play their files. `pane-set` is measured that way.
-- The header reads "3 Files · 6.9 MB" and is not a disclosure. The bar goes. The strip stays on
-  the first file's place, centred on the first file's frame; every file shown wears the in-pane
-  mark on its tile and frame.
-- A tile or a set dragged onto the pane: the whole pane wears the accepting row's 2px pewter ring
-  and the ghost reads "Add 2 files to the pane", or "Show 2 files in the pane" over an empty pane
-  or a folder, which they replace. Files join at the end. Explorer's files are not taken.
-- `pane-set` is 12 on the token sheet until measured. Past it, what fits is added in the order
-  carried ("Add 2 of 5 files to the pane"), then the line "Added 2 of 5 files to the pane. It
-  shows 12 at most." with no Undo. Full: "The pane shows 12 at most", refused. A file already
-  shown is not added or counted; all of them: "Already in the pane".
-- Videos loop from the start, muted, each with a mute plate at its bottom-left; unmuting one
-  mutes the one that had the sound, and the saved mute is not changed.
-- Under the pointer or focus a file shows × (Remove from Pane) at its top-right. The set is one
-  tab stop: arrows move between files in reading order, Enter shows one alone, Tab reaches its ×;
-  removal passes the focus to the next, or the one before.
-- A click on any file, in the grid, the strip or the pane, shows it alone. Escape shows the first
-  alone only with the focus in the pane, last in its order: after whatever else is open has
-  closed, then full screen. A drop leaves the focus where it was, so Escape in the grid after
-  dragging a checked set still clears the set, as DECISIONS.md "The grid" says, and leaves the
-  pane as it is. A file deleted, moved away or gone leaves the set. A folded pane takes no drop.
-
 ## A folder in the pane · DRAWN
 
 A folder can be shown in the pane rather than a file: its cover, counts and details (#67).

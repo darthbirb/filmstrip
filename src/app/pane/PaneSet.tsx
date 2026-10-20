@@ -28,8 +28,8 @@ type Room = { area: Size; gap: number; least: Least };
 
 /**
  * Several files at one scale, in the rows that draw them largest, each with its × and a video's
- * mute. One tab stop: the arrows move between them, Enter shows one alone. DECISIONS.md "Several
- * files in the pane".
+ * mute. One tab stop: the arrows move between them, Enter shows one alone.
+ * DECISIONS.md "Several files in the pane".
  */
 export function PaneSet({ items }: { items: readonly ItemDetail[] }) {
   const area = useRef<HTMLDivElement>(null);

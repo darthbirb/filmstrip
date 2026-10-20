@@ -681,6 +681,35 @@ and one height in justified rows is equal cells by another measure.
   the floor's lift; the set's scale already keeps every file inside the area.
 - **Each file draws its original, never its thumbnail.** A 320px thumbnail swapped for the
   original as the room grows is the stand-in "The pane" turned down.
+- **A drop adds, a click replaces.** Files dragged onto the open pane join the end of what it
+  shows, in the order carried, or take its place while it shows nothing; a click anywhere shows
+  one alone again. Each file keeps the place it was carried from, which it takes with it when it
+  is shown alone; the strip stays on the first's. A file already shown is neither added nor
+  counted, so a drop of only those is refused, as one into a full pane is; past the limit what
+  fits goes in and the foot's Line says how many of how many, with no Undo since the library did
+  not change. A folded pane's rail takes no drop, and Explorer's files are never taken: they are
+  not in the index until they land in a folder.
+- **The limit is twelve, measured.** On 20 October 2026, in a headed Chromium 155 on the owner's
+  machine and in the headless Edge the tests use, twelve 6000 × 4000 JPEG originals in a
+  full-screen pane held 60 frames a second with no frame late; that is what
+  `src/app/pane/set-frame-rate.test.tsx` holds `pane-set` to. Playing clips are the dearer part,
+  and were measured apart: two 1080p clips drop Chromium's drawing to the clips' own 30 a
+  second even in a bare page with nothing else on it, two 640 × 360 ones too, so that is the
+  engine pacing video and not the set; and the canvas-recorded VP8 clips the tests can make kept
+  their frames up to five or six playing at once, slipping from seven. A camera's H.264 decoded
+  by the GPU in the real window is cheaper than that, so twelve stands, measured on pictures.
+- **Videos loop from the start, muted**, each with its own mute; giving one the sound takes it
+  from the one that had it, so one plays aloud at a time.
+- **The set is one tab stop.** The arrows move in reading order, Enter shows one alone, and Tab
+  reaches the focused file's ×. × takes a file out and does nothing to it, the focus passing to
+  the next, or the one before; the last but one leaves the ordinary pane, its picture focused.
+  **Escape shows the first alone only with the focus in the pane**, and only once a menu, a drag,
+  full screen and a checked set have each taken their own Escape, so after a drop Escape in the
+  grid still clears the grid's set and leaves the pane alone.
+- **A file deleted, moved to another folder or gone leaves the set**, and the rest stay; only when
+  every file goes does the pane move on, as after deleting the one it shows. A set has no one file
+  for the bar or a destination key to act on, so the bar goes and a key with nothing checked does
+  nothing.
 
 ## Right-click menus
 
