@@ -1143,23 +1143,25 @@ every file: a drive with none, such as a removable one or a network share, the b
 or a file over its quota. There the shell deletes it outright, and asking it not to means a
 dialog, which the app never shows on its behalf.
 
-- **A second name first, then the shell, then the count of names.** Before the shell is asked,
-  the file is given a second name beside it by a hard link, and its count of names is read. The
-  bin moves a file within its own volume, so a file it took keeps that count; a file the shell
-  deleted outright has one fewer, and is given its own name back. Anything else, something on the
-  disk naming the file meanwhile, is refused with the second name kept. Whatever the shell
-  answers, the disk says which happened, so a refusal is never mistaken for a send. The count is
-  compared with itself, never with two: a user's file can already have other names, from a dedup
-  tool or a link-based backup, and keeps them into the Trash, since trashing within a volume is a
-  rename. A file that cannot be given a second name, on a drive without hard links, is never sent.
+- **A second name first, then the shell, then the file's names.** Before the shell is asked, the
+  file is given a second name beside it by a hard link. The bin moves a file within its own
+  volume, so a file it took has a name under that volume's `$Recycle.Bin`, and the second name's
+  file lists all its names through `FindFirstFileNameW`. Only with one there is the second name
+  removed and the file counted as sent. Otherwise, and when its names cannot be read, the second
+  name is given the file's own name back and the file is refused. Whatever the shell answers, the
+  disk says which happened, so a refusal is never mistaken for a send. The count of names,
+  compared before and after, is not enough: something on the disk giving the file a name
+  elsewhere while the shell deletes it outright leaves the count unchanged, with the file in
+  neither the Trash nor the bin. A user's file can already have other names, from a dedup tool or
+  a link-based backup, and keeps them into the Trash, since trashing within a volume is a rename;
+  those never count as the bin's. A file that cannot be given a second name, on a drive without
+  hard links, is never sent.
 - **What a cut-short send left is settled at the next, and never counted as sent.** A crash
-  between the steps leaves the second name. Beside the file it is removed. Alone, the count it
-  was read at is gone with the crash, and a lone second name with other names cannot be told from
-  the bin's twin, so it is the file again, put back and sent once more; at worst the bin then
-  holds the same file twice. Keeping the count durably, in the second name or the index, was not
-  chosen: the disk can change while the app is closed, so a count kept from before is no better
-  than none, and it would be one more thing to settle. A second name that is not the same file is
-  never removed.
+  between the steps leaves the second name. Beside the file it is removed. Alone, it is the file
+  again, put back and sent once more; at worst the bin then holds the same file twice. A lone one
+  with a name in the bin is not counted as sent either: the disk can change while the app is
+  closed, so that name may be gone or emptied by the next look, and the twin costs only space. A
+  second name that is not the same file is never removed.
 - **Every lone second name is put back at launch.** A lone one is never counted as sent, so
   putting it back then is what its row's next send would do, only sooner. Waiting for that send
   left a crash during Remove Source with an item in the Trash and no file under it: not
@@ -1171,9 +1173,10 @@ dialog, which the app never shows on its behalf.
   before it happens, but only through a COM sink the app would have to implement; the second name
   gets the same promise from one flat call. The reason a file was refused is not told apart: all
   three are the Recycle Bin refusing, and a send that fails on the disk is said in the log.
-- **Tests never reach the real bin.** The shell is behind the `Bin` trait, and the tests' stand-in
-  recycles, deletes outright or refuses, while the second name and the link count are real. Its
-  files start with one name and with several, since a count compared with two only failed there.
+- **Tests never reach the real bin.** The shell is behind the `Bin` trait, which also says
+  whether a name is inside it; the tests' stand-in recycles into a folder of its own, deletes
+  outright or refuses, while the second name and the file's names are real. Its files start with
+  one name and with several, and gain one from outside while the shell acts.
 
 ## Settings
 

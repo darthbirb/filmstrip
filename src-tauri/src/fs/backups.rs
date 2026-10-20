@@ -584,6 +584,10 @@ mod tests {
         fn take(&self, file: &Path) -> std::io::Result<()> {
             panic!("{} was sent to the Recycle Bin", file.display())
         }
+
+        fn holds(&self, _name: &Path) -> bool {
+            false
+        }
     }
 
     fn no_bin<'a>(kept: &'a dyn Fn(&InTrash) -> bool) -> Trash<'a> {

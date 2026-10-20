@@ -13,6 +13,9 @@ pub trait Bin {
     /// Asks for `file` to go. The shell may recycle it, delete it outright, or leave it; [`send`]
     /// finds out which from the disk, never from what this returns.
     fn take(&self, file: &Path) -> io::Result<()>;
+
+    /// Whether `name`, one of a file's full names, is inside this bin.
+    fn holds(&self, name: &Path) -> bool;
 }
 
 /// What came of sending one file.
@@ -27,8 +30,8 @@ pub enum Sent {
 }
 
 /// Sends a file to the Recycle Bin. A second name made beside it first outlives whatever the shell
-/// does, and its count of names says what that was: unchanged, recycled; one fewer, deleted
-/// outright and given its name back. DECISIONS.md "Sending to the Recycle Bin".
+/// does, and its other names say what that was: one in the bin, recycled; none, given its name
+/// back and refused. DECISIONS.md "Sending to the Recycle Bin".
 pub fn send(bin: &dyn Bin, file: &Path) -> io::Result<Sent> {
     let hold = hold_of(file);
     settle(file, &hold)?;
@@ -41,20 +44,16 @@ pub fn send(bin: &dyn Bin, file: &Path) -> io::Result<Sent> {
     if std::fs::hard_link(file, &hold).is_err() {
         return Ok(Sent::Refused);
     }
-    let held = identity(&hold)?.links;
     let _ = bin.take(file);
     if std::fs::symlink_metadata(file).is_ok() {
         drop_hold(file, &hold)?;
         return Ok(Sent::Refused);
     }
-    let left = identity(&hold)?.links;
-    if left == held {
+    if names_of(&hold).is_ok_and(|names| names.iter().any(|name| bin.holds(name))) {
         std::fs::remove_file(&hold)?;
         return Ok(Sent::Recycled);
     }
-    if left + 1 == held {
-        noclobber::rename(&hold, file)?;
-    }
+    noclobber::rename(&hold, file)?;
     Ok(Sent::Refused)
 }
 
@@ -71,8 +70,8 @@ fn held_by(path: &Path) -> Option<PathBuf> {
     (!file.is_empty()).then(|| path.with_file_name(file))
 }
 
-/// Settles a hold a send cut short left behind. Its count of names then is unknown, so it is never
-/// taken for the bin's: a hold left alone is the file again, and goes on to be sent.
+/// Settles a hold a send cut short left behind. It is never taken for sent: a hold left alone is
+/// the file again, and goes on to be sent.
 fn settle(file: &Path, hold: &Path) -> io::Result<()> {
     if identity(hold).is_err() {
         return Ok(());
@@ -177,6 +176,80 @@ fn identity(path: &Path) -> io::Result<Identity> {
     })
 }
 
+#[cfg(windows)]
+const LONGEST: u32 = 32_768;
+
+#[cfg(windows)]
+fn wide(path: &Path) -> Vec<u16> {
+    use std::os::windows::ffi::OsStrExt;
+    path.as_os_str().encode_wide().chain([0]).collect()
+}
+
+#[cfg(windows)]
+fn unwide(text: &[u16]) -> PathBuf {
+    use std::os::windows::ffi::OsStringExt;
+    let end = text
+        .iter()
+        .position(|&unit| unit == 0)
+        .unwrap_or(text.len());
+    std::ffi::OsString::from_wide(&text[..end]).into()
+}
+
+/// The root of the volume `path` is on, as its names under it are given.
+#[cfg(windows)]
+fn volume_of(path: &Path) -> io::Result<PathBuf> {
+    use windows_sys::Win32::Storage::FileSystem::GetVolumePathNameW;
+
+    let mut root = vec![0u16; LONGEST as usize];
+    // SAFETY: the path is NUL-terminated, and `root` is as long as the length the call is given.
+    if unsafe { GetVolumePathNameW(wide(path).as_ptr(), root.as_mut_ptr(), LONGEST) } == 0 {
+        return Err(io::Error::last_os_error());
+    }
+    Ok(unwide(&root))
+}
+
+/// Every full name the file at `path` has, on its volume.
+#[cfg(windows)]
+fn names_of(path: &Path) -> io::Result<Vec<PathBuf>> {
+    use windows_sys::Win32::Foundation::{ERROR_HANDLE_EOF, INVALID_HANDLE_VALUE};
+    use windows_sys::Win32::Storage::FileSystem::{
+        FindClose, FindFirstFileNameW, FindNextFileNameW,
+    };
+
+    let path = std::path::absolute(path)?;
+    let volume = volume_of(&path)?;
+    let mut name = vec![0u16; LONGEST as usize];
+    let mut length = LONGEST;
+    // SAFETY: the path is NUL-terminated, and `name` is as long as `length` says.
+    let find =
+        unsafe { FindFirstFileNameW(wide(&path).as_ptr(), 0, &mut length, name.as_mut_ptr()) };
+    if find == INVALID_HANDLE_VALUE {
+        return Err(io::Error::last_os_error());
+    }
+    let mut names = Vec::new();
+    let ended = loop {
+        let relative = unwide(&name);
+        names.push(volume.join(relative.strip_prefix(r"\").unwrap_or(&relative)));
+        name.fill(0);
+        length = LONGEST;
+        // SAFETY: `find` is open until closed below, and `name` is as long as `length` says.
+        if unsafe { FindNextFileNameW(find, &mut length, name.as_mut_ptr()) } == 0 {
+            break io::Error::last_os_error();
+        }
+    };
+    // SAFETY: `find` came from FindFirstFileNameW and is closed once.
+    unsafe { FindClose(find) };
+    if ended.raw_os_error() != Some(ERROR_HANDLE_EOF as i32) {
+        return Err(ended);
+    }
+    Ok(names)
+}
+
+#[cfg(unix)]
+fn names_of(_path: &Path) -> io::Result<Vec<PathBuf>> {
+    Err(io::ErrorKind::Unsupported.into())
+}
+
 /// The shell's own Recycle Bin, which every send goes through in the app.
 pub struct RecycleBin;
 
@@ -217,12 +290,26 @@ impl Bin for RecycleBin {
         }
         Ok(())
     }
+
+    fn holds(&self, name: &Path) -> bool {
+        let Ok(volume) = volume_of(name) else {
+            return false;
+        };
+        name.strip_prefix(&volume)
+            .ok()
+            .and_then(|rest| rest.components().next())
+            .is_some_and(|first| first.as_os_str().eq_ignore_ascii_case("$Recycle.Bin"))
+    }
 }
 
 #[cfg(not(windows))]
 impl Bin for RecycleBin {
     fn take(&self, _file: &Path) -> io::Result<()> {
         Err(io::ErrorKind::Unsupported.into())
+    }
+
+    fn holds(&self, _name: &Path) -> bool {
+        false
     }
 }
 
@@ -241,6 +328,8 @@ pub(crate) mod tests {
         Fails,
         /// Moves it as [`Stand::Recycles`] does, while something else gives it one more name there.
         Relinks(PathBuf),
+        /// Deletes it outright, while something else gives its second name one more name here.
+        DeletesWhileLinked(PathBuf),
     }
 
     pub(crate) struct Fake {
@@ -280,7 +369,19 @@ pub(crate) mod tests {
                     std::fs::rename(file, bin.join(name))?;
                     std::fs::hard_link(bin.join(name), bin.join("another"))
                 }
+                Stand::DeletesWhileLinked(outside) => {
+                    std::fs::remove_file(file)?;
+                    std::fs::hard_link(hold_of(file), outside)
+                }
             }
+        }
+
+        fn holds(&self, name: &Path) -> bool {
+            let (Stand::Recycles(bin) | Stand::Relinks(bin)) = &self.stand else {
+                return false;
+            };
+            let lower = |path: &Path| PathBuf::from(path.to_string_lossy().to_lowercase());
+            lower(name).starts_with(lower(bin))
         }
     }
 
@@ -377,24 +478,69 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn a_file_whose_names_change_otherwise_is_refused_and_kept_under_its_second_name() {
+    fn a_file_the_bin_takes_while_it_gains_a_name_there_is_still_recycled() {
         let dir = scratch("relinked");
         let file = one_with_names(&dir, 1);
-        let hold = hold_of(&file);
 
         let bin = Fake::new(Stand::Relinks(dir.join("bin")));
-        assert_eq!(send(&bin, &file).unwrap(), Sent::Refused);
-        assert_eq!(names(&dir.join("trash")), [".one.jpg.recycling"]);
-        assert_eq!(std::fs::read_to_string(&hold).unwrap(), "one");
-
-        let again = Fake::new(Stand::Recycles(dir.join("bin-again")));
-        assert_eq!(send(&again, &file).unwrap(), Sent::Recycled);
-        assert_eq!(again.asked.borrow().as_slice(), std::slice::from_ref(&file));
+        assert_eq!(send(&bin, &file).unwrap(), Sent::Recycled);
         assert!(names(&dir.join("trash")).is_empty());
         assert_eq!(
-            std::fs::read_to_string(dir.join("bin-again/one.jpg")).unwrap(),
+            std::fs::read_to_string(dir.join("bin/one.jpg")).unwrap(),
             "one"
         );
+        assert_eq!(identity(&dir.join("bin/one.jpg")).unwrap().links, 3);
+    }
+
+    #[test]
+    fn a_file_deleted_outright_while_it_gains_a_name_elsewhere_is_put_back_and_refused() {
+        for others in [0, 1] {
+            let dir = scratch(&format!("deleted-relinked-{others}"));
+            let file = one_with_names(&dir, others);
+            let outside = dir.join("elsewhere/outside.jpg");
+
+            let bin = Fake::new(Stand::DeletesWhileLinked(outside.clone()));
+            assert_eq!(send(&bin, &file).unwrap(), Sent::Refused, "{others}");
+            assert_eq!(names(&dir.join("trash")), ["one.jpg"]);
+            assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
+            assert_eq!(identity(&file).unwrap().links, others + 2);
+            assert!(
+                identity(&file)
+                    .unwrap()
+                    .same_as(&identity(&outside).unwrap())
+            );
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_file_has_every_one_of_its_names_and_the_shells_bin_is_at_its_volumes_root() {
+        let dir = scratch("names");
+        let file = one_with_names(&dir, 2);
+
+        let lower = |paths: Vec<PathBuf>| -> Vec<PathBuf> {
+            let mut lowered: Vec<PathBuf> = paths
+                .iter()
+                .map(|path| PathBuf::from(path.to_string_lossy().to_lowercase()))
+                .collect();
+            lowered.sort();
+            lowered
+        };
+        assert_eq!(
+            lower(names_of(&file).unwrap()),
+            lower(vec![
+                dir.join("elsewhere/0.jpg"),
+                dir.join("elsewhere/1.jpg"),
+                file.clone(),
+            ])
+        );
+
+        let volume = volume_of(&dir).unwrap();
+        let shell = RecycleBin;
+        assert!(shell.holds(&volume.join(r"$Recycle.Bin\S-1-5-21\$RAB12CD.jpg")));
+        assert!(shell.holds(&volume.join(r"$RECYCLE.BIN\S-1-5-21\$RAB12CD.jpg")));
+        assert!(!shell.holds(&dir.join(r"$Recycle.Bin\S-1-5-21\$RAB12CD.jpg")));
+        assert!(!shell.holds(&file));
     }
 
     #[test]
