@@ -128,6 +128,12 @@ Drawn in Pane › several:
   file is drawn under 2.25rem on its shorter side or 4rem on its longer, so its × and a video's
   mute both fit a `tile-inset` in. A 640 × 360 clip before two 6000 × 4000 photographs draws at
   64 × 36 while they draw at 4.2%, and the split search counts it at that size.
+- The room outranks the floor: no file is drawn past the media area. A file the floor would push
+  past it is drawn at the most the area holds, and its row keeps the floor across it, 2.25rem
+  tall for a wide file or wide for a tall one, the file centred in that band. Its × and a video's
+  mute sit a `tile-inset` in from the band's corners, over the file and the band's bare margin,
+  never on another file; the split search counts the band. A 12000 × 1000 panorama in the 14rem
+  pane draws at 208 × 17.33 in a 36px band, not 432 × 36, and sets the scale for the set.
 - Each file draws its original, as it does alone, never its thumbnail: that is 320px, and
   swapping one for the other as the room grows is the stand-in DECISIONS.md "The pane" turned
   down. Videos play their files. `pane-set` is measured that way.
