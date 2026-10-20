@@ -117,7 +117,16 @@ Drawn in Pane › several:
 - One scale for all, the scale the zoom plate reads: each file at its own shape against its own
   pixels. The pane tries every split of the files, in the order added, into rows and keeps the
   one drawing them largest, ties to fewer rows; rows centred, each file on its row's middle line,
-  `tile-gap` apart. Recomputed for any change of room.
+  `tile-gap` apart. Recomputed for any change of room. Not one height in justified rows: that
+  draws a 640-wide clip as tall as a 6000-wide photograph, equal cells by another measure.
+- The scale stops at 100%, as `fitScale` stops a lone picture: a 160px and a 96px sticker draw
+  at their own pixels in one row, with room to spare. One floor outranks it, `pane-set-least`: no
+  file is drawn under 2.25rem on its shorter side or 4rem on its longer, so its × and a video's
+  mute both fit a `tile-inset` in. A 640 × 360 clip before two 6000 × 4000 photographs draws at
+  64 × 36 while they draw at 4.2%, and the split search counts it at that size.
+- Each file draws its original, as it does alone, never its thumbnail: that is 320px, and
+  swapping one for the other as the room grows is the stand-in DECISIONS.md "The pane" turned
+  down. Videos play their files. `pane-set` is measured that way.
 - The header reads "3 Files · 6.9 MB" and is not a disclosure. The bar goes. The strip stays on
   the first file's place; every file shown wears the in-pane mark on its tile and frame.
 - A tile or a set dragged onto the pane: the whole pane wears the accepting row's 2px pewter ring
@@ -133,8 +142,10 @@ Drawn in Pane › several:
   tab stop: arrows move between files in reading order, Enter shows one alone, Tab reaches its ×;
   removal passes the focus to the next, or the one before.
 - A click on any file, in the grid, the strip or the pane, shows it alone. Escape shows the first
-  alone, after leaving full screen if in it. A file deleted, moved away or gone leaves the set.
-  A folded pane takes no drop.
+  alone only with the focus in the pane, last in its order: after whatever else is open has
+  closed, then full screen. A drop leaves the focus where it was, so Escape in the grid after
+  dragging a checked set still clears the set, as DECISIONS.md "The grid" says, and leaves the
+  pane as it is. A file deleted, moved away or gone leaves the set. A folded pane takes no drop.
 
 ## A folder in the pane · DRAWN
 
@@ -143,9 +154,10 @@ A folder can be shown in the pane rather than a file: its cover, counts and deta
 Drawn in Pane › folder, and as the first row of every folder and source menu in Components ›
 Right-click and Artboards › Bringing files in:
 
-- Show in Pane heads a folder's, a source's and a folder card's menu. The header carries the
-  folder's name, ending in an ellipsis, and its count pill, which never leaves; offline, the word
-  `offline`.
+- Show in Pane heads a folder's, a source's and a folder card's menu, an offline one's too, since
+  the pane reads only the index. A sorting source's folder has none: its band has no rows to
+  show. The header carries the folder's name, ending in an ellipsis, and its count pill, which
+  never leaves; offline, the word `offline`.
 - The cover stands in the picture's place at its own shape, the band's cover rule and pencil
   with it, and does not zoom. The details are the band's rows, one component in both places,
   behind the pane's own disclosure and its saved preference.
