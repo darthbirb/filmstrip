@@ -116,7 +116,11 @@ Drawn in Pane › several:
 
 - One scale for all, the scale the zoom plate reads: each file at its own shape against its own
   pixels. The pane tries every split of the files, in the order added, into rows and keeps the
-  one drawing them largest, ties to fewer rows; rows centred, each file on its row's middle line,
+  one drawing them largest. Scales within a millionth of the largest count as equal, which only
+  absorbs rounding. Of equal splits it keeps the fewest rows, then the earlier rows fuller, as
+  text wraps: at the first row where two differ, the one holding more files. Ties are routine,
+  since rows of one height reorder freely: Twelve's files draw as large in 3+1+3+2+3 as in
+  3+2+3+3+1, and the pane keeps 3+2+3+3+1. Rows centred, each file on its row's middle line,
   `tile-gap` apart. Recomputed for any change of room. Not one height in justified rows: that
   draws a 640-wide clip as tall as a 6000-wide photograph, equal cells by another measure.
 - The scale stops at 100%, as `fitScale` stops a lone picture: a 160px and a 96px sticker draw
