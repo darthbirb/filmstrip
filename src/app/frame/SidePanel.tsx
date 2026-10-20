@@ -43,6 +43,10 @@ type Props = {
   /** The places the rail keeps while the panel is folded, and that foot's narrower shape. */
   rail?: ReactNode;
   railFoot?: ReactNode;
+  /** What a drag can land on while the panel is open, never on its folded rail. */
+  drop?: string;
+  /** Over everything the panel holds, as a drop target's ring is. */
+  overlay?: ReactNode;
   children?: ReactNode;
 };
 
@@ -57,6 +61,8 @@ export function SidePanel({
   behind = false,
   rail,
   railFoot,
+  drop,
+  overlay,
   children,
 }: Props) {
   const copy = COPY[side];
@@ -155,6 +161,7 @@ export function SidePanel({
       <Region
         ref={regionRef}
         aria-label={copy.label}
+        data-drop={showRail ? undefined : drop}
         style={side === "nav" ? { width, left: 0 } : { width, right: 0 }}
         // The grid's tiles are positioned too, so without this they paint over a folding panel.
         className={`absolute inset-y-0 z-(--z-overlay) overflow-hidden border-line bg-panel ${copy.edge} ${
@@ -183,6 +190,7 @@ export function SidePanel({
         >
           {railColumn}
         </Layer>
+        {!showRail && overlay}
       </Region>
       {side === "nav" ? (
         <>

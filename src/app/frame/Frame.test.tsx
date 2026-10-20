@@ -88,6 +88,24 @@ test("a folded panel opens over the grid, and Escape puts it away", async () => 
   await expect.poll(() => inSight(screen.getByText("pane content"))).toBe(false);
 });
 
+test("the open pane takes a drop and wears its overlay; its folded rail does neither", async () => {
+  await page.viewport(640, 480);
+  const screen = await render(
+    <div className="flex h-dvh flex-col">
+      <Frame pane={<p>pane content</p>} paneOverlay={<span>ring</span>} />
+    </div>,
+  );
+  const pane = screen.getByRole("complementary", { name: "Pane" });
+  await expect.element(screen.getByRole("button", { name: "Show Pane" })).toBeVisible();
+  expect(pane.element().dataset.drop).toBeUndefined();
+  expect(screen.getByText("ring").elements()).toHaveLength(0);
+
+  await screen.getByRole("button", { name: "Show Pane" }).click();
+  await expect.element(screen.getByText("pane content")).toBeVisible();
+  expect(pane.element().dataset.drop).toBe("pane");
+  expect(pane.element().contains(screen.getByText("ring").element())).toBe(true);
+});
+
 test("a panel can be hidden while it fits, and shown again", async () => {
   await page.viewport(1600, 900);
   const screen = await renderFrame();

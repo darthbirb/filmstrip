@@ -411,6 +411,19 @@ test("a refusal stacks above the walk, and dismissing it leaves the walk alone",
   await expect.element(screen.getByText("Indexing 4,120…")).toBeVisible();
 });
 
+test("a line for an act that changed nothing has a check and no Undo, and leaves the rail", async () => {
+  const sentence = "Added 2 of 5 files to the pane. It shows 12 at most.";
+  setNews({ kind: "said", line: sentence });
+  const screen = await render(<Foot />);
+  await expect.element(screen.getByText(sentence)).toBeVisible();
+  expect(screen.getByRole("button", { name: "Undo" }).elements()).toHaveLength(0);
+  await screen.unmount();
+  const rail = await render(<Foot rail />);
+  await expect.element(rail.getByRole("button", { name: /items/ })).toBeInTheDocument();
+  expect(document.body.textContent).not.toContain("Nothing to undo.");
+  setNews(null);
+});
+
 test("the baseline is read again when a walk goes quiet", async () => {
   let now = TOTALS;
   mockIPC(

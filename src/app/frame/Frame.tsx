@@ -23,6 +23,8 @@ export type Regions = {
   pane?: ReactNode;
   /** Beside the pane's fold button, in its header row. */
   paneHeader?: ReactNode;
+  /** Over the whole pane while it is open: a drop's ring. */
+  paneOverlay?: ReactNode;
   /** Subscribes to the pane being given something to show, which opens it if folded or hidden. */
   revealPane?: (listener: () => void) => () => void;
   /** Whether the pane has the window to itself. */
@@ -43,6 +45,7 @@ export function Frame({
   gridFoot,
   pane,
   paneHeader,
+  paneOverlay,
   revealPane,
   full = false,
 }: Regions) {
@@ -83,7 +86,14 @@ export function Frame({
         <div className="min-h-0 flex-1 overflow-auto">{grid}</div>
         {gridFoot}
       </main>
-      <SidePanel layout={layout} side="pane" header={paneHeader} full={full}>
+      <SidePanel
+        layout={layout}
+        side="pane"
+        header={paneHeader}
+        full={full}
+        drop="pane"
+        overlay={paneOverlay}
+      >
         {pane}
       </SidePanel>
     </div>

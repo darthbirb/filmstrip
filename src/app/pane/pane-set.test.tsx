@@ -99,12 +99,10 @@ test("the set draws at one scale inside the area, at every pane size, rows centr
       expect(drawn.bottom).toBeLessThanOrEqual(box.bottom + 0.5);
       scales.push(drawn.width / (cairo[name]?.width ?? 1));
       // Each row is centred in the area.
-      const row = [...area.element().querySelectorAll("[data-file]")].filter(
-        (other) => {
-          const box = other.getBoundingClientRect();
-          return Math.abs(box.top + box.height / 2 - (drawn.top + drawn.height / 2)) < 1;
-        },
-      );
+      const row = [...area.element().querySelectorAll("[data-file]")].filter((other) => {
+        const box = other.getBoundingClientRect();
+        return Math.abs(box.top + box.height / 2 - (drawn.top + drawn.height / 2)) < 1;
+      });
       const left = Math.min(...row.map((one) => one.getBoundingClientRect().left));
       const right = Math.max(...row.map((one) => one.getBoundingClientRect().right));
       expect(Math.abs(left - box.left - (box.right - right))).toBeLessThan(1);
