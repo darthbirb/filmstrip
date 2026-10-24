@@ -6,7 +6,7 @@ import type { Place } from "../place";
 import { deletedBannerLine } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
-import { getPaneItem, getPaneOrigin, showInPane } from "./pane-store";
+import { getPaneItem, getPaneOrigin, paneMovesOn, showInPane } from "./pane-store";
 
 /**
  * Sends files to the trash and says what happened: the line at the foot for what went, the banner
@@ -17,7 +17,7 @@ export async function deleteFiles(itemIds: number[]) {
   const shown = getPaneItem();
   const origin = getPaneOrigin();
   // Worked out before the list changes, from the order the grid shows it in.
-  const next = shown !== null && itemIds.includes(shown) ? await neighbour(origin, itemIds) : shown;
+  const next = paneMovesOn(itemIds) ? await neighbour(origin, itemIds) : shown;
   const done = await trashItems(itemIds).catch(() => null);
   if (!done) return;
   const { batch, report } = done;

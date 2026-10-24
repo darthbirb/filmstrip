@@ -3,15 +3,24 @@ import { type PointerEvent as ReactPointerEvent, useSyncExternalStore } from "re
 
 import { formatCount } from "../../lib/format";
 import { DragGhost } from "../../ui/DragGhost";
+import { setNews } from "../navigation/foot-slot";
 import { moveFiles } from "../pane/move-picker";
+import { addToPane, paneDrop, paneSetLimit } from "../pane/pane-store";
+import { getPlace } from "../place";
 import type { CheckedFile } from "./selection";
 
 // A tile or a set dragged onto a tree row is Move to… that row. Artboards › Dragging onto a folder.
+// Onto the pane, it adds them to what the pane shows. Pane › several.
 
 /** What a row does with a drop: takes it, opening first if it is shut and held, or says why not. */
 export type Landing =
   | { kind: "accept"; to: { id: number; title: string }; open?: () => void }
-  | { kind: "refuse"; why: string };
+  | { kind: "refuse"; why: string }
+  /** The pane takes these, of so many carried new, beside what it shows or in its place. */
+  | { kind: "pane"; adds: number[]; of: number; replaces: boolean };
+
+/** What the drag is over when it is over the pane rather than a row. */
+export const PANE = "pane";
 
 /** Navigation's answer for each of its rows; null for a row that is no place to land. */
 export type Resolver = (rowId: string, carried: readonly CheckedFile[]) => Landing | null;
@@ -121,9 +130,15 @@ export function pressTile(
 
   const track = () => {
     if (!drag) return;
-    const row = document.elementFromPoint(at.x, at.y)?.closest<HTMLElement>("[data-row]");
-    const rowId = row?.dataset.row ?? null;
-    const landing = rowId === null ? null : resolve(rowId, drag.carried);
+    const under = document.elementFromPoint(at.x, at.y);
+    const row = under?.closest<HTMLElement>("[data-row]");
+    const onPane = !row && Boolean(under?.closest("[data-drop=pane]"));
+    const rowId = onPane ? PANE : (row?.dataset.row ?? null);
+    const landing = onPane
+      ? toPane(drag.carried)
+      : rowId === null
+        ? null
+        : resolve(rowId, drag.carried);
     const over = rowId !== null && landing ? { rowId, landing } : null;
     if (over?.rowId !== drag.over?.rowId) {
       clearTimeout(hold);
@@ -166,6 +181,14 @@ export function pressTile(
   const up = () => {
     const was = stop();
     const landing = was?.over?.landing;
+    if (was && landing?.kind === "pane") {
+      addToPane(landing.adds, getPlace());
+      if (landing.adds.length < landing.of) {
+        const limit = paneSetLimit();
+        const line = `Added ${landing.adds.length} of ${files(landing.of)} to the pane. It shows ${limit} at most.`;
+        setNews({ kind: "said", line });
+      }
+    }
     if (was && landing?.kind === "accept") {
       void moveFiles(
         was.carried.map((row) => row.id),
@@ -190,6 +213,34 @@ export function pressTile(
   window.addEventListener("keydown", putAway, true);
 }
 
+/** What the pane would do with these files: the files ride in the order they were carried. */
+function toPane(carried: readonly CheckedFile[]): Landing {
+  const answer = paneDrop(carried.map((row) => row.id));
+  return answer.kind === "refuse" ? answer : { ...answer, kind: "pane" };
+}
+
+/** The words for a drop on the pane: "Add 2 files to the pane", "Add 2 of 5 files to the pane". */
+function onPaneWords(landing: Extract<Landing, { kind: "pane" }>) {
+  const count =
+    landing.adds.length < landing.of
+      ? `${formatCount(landing.adds.length)} of ${files(landing.of)}`
+      : files(landing.adds.length);
+  return landing.replaces ? `Show ${count} in the pane` : `Add ${count} to the pane`;
+}
+
+/** The whole pane wears the accepting row's ring inside its edge while a drag over it will be taken. */
+export function PaneDropRing() {
+  const now = useDrag();
+  if (now?.over?.rowId !== PANE || now.over.landing.kind !== "pane") return null;
+  return (
+    <span
+      aria-hidden="true"
+      data-pane-lit
+      className="pointer-events-none absolute inset-0 z-(--z-overlay) rounded-control inset-ring-2 inset-ring-plate"
+    />
+  );
+}
+
 /** The ghost, while a drag is on. */
 export function Dragging() {
   const now = useDrag();
@@ -200,9 +251,11 @@ export function Dragging() {
   const label =
     landing?.kind === "accept"
       ? `Move ${count} to ${landing.to.title}`
-      : landing?.kind === "refuse"
-        ? landing.why
-        : count;
+      : landing?.kind === "pane"
+        ? onPaneWords(landing)
+        : landing?.kind === "refuse"
+          ? landing.why
+          : count;
   return (
     <DragGhost
       x={now.x}

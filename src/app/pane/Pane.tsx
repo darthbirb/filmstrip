@@ -1,5 +1,5 @@
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
-import { formatBytes, formatDimensions, formatDuration } from "../../lib/format";
+import { formatBytes, formatCount, formatDimensions, formatDuration } from "../../lib/format";
 import { EmptyState } from "../../ui/EmptyState";
 import { Glyph } from "../../ui/Glyph";
 import { GlyphButton } from "../../ui/GlyphButton";
@@ -9,7 +9,9 @@ import { Actions } from "./Actions";
 import { Details } from "./Details";
 import { setFullScreen, useFullScreen } from "./full-screen";
 import { Media } from "./Media";
-import { usePaneDetail } from "./pane-detail";
+import { PaneSet } from "./PaneSet";
+import { usePaneDetail, usePaneSetDetail } from "./pane-detail";
+import { usePaneSet } from "./pane-store";
 import { Strip } from "./Strip";
 
 const DETAILS_ID = "pane-details";
@@ -20,17 +22,33 @@ const DETAILS_ID = "pane-details";
  */
 export function PaneHeader() {
   const shown = usePaneDetail();
+  const set = usePaneSet();
+  const several = usePaneSetDetail();
   const open = usePreferences().details ?? false;
   const full = useFullScreen();
+  const into = (
+    <GlyphButton
+      glyph={full ? "leaveFullScreen" : "fullScreen"}
+      label={full ? "Exit Full Screen" : "Full Screen"}
+      pressed={full}
+      onClick={() => setFullScreen(!full)}
+    />
+  );
+  // Details are about one file, so a set's header counts them and is not a disclosure.
+  if (set.length > 1) {
+    return (
+      <div className="flex min-w-0 items-center gap-1.5">
+        {into}
+        <span className="flex h-control min-w-0 flex-1 items-center px-2 text-fg-mid text-ui tabular-nums">
+          <span className="min-w-0 truncate">{setSummary(set.length, several)}</span>
+        </span>
+      </div>
+    );
+  }
   if (shown.status !== "ready") return null;
   return (
     <div className="flex min-w-0 items-center gap-1.5">
-      <GlyphButton
-        glyph={full ? "leaveFullScreen" : "fullScreen"}
-        label={full ? "Exit Full Screen" : "Full Screen"}
-        pressed={full}
-        onClick={() => setFullScreen(!full)}
-      />
+      {into}
       <button
         type="button"
         aria-expanded={open}
@@ -51,7 +69,19 @@ export function PaneHeader() {
 /** The item last clicked: its details when opened, the picture, and the strip it was chosen from. PRODUCT.md "The three panels". */
 export function Pane() {
   const shown = usePaneDetail();
+  const set = usePaneSet();
+  const several = usePaneSetDetail();
   const open = usePreferences().details ?? false;
+  if (set.length > 1) {
+    // The bar goes, as wherever there is no one file to act on. Pane › several.
+    return (
+      <div className="flex h-full flex-col">
+        <h2 className="sr-only">{setSummary(set.length, null)}</h2>
+        <div className="flex min-h-0 flex-1 p-2">{several && <PaneSet items={several} />}</div>
+        <Strip />
+      </div>
+    );
+  }
   if (shown.status === "loading") return null;
   if (shown.status !== "ready") return <Empty gone={shown.status === "gone" ? shown : null} />;
   const { item, tags } = shown;
@@ -83,6 +113,13 @@ function Empty({ gone }: { gone: { path: string | null } | null }) {
   ) : (
     <EmptyState glyph="image" title="Nothing Chosen Yet" />
   );
+}
+
+/** How many files a set holds, and once they are read, what they weigh together. */
+function setSummary(count: number, items: readonly ItemDetail[] | null) {
+  const files = `${formatCount(count)} Files`;
+  if (!items) return files;
+  return `${files} · ${formatBytes(items.reduce((sum, item) => sum + item.sizeBytes, 0))}`;
 }
 
 /** Shape, length and size: what the header row says before the details are opened. */

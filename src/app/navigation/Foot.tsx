@@ -31,7 +31,10 @@ export function Foot({ rail = false }: { rail?: boolean }) {
   // Folded, a line that has been answered leaves: the grid is what shows the files are back.
   const shown =
     news !== null &&
-    !(rail && (news.kind === "undone" || (news.kind === "exported" && !news.path)));
+    !(
+      rail &&
+      (news.kind === "undone" || news.kind === "said" || (news.kind === "exported" && !news.path))
+    );
 
   // Newest highest, above the walk, as the foot is ordered by permanence from the bottom.
   const jobs: Job[] = [
@@ -274,6 +277,9 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
   }
   if (news.kind === "noFiles") {
     return <Line glyph="paste" sentence={NO_FILES} onDismiss={dismiss} />;
+  }
+  if (news.kind === "said") {
+    return <Line glyph="done" sentence={news.line} onDismiss={dismiss} />;
   }
   return (
     <Line

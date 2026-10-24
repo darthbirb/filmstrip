@@ -1,5 +1,5 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
-import { type ReactNode, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import { useContextMenu } from "../../ui/Menu";
@@ -17,6 +17,13 @@ type Props = {
 // The picture sizes itself and carries the corner, so nothing is drawn around it. DECISIONS.md "The pane".
 const PICTURE = "max-h-full max-w-full rounded-control";
 
+let focusNext = false;
+
+/** The next picture the pane draws takes the focus, so a set shown down to one keeps it in the pane. */
+export function focusNextPicture() {
+  focusNext = true;
+}
+
 /** The item itself: a picture once its original is in, or a video over its poster. */
 export function Media({ item, fill = false }: Props) {
   const [state, setState] = useState<"loading" | "shown" | "failed">("loading");
@@ -28,6 +35,12 @@ export function Media({ item, fill = false }: Props) {
   const zoom = useZoom(area, fill && item.kind === "image" ? (own ?? known) : null, own !== null);
   // The item is already the one shown, so its menu's Full screen only has to go there.
   const context = useContextMenu();
+
+  useEffect(() => {
+    if (!fill || !focusNext) return;
+    focusNext = false;
+    area.current?.focus();
+  }, [fill]);
 
   let body: ReactNode;
   if (item.kind === "video") {
@@ -82,6 +95,7 @@ export function Media({ item, fill = false }: Props) {
       {/* biome-ignore lint/a11y/noStaticElementInteractions: the right-click menu repeats the bar's verbs, which the keyboard reaches there; a zoomable picture is a focusable group */}
       <div
         ref={area}
+        tabIndex={fill ? -1 : undefined}
         {...zoom.handlers}
         onContextMenu={(event) =>
           context.open(

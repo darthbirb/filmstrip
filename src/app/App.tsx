@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { GlyphButton } from "../ui/GlyphButton";
 import { ExportSheetHost } from "./export/ExportSheet";
 import { Frame } from "./frame/Frame";
-import { Dragging } from "./grid/drag";
+import { Dragging, PaneDropRing } from "./grid/drag";
 import { FolderBand } from "./grid/FolderBand";
 import { Grid } from "./grid/Grid";
 import { DEFAULT_LAYOUT } from "./grid/layout";
@@ -87,6 +87,7 @@ export function App() {
           gridFoot={<SelectionBar />}
           pane={<Pane />}
           paneHeader={<PaneHeader />}
+          paneOverlay={<PaneDropRing />}
           revealPane={whenShownInPane}
           full={full}
         />
