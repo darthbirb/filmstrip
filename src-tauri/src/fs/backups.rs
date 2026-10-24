@@ -16,11 +16,15 @@ use ts_rs::TS;
 use crate::db::backup::{self as index, InTrash};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::noclobber;
+use crate::fs::recycle::Bin;
+use crate::fs::trash::recycle_items;
 
 const PREFIX: &str = "index-";
 const SUFFIX: &str = ".db";
 const PART: &str = ".part";
 const DAY_SECS: i64 = 86_400;
+/// The share of a restore's bar its files sent to the Recycle Bin take, before the backup.
+const SENDING: f64 = 0.2;
 
 /// How a backup was taken, which its name records.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
@@ -68,6 +72,38 @@ pub enum Restored {
     Restored { from: Backup, back: Backup },
     /// Refused before anything was written: it could not be read whole.
     Unreadable { from: Backup },
+    /// Not restored, nothing swapped and no backup taken: the Recycle Bin could not take
+    /// `refused` of the files in the Trash it forgets, which stay in `trash`.
+    Kept {
+        from: Backup,
+        forgets: Forgets,
+        refused: u32,
+        trash: String,
+    },
+    /// Failed after the files in the Trash it forgets went to the Recycle Bin, which stand; the
+    /// index is otherwise as it was.
+    Failed {
+        from: Backup,
+        forgets: Forgets,
+        reason: Reason,
+    },
+}
+
+/// What a restore forgets of the Trash: the sources it forgets with files there, by their titles
+/// now, and every file there it forgets, theirs or not.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Forgets {
+    pub sources: Vec<String>,
+    pub files: u32,
+}
+
+/// What a restore asks of the Trash: whether a file is still in it, and the bin each file it
+/// forgets goes to.
+pub struct Trash<'a> {
+    pub kept: &'a dyn Fn(&InTrash) -> bool,
+    pub bin: &'a dyn Bin,
 }
 
 /// The backups as Settings lists them, with the number kept and the folder they are in.
@@ -320,15 +356,44 @@ fn remove_part(part: &Path) {
     let _ = std::fs::remove_file(PathBuf::from(journal));
 }
 
-/// Restores a backup over the live index: checked whole first, then `hold`, then the index backed
-/// up as it is, then the swap; only after it the oldest go, never the one restored. A failure
-/// leaves the index as it was. DECISIONS.md "Backing up the index".
+/// What restoring a backup would forget of the Trash, for its question to say; nothing for one
+/// that cannot be read.
+pub fn forgets(live: &Connection, dir: &Path, name: &str) -> Result<Forgets> {
+    find(dir, name)?;
+    Ok(forgotten(live, &dir.join(name))
+        .map(|(forgets, _)| forgets)
+        .unwrap_or_default())
+}
+
+/// What a restore of the backup at `path` forgets of the Trash, and the rows it forgets there.
+fn forgotten(live: &Connection, path: &Path) -> Result<(Forgets, Vec<i64>)> {
+    let trash = index::in_trash(live)?;
+    let lost = index::unplaced(path, &trash)?;
+    let mut named: Vec<(i64, &str)> = lost
+        .iter()
+        .map(|one| (one.source_id, one.source.as_str()))
+        .collect();
+    named.sort_unstable();
+    named.dedup();
+    let forgets = Forgets {
+        sources: named
+            .into_iter()
+            .map(|(_, title)| title.to_owned())
+            .collect(),
+        files: u32::try_from(lost.len()).unwrap_or(u32::MAX),
+    };
+    Ok((forgets, lost.iter().map(|one| one.id).collect()))
+}
+
+/// Restores a backup over the live index: checked whole, `hold`, the files in the Trash it forgets
+/// sent to the Recycle Bin, the index backed up as it is, the swap, and only then the oldest gone.
+/// DECISIONS.md "Backing up the index".
 pub fn restore<H>(
     live: &mut Connection,
     dir: &Path,
     name: &str,
     keep: u32,
-    kept: &dyn Fn(&InTrash) -> bool,
+    trash: &Trash<'_>,
     progress: &dyn Fn(f64),
     hold: impl FnOnce() -> Result<H>,
 ) -> Result<Restored> {
@@ -343,18 +408,51 @@ pub fn restore<H>(
         });
     }
     let _held = hold()?;
+    let (forgets, lost) = forgotten(live, &path)?;
+    let recycled = recycle_items(live, trash.bin, &lost, &|done| progress(done * SENDING))?;
+    if recycled.refused > 0 {
+        return Ok(Restored::Kept {
+            from,
+            forgets,
+            refused: recycled.refused,
+            trash: crate::fs::paths::trash_dir()?
+                .to_string_lossy()
+                .into_owned(),
+        });
+    }
+    match swap_in(live, dir, &path, trash.kept, progress) {
+        Ok(back) => {
+            rotate(dir, keep, Some(name));
+            Ok(Restored::Restored { from, back })
+        }
+        Err(err) if forgets.files > 0 => Ok(Restored::Failed {
+            from,
+            forgets,
+            reason: Reason::of(&err),
+        }),
+        Err(err) => Err(err),
+    }
+}
+
+/// Backs the index up as it is, then swaps the backup at `path` in; a failure removes that backup.
+fn swap_in(
+    live: &mut Connection,
+    dir: &Path,
+    path: &Path,
+    kept: &dyn Fn(&InTrash) -> bool,
+    progress: &dyn Fn(f64),
+) -> Result<Backup> {
     let back = take(live, dir, Taken::Restore)?;
     progress(0.25);
     let staging = dir.join(format!(".restore{PART}"));
     remove_part(&staging);
-    let swapped = swap(live, &path, &staging, kept, progress);
+    let swapped = swap(live, path, &staging, kept, progress);
     remove_part(&staging);
     if let Err(err) = swapped {
         let _ = std::fs::remove_file(dir.join(&back.name));
         return Err(err);
     }
-    rotate(dir, keep, Some(name));
-    Ok(Restored::Restored { from, back })
+    Ok(back)
 }
 
 /// What follows a restore that swapped: a walk queued, and `allow` given the root of every source
@@ -405,6 +503,7 @@ mod tests {
     use super::*;
     use crate::db::sources::{self, SourceKind};
     use crate::db::{self, folders, items, journal, tags};
+    use crate::fs::recycle::tests::{Fake, Stand};
     use crate::fs::walk;
     use std::cell::Cell;
 
@@ -478,6 +577,23 @@ mod tests {
         dir.join(name_of(ms, how))
     }
 
+    /// A bin no file reaches: a restore with nothing in the Trash to forget never asks one.
+    struct Never;
+
+    impl Bin for Never {
+        fn take(&self, file: &Path) -> std::io::Result<()> {
+            panic!("{} was sent to the Recycle Bin", file.display())
+        }
+
+        fn holds(&self, _name: &Path) -> bool {
+            false
+        }
+    }
+
+    fn no_bin<'a>(kept: &'a dyn Fn(&InTrash) -> bool) -> Trash<'a> {
+        Trash { kept, bin: &Never }
+    }
+
     fn restoring(
         live: &mut Connection,
         dir: &Path,
@@ -485,7 +601,7 @@ mod tests {
         keep: u32,
         held: &Cell<u32>,
     ) -> Result<Restored> {
-        restore(live, dir, name, keep, &|_| true, &|_| {}, || {
+        restore(live, dir, name, keep, &no_bin(&|_| true), &|_| {}, || {
             held.set(held.get() + 1);
             Ok(())
         })
@@ -620,7 +736,7 @@ mod tests {
             &backups,
             &then.name,
             7,
-            &|_| true,
+            &no_bin(&|_| true),
             &|done| progress.set(done),
             || {
                 held.set(held.get() + 1);
@@ -703,7 +819,7 @@ mod tests {
             &backups,
             &then.name,
             7,
-            &|_| true,
+            &no_bin(&|_| true),
             &|_| {},
             || Err::<(), _>(AppError::invalid("busy")),
         );
@@ -768,7 +884,7 @@ mod tests {
             &backups,
             &then.name,
             7,
-            &|kept| kept.uuid != gone_uuid,
+            &no_bin(&|kept| kept.uuid != gone_uuid),
             &|_| {},
             || Ok(()),
         )
@@ -864,7 +980,7 @@ mod tests {
             &backups,
             &then.name,
             7,
-            &|_| false,
+            &no_bin(&|_| false),
             &|_| {},
             || Ok(()),
         )
@@ -883,48 +999,174 @@ mod tests {
         assert_eq!(rows, [(cairo, true)], "only the file there now");
     }
 
+    /// Phone, added since the backup, with each of `names` in it sent to the Trash.
+    fn phone_since(conn: &Connection, dir: &Path, names: &[&str]) -> Vec<PathBuf> {
+        std::fs::create_dir_all(dir.join("Phone")).unwrap();
+        for name in names {
+            std::fs::write(dir.join("Phone").join(name), name).unwrap();
+        }
+        sources::add(conn, &dir.join("Phone"), "Phone", SourceKind::Sorting).unwrap();
+        walk::reconcile(conn).unwrap();
+        names
+            .iter()
+            .map(|name| {
+                let id = item(conn, name);
+                crate::fs::trash::trash_items(conn, &[id], &journal::new_batch()).unwrap();
+                crate::fs::paths::trash_path(&uuid(conn, id), name).unwrap()
+            })
+            .collect()
+    }
+
+    fn in_the_trash(one: &InTrash) -> bool {
+        crate::fs::paths::trash_path(&one.uuid, &one.disk_name).is_ok_and(|f| f.is_file())
+    }
+
+    fn rows_named(conn: &Connection, name: &str) -> i64 {
+        conn.query_row(
+            "SELECT COUNT(*) FROM item WHERE disk_name = ?1",
+            [name],
+            |r| r.get(0),
+        )
+        .unwrap()
+    }
+
     #[test]
-    fn a_trashed_file_from_a_source_added_since_is_left_in_the_trash_untouched() {
+    fn a_trashed_file_from_a_source_added_since_goes_to_the_recycle_bin() {
         let (mut conn, dir, backups) = library("trash-orphan");
         let then = take(&conn, &backups, Taken::Hand).unwrap();
-        std::fs::create_dir_all(dir.join("Phone")).unwrap();
-        std::fs::write(dir.join("Phone/IMG_5.jpg"), "five").unwrap();
-        sources::add(&conn, &dir.join("Phone"), "Phone", SourceKind::Sorting).unwrap();
-        walk::reconcile(&conn).unwrap();
-        let five = item(&conn, "IMG_5.jpg");
-        let five_uuid = uuid(&conn, five);
-        crate::fs::trash::trash_items(&conn, &[five], &journal::new_batch()).unwrap();
-        let file = crate::fs::paths::trash_path(&five_uuid, "IMG_5.jpg").unwrap();
-        assert!(file.is_file());
+        let files = phone_since(&conn, &dir, &["IMG_5.jpg"]);
+        let bin = Fake::new(Stand::Recycles(dir.join("bin")));
+        assert_eq!(
+            forgets(&conn, &backups, &then.name).unwrap(),
+            Forgets {
+                sources: vec!["Phone".into()],
+                files: 1
+            }
+        );
 
-        let kept = |one: &InTrash| {
-            crate::fs::paths::trash_path(&one.uuid, &one.disk_name).is_ok_and(|f| f.is_file())
+        let shares = std::cell::RefCell::new(Vec::new());
+        let trash = Trash {
+            kept: &in_the_trash,
+            bin: &bin,
         };
-        restore(
+        let restored = restore(
             &mut conn,
             &backups,
             &then.name,
             7,
-            &kept,
-            &|_| {},
+            &trash,
+            &|done| shares.borrow_mut().push(done),
             || Ok(()),
         )
         .unwrap();
 
-        assert_eq!(std::fs::read_to_string(&file).unwrap(), "five");
-        assert!(!dir.join("Phone/IMG_5.jpg").exists());
-        let rows: i64 = conn
-            .query_row(
-                "SELECT COUNT(*) FROM item WHERE uuid = ?1",
-                [&five_uuid],
-                |r| r.get(0),
-            )
-            .unwrap();
-        assert_eq!(
-            rows, 0,
-            "the index forgets it; #110 decides what becomes of it"
+        assert!(
+            matches!(restored, Restored::Restored { .. }),
+            "{restored:?}"
         );
-        std::fs::remove_file(&file).unwrap();
+        assert_eq!(
+            shares.borrow()[..2],
+            [SENDING, 0.25],
+            "sent before the backup"
+        );
+        assert!(!files[0].exists());
+        let recycled = dir.join("bin").join(files[0].file_name().unwrap());
+        assert_eq!(std::fs::read_to_string(recycled).unwrap(), "IMG_5.jpg");
+        assert!(!dir.join("Phone/IMG_5.jpg").exists());
+        assert_eq!(rows_named(&conn, "IMG_5.jpg"), 0);
+        let back = Connection::open(backups.join(&names_in(&backups)[0])).unwrap();
+        assert_eq!(
+            rows_named(&back, "IMG_5.jpg"),
+            0,
+            "the way back holds no row for a file in the Recycle Bin"
+        );
+    }
+
+    fn names_in(dir: &Path) -> Vec<String> {
+        list(dir, &HashSet::new())
+            .unwrap()
+            .into_iter()
+            .map(|backup| backup.name)
+            .collect()
+    }
+
+    #[test]
+    fn a_file_the_recycle_bin_cannot_take_stops_the_restore_before_the_backup() {
+        let (mut conn, dir, backups) = library("trash-refused");
+        let then = take(&conn, &backups, Taken::Hand).unwrap();
+        let files = phone_since(&conn, &dir, &["IMG_5.jpg", "IMG_6.jpg", "IMG_7.jpg"]);
+        let mut bin = Fake::new(Stand::Recycles(dir.join("bin")));
+        bin.deletes = files[1..]
+            .iter()
+            .map(|file| file.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        let trash = Trash {
+            kept: &in_the_trash,
+            bin: &bin,
+        };
+
+        let restored = restore(&mut conn, &backups, &then.name, 7, &trash, &|_| {}, || {
+            Ok(())
+        });
+
+        let Ok(Restored::Kept {
+            forgets, refused, ..
+        }) = restored
+        else {
+            panic!("{restored:?}");
+        };
+        assert_eq!(
+            (forgets.sources, forgets.files, refused),
+            (vec!["Phone".to_string()], 3, 2)
+        );
+        assert_eq!(kinds(&backups), [Taken::Hand], "no backup taken");
+        assert_eq!(sources::list(&conn).unwrap().len(), 2, "nothing swapped");
+        assert!(!files[0].exists(), "the one taken went, its row with it");
+        assert_eq!(rows_named(&conn, "IMG_5.jpg"), 0);
+        for file in &files[1..] {
+            assert!(file.is_file(), "{} stays in the Trash", file.display());
+        }
+        assert_eq!(
+            forgets_files(&conn, &backups, &then.name),
+            2,
+            "asked again, the question says 2"
+        );
+        for file in &files[1..] {
+            std::fs::remove_file(file).unwrap();
+        }
+    }
+
+    fn forgets_files(conn: &Connection, dir: &Path, name: &str) -> u32 {
+        forgets(conn, dir, name).unwrap().files
+    }
+
+    #[test]
+    fn files_sent_stand_when_the_restore_fails_after_them() {
+        let (mut conn, dir, backups) = library("trash-then-failed");
+        let then = take(&conn, &backups, Taken::Hand).unwrap();
+        let files = phone_since(&conn, &dir, &["IMG_5.jpg"]);
+        std::fs::create_dir_all(backups.join(format!(".restore{PART}"))).unwrap();
+        let bin = Fake::new(Stand::Recycles(dir.join("bin")));
+        let trash = Trash {
+            kept: &in_the_trash,
+            bin: &bin,
+        };
+
+        let restored = restore(&mut conn, &backups, &then.name, 7, &trash, &|_| {}, || {
+            Ok(())
+        });
+
+        let Ok(Restored::Failed { forgets, .. }) = restored else {
+            panic!("{restored:?}");
+        };
+        assert_eq!(forgets.files, 1);
+        assert!(!files[0].exists());
+        assert_eq!(kinds(&backups), [Taken::Hand], "and no way back is kept");
+        assert_eq!(
+            sources::list(&conn).unwrap().len(),
+            2,
+            "the index is otherwise as it was"
+        );
     }
 
     #[test]

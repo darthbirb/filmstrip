@@ -25,6 +25,7 @@ import type { FolderEntry } from "../ipc/bindings/FolderEntry";
 import type { FolderMatch } from "../ipc/bindings/FolderMatch";
 import type { FolderNode } from "../ipc/bindings/FolderNode";
 import type { FolderStatus } from "../ipc/bindings/FolderStatus";
+import type { Forgets } from "../ipc/bindings/Forgets";
 import type { Hit } from "../ipc/bindings/Hit";
 import type { ItemDetail } from "../ipc/bindings/ItemDetail";
 import type { ItemRow } from "../ipc/bindings/ItemRow";
@@ -40,6 +41,7 @@ import type { Progress } from "../ipc/bindings/Progress";
 import type { QueryTerm } from "../ipc/bindings/QueryTerm";
 import type { Reading } from "../ipc/bindings/Reading";
 import type { Reason } from "../ipc/bindings/Reason";
+import type { Removal } from "../ipc/bindings/Removal";
 import type { Restored } from "../ipc/bindings/Restored";
 import type { Scope } from "../ipc/bindings/Scope";
 import type { SearchOutcome } from "../ipc/bindings/SearchOutcome";
@@ -96,6 +98,7 @@ function source(
     itemCount,
     rootCount: 0,
     totalBytes,
+    trashCount: 0,
     favorite: false,
   };
 }
@@ -1422,6 +1425,7 @@ export function resetBackups(refused: Reason | null = null) {
   backups = backupsDrawn();
   backupsKept = 7;
   launchRefusal = refused;
+  forgetting = null;
 }
 
 function takeBackup(how: Taken): Backup {
@@ -1452,6 +1456,62 @@ function backUpNow(): Promise<Backup | null> {
   );
 }
 
+const TRASH_DIR = "D:\\Filmstrip\\data\\trash";
+// `?recycle-refused` has the Recycle Bin refuse a removed source's newest file in the Trash, and
+// two of the three a restore forgets; `?restore-forgets` has every restore forget Archive's three.
+const recycleRefused = () => backupsWanted().has("recycle-refused");
+
+/** What every restore forgets of the Trash, as Archive added since with three files there;
+ * `unknown` has asking what it forgets fail. */
+type Forgetting = { forgets: Forgets; refused: number; failed: boolean; unknown?: boolean };
+let forgetting: Forgetting | null = backupsWanted().has("restore-forgets")
+  ? {
+      forgets: { sources: ["Archive"], files: 3 },
+      refused: recycleRefused() ? 2 : 0,
+      failed: false,
+    }
+  : null;
+
+/** Has every restore forget files in the Trash, for tests: refused by the bin, or failing after. */
+export function forgetOnRestore(next: Forgetting | null) {
+  forgetting = next;
+}
+
+function withTrashCount(one: SourceSummary): SourceSummary {
+  const trashCount = [...trashed.values()].filter((gone) => gone.home.id === one.id).length;
+  return { ...one, trashCount };
+}
+
+/** Sends a source's files in the Trash on to the Recycle Bin, then forgets it. Its folders stay. */
+function removeSource(id: number): Promise<Removal> {
+  const files = (ITEMS[TRASH] ?? []).filter((item) => trashed.get(item.id)?.home.id === id);
+  const refused = recycleRefused() && files.length > 0 ? 1 : 0;
+  return new Promise((resolve) => {
+    let sent = 0;
+    const step = () => {
+      if (sent < files.length - refused) {
+        const item = files[sent] as ItemRow;
+        ITEMS[TRASH] = (ITEMS[TRASH] ?? []).filter((other) => other !== item);
+        trashed.delete(item.id);
+      }
+      sent += 1;
+      if (files.length > 0) void emit("remove-progress", Math.round((sent / files.length) * 100));
+      if (sent < files.length) {
+        setTimeout(step, BACKUP_STEP_MS);
+        return;
+      }
+      if (refused > 0) {
+        resolve({ kind: "kept", refused, trash: TRASH_DIR });
+        return;
+      }
+      const at = SOURCES.findIndex((one) => one.id === id);
+      if (at >= 0) SOURCES.splice(at, 1);
+      resolve({ kind: "removed" });
+    };
+    setTimeout(step, files.length > 0 ? BACKUP_STEP_MS : 0);
+  });
+}
+
 function restoreBackup(name: string): Promise<Restored> | Restored {
   const from = backups.find((backup) => backup.name === name);
   if (!from) return invalid(`there is no backup named ${name}`) as never;
@@ -1459,6 +1519,24 @@ function restoreBackup(name: string): Promise<Restored> | Restored {
     from.readable = false;
     return { kind: "unreadable", from };
   }
+  const forgot = forgetting;
+  if (forgot && (forgot.refused > 0 || forgot.failed)) {
+    return new Promise((resolve) =>
+      setTimeout(() => {
+        void emit("restore-progress", 20);
+        const { forgets, refused } = forgot;
+        if (refused > 0) {
+          forgot.forgets = { ...forgets, files: refused };
+          forgot.refused = 0;
+          resolve({ kind: "kept", from, forgets, refused, trash: TRASH_DIR });
+        } else {
+          forgetting = null;
+          resolve({ kind: "failed", from, forgets, reason: { kind: "diskFull" } });
+        }
+      }, BACKUP_STEP_MS),
+    );
+  }
+  forgetting = null;
   return new Promise((resolve) => {
     let percent = 0;
     const step = () => {
@@ -1488,7 +1566,8 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     return null;
   },
   // `?no-sources` empties the library, which is the only way to see the doorways it draws instead.
-  list_sources: () => (new URLSearchParams(location.search).has("no-sources") ? [] : SOURCES),
+  list_sources: () =>
+    new URLSearchParams(location.search).has("no-sources") ? [] : SOURCES.map(withTrashCount),
   add_source: () =>
     Promise.reject<AppError>({ kind: "invalid", message: "Adding a source needs the real app." }),
   // The picker is the system's, so outside Tauri there is nothing to open and nothing chosen.
@@ -1496,7 +1575,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   rename_source: () => null,
   set_source_kind: () => null,
   reveal_source: () => null,
-  remove_source: () => null,
+  remove_source: ({ id }) => removeSource(id as number),
   reveal_folder: () => null,
   reveal_held: () => null,
   read_folder_again: () => null,
@@ -2056,6 +2135,10 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   list_backups: () => shelved(),
   back_up_now: () => backUpNow(),
   restore_backup: ({ name }) => restoreBackup(name as string),
+  restore_forgets: (): Promise<Forgets> | Forgets =>
+    forgetting?.unknown
+      ? (invalid("the index could not be read") as never)
+      : (forgetting?.forgets ?? { sources: [], files: 0 }),
   set_backups_kept: ({ kept }) => {
     backupsKept = kept as number;
     return null;

@@ -10,7 +10,7 @@ import { Backups } from "./Backups";
 import { Keys } from "./Keys";
 import { Caption, type Row, Rows } from "./Rows";
 import { Sources } from "./Sources";
-import { settingsHeld, useRestore } from "./settings-store";
+import { settingsHeld, useSettingsHeld } from "./settings-store";
 import { Tags } from "./Tags";
 
 type Section = {
@@ -155,7 +155,7 @@ export function Settings({ open, onClose, section, asking }: Props) {
 function Body({ onClose, section, asking }: Omit<Props, "open">) {
   const [query, setQuery] = useState("");
   const [chosen, setChosen] = useState<string | null>(section ?? null);
-  const held = useRestore().restoring !== null;
+  const held = useSettingsHeld();
   const term = query.trim().toLowerCase();
   const found = useSections(asking)
     .map((section) => ({

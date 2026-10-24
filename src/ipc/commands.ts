@@ -19,6 +19,7 @@ import type { FolderEntry } from "./bindings/FolderEntry";
 import type { FolderMade } from "./bindings/FolderMade";
 import type { FolderNode } from "./bindings/FolderNode";
 import type { FolderStatus } from "./bindings/FolderStatus";
+import type { Forgets } from "./bindings/Forgets";
 import type { ItemDetail } from "./bindings/ItemDetail";
 import type { ItemRow } from "./bindings/ItemRow";
 import type { ItemsMoved } from "./bindings/ItemsMoved";
@@ -32,6 +33,7 @@ import type { Plan } from "./bindings/Plan";
 import type { Progress } from "./bindings/Progress";
 import type { Reading } from "./bindings/Reading";
 import type { Reason } from "./bindings/Reason";
+import type { Removal } from "./bindings/Removal";
 import type { Restored } from "./bindings/Restored";
 import type { Scope } from "./bindings/Scope";
 import type { SearchOutcome } from "./bindings/SearchOutcome";
@@ -73,7 +75,7 @@ export const setSourceKind = (id: number, kind: SourceKind) =>
 
 export const revealSource = (id: number) => invoke<void>("reveal_source", { id });
 
-export const removeSource = (id: number) => invoke<void>("remove_source", { id });
+export const removeSource = (id: number) => invoke<Removal>("remove_source", { id });
 
 export const revealFolder = (folderId: number) => invoke<void>("reveal_folder", { folderId });
 
@@ -288,6 +290,8 @@ export const listBackups = () => invoke<Shelved>("list_backups");
 export const backUpNow = () => invoke<Backup | null>("back_up_now");
 
 export const restoreBackup = (name: string) => invoke<Restored>("restore_backup", { name });
+
+export const restoreForgets = (name: string) => invoke<Forgets>("restore_forgets", { name });
 
 export const setBackupsKept = (kept: number) => invoke<void>("set_backups_kept", { kept });
 

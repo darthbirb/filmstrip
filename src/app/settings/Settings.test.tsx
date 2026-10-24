@@ -161,6 +161,7 @@ const SOURCES = [
     reachable: true,
     itemCount: 6,
     totalBytes: 0,
+    trashCount: 0,
   },
   {
     id: 2,
@@ -172,6 +173,7 @@ const SOURCES = [
     reachable: false,
     itemCount: 0,
     totalBytes: 0,
+    trashCount: 0,
   },
 ];
 
@@ -181,7 +183,10 @@ async function onSources(removed: number[] = []) {
     (cmd, payload) => {
       if (cmd === "list_sources") return SOURCES;
       if (cmd === "folder_items") return items;
-      if (cmd === "remove_source") removed.push((payload as { id: number }).id);
+      if (cmd === "remove_source") {
+        removed.push((payload as { id: number }).id);
+        return { kind: "removed" };
+      }
       return undefined;
     },
     { shouldMockEvents: true },
