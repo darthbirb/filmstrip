@@ -704,7 +704,8 @@ and one height in justified rows is equal cells by another measure.
   reaches the focused file's ×. × takes a file out and does nothing to it, the focus passing to
   the next, or the one before; the last but one leaves the ordinary pane, its picture focused.
   **Escape shows the first alone only with the focus in the pane**, and only once a menu, a drag,
-  full screen and a checked set have each taken their own Escape, so after a drop Escape in the
+  full screen, the folded pane open over the grid and a checked set have each taken their own
+  Escape, whichever order their listeners were added in, so after a drop Escape in the
   grid still clears the grid's set and leaves the pane alone.
 - **A file deleted, moved to another folder or gone leaves the set**, and the rest stay; only when
   every file goes does the pane move on, as after deleting the one it shows. A set has no one file

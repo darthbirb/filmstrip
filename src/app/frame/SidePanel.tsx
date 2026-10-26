@@ -162,6 +162,7 @@ export function SidePanel({
         ref={regionRef}
         aria-label={copy.label}
         data-drop={showRail ? undefined : drop}
+        data-over-grid={open || undefined}
         style={side === "nav" ? { width, left: 0 } : { width, right: 0 }}
         // The grid's tiles are positioned too, so without this they paint over a folding panel.
         className={`absolute inset-y-0 z-(--z-overlay) overflow-hidden border-line bg-panel ${copy.edge} ${

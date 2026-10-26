@@ -312,7 +312,8 @@ function useRoom(
 
 /**
  * Escape with the focus in the pane shows the first file alone, once nothing else is left to
- * close: a menu, a drag, full screen and a checked set all take it first.
+ * close: a menu, a drag, full screen, the pane open over the grid and a checked set all take it
+ * first, whichever order their listeners were added in.
  */
 function useEscapeShowsFirst(first: number | null) {
   useEffect(() => {
@@ -320,8 +321,8 @@ function useEscapeShowsFirst(first: number | null) {
     const onKey = (event: globalThis.KeyboardEvent) => {
       if (event.key !== "Escape" || event.defaultPrevented) return;
       if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
-      const focus = document.activeElement;
-      if (!focus?.closest('[aria-label="Pane"]')) return;
+      const pane = document.activeElement?.closest<HTMLElement>('[aria-label="Pane"]');
+      if (!pane || pane.dataset.overGrid !== undefined) return;
       if (getFullScreen() || dragging() || getSelection().ids.length > 0) return;
       event.preventDefault();
       focusNextPicture();

@@ -6,10 +6,13 @@ import { clip, serveFiles } from "../../dev/media";
 import { recording } from "../../dev/recording";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { folderItems, undoLast } from "../../ipc/commands";
+import { Frame } from "../frame/Frame";
 import { Grid } from "../grid/Grid";
 import { clearChecked, toggleChecked } from "../grid/selection";
 import { type Place, setPlace } from "../place";
+import { updatePreferences } from "../preferences";
 import { deleteFiles } from "./delete";
+import { getFullScreen, setFullScreen, useEscapeLeavesFullScreen } from "./full-screen";
 import { Pane, PaneHeader } from "./Pane";
 import { PaneDetailProvider } from "./pane-detail";
 import { addToPane, getPaneItem, getPaneSet, showInPane } from "./pane-store";
@@ -34,6 +37,8 @@ beforeEach(async () => {
   while (await undoLast()) {}
   showInPane(null);
   clearChecked();
+  setFullScreen(false);
+  updatePreferences({ widths: undefined, hidden: undefined });
   setPlace(CAIRO);
   cairo = Object.fromEntries((await folderItems(6)).map((row) => [row.diskName, row]));
   await page.viewport(1200, 800);
@@ -219,6 +224,56 @@ test("Escape in the pane shows the first alone, once a checked set has been clea
   await userEvent.keyboard("{Escape}");
   expect(getPaneSet()).toEqual([id("pyramid.jpg")]);
   expect(getPaneItem()).toBe(id("pyramid.jpg"));
+});
+
+function LeavesFullScreen() {
+  useEscapeLeavesFullScreen();
+  return null;
+}
+
+test("after × on the first file in full screen, one Escape only leaves full screen", async () => {
+  showThree();
+  await render(
+    <>
+      <LeavesFullScreen />
+      <Harness />
+    </>,
+  );
+  setFullScreen(true);
+  await expect.element(file("pyramid.jpg")).toBeVisible();
+  await tabIn();
+  await expect.element(file("pyramid.jpg")).toHaveFocus();
+  await userEvent.tab();
+  await userEvent.keyboard("{Enter}");
+  expect(getPaneSet()).toEqual([id("sphinx.jpg"), id("felucca.mp4")]);
+  await expect
+    .poll(() => document.activeElement?.closest('[aria-label="Pane"]') !== null)
+    .toBe(true);
+  await userEvent.keyboard("{Escape}");
+  expect(getFullScreen()).toBe(false);
+  expect(getPaneSet()).toEqual([id("sphinx.jpg"), id("felucca.mp4")]);
+  await userEvent.keyboard("{Escape}");
+  expect(getPaneSet()).toEqual([id("sphinx.jpg")]);
+});
+
+test("Escape over the folded pane opened over the grid only puts the pane away", async () => {
+  await page.viewport(640, 480);
+  showThree();
+  const screen = await render(
+    <PaneDetailProvider>
+      <div className="flex h-dvh flex-col">
+        <Frame pane={<Pane />} paneHeader={<PaneHeader />} />
+      </div>
+    </PaneDetailProvider>,
+  );
+  await screen.getByRole("button", { name: "Show Pane" }).click();
+  await expect.element(file("sphinx.jpg")).toBeVisible();
+  (file("sphinx.jpg").element() as HTMLElement).focus();
+  const pane = screen.getByRole("complementary", { name: "Pane" }).element() as HTMLElement;
+  expect(pane.dataset.overGrid).toBe("true");
+  await userEvent.keyboard("{Escape}");
+  await expect.poll(() => pane.dataset.overGrid).toBeUndefined();
+  expect(getPaneSet()).toHaveLength(3);
 });
 
 test("Escape with the focus outside the pane leaves the set as it is", async () => {
