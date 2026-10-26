@@ -82,9 +82,9 @@ drawn. **Not started** — neither.
 | Full screen | Built | |
 | Zoom and pan a picture | Built | DECISIONS.md "The pane" |
 | Video playback | Built, on a plate of its own | DECISIONS.md "The pane"; the mute is not yet kept between items |
-| Frame steps and a named speed set | Drawn | #68, `docs/design/pane.dc.html`; waiting on the probe to record a frame rate |
-| Several items at once, scaled to fit together | Not started | dragging items onto the pane, PRODUCT.md "The three panels" |
-| A folder shown in the pane rather than an item | Not started | its own thing, not a second mode |
+| Frame steps, a named speed set and the volume | Drawn | #68, `docs/design/pane.dc.html`; waiting on the probe to record a frame rate |
+| Several items at once, scaled to fit together | Drawn | #66, dragging items onto the pane, PRODUCT.md "The three panels"; `docs/design/pane.dc.html` |
+| A folder shown in the pane rather than an item | Drawn | #67, its own thing, not a second mode; `docs/design/pane.dc.html` |
 | Tiled compare and multi-view panes | **Dropped on purpose.** The pane has one mode. |
 
 ## Tags and labels
