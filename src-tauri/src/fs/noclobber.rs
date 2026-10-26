@@ -60,7 +60,7 @@ pub fn make_dir(to: &Path) -> io::Result<()> {
 
 /// Verbatim, as `std::fs` passes its own paths, or a name past MAX_PATH would not move.
 #[cfg(windows)]
-fn verbatim(path: &Path) -> io::Result<Vec<u16>> {
+pub(crate) fn verbatim(path: &Path) -> io::Result<Vec<u16>> {
     use std::os::windows::ffi::OsStrExt;
 
     let full: Vec<u16> = std::path::absolute(path)?

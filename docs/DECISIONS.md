@@ -1143,19 +1143,26 @@ every file: a drive with none, such as a removable one or a network share, the b
 or a file over its quota. There the shell deletes it outright, and asking it not to means a
 dialog, which the app never shows on its behalf.
 
-- **A second name first, then the shell, then the file's names.** Before the shell is asked, the
-  file is given a second name beside it by a hard link. The bin moves a file within its own
-  volume, so a file it took has a name under that volume's `$Recycle.Bin`, and the second name's
-  file lists all its names through `FindFirstFileNameW`. Only with one there is the second name
-  removed and the file counted as sent. Otherwise, and when its names cannot be read, the second
-  name is given the file's own name back and the file is refused. Whatever the shell answers, the
-  disk says which happened, so a refusal is never mistaken for a send. The count of names,
-  compared before and after, is not enough: something on the disk giving the file a name
-  elsewhere while the shell deletes it outright leaves the count unchanged, with the file in
-  neither the Trash nor the bin. A user's file can already have other names, from a dedup tool or
-  a link-based backup, and keeps them into the Trash, since trashing within a volume is a rename;
-  those never count as the bin's. A file that cannot be given a second name, on a drive without
-  hard links, is never sent.
+- **A second name first, then its names, then the shell, then its names again.** Before the
+  shell is asked, the file is given a second name beside it by a hard link, and that file's names
+  are read through `FindFirstFileNameW`. The bin moves a file within its own volume, so a file it
+  took gains a name under that volume's `$Recycle.Bin`. Only with a name there that was not there
+  before is the second name removed and the file counted as sent. Otherwise, and when its names
+  cannot be read afterwards, the second name is given the file's own name back and the file is
+  refused. Whatever the shell answers, the disk says which happened, so a refusal is never
+  mistaken for a send. The count of names, compared before and after, is not enough: something on
+  the disk giving the file a name elsewhere while the shell deletes it outright leaves the count
+  unchanged, with the file in neither the Trash nor the bin. A user's file can already have other
+  names, from a dedup tool or a link-based backup, and keeps them into the Trash, since trashing
+  within a volume is a rename; one can even be in the bin already, when the user recycled another
+  of its names. Those never count as the send, being there before it.
+- **A file whose names cannot be read is never sent.** A drive or filter that cannot list a
+  file's names, or one without hard links, would leave the app unable to tell a send from a
+  delete; read only after the shell, it turned a file the bin took into a refusal, and every retry
+  left one more copy in the bin. So the names are read before the shell is asked, and where they
+  cannot be, the second name is removed and the file refused without asking. Names are read in
+  verbatim form, as `std::fs` and `noclobber` pass theirs, since the second name is longer than
+  the file's and can pass MAX_PATH where the file does not.
 - **What a cut-short send left is settled at the next, and never counted as sent.** A crash
   between the steps leaves the second name. Beside the file it is removed. Alone, it is the file
   again, put back and sent once more; at worst the bin then holds the same file twice. A lone one
@@ -1176,7 +1183,8 @@ dialog, which the app never shows on its behalf.
 - **Tests never reach the real bin.** The shell is behind the `Bin` trait, which also says
   whether a name is inside it; the tests' stand-in recycles into a folder of its own, deletes
   outright or refuses, while the second name and the file's names are real. Its files start with
-  one name and with several, and gain one from outside while the shell acts.
+  one name and with several, one of them already in the bin, and gain one from outside while the
+  shell acts. Names that cannot be read are made so by a switch only tests have.
 
 ## Settings
 

@@ -30,7 +30,7 @@ pub enum Sent {
 }
 
 /// Sends a file to the Recycle Bin. A second name made beside it first outlives whatever the shell
-/// does, and its other names say what that was: one in the bin, recycled; none, given its name
+/// does, and the names it gains say what that was: one in the bin, recycled; none, given its name
 /// back and refused. DECISIONS.md "Sending to the Recycle Bin".
 pub fn send(bin: &dyn Bin, file: &Path) -> io::Result<Sent> {
     let hold = hold_of(file);
@@ -44,12 +44,17 @@ pub fn send(bin: &dyn Bin, file: &Path) -> io::Result<Sent> {
     if std::fs::hard_link(file, &hold).is_err() {
         return Ok(Sent::Refused);
     }
+    let Ok(before) = names_of(&hold) else {
+        drop_hold(file, &hold)?;
+        return Ok(Sent::Refused);
+    };
     let _ = bin.take(file);
     if std::fs::symlink_metadata(file).is_ok() {
         drop_hold(file, &hold)?;
         return Ok(Sent::Refused);
     }
-    if names_of(&hold).is_ok_and(|names| names.iter().any(|name| bin.holds(name))) {
+    let gained = |name: &PathBuf| !before.contains(name) && bin.holds(name);
+    if names_of(&hold).is_ok_and(|names| names.iter().any(gained)) {
         std::fs::remove_file(&hold)?;
         return Ok(Sent::Recycled);
     }
@@ -195,20 +200,38 @@ fn unwide(text: &[u16]) -> PathBuf {
     std::ffi::OsString::from_wide(&text[..end]).into()
 }
 
+/// `path` in full and verbatim, the form every name here is read and compared in.
+#[cfg(windows)]
+fn verbatim(path: &Path) -> io::Result<PathBuf> {
+    Ok(unwide(&noclobber::verbatim(path)?))
+}
+
 /// The root of the volume `path` is on, as its names under it are given.
 #[cfg(windows)]
 fn volume_of(path: &Path) -> io::Result<PathBuf> {
     use windows_sys::Win32::Storage::FileSystem::GetVolumePathNameW;
 
     let mut root = vec![0u16; LONGEST as usize];
+    let path = noclobber::verbatim(path)?;
     // SAFETY: the path is NUL-terminated, and `root` is as long as the length the call is given.
-    if unsafe { GetVolumePathNameW(wide(path).as_ptr(), root.as_mut_ptr(), LONGEST) } == 0 {
+    if unsafe { GetVolumePathNameW(path.as_ptr(), root.as_mut_ptr(), LONGEST) } == 0 {
         return Err(io::Error::last_os_error());
     }
     Ok(unwide(&root))
 }
 
-/// Every full name the file at `path` has, on its volume.
+#[cfg(test)]
+thread_local! {
+    static UNREADABLE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Makes every file's names unreadable on this thread, as on a drive that cannot list them.
+#[cfg(test)]
+fn names_unreadable() {
+    UNREADABLE.set(true);
+}
+
+/// Every full name the file at `path` has, on its volume, verbatim.
 #[cfg(windows)]
 fn names_of(path: &Path) -> io::Result<Vec<PathBuf>> {
     use windows_sys::Win32::Foundation::{ERROR_HANDLE_EOF, INVALID_HANDLE_VALUE};
@@ -216,7 +239,11 @@ fn names_of(path: &Path) -> io::Result<Vec<PathBuf>> {
         FindClose, FindFirstFileNameW, FindNextFileNameW,
     };
 
-    let path = std::path::absolute(path)?;
+    #[cfg(test)]
+    if UNREADABLE.get() {
+        return Err(io::ErrorKind::Unsupported.into());
+    }
+    let path = verbatim(path)?;
     let volume = volume_of(&path)?;
     let mut name = vec![0u16; LONGEST as usize];
     let mut length = LONGEST;
@@ -292,7 +319,7 @@ impl Bin for RecycleBin {
     }
 
     fn holds(&self, name: &Path) -> bool {
-        let Ok(volume) = volume_of(name) else {
+        let (Ok(name), Ok(volume)) = (verbatim(name), volume_of(name)) else {
             return false;
         };
         name.strip_prefix(&volume)
@@ -380,7 +407,10 @@ pub(crate) mod tests {
             let (Stand::Recycles(bin) | Stand::Relinks(bin)) = &self.stand else {
                 return false;
             };
-            let lower = |path: &Path| PathBuf::from(path.to_string_lossy().to_lowercase());
+            let lower = |path: &Path| {
+                let text = path.to_string_lossy().to_lowercase();
+                PathBuf::from(text.strip_prefix(r"\\?\").unwrap_or(&text))
+            };
             lower(name).starts_with(lower(bin))
         }
     }
@@ -528,11 +558,16 @@ pub(crate) mod tests {
         };
         assert_eq!(
             lower(names_of(&file).unwrap()),
-            lower(vec![
-                dir.join("elsewhere/0.jpg"),
-                dir.join("elsewhere/1.jpg"),
-                file.clone(),
-            ])
+            lower(
+                [
+                    dir.join("elsewhere/0.jpg"),
+                    dir.join("elsewhere/1.jpg"),
+                    file.clone(),
+                ]
+                .iter()
+                .map(|path| verbatim(path).unwrap())
+                .collect()
+            )
         );
 
         let volume = volume_of(&dir).unwrap();
@@ -541,6 +576,65 @@ pub(crate) mod tests {
         assert!(shell.holds(&volume.join(r"$RECYCLE.BIN\S-1-5-21\$RAB12CD.jpg")));
         assert!(!shell.holds(&dir.join(r"$Recycle.Bin\S-1-5-21\$RAB12CD.jpg")));
         assert!(!shell.holds(&file));
+        let plain = volume.to_string_lossy().replace(r"\\?\", "");
+        assert!(shell.holds(&Path::new(&plain).join(r"$Recycle.Bin\S-1-5-21\$RAB12CD.jpg")));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_file_whose_second_name_is_past_max_path_is_still_recycled() {
+        let dir = scratch("long");
+        let trash = dir.join("trash");
+        let room = 255 - trash.as_os_str().len();
+        let file = trash.join(format!("{}.jpg", "a".repeat(room - 5)));
+        assert!(file.as_os_str().len() < 260 && hold_of(&file).as_os_str().len() >= 260);
+        std::fs::write(&file, "one").unwrap();
+        let bin = Fake::new(Stand::Recycles(dir.join("bin")));
+
+        assert_eq!(send(&bin, &file).unwrap(), Sent::Recycled);
+        assert!(names(&trash).is_empty());
+        assert_eq!(names(&dir.join("bin")).len(), 1);
+    }
+
+    #[test]
+    fn a_file_whose_names_cannot_be_read_is_refused_and_never_handed_to_the_shell() {
+        let dir = scratch("unreadable");
+        let file = one_with_names(&dir, 1);
+        let bin = Fake::new(Stand::Recycles(dir.join("bin")));
+        names_unreadable();
+
+        assert_eq!(send(&bin, &file).unwrap(), Sent::Refused);
+        assert!(bin.asked.borrow().is_empty());
+        assert_eq!(names(&dir.join("trash")), ["one.jpg"]);
+        assert_eq!(identity(&file).unwrap().links, 2);
+        assert!(!dir.join("bin").exists());
+    }
+
+    #[test]
+    fn a_name_already_in_the_bin_never_counts_as_the_send() {
+        for deleted in [true, false] {
+            let dir = scratch(&format!("in-bin-already-{deleted}"));
+            let file = dir.join("trash/one.jpg");
+            std::fs::write(&file, "one").unwrap();
+            std::fs::create_dir_all(dir.join("bin")).unwrap();
+            std::fs::hard_link(&file, dir.join("bin/$Rold.jpg")).unwrap();
+            let mut bin = Fake::new(Stand::Recycles(dir.join("bin")));
+            if deleted {
+                bin.deletes.push("one".into());
+            }
+
+            let sent = send(&bin, &file).unwrap();
+            if deleted {
+                assert_eq!(sent, Sent::Refused);
+                assert_eq!(names(&dir.join("trash")), ["one.jpg"]);
+                assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
+                assert_eq!(names(&dir.join("bin")), ["$Rold.jpg"]);
+            } else {
+                assert_eq!(sent, Sent::Recycled);
+                assert!(names(&dir.join("trash")).is_empty());
+                assert_eq!(names(&dir.join("bin")), ["$Rold.jpg", "one.jpg"]);
+            }
+        }
     }
 
     #[test]
