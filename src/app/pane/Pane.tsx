@@ -7,10 +7,11 @@ import { PushDown } from "../../ui/PushDown";
 import { updatePreferences, usePreferences } from "../preferences";
 import { Actions } from "./Actions";
 import { Details } from "./Details";
+import { FolderPane, FolderPaneHeader } from "./FolderPane";
 import { setFullScreen, useFullScreen } from "./full-screen";
 import { Media } from "./Media";
 import { PaneSet } from "./PaneSet";
-import { usePaneDetail, usePaneSetDetail } from "./pane-detail";
+import { usePaneDetail, usePaneFolderDetail, usePaneSetDetail } from "./pane-detail";
 import { usePaneSet } from "./pane-store";
 import { Strip } from "./Strip";
 
@@ -24,6 +25,7 @@ export function PaneHeader() {
   const shown = usePaneDetail();
   const set = usePaneSet();
   const several = usePaneSetDetail();
+  const folder = usePaneFolderDetail();
   const open = usePreferences().details ?? false;
   const full = useFullScreen();
   const into = (
@@ -34,6 +36,7 @@ export function PaneHeader() {
       onClick={() => setFullScreen(!full)}
     />
   );
+  if (folder.status !== "empty") return <FolderPaneHeader shown={folder} into={into} />;
   // Details are about one file, so a set's header counts them and is not a disclosure.
   if (set.length > 1) {
     return (
@@ -71,7 +74,9 @@ export function Pane() {
   const shown = usePaneDetail();
   const set = usePaneSet();
   const several = usePaneSetDetail();
+  const folder = usePaneFolderDetail();
   const open = usePreferences().details ?? false;
+  if (folder.status !== "empty") return <FolderPane shown={folder} />;
   if (set.length > 1) {
     // The bar goes, as wherever there is no one file to act on. Pane › several.
     return (

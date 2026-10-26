@@ -3,6 +3,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import type { FolderDetail } from "../../ipc/bindings/FolderDetail";
 import { folderDetail } from "../../ipc/commands";
 import { useIndex } from "../navigation/index-store";
+import type { Crumb } from "../place";
 
 // Whether the band is open, for the whole session and whichever folder is shown: a person who
 // opened it once wants it on the next folder too. DECISIONS.md "A folder's details".
@@ -37,6 +38,11 @@ export function detailChanged() {
   changed();
 }
 
+/** A count that moves each time what a folder knows about itself changes. */
+export function useDetailVersion() {
+  return useSyncExternalStore(subscribe, () => version);
+}
+
 /** A folder's details, read again whenever the index or the folder itself changes. */
 export function useFolderDetail(folderId: number | null) {
   const { sources } = useIndex();
@@ -54,6 +60,11 @@ export function useFolderDetail(folderId: number | null) {
     };
   }, [folderId, sources, read]);
   return found?.id === folderId ? found : null;
+}
+
+/** Where a folder is on disk: its source's directory, then each folder down from it. */
+export function diskPath(root: string, path: readonly Crumb[]) {
+  return [root.replace(/[\\/]+$/, ""), ...path.slice(1).map((crumb) => crumb.title)].join("\\");
 }
 
 /** Closes the band and forgets what was read, for tests. */

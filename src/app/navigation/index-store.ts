@@ -15,7 +15,7 @@ import {
   listFolders,
   listSources,
 } from "../../ipc/commands";
-import { getPaneOrigin, movePaneOrigin, showInPane } from "../pane/pane-store";
+import { dropPaneFolder, getPaneOrigin, movePaneOrigin, showInPane } from "../pane/pane-store";
 import { type Crumb, getPlace, type Place, setPlace } from "../place";
 import { openFolders, setOpenFolders } from "./open-folders";
 
@@ -79,6 +79,7 @@ async function settle(sources: SourceSummary[]) {
   const from = now(origin);
   if (origin !== null && (from === null || leaf(from) !== leaf(origin))) showInPane(null);
   else if (from && from !== origin) movePaneOrigin(from);
+  dropPaneFolder((shown) => !sources.some((source) => source.id === shown.sourceId));
 
   const library = sources.find((source) => source.kind === "library");
   if (getPlace() === null && library) {

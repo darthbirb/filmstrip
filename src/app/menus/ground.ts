@@ -1,25 +1,45 @@
-import type { HeadedMenu } from "../../ui/Menu";
+import type { HeadedMenu, MenuAnchor } from "../../ui/Menu";
 import type { Place } from "../place";
 
 /** A point in the window, where the ground's menu opened and what its verbs open against. */
 export type Point = { x: number; y: number };
 
+/** What a place menu's follow-ups open against: a menu, a picker, and the export sheet hung under it. */
+export type Against = { anchor: () => MenuAnchor; sheet: () => HTMLElement | null };
+
 /**
- * Navigation's menu for a place, the one its row has, opened from the grid's ground instead.
- * DECISIONS.md "Right-click menus".
+ * Navigation's menu for a place, the one its row has, opened somewhere other than its row: the
+ * grid's ground, a search's folder card, the pane's ⋯. DECISIONS.md "Right-click menus".
  */
-export type GroundMenu = (place: Place, at: Point) => HeadedMenu;
+export type PlaceMenu = (place: Place, against: Against) => HeadedMenu;
 
-let menu: GroundMenu = () => ({ groups: [] });
+/** A menu has handed the focus back to what opened it by the time a verb runs. */
+export const fromFocus: Against = {
+  anchor: () => {
+    const element = document.activeElement;
+    return element instanceof HTMLElement ? { element } : { x: 0, y: 0 };
+  },
+  sheet: () => {
+    const element = document.activeElement;
+    return element instanceof HTMLElement ? element : null;
+  },
+};
 
-/** Navigation says what each place's ground holds; the newest answer stands. */
-export function setGroundMenu(next: GroundMenu) {
+let menu: PlaceMenu = () => ({ groups: [] });
+
+/** Navigation says what each place's menu holds; the newest answer stands. */
+export function setPlaceMenu(next: PlaceMenu) {
   menu = next;
+}
+
+/** A place's menu under its name, its verbs opening `against` where it was asked from. */
+export function placeMenu(place: Place, against: Against) {
+  return menu(place, against);
 }
 
 /** The menu a right-click on the grid's ground opens: the place's own, under its name. */
 export function groundMenu(place: Place, at: Point) {
-  return menu(place, at);
+  return menu(place, { anchor: () => at, sheet: placeHeader });
 }
 
 /** The header naming the place, which a sheet asked for from the ground hangs under. */

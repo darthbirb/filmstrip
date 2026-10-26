@@ -2,9 +2,10 @@ import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import type { Contents } from "../../ipc/bindings/Contents";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
-import { deleteFolder, folderFileCount } from "../../ipc/commands";
+import { deleteFolder, folderDetail, folderFileCount } from "../../ipc/commands";
 import { Question } from "../../ui/Question";
 import { libraryChanged } from "../library";
+import { dropPaneFolder, getPaneFolder } from "../pane/pane-store";
 import { getPreferences, updatePreferences } from "../preferences";
 import { folderStayedBanner, folderStayedLine, holdsLine } from "../undo/lines";
 import { showReport } from "../undo/report-store";
@@ -55,9 +56,11 @@ async function settle(
   held: number,
   sources: readonly SourceSummary[],
 ) {
+  const inPane = await showsInPane(folder.id);
   const done = await deleteFolder(folder.id, contents).catch(() => null);
   if (!done) return;
   const { batch, report } = done;
+  if (report.deleted && inPane !== null) dropPaneFolder((shown) => shown.folderId === inPane);
   const into =
     contents?.kind === "moveTo"
       ? (sources.find((source) => source.id === contents.sourceId)?.title ?? null)
@@ -75,6 +78,15 @@ async function settle(
     });
   }
   await libraryChanged();
+}
+
+/** The folder the pane shows, when it is this one or inside it. */
+async function showsInPane(folderId: number) {
+  const shown = getPaneFolder();
+  if (!shown) return null;
+  if (shown.folderId === folderId) return shown.folderId;
+  const detail = await folderDetail(shown.folderId).catch(() => null);
+  return detail?.path.some((crumb) => crumb.id === folderId) ? shown.folderId : null;
 }
 
 function subscribe(listener: () => void) {

@@ -21,6 +21,8 @@ export type MenuAction = {
   glyph?: GlyphName;
   /** The glyph drawn filled, for a row that undoes a state the item is in. */
   filled?: boolean;
+  /** The glyph mirrored, as the pane's panel glyph is the navigation's. */
+  flip?: boolean;
   /** The one row that cannot be taken back, drawn apart in the danger hue. */
   tone?: "danger";
   /** A destination key drawn where the glyph would be, as a list of keys has them. */
@@ -83,6 +85,7 @@ function MenuList({
             <Glyph
               name={action.glyph}
               filled={action.filled}
+              flip={action.flip}
               className={`text-glyph ${action.tone === "danger" ? "" : "text-fg-dim"}`}
             />
           )}

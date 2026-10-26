@@ -24,7 +24,7 @@ import { type HeadedMenu, useContextMenu } from "../../ui/Menu";
 import { SelectBox } from "../../ui/SelectBox";
 import { SkeletonTile } from "../../ui/Skeleton";
 import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
-import { groundMenu } from "../menus/ground";
+import { fromFocus, groundMenu, placeMenu } from "../menus/ground";
 import { itemMenu, setMenu } from "../menus/item-menu";
 import { setFullScreen } from "../pane/full-screen";
 import { showInPane, usePaneItem, usePaneSet } from "../pane/pane-store";
@@ -272,6 +272,15 @@ export function Grid({ mode }: { mode: LayoutMode }) {
                     onOpen={() =>
                       setPlace({ kind: "folder", sourceId: folder.sourceId, path: folder.path })
                     }
+                    onMenu={(event) => {
+                      const at: Place = {
+                        kind: "folder",
+                        sourceId: folder.sourceId,
+                        path: folder.path,
+                      };
+                      const { heading, groups } = placeMenu(at, fromFocus);
+                      ground.open(event, heading ?? "", groups, heading);
+                    }}
                     onScope={() => void scopeTo(folder.path.map((crumb) => crumb.title))}
                   />
                 ))}
