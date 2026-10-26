@@ -692,7 +692,7 @@ and one height in justified rows is equal cells by another measure.
 - **The limit is twelve, measured.** On 20 October 2026, in a headed Chromium 155 on the owner's
   machine and in the headless Edge the tests use, twelve 6000 × 4000 JPEG originals in a
   full-screen pane held 60 frames a second with no frame late; that is what
-  `src/app/pane/set-frame-rate.test.tsx` holds `pane-set` to. Playing clips are the dearer part,
+  `src/app/pane/set-frame-rate.timing.test.tsx` holds `pane-set` to. Playing clips are the dearer part,
   and were measured apart: two 1080p clips drop Chromium's drawing to the clips' own 30 a
   second even in a bare page with nothing else on it, two 640 × 360 ones too, so that is the
   engine pacing video and not the set; and the canvas-recorded VP8 clips the tests can make kept

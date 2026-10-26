@@ -55,6 +55,9 @@ jobs:
       - name: Component tests
         run: npx --yes pnpm@12.4.1 test
 
+      - name: 'Component timing tests, one file at a time'
+        run: 'npx --yes pnpm@12.4.1 test:timing'
+
       - name: End-to-end tests
         run: npx --yes pnpm@12.4.1 test:e2e
 
