@@ -80,7 +80,8 @@ export function FolderPaneHeader({ shown, into }: { shown: FolderShown; into: Re
 
 /**
  * A folder where a file would stand: its band's rows behind the disclosure, its cover in the
- * picture's place, what can be done to it, and a strip of its own files. Pane › folder.
+ * picture's place, what can be done to it, and a strip of its own files.
+ * DECISIONS.md "A folder in the pane".
  */
 export function FolderPane({ shown }: { shown: FolderShown }) {
   const open = usePreferences().details ?? false;

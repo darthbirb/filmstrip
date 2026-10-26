@@ -74,7 +74,7 @@ export function EmptyPlace({ place }: { place: Place }) {
   );
 }
 
-/** A place whose drive is away: whose drive, and what was there, in a folder below the source's own. */
+/** A place whose drive is away: whose drive, and what was there, `in` a folder below its source's own. */
 export function OfflinePlace({
   source,
   held,

@@ -67,26 +67,3 @@ Drawn in Pane › 02, the column beside "A video", in the built plate's own valu
 - Keys, while the focus is on the video or in its plate: `,` and `.` step, `<` and `>` change the
   speed without wrapping, Space plays and pauses, `M` mutes. The video takes the focus as a
   zoomable picture does.
-
-## A folder in the pane · DRAWN
-
-A folder can be shown in the pane rather than a file: its cover, counts and details (#67).
-
-Drawn in Pane › folder, and as the first row of every folder and source menu in Components ›
-Right-click and Artboards › Bringing files in:
-
-- Show in Pane heads a folder's, a source's and a folder card's menu, an offline one's too, since
-  the pane reads only the index. A sorting source's folder has none: its band has no rows to
-  show. The header carries the folder's name, ending in an ellipsis, and its count pill, which
-  never leaves; offline, the word `offline`.
-- The cover stands in the picture's place at its own shape, the band's cover rule and pencil
-  with it, and does not zoom. The details are the band's rows, one component in both places,
-  behind the pane's own disclosure and its saved preference.
-- The bar: Open Cairo, the one worded button, which never leaves and goes into the folder; Show
-  in Explorer, which folds into the ⋯; the ⋯ holding the folder's menu without Show in Pane.
-  Rename opens the folder's tree row; once the folder is deleted the pane shows nothing.
-- The strip runs through the folder's own files, none ringed; a frame or the forward step shows
-  that file with the folder as its place. No own files, no strip.
-- Offline: the grid's offline empty state in the picture's place, no strip, no Show in Explorer,
-  and the ⋯ keeps the offline row's three. Empty: "This Folder Is Empty". Gone outside the app:
-  "This Folder Has Gone" over its path, the fold alone in the header and no bar.

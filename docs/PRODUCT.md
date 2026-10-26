@@ -89,7 +89,8 @@ folder.
 Navigation on one side, the grid in the middle, the pane on the other. The pane shows the item
 you clicked; clicking another replaces it, and dragging items onto it adds them, up to a limit —
 several at once are scaled together so all of them are in sight. One mode, not a preview mode and
-a grid mode.
+a grid mode. A folder can be shown there too, from its menu: its cover, its counts and its
+details, so it can be looked at without leaving the place you are in.
 
 Along the pane's foot, a filmstrip steps through the place the item was clicked in. The pane
 keeps both while the user looks somewhere else.
