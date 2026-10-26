@@ -561,7 +561,8 @@ measured, never a breakpoint. DECISIONS.md "The interface size" has the reasonin
 - **The pane shows `--pane-set` files at most**, twelve, a count rather than a length, set from
   the frame rate measured with that many originals on screen. Dropped together they share one
   scale, and none is drawn under `pane-set-least` on its shorter side or `pane-set-least-long` on
-  its longer, so its × and a video's mute fit a `tile-inset` in.
+  its longer, so its × and a video's mute fit a `tile-inset` in. A file with no shape to draw
+  stands in at that floor.
 - **Settings** is `dialog` wide and `dialog-height` tall, never more than the window, with a
   `dialog-rail`-wide rail of sections.
 
@@ -787,8 +788,9 @@ toward the rest surface.
   disclosure; the action bar goes. Under the pointer or the keyboard's focus a file shows a badge
   button with × a `tile-inset` in from its band's top-right; a video loops muted with its mute
   badge button a `tile-inset` in from the bottom-left, the speaker struck through until it has the
-  sound. While a drag over it will be taken, the whole pane wears the accepting row's 2px `plate`
-  ring inside its edge at the `control` corner, and no wash.
+  sound. A file with nothing to draw, or whose original fails with no thumbnail, is its extension
+  in `small` `fg-dim` on the hatch. While a drag over it will be taken, the whole pane wears the
+  accepting row's 2px `plate` ring inside its edge at the `control` corner, and no wash.
 - **Badge button.** A glyph that acts on a picture: a `badge` square at the `badge` corner on
   `veil`, its glyph `glyph-small` in `fg`, `hover-wash` under the pointer and the focus ring for
   the keyboard; the cover's pencil is one too.

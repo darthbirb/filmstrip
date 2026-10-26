@@ -27,12 +27,17 @@ const SLACK = 1e-6;
 
 /**
  * Where one file is drawn at the set's scale: lifted to the floor, never past the area, and in a
- * band the floor's size across it when the area cut it back from the floor.
+ * band the floor's size across it when the area cut it back from the floor. A file with no shape
+ * has no pixels to scale, and stands in at the floor, landscape.
  */
 export function place(file: Size, scale: number, area: Size, least: Least): Placed {
   const { width, height } = file;
   if (!(width > 0 && height > 0)) {
-    return { box: { width: 0, height: 0 }, drawn: { width: 0, height: 0 } };
+    const stand = {
+      width: Math.min(area.width, least.long),
+      height: Math.min(area.height, least.short),
+    };
+    return { box: stand, drawn: stand };
   }
   const lift = Math.max(
     least.short / Math.min(width, height),

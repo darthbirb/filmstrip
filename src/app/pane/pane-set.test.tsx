@@ -4,8 +4,9 @@ import { render } from "vitest-browser-react";
 
 import { clip, serveFiles } from "../../dev/media";
 import { recording } from "../../dev/recording";
+import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
-import { folderItems, undoLast } from "../../ipc/commands";
+import { folderItems, itemDetail, undoLast } from "../../ipc/commands";
 import { Frame } from "../frame/Frame";
 import { Grid } from "../grid/Grid";
 import { clearChecked, toggleChecked } from "../grid/selection";
@@ -14,6 +15,7 @@ import { updatePreferences } from "../preferences";
 import { deleteFiles } from "./delete";
 import { getFullScreen, setFullScreen, useEscapeLeavesFullScreen } from "./full-screen";
 import { Pane, PaneHeader } from "./Pane";
+import { PaneSet } from "./PaneSet";
 import { PaneDetailProvider } from "./pane-detail";
 import { addToPane, getPaneItem, getPaneSet, showInPane } from "./pane-store";
 
@@ -116,6 +118,38 @@ test("the set draws at one scale inside the area, at every pane size, rows centr
     for (const scale of scales) expect(scale / (scales[0] ?? 1)).toBeCloseTo(1, 2);
     await screen.unmount();
   }
+});
+
+test("a file with no shape stands in at the floor, its extension on the hatch, and counts", async () => {
+  const [pyramid, sphinx] = await Promise.all(
+    ["pyramid.jpg", "sphinx.jpg"].map((name) => itemDetail(id(name))),
+  );
+  if (!pyramid || !sphinx) throw new Error("the mock has no pyramid.jpg or sphinx.jpg");
+  const notes: ItemDetail = {
+    ...pyramid,
+    id: 9001,
+    uuid: "notes",
+    diskName: "notes.pdf",
+    ext: "pdf",
+    kind: "other",
+    width: null,
+    height: null,
+    thumb: null,
+    path: "D:\\Pictures\\Cairo\\notes.pdf",
+  };
+  await render(
+    <div style={{ display: "flex", width: 320, height: 640 }}>
+      <PaneSet items={[pyramid, notes, sphinx]} />
+    </div>,
+  );
+  const stand = file("notes.pdf");
+  await expect.element(stand.getByText("PDF")).toBeVisible();
+  const box = stand.element().getBoundingClientRect();
+  const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
+  expect(box.width).toBeCloseTo(4 * rem, 0);
+  expect(box.height).toBeCloseTo(2.25 * rem, 0);
+  await stand.click();
+  expect(getPaneSet()).toEqual([9001]);
 });
 
 test("the set's files are read in one call, not one call each", async () => {

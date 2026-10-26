@@ -210,7 +210,9 @@ function SetFile(props: FileProps) {
         className="focus-ring relative block shrink-0 rounded-control"
         style={{ width: placed.drawn.width, height: placed.drawn.height }}
       >
-        {item.kind === "video" ? (
+        {state === "failed" && !thumb ? (
+          <StandIn ext={item.ext} />
+        ) : item.kind === "video" ? (
           <video
             ref={video}
             className="block size-full rounded-control object-cover"
@@ -231,7 +233,7 @@ function SetFile(props: FileProps) {
           <>
             {thumb && state === "failed" && (
               <img
-                className="absolute inset-0 size-full rounded-control"
+                className="absolute inset-0 size-full rounded-control object-contain"
                 src={thumb}
                 alt=""
                 draggable={false}
@@ -252,9 +254,7 @@ function SetFile(props: FileProps) {
             />
           </>
         ) : (
-          <span className="hatch grid size-full place-items-center rounded-control text-fg-dim text-small">
-            {item.ext.toUpperCase() || "File"}
-          </span>
+          <StandIn ext={item.ext} />
         )}
       </button>
       <BadgeButton
@@ -275,6 +275,15 @@ function SetFile(props: FileProps) {
         />
       )}
     </div>
+  );
+}
+
+/** What is drawn for a file with nothing to draw: its extension on the hatch. */
+function StandIn({ ext }: { ext: string }) {
+  return (
+    <span className="hatch grid size-full place-items-center rounded-control text-fg-dim text-small">
+      {ext.toUpperCase() || "File"}
+    </span>
   );
 }
 

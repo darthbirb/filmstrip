@@ -87,6 +87,17 @@ test("a file smaller than the floor at its own pixels is drawn up to it", () => 
   expect(size(tall.drawn)).toEqual([36, 144]);
 });
 
+test("a file with no shape stands in at the floor, and takes its room in the rows", () => {
+  const none = { width: 0, height: 0 };
+  const alone = place(none, 0.05, WIDE, LEAST);
+  expect(size(alone.drawn)).toEqual([64, 36]);
+  expect(size(alone.box)).toEqual([64, 36]);
+  const set = layOutSet([photo, none, photo], WIDE, GAP, LEAST);
+  expect(size(set.files[1]?.drawn ?? none)).toEqual([64, 36]);
+  expect(set.fits).toBe(true);
+  expect(set.rows.reduce((sum, count) => sum + count, 0)).toBe(3);
+});
+
 test("a panorama is held to the area in the floor's band, and holds the set's scale there", () => {
   const nile = { width: 12000, height: 1000 };
   const big = { width: 6000, height: 4000 };

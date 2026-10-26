@@ -700,6 +700,10 @@ and one height in justified rows is equal cells by another measure.
   by the GPU in the real window is cheaper than that, so twelve stands, measured on pictures.
 - **Videos loop from the start, muted**, each with its own mute; giving one the sound takes it
   from the one that had it, so one plays aloud at a time.
+- **A file with no shape stands in at the floor**, landscape, its extension on the hatch as the
+  lone pane shows it: a file of another kind, or a picture whose original fails with no
+  thumbnail when the index lacks its shape. Refusing it at the drop would turn away a file the
+  pane already shows alone; drawn, it counts, takes the arrows' focus and its ×, as any file does.
 - **The set is one tab stop.** The arrows move in reading order, Enter shows one alone, and Tab
   reaches the focused file's ×. × takes a file out and does nothing to it, the focus passing to
   the next, or the one before; the last but one leaves the ordinary pane, its picture focused.
