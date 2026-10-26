@@ -137,6 +137,25 @@ pub fn item_stats(conn: &Connection, id: i64) -> Result<(i64, i64)> {
     )?)
 }
 
+/// Every item of a source in the Trash, oldest first.
+pub fn trashed(conn: &Connection, id: i64) -> Result<Vec<i64>> {
+    let mut stmt = conn.prepare(
+        "SELECT id FROM item WHERE source_id = ?1 AND trashed_at IS NOT NULL ORDER BY id",
+    )?;
+    Ok(stmt
+        .query_map(params![id], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?)
+}
+
+/// How many items of a source are in the Trash.
+pub fn trashed_count(conn: &Connection, id: i64) -> Result<i64> {
+    Ok(conn.query_row(
+        "SELECT COUNT(*) FROM item WHERE source_id = ?1 AND trashed_at IS NOT NULL",
+        params![id],
+        |r| r.get(0),
+    )?)
+}
+
 /// The app's own label for a source, not the folder's name on disk. Its root folder
 /// carries the same words, so navigation and Settings never disagree.
 pub fn rename(conn: &Connection, id: i64, title: &str) -> Result<()> {

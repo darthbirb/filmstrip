@@ -31,6 +31,10 @@ pub fn run() {
             jobs::abandon_exports(&conn)?;
             db::jobs::requeue_running(&conn)?;
             jobs::enqueue_index(&conn)?;
+            let put = fs::recycle::sweep(&fs::paths::trash_dir()?);
+            if put > 0 {
+                eprintln!("trash: {put} held files put back");
+            }
 
             // The window may load files from the sources, the thumbnail cache and the trash, where
             // a file waits to be restored; and nothing else.
@@ -184,6 +188,7 @@ pub fn run() {
             commands::list_backups,
             commands::back_up_now,
             commands::restore_backup,
+            commands::restore_forgets,
             commands::set_backups_kept,
             commands::launch_backup_refusal,
             commands::ui_preferences,

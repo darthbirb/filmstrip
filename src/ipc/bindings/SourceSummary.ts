@@ -14,6 +14,10 @@ reachable: boolean,
  */
 itemCount: number, rootCount: number, totalBytes: number, 
 /**
+ * Its files in the Trash, which go to the Recycle Bin when it is removed.
+ */
+trashCount: number, 
+/**
  * Whether its own folder is a favourite place.
  */
 favorite: boolean, id: number, root: string, title: string, kind: SourceKind, addedAt: number, 

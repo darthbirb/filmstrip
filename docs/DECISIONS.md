@@ -672,7 +672,8 @@ Shift+F10 did nothing at all.
   between two groups that both hold rows, so an absent verb leaves no stray line, and a menu with
   nothing in it opens nothing.
 - **What a drive that is away cannot do is absent too.** An offline source keeps Rename, Manage
-  Sources and Remove Source, which touch only the index; it and its folders keep Favourite, Assign
+  Sources and Remove Source, which touch only the index and the app's own Trash, never the drive;
+  it and its folders keep Favourite, Assign
   Key… and Select Everything Inside, as their band keeps what the index holds, and lose every verb
   that needs the folder on disk.
 - **Favourite is on a folder's and a source's menu**, reading Remove Favourite when on, from
@@ -1083,22 +1084,25 @@ does not: tags, labels, notes, statuses, covers, favourites, keys and the undo j
 - **A restore checks the chosen backup whole first**, every page read, and refuses one that cannot
   be read, or that a later build wrote, before anything is written. Then the queue is held: each
   copy and export is stopped as its Cancel would, a walk stops before its next directory, and
-  the restore waits for every job in flight. Then the index as it is is backed up, "before restore";
+  the restore waits for every job in flight. Then each file in the Trash the restore would forget
+  goes to the Recycle Bin, its row with it; with any the bin cannot take, the restore stops there,
+  nothing backed up and nothing swapped. Then the index as it is is backed up, "before restore";
   then the chosen one is copied aside, brought to this build's schema, settled, and copied over the
   live index by the backup API in one write, so one that fails part way leaves the index as it
-  was. Only once that has succeeded do the oldest go, and never the one restored: had it been the
+  was but for the files already sent, which stand and which the failure names. Only once that has
+  succeeded do the oldest go, and never the one restored: had it been the
   oldest, it stays past the number until the next backup. Rotating, queueing the walk and letting
   the window load from every source the restored index has follow it, and none of them can fail a
   restore that has swapped.
 - **What a restore leaves as it is now.** The index goes back; the disk does not. The Trash is kept
   as it is now: a file in it since the backup is in it again from the folder it left, found by its
   source's root and the titles below it, with the folders on the way made retired where the
-  backup has none. One from a source added since, or from a place the backup cannot find, loses
-  its row as that source's other rows do, and its file is left in `data\trash` untouched: never
-  shown, never restorable and never expiring, as when a source is removed, until #110 settles what
-  becomes of such files. A row the backup has in the Trash whose file is no longer in
-  `data\trash` is retired where it was, keeping its tags and uuid for the walk to find again, or
-  dropped where a file there now has its name. The job queue starts empty but for the walk, which
+  backup has none. One from a source added since, or from a place the backup cannot find, is
+  forgotten as that source's other rows are, so its file goes to the Recycle Bin first, as a
+  removed source's do, and the question names the sources and counts the files beforehand. A row
+  the backup has in the Trash whose file is no longer in `data\trash` is retired where it was,
+  keeping its tags and uuid for the walk to find again, or dropped where a file there now has its
+  name. The job queue starts empty but for the walk, which
   runs at once, so a copy or an export waiting in the backup never runs again and files moved or
   added since are found where they are. A source added since is forgotten, and its files on disk
   are left as they are.
@@ -1122,6 +1126,65 @@ promise the person has to keep in mind.
   trash deletes outright, and it asks first.
 - **An item over the per-item size goes where an expiry would**: refused by the trash, the delete
   offers to send it to the Recycle Bin instead.
+- **A removed source's trashed files go there too**, and so does each trashed file a restore of
+  the index would forget (#110). Removing a source forgets its rows, the trashed ones with them,
+  and a file left in `data\trash` with no row would never be shown, restored or expired. The
+  files go first, each row with its file, one already gone counting as sent, and the source only
+  once every one has gone; a file the Recycle Bin cannot take stays in the Trash under its row,
+  the rest still go, and the source stays with it. Nothing is predicted: the question says what
+  happens if nothing refuses, and the band says what did when something does. Artboards ›
+  Sources, "What removing does with its trashed files".
+
+## Sending to the Recycle Bin
+
+**`fs::recycle::send` hands a file to the shell's Recycle Bin and never lets it be destroyed**,
+built on 20 October 2026 for #110 and meant for expiry (#70) too. The Recycle Bin cannot take
+every file: a drive with none, such as a removable one or a network share, the bin turned off,
+or a file over its quota. There the shell deletes it outright, and asking it not to means a
+dialog, which the app never shows on its behalf.
+
+- **A second name first, then its names, then the shell, then its names again.** Before the
+  shell is asked, the file is given a second name beside it by a hard link, and that file's names
+  are read through `FindFirstFileNameW`. The bin moves a file within its own volume, so a file it
+  took gains a name under that volume's `$Recycle.Bin`. Only with a name there that was not there
+  before is the second name removed and the file counted as sent. Otherwise, and when its names
+  cannot be read afterwards, the second name is given the file's own name back and the file is
+  refused. Whatever the shell answers, the disk says which happened, so a refusal is never
+  mistaken for a send. The count of names, compared before and after, is not enough: something on
+  the disk giving the file a name elsewhere while the shell deletes it outright leaves the count
+  unchanged, with the file in neither the Trash nor the bin. A user's file can already have other
+  names, from a dedup tool or a link-based backup, and keeps them into the Trash, since trashing
+  within a volume is a rename; one can even be in the bin already, when the user recycled another
+  of its names. Those never count as the send, being there before it.
+- **A file whose names cannot be read is never sent.** A drive or filter that cannot list a
+  file's names, or one without hard links, would leave the app unable to tell a send from a
+  delete; read only after the shell, it turned a file the bin took into a refusal, and every retry
+  left one more copy in the bin. So the names are read before the shell is asked, and where they
+  cannot be, the second name is removed and the file refused without asking. Names are read in
+  verbatim form, as `std::fs` and `noclobber` pass theirs, since the second name is longer than
+  the file's and can pass MAX_PATH where the file does not.
+- **What a cut-short send left is settled at the next, and never counted as sent.** A crash
+  between the steps leaves the second name. Beside the file it is removed. Alone, it is the file
+  again, put back and sent once more; at worst the bin then holds the same file twice. A lone one
+  with a name in the bin is not counted as sent either: the disk can change while the app is
+  closed, so that name may be gone or emptied by the next look, and the twin costs only space. A
+  second name that is not the same file is never removed.
+- **Every lone second name is put back at launch.** A lone one is never counted as sent, so
+  putting it back then is what its row's next send would do, only sooner. Waiting for that send
+  left a crash during Remove Source with an item in the Trash and no file under it: not
+  restorable, not shown, and dropped by a restore of the index, which keeps only the trashed rows
+  whose files it finds. One whose row was forgotten would wait unseen forever. At launch, every
+  second name under `data\trash` alone where its file's name is free is given that name back,
+  whatever the index holds; nothing there is removed.
+- **`SHFileOperationW`, not `IFileOperation`.** The newer interface can refuse an outright delete
+  before it happens, but only through a COM sink the app would have to implement; the second name
+  gets the same promise from one flat call. The reason a file was refused is not told apart: all
+  three are the Recycle Bin refusing, and a send that fails on the disk is said in the log.
+- **Tests never reach the real bin.** The shell is behind the `Bin` trait, which also says
+  whether a name is inside it; the tests' stand-in recycles into a folder of its own, deletes
+  outright or refuses, while the second name and the file's names are real. Its files start with
+  one name and with several, one of them already in the bin, and gain one from outside while the
+  shell acts. Names that cannot be read are made so by a switch only tests have.
 
 ## Settings
 

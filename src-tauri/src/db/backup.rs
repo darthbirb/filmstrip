@@ -100,31 +100,62 @@ pub struct InTrash {
     pub disk_name: String,
     pub root: String,
     pub titles: Vec<String>,
+    pub source_id: i64,
+    pub source: String,
 }
 
 /// Everything in the live index's Trash.
 pub fn in_trash(conn: &Connection) -> Result<Vec<InTrash>> {
     let mut stmt = conn.prepare(
-        "SELECT i.id, i.uuid, i.disk_name, i.folder_id, s.root
+        "SELECT i.id, i.uuid, i.disk_name, i.folder_id, s.root, s.id, s.title
            FROM item i JOIN source s ON s.id = i.source_id
           WHERE i.trashed_at IS NOT NULL ORDER BY i.id",
     )?;
-    let rows: Vec<(i64, String, String, i64, String)> = stmt
+    let rows: Vec<(i64, String, String, i64, String, i64, String)> = stmt
         .query_map([], |r| {
-            Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+            Ok((
+                r.get(0)?,
+                r.get(1)?,
+                r.get(2)?,
+                r.get(3)?,
+                r.get(4)?,
+                r.get(5)?,
+                r.get(6)?,
+            ))
         })?
         .collect::<rusqlite::Result<_>>()?;
     rows.into_iter()
-        .map(|(id, uuid, disk_name, folder_id, root)| {
-            Ok(InTrash {
-                id,
-                uuid,
-                disk_name,
-                root,
-                titles: folders::location(conn, folder_id)?.titles,
-            })
-        })
+        .map(
+            |(id, uuid, disk_name, folder_id, root, source_id, source)| {
+                Ok(InTrash {
+                    id,
+                    uuid,
+                    disk_name,
+                    root,
+                    titles: folders::location(conn, folder_id)?.titles,
+                    source_id,
+                    source,
+                })
+            },
+        )
         .collect()
+}
+
+/// What in `trash` a restore of the backup at `path` would forget: each whose source's root it
+/// has no folder for, so [`settle`] finds no place for it.
+pub fn unplaced<'a>(path: &Path, trash: &'a [InTrash]) -> Result<Vec<&'a InTrash>> {
+    let backup = read_only(path)?;
+    let mut stmt = backup.prepare(
+        "SELECT EXISTS(SELECT 1 FROM source s JOIN folder f ON f.source_id = s.id
+                        WHERE s.root = ?1 AND f.parent_id IS NULL AND f.deleted_at IS NULL)",
+    )?;
+    let mut lost = Vec::new();
+    for one in trash {
+        if !stmt.query_row(params![one.root], |r| r.get::<_, bool>(0))? {
+            lost.push(one);
+        }
+    }
+    Ok(lost)
 }
 
 /// Makes a restored index fit what is true now: the live Trash, its folders retired where missing;
