@@ -3,7 +3,7 @@ import { type CSSProperties, type KeyboardEvent, useId, useRef, useState } from 
 
 import type { CoverChoice } from "../../ipc/bindings/CoverChoice";
 import { folderCoverChoices, setFolderCover } from "../../ipc/commands";
-import { Glyph } from "../../ui/Glyph";
+import { BadgeButton } from "../../ui/BadgeButton";
 import { SURFACE } from "../../ui/Menu";
 import { Plate } from "../../ui/Plate";
 import { detailChanged } from "./folder-detail";
@@ -60,18 +60,15 @@ export function CoverPicker({ folderId, title, chosen, anchor }: Props) {
 
   return (
     <>
-      <button
+      <BadgeButton
         ref={pencil}
-        type="button"
+        glyph="pencil"
+        label={chosen === null ? "Choose Cover · now the first picture" : "Change Cover"}
         popoverTarget={id}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={chosen === null ? "Choose Cover · now the first picture" : "Change Cover"}
-        title={chosen === null ? "Choose Cover · now the first picture" : "Change Cover"}
-        className="focus-ring hover-wash absolute top-1.5 right-1.5 grid size-badge place-items-center rounded-badge bg-veil text-fg text-glyph-small aria-expanded:outline-(length:--focus-width) aria-expanded:outline-in-pane aria-expanded:outline-offset-(--focus-gap)"
-      >
-        <Glyph name="pencil" />
-      </button>
+        className="absolute top-1.5 right-1.5 aria-expanded:outline-(length:--focus-width) aria-expanded:outline-in-pane aria-expanded:outline-offset-(--focus-gap)"
+      />
       <div
         ref={panel}
         id={id}

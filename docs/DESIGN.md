@@ -790,7 +790,7 @@ toward the rest surface.
   ring inside its edge at the `control` corner, and no wash.
 - **Badge button.** A glyph that acts on a picture: a `badge` square at the `badge` corner on
   `veil`, its glyph `glyph-small` in `fg`, `hover-wash` under the pointer and the focus ring for
-  the keyboard; the cover's pencil is the same shape.
+  the keyboard; the cover's pencil is one too.
 - **Pane disclosure.** The pane's header row: a chevron and the item's shape, length and size in
   tabular `ui` figures. A `wash` under the pointer; opened, it rests on `raised` in `fg` and the
   chevron turns down.
