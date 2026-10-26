@@ -62,7 +62,15 @@ export async function press(digit: string) {
   }
   const { checked, listed } = getChecked();
   // A pane showing several has no one file for a key to move, as it has no bar.
-  if (checked.length === 0 && getPaneSet().length > 1) return;
+  const several = getPaneSet().length;
+  if (checked.length === 0 && several > 1) {
+    setNews({
+      kind: "keyRefused",
+      line: `The pane shows ${several} files.`,
+      detail: `Check the ones to move to ${name}.`,
+    });
+    return;
+  }
   const shown = getPaneItem();
   const files =
     checked.length > 0

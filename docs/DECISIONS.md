@@ -708,8 +708,8 @@ and one height in justified rows is equal cells by another measure.
   grid still clears the grid's set and leaves the pane alone.
 - **A file deleted, moved to another folder or gone leaves the set**, and the rest stay; only when
   every file goes does the pane move on, as after deleting the one it shows. A set has no one file
-  for the bar or a destination key to act on, so the bar goes and a key with nothing checked does
-  nothing.
+  for the bar or a destination key to act on, so the bar goes and a key with nothing checked
+  moves nothing, its Line saying to check the ones to move.
 
 ## Right-click menus
 
