@@ -26,23 +26,27 @@ export async function clip(width: number, height: number, ms: number) {
   canvas.height = height;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("no 2d canvas");
-  const recorder = new MediaRecorder(canvas.captureStream(30), { mimeType: "video/webm" });
+  // Frames are pushed by hand until the encoder has written some: on a loaded machine it can fall
+  // so far behind that a clip stopped on time holds no frame and will not open.
+  const stream = canvas.captureStream(0);
+  const [track] = stream.getVideoTracks() as CanvasCaptureMediaStreamTrack[];
+  if (!track) throw new Error("the canvas gave no video track");
+  const recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
   const chunks: Blob[] = [];
   recorder.ondataavailable = (event) => chunks.push(event.data);
   const stopped = new Promise((resolve) => {
     recorder.onstop = resolve;
   });
-  recorder.start();
+  const written = () => chunks.reduce((sum, chunk) => sum + chunk.size, 0);
+  recorder.start(100);
   const start = performance.now();
-  await new Promise<void>((resolve) => {
-    const draw = (now: number) => {
-      context.fillStyle = `hsl(${((now - start) / 4) % 360} 50% 45%)`;
-      context.fillRect(0, 0, width, height);
-      if (now - start < ms) requestAnimationFrame(draw);
-      else resolve();
-    };
-    requestAnimationFrame(draw);
-  });
+  for (let now = start; now - start < ms || written() < 1000; now = performance.now()) {
+    if (now - start > 30_000) throw new Error("the encoder wrote no frame in 30 seconds");
+    context.fillStyle = `hsl(${((now - start) / 4) % 360} 50% 45%)`;
+    context.fillRect(0, 0, width, height);
+    track.requestFrame();
+    await new Promise((resolve) => setTimeout(resolve, 1000 / 30));
+  }
   recorder.stop();
   await stopped;
   return URL.createObjectURL(new Blob(chunks, { type: "video/webm" }));
