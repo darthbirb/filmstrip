@@ -40,7 +40,7 @@ test("diag", { timeout: 1_500_000 }, async () => {
   };
   await page.viewport(1600, 1000);
   await benchSet(12, { clips: 2, ms: 1000 });
-  for (const clips of [2, 3, 4]) {
+  for (const clips of [2, 3, 4, 6]) {
     for (let run = 0; run < 3; run++) {
       const stop = watch();
       const bench = await benchSet(12, { clips, ms: 3000, spans: 4 });
