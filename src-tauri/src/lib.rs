@@ -171,6 +171,7 @@ pub fn run() {
             commands::merge_label_values,
             commands::delete_label_value,
             commands::item_detail,
+            commands::items_detail,
             commands::item_path,
             commands::set_item_favorite,
             commands::reveal_item,

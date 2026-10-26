@@ -3,6 +3,7 @@ import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { clip, serveFiles } from "../../dev/media";
+import { recording } from "../../dev/recording";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { folderItems, undoLast } from "../../ipc/commands";
 import { Grid } from "../grid/Grid";
@@ -110,6 +111,20 @@ test("the set draws at one scale inside the area, at every pane size, rows centr
     for (const scale of scales) expect(scale / (scales[0] ?? 1)).toBeCloseTo(1, 2);
     await screen.unmount();
   }
+});
+
+test("the set's files are read in one call, not one call each", async () => {
+  await recording(async (calls) => {
+    showThree();
+    await render(<Harness />);
+    await expect.element(file("felucca.mp4")).toBeVisible();
+    const each = calls.filter(([cmd]) => cmd === "item_detail").map(([, args]) => args);
+    expect(each).toEqual(each.map(() => ({ itemId: id("pyramid.jpg") })));
+    expect(calls).toContainEqual([
+      "items_detail",
+      { itemIds: [id("pyramid.jpg"), id("sphinx.jpg"), id("felucca.mp4")] },
+    ]);
+  });
 });
 
 test("the header counts the files and their size, is no disclosure, and the bar goes", async () => {

@@ -84,6 +84,10 @@ export async function benchSet(
         const id = (payload as { itemId: number }).itemId;
         return files.find((file) => file.id === id) ?? null;
       }
+      if (cmd === "items_detail") {
+        const ids = (payload as { itemIds: number[] }).itemIds;
+        return ids.map((id) => files.find((file) => file.id === id) ?? null);
+      }
       if (cmd === "folder_items") return [];
       return cmd === "item_tags" ? [] : undefined;
     },

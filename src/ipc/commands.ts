@@ -242,6 +242,10 @@ export const deleteLabelValue = (tagId: number) =>
 
 export const itemDetail = (itemId: number) => invoke<ItemDetail | null>("item_detail", { itemId });
 
+/** Several items in full, in the order asked, with `null` for each one gone. */
+export const itemsDetail = (itemIds: readonly number[]) =>
+  invoke<(ItemDetail | null)[]>("items_detail", { itemIds });
+
 export const itemPath = (itemId: number) => invoke<string | null>("item_path", { itemId });
 
 export const sortingItems = (sort: Sort = FIRST_SORT) =>

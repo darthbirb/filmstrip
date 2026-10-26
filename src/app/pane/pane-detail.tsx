@@ -2,7 +2,7 @@ import { listen } from "@tauri-apps/api/event";
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
 
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
-import { itemDetail } from "../../ipc/commands";
+import { itemsDetail } from "../../ipc/commands";
 import { whenLibraryChanges } from "../library";
 import { leavePane, usePaneItem, usePaneSet } from "./pane-store";
 import { type Shown, useItemDetail } from "./useItemDetail";
@@ -44,27 +44,29 @@ function useSetDetail(ids: readonly number[]) {
     let live = true;
     const seen = new Map<number, ItemDetail>();
     const load = () => {
-      void Promise.all(ids.map((id) => itemDetail(id).catch(() => null))).then((found) => {
-        if (!live) return;
-        const leaving: number[] = [];
-        const kept: ItemDetail[] = [];
-        ids.forEach((id, at) => {
-          const now = found[at];
-          const was = seen.get(id);
-          const left =
-            !now ||
-            (was !== undefined &&
-              (was.folderId !== now.folderId ||
-                (was.trashedAt === null) !== (now.trashedAt === null)));
-          if (left) leaving.push(id);
-          else if (now) {
-            seen.set(id, now);
-            kept.push(now);
-          }
+      void itemsDetail(ids)
+        .catch(() => ids.map(() => null))
+        .then((found) => {
+          if (!live) return;
+          const leaving: number[] = [];
+          const kept: ItemDetail[] = [];
+          ids.forEach((id, at) => {
+            const now = found[at];
+            const was = seen.get(id);
+            const left =
+              !now ||
+              (was !== undefined &&
+                (was.folderId !== now.folderId ||
+                  (was.trashedAt === null) !== (now.trashedAt === null)));
+            if (left) leaving.push(id);
+            else if (now) {
+              seen.set(id, now);
+              kept.push(now);
+            }
+          });
+          setItems(kept);
+          if (leaving.length > 0) leavePane(leaving);
         });
-        setItems(kept);
-        if (leaving.length > 0) leavePane(leaving);
-      });
     };
     load();
     const unlisten = listen("job-progress", load).catch(() => undefined);
