@@ -17,6 +17,10 @@ path: Array<Crumb>, status: FolderStatus | null, statusSetAt: number | null, fav
  */
 coverItemId: number | null, 
 /**
+ * The file that stands for it, chosen or the first, while it holds one.
+ */
+coverFileId: number | null, 
+/**
  * The picture that stands for it, once its thumbnail is made. Filled by the command.
  */
 cover: string | null, 

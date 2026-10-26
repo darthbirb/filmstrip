@@ -999,6 +999,7 @@ function folderDetail(folderId: number): FolderDetail | null {
     favorite: isRoot ? home.favorite : (live(folderId)?.node.favorite ?? false),
     note: own.note,
     coverItemId: standing && standing.id === own.cover ? standing.id : null,
+    coverFileId: standing?.id ?? null,
     cover: standing?.thumb ?? null,
     ownCount: ITEMS[folderId]?.length ?? 0,
     allCount: under(folderId).length,
