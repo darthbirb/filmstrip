@@ -758,7 +758,7 @@ mod tests {
                 assert_eq!(entry.compression(), CompressionMethod::Stored);
                 let mut bytes = String::new();
                 entry.read_to_string(&mut bytes).unwrap();
-                (entry.name().to_owned(), bytes)
+                (entry.name().unwrap().into_owned(), bytes)
             })
             .collect()
     }
