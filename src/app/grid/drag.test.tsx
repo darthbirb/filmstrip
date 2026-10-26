@@ -208,13 +208,13 @@ test("a branch dragged by a tile it lists wears that tile's picture", async () =
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 });
 
-/** The grid beside a stand-in pane that takes a drop as the frame's open pane does. */
+/** The grid beside a stand-in pane at the window's right edge, taking a drop as the open pane does. */
 async function renderWithPane() {
   await page.viewport(1200, 800);
   render(
     <>
       <div style={{ display: "flex", height: 600 }}>
-        <div style={{ width: 800 }}>
+        <div style={{ flex: 1 }}>
           <Grid mode="uniform" />
         </div>
         <aside aria-label="Pane" data-drop="pane" style={{ position: "relative", width: 320 }}>
@@ -249,6 +249,18 @@ test("a tile dragged onto the pane lights it and is added after what it shows", 
   expect(getPaneSet()).toEqual([pyramid, sphinx]);
   await expect.poll(lit).toBe(false);
   expect(getNews()).toBeNull();
+});
+
+test("over the pane at the window's right edge the ghost sits to the pointer's left", async () => {
+  await renderWithPane();
+  showInPane(await idOf("pyramid.jpg"), CAIRO);
+  await dragToPane("sphinx.jpg");
+  const pane = page.getByRole("complementary", { name: "Pane" }).element();
+  const box = ghost()?.getBoundingClientRect();
+  letGo();
+  expect(box?.right).toBeLessThanOrEqual(document.documentElement.clientWidth);
+  expect(box?.right).toBeLessThan(centre(pane).clientX);
+  expect(box?.left).toBeGreaterThan(0);
 });
 
 test("over an empty pane a set is shown in its place, in the order carried", async () => {

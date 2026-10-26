@@ -714,8 +714,9 @@ toward the rest surface.
   in `fg-dim`, `raised-hi` with `fg` under the pointer. Folders come under an eyebrow heading
   before the files, which then take one of their own.
 - **Drag ghost.** One `control`-tall line following the pointer, `--ghost-x` and `--ghost-y` from
-  its tip: `veil` glass at the `control` corner in a `line-control-hi` ring, with the overlay
-  shadow. It holds the pressed file's picture, or the first carried one's that has one, as a
+  its tip, or as far to its left where the window has no room on the right, as over the pane:
+  `veil` glass at the `control` corner in a `line-control-hi` ring, with the overlay shadow. It
+  holds the pressed file's picture, or the first carried one's that has one, as a
   `ghost-thumb` square at the `badge` corner, the rest stacked `--ghost-stack` behind it in
   `line-strong`, then its words in `ui` `fg`: the count, the act, or after a `danger` prohibit the
   reason. A tree row that will take the drop lifts to the `wash` inside a 2px `plate` ring, its
