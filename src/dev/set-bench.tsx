@@ -8,7 +8,7 @@ import type { ItemDetail } from "../ipc/bindings/ItemDetail";
 import { clip, photograph, serveFiles } from "./media";
 
 // Frame rate with several originals in the pane, which `pane-set` is set from. It runs in a
-// component test, and in a headed browser on the dev server by importing this module there.
+// timing test, and in a headed browser on the dev server by importing this module there.
 // DECISIONS.md "Several files in the pane".
 
 const PHOTO = { width: 6000, height: 4000 };
@@ -23,6 +23,22 @@ export type Bench = {
   /** Of the frames the clips were due to show over the count, how many they dropped. */
   dropped: number;
   due: number;
+};
+
+/** What the window does while its frames are counted. */
+export type Motion =
+  /** Nothing moves but the clips. */
+  | "still"
+  /** The pane is resized every frame, so the set is laid out and drawn again at a new scale. */
+  | "resize";
+
+export type BenchOptions = {
+  /** How many of the files are 1080p clips playing; the rest are 6000 × 4000 photographs. */
+  clips?: number;
+  motion?: Motion;
+  ms?: number;
+  width?: number;
+  height?: number;
 };
 
 function detail(id: number, video: boolean): ItemDetail {
@@ -57,23 +73,22 @@ function detail(id: number, video: boolean): ItemDetail {
 }
 
 /**
- * Puts `count` originals in a pane `width` by `height`, every `clipsEvery`th a 1080p clip playing
- * and the rest 6000 × 4000 photographs, waits until every one is drawn, and times the frames the
- * window draws over `ms`. It replaces the IPC mock and the pane's contents.
+ * Puts `count` originals in a pane `width` by `height`, `clips` of them 1080p clips spread among
+ * the photographs and every one playing, waits until every one is drawn, and times the frames the window draws over
+ * `ms` while `motion` goes on. It replaces the IPC mock and the pane's contents.
  */
 export async function benchSet(
   count: number,
-  clipsEvery: number,
-  { ms = 3000, width = 1500, height = 900 } = {},
+  { clips = 0, motion = "still", ms = 3000, width = 1500, height = 900 }: BenchOptions = {},
 ): Promise<Bench> {
-  const files = Array.from({ length: count }, (_, at) =>
-    detail(at + 1, clipsEvery > 0 && at % clipsEvery === clipsEvery - 1),
-  );
-  const movie = await clip(VIDEO.width, VIDEO.height, 2000);
+  const isClip = (at: number) =>
+    Math.floor(((at + 1) * clips) / count) > Math.floor((at * clips) / count);
+  const files = Array.from({ length: count }, (_, at) => detail(at + 1, isClip(at)));
+  const movie = clips > 0 ? await clip(VIDEO.width, VIDEO.height, 2000) : null;
   const urls: Record<string, string> = {};
   for (const file of files) {
     urls[file.diskName] =
-      file.kind === "video"
+      file.kind === "video" && movie
         ? movie
         : await photograph(PHOTO.width, PHOTO.height, (file.id * 47) % 360);
   }
@@ -93,14 +108,17 @@ export async function benchSet(
     },
     { shouldMockEvents: true },
   );
+  const root = document.documentElement;
+  const playing = root.style.getPropertyValue("--pane-set-playing");
+  if (clips > 0) root.style.setProperty("--pane-set-playing", String(clips));
   const host = document.createElement("div");
-  host.style.cssText = `position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;width:${width}px;height:${height}px;background:var(--color-panel)`;
+  host.style.cssText = `position:fixed;top:0;right:0;z-index:9999;display:flex;flex-direction:column;width:${width}px;height:${height}px;background:var(--color-panel)`;
   document.body.append(host);
-  const root = createRoot(host);
+  const react = createRoot(host);
   const [first, ...rest] = files.map((file) => file.id);
   showInPane(first ?? 1, null);
   addToPane(rest, null);
-  root.render(
+  react.render(
     <PaneDetailProvider>
       <Pane />
     </PaneDetailProvider>,
@@ -113,22 +131,32 @@ export async function benchSet(
       return (
         images.filter((image) => image.complete && image.naturalWidth > 0).length ===
           wanted("image") &&
-        videos.filter((video) => !video.paused && video.readyState >= 2).length === wanted("video")
+        videos.filter((video) => video.readyState >= 2).length === wanted("video")
       );
     });
     await Promise.all(
       [...host.querySelectorAll("img")].map((image) => image.decode().catch(() => undefined)),
     );
-    // A second to settle, so the first decodes are not what is counted.
+    const videos = [...host.querySelectorAll<HTMLVideoElement>("[data-file] video")];
+    // Settled, so the first decodes are not what is counted: a second, and every clip a second in.
     await frames(1000);
-    const clips = [...host.querySelectorAll<HTMLVideoElement>("[data-file] video")];
-    const before = clips.map((one) => one.getVideoPlaybackQuality());
-    const drawn = await frames(ms);
-    const after = clips.map((one) => one.getVideoPlaybackQuality());
-    const count = (pick: (quality: VideoPlaybackQuality) => number) =>
+    await until(() => videos.every((one) => one.getVideoPlaybackQuality().totalVideoFrames >= 30));
+    const before = videos.map((one) => one.getVideoPlaybackQuality());
+    const drawn = await frames(
+      ms,
+      motion === "resize"
+        ? (now) => {
+            // Down to half the width and back each second: a new scale every frame.
+            const swing = (1 + Math.cos((now / 1000) * 2 * Math.PI)) / 2;
+            host.style.width = `${Math.round(width * (0.5 + 0.5 * swing))}px`;
+          }
+        : undefined,
+    );
+    const after = videos.map((one) => one.getVideoPlaybackQuality());
+    const total = (pick: (quality: VideoPlaybackQuality) => number) =>
       after.reduce((sum, one, at) => sum + pick(one) - pick(before[at] ?? one), 0);
-    const dropped = count((one) => one.droppedVideoFrames);
-    const due = count((one) => one.totalVideoFrames);
+    const dropped = total((one) => one.droppedVideoFrames);
+    const due = total((one) => one.totalVideoFrames);
     const intervals = drawn.slice(1).map((at, index) => at - (drawn[index] ?? at));
     const sorted = [...intervals].sort((a, b) => a - b);
     const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
@@ -136,20 +164,29 @@ export async function benchSet(
     const rate = (drawn.length - 1) / (((drawn.at(-1) ?? 0) - (drawn[0] ?? 0)) / 1000);
     return { rate, median, late, intervals: intervals.length, dropped, due };
   } finally {
-    root.unmount();
+    react.unmount();
     host.remove();
+    if (playing) root.style.setProperty("--pane-set-playing", playing);
+    else root.style.removeProperty("--pane-set-playing");
     showInPane(null);
     unserve();
     for (const url of new Set(Object.values(urls))) URL.revokeObjectURL(url);
   }
 }
 
-/** The time of every frame the window draws over this long. */
-export function frames(ms: number) {
+/** The display's own frame rate, counted over a second with nothing else drawn. */
+export async function displayRate() {
+  const idle = await frames(1000);
+  return (idle.length - 1) / (((idle.at(-1) ?? 0) - (idle[0] ?? 0)) / 1000);
+}
+
+/** The time of every frame the window draws over this long, calling `each` at every one. */
+export function frames(ms: number, each?: (now: number) => void) {
   return new Promise<number[]>((resolve) => {
     const drawn: number[] = [];
     const step = (now: number) => {
       drawn.push(now);
+      each?.(now);
       if (now - (drawn[0] ?? now) < ms) requestAnimationFrame(step);
       else resolve(drawn);
     };
@@ -157,7 +194,7 @@ export function frames(ms: number) {
   });
 }
 
-function until(done: () => boolean, timeout = 30_000) {
+function until(done: () => boolean, timeout = 60_000) {
   const start = performance.now();
   return new Promise<void>((resolve, reject) => {
     const check = () => {

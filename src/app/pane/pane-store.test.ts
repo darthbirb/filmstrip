@@ -10,6 +10,7 @@ import {
   paneDrop,
   paneFileOrigin,
   paneSetLimit,
+  paneSetPlaying,
   showInPane,
   whenShownInPane,
 } from "./pane-store";
@@ -23,6 +24,12 @@ test("the limit is the token sheet's pane-set", () => {
   const root = getComputedStyle(document.documentElement);
   expect(paneSetLimit()).toBe(Number.parseInt(root.getPropertyValue("--pane-set"), 10));
   expect(paneSetLimit()).toBeGreaterThan(1);
+});
+
+test("the clips that play at once are the token sheet's pane-set-playing", () => {
+  const root = getComputedStyle(document.documentElement);
+  expect(paneSetPlaying()).toBe(Number.parseInt(root.getPropertyValue("--pane-set-playing"), 10));
+  expect(paneSetPlaying()).toBeLessThanOrEqual(paneSetLimit());
 });
 
 test("a drop adds what is new, in the order carried, after what the pane shows", () => {

@@ -82,9 +82,9 @@ Three ways, cheapest first.
   many times longer than the work, does not bound the code, so its test stays in the plain run.
   **The frontend's are `*.timing.test.tsx`**, which `test` leaves out and `test:timing` runs one
   file at a time (`vitest.timing.config.ts`); CI runs it after the component tests, and it fails
-  when it finds no file. The pane's frame-rate tests are, measuring with `src/dev/set-bench.tsx`;
+  when it finds no file. The pane's frame-rate tests are two, measuring with `src/dev/set-bench.tsx`;
   by hand, in a headed browser on the dev server, the console runs
-  `(await import("/src/dev/set-bench.tsx")).benchSet(24, 0)`.
+  `(await import("/src/dev/set-bench.tsx")).benchSet(24, { motion: "resize" })`.
 - **A test that needs ffmpeg is `#[ignore]`d**, so a plain `cargo test` needs nothing
   downloaded. `pwsh scripts/fetch-ffmpeg.ps1` puts the build the release carries in
   `src-tauri/target/tools`, where those tests look before PATH, and

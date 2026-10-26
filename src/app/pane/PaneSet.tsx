@@ -18,7 +18,7 @@ import { getSelection } from "../grid/selection";
 import { itemMenu } from "../menus/item-menu";
 import { getFullScreen } from "./full-screen";
 import { focusNextPicture } from "./Media";
-import { leavePane, paneFileOrigin, showInPane } from "./pane-store";
+import { leavePane, paneFileOrigin, paneSetPlaying, showInPane } from "./pane-store";
 import { arrange, type Least, layOutSet, type Placed } from "./set-layout";
 import type { Size } from "./zoom";
 
@@ -52,6 +52,7 @@ export function PaneSet({ items }: { items: readonly ItemDetail[] }) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: the shapes string stands for the sizes it is made from
   const layout = useMemo(() => layOutSet(sizes, room.area, room.gap, room.least), [shapes, room]);
   const ring = items.some((item) => item.id === ringed) ? ringed : (items[0]?.id ?? null);
+  const playing = playingClips(items, voiced);
 
   useLayoutEffect(() => {
     const id = focusing.current;
@@ -130,6 +131,7 @@ export function PaneSet({ items }: { items: readonly ItemDetail[] }) {
               top={spot.top}
               stop={item.id === ring}
               voiced={voiced === item.id}
+              playing={playing.has(item.id)}
               onShow={() => show(item)}
               onRemove={() => remove(item)}
               onVoice={() => setVoiced(voiced === item.id ? null : item.id)}
@@ -170,6 +172,8 @@ type FileProps = {
   stop: boolean;
   /** This clip has the sound. */
   voiced: boolean;
+  /** This clip is one of those that play; the rest hold still. */
+  playing: boolean;
   onShow: () => void;
   onRemove: () => void;
   onVoice: () => void;
@@ -181,7 +185,8 @@ type FileProps = {
 
 /** One file of the set: its original at the set's scale, centred in its band, and what sits on it. */
 function SetFile(props: FileProps) {
-  const { item, placed, left, top, stop, voiced, onShow, onRemove, onVoice, onFocus } = props;
+  const { item, placed, left, top, stop, voiced, playing, onShow, onRemove, onVoice, onFocus } =
+    props;
   const { onKeyDown, onContextMenu, onOwn } = props;
   const [state, setState] = useState<"loading" | "shown" | "failed">("loading");
   const video = useRef<HTMLVideoElement>(null);
@@ -191,6 +196,13 @@ function SetFile(props: FileProps) {
   useEffect(() => {
     if (video.current) video.current.muted = !voiced;
   }, [voiced]);
+
+  useEffect(() => {
+    const clip = video.current;
+    if (!clip) return;
+    if (playing) void clip.play().catch(() => undefined);
+    else clip.pause();
+  }, [playing]);
 
   return (
     <div
@@ -218,7 +230,7 @@ function SetFile(props: FileProps) {
             className="block size-full rounded-control object-cover"
             src={convertFileSrc(item.path)}
             poster={thumb}
-            autoPlay
+            preload="auto"
             loop
             muted
             playsInline
@@ -340,6 +352,17 @@ function useEscapeShowsFirst(first: number | null) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [first]);
+}
+
+/**
+ * The clips that play: the one with the sound, then the rest in the order added, up to
+ * `pane-set-playing`. DECISIONS.md "Several files in the pane".
+ */
+function playingClips(items: readonly ItemDetail[], voiced: number | null) {
+  const clips = items.filter((item) => item.kind === "video").map((item) => item.id);
+  const first = voiced !== null && clips.includes(voiced) ? [voiced] : [];
+  const rest = clips.filter((id) => id !== voiced);
+  return new Set([...first, ...rest].slice(0, paneSetPlaying()));
 }
 
 function known(item: ItemDetail): Size | null {

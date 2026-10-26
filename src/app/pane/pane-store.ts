@@ -92,10 +92,19 @@ export type PaneDrop =
   /** These join what it shows, or take its place when it shows nothing; `of` were carried new. */
   | { kind: "add"; adds: number[]; of: number; replaces: boolean };
 
+function count(token: string) {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(token);
+  return Number.parseInt(value, 10) || 1;
+}
+
 /** The most files the pane shows at once. DESIGN.md "Layout". */
 export function paneSetLimit() {
-  const value = getComputedStyle(document.documentElement).getPropertyValue("--pane-set");
-  return Number.parseInt(value, 10) || 1;
+  return count("--pane-set");
+}
+
+/** The most clips in the pane's set that play at once. DESIGN.md "Layout". */
+export function paneSetPlaying() {
+  return count("--pane-set-playing");
 }
 
 export function paneDrop(carried: readonly number[], limit = paneSetLimit()): PaneDrop {

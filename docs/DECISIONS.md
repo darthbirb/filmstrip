@@ -689,15 +689,20 @@ and one height in justified rows is equal cells by another measure.
   fits goes in and the foot's Line says how many of how many, with no Undo since the library did
   not change. A folded pane's rail takes no drop, and Explorer's files are never taken: they are
   not in the index until they land in a folder.
-- **The limit is twelve, measured.** On 20 October 2026, in a headed Chromium 155 on the owner's
-  machine and in the headless Edge the tests use, twelve 6000 × 4000 JPEG originals in a
-  full-screen pane held 60 frames a second with no frame late; that is what
-  `src/app/pane/set-frame-rate.timing.test.tsx` holds `pane-set` to. Playing clips are the dearer part,
-  and were measured apart: two 1080p clips drop Chromium's drawing to the clips' own 30 a
-  second even in a bare page with nothing else on it, two 640 × 360 ones too, so that is the
-  engine pacing video and not the set; and the canvas-recorded VP8 clips the tests can make kept
-  their frames up to five or six playing at once, slipping from seven. A camera's H.264 decoded
-  by the GPU in the real window is cheaper than that, so twelve stands, measured on pictures.
+- **The limit is twelve, a third of what held.** A set that holds still costs nothing to show, so
+  the measure is one that draws every frame: on 26 October 2026, in the headless Edge the tests
+  use on the owner's machine, a 1500 × 900 pane of 6000 × 4000 JPEG originals was resized every
+  frame, down to half its width and back each second, so the set was laid out and drawn again at
+  a new scale each time. Twelve, 24 and 36 held the display's 60 a second, no more than four
+  frames in 300 late; 48 fell to 52 in one run of two, and 72 to 30. Twelve leaves the margin a
+  slower machine and CI's runner need. `src/app/pane/set-frame-rate.timing.test.tsx` holds
+  `pane-set` to it, run alone.
+- **Two clips play at once, `pane-set-playing`.** Measured the same way among twelve, each 1080p
+  clip a second in before the count: two dropped none of their frames in three runs of five
+  seconds, though two pace the window to their own 30 a second, as they do on a bare page; three
+  dropped some in every run, up to one in a hundred, and four up to one in twenty. Past the two,
+  a clip holds on its first frame, and the one given the sound plays in place of the later of
+  the two. The same test holds the two under one dropped frame in a hundred.
 - **Videos loop from the start, muted**, each with its own mute; giving one the sound takes it
   from the one that had it, so one plays aloud at a time.
 - **A file with no shape stands in at the floor**, landscape, its extension on the hatch as the
