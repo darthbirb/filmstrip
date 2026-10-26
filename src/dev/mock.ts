@@ -2082,6 +2082,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     );
   },
   item_detail: ({ itemId }) => detail(itemId as number),
+  items_detail: ({ itemIds }) => (itemIds as number[]).map((id) => detail(id)),
   item_path: ({ itemId }) => detail(itemId as number)?.path ?? null,
   sorting_items: ({ sort }) => sorted(ITEMS[2] ?? [], sort),
   // The bar acts on the mock library as it would on a real one, so the dev window shows the state.

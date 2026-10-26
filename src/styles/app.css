@@ -51,6 +51,10 @@
 
   /* The tallest a picture stands in the pane at its own shape, so a panorama never runs away. */
   --pane-media-max: 70dvh;
+  /* The most files the pane shows at once: a count, set from frame rate measured with that many. */
+  --pane-set: 12;
+  /* The most of its clips that play at once, set from the frames they dropped measured with more. */
+  --pane-set-playing: 2;
 
   /* Panel widths in rem; the frame reads them to decide what fits. */
   --frame-nav: 15rem;
@@ -214,6 +218,9 @@
   --spacing-strip-step: 1.5rem;
   --spacing-strip-step-height: 3.25rem;
   --spacing-strip-fade: 3rem;
+  /* The least a file in the pane's set is drawn, shorter side then longer, so its × and mute fit. */
+  --spacing-pane-set-least: 2.25rem;
+  --spacing-pane-set-least-long: 4rem;
   --spacing-menu: 14rem;
   --spacing-dialog: 41rem;
   --spacing-dialog-height: 27rem;

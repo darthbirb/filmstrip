@@ -17,7 +17,7 @@ import { useDestinationKeys } from "./keys";
 import { Foot } from "./navigation/Foot";
 import { getNews, setNews } from "./navigation/foot-slot";
 import { loadIndex, refreshIndex, resetIndex } from "./navigation/index-store";
-import { getPaneItem, showInPane } from "./pane/pane-store";
+import { addToPane, getPaneItem, getPaneSet, showInPane } from "./pane/pane-store";
 import { type Place, setPlace } from "./place";
 import { showReport } from "./undo/report-store";
 
@@ -96,6 +96,37 @@ test("with nothing checked it moves the pane's file, and the pane moves on to th
   });
   await expect.poll(getPaneItem).toBe(sphinx);
   await expect.element(page.getByText("Moved pyramid.jpg to People.")).toBeVisible();
+});
+
+test("with a set in the pane and nothing checked a key moves nothing, and says why", async () => {
+  await renderIt();
+  const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
+  showInPane(pyramid, CAIRO);
+  addToPane([sphinx], CAIRO);
+  await recording(async (calls) => {
+    await userEvent.keyboard("1");
+    await expect.element(page.getByText("The pane shows 2 files.")).toBeVisible();
+    await expect.element(page.getByText("Check the ones to move to People.")).toBeVisible();
+    expect(moved(calls)).toBeUndefined();
+  });
+  expect(getPaneSet()).toEqual([pyramid, sphinx]);
+});
+
+test("with a set in the pane a key still moves what is checked", async () => {
+  await renderIt();
+  const [pyramid, sphinx, felucca] = [
+    await idOf("pyramid.jpg"),
+    await idOf("sphinx.jpg"),
+    await idOf("felucca.mp4"),
+  ];
+  showInPane(pyramid, CAIRO);
+  addToPane([sphinx], CAIRO);
+  await userEvent.click(page.getByRole("checkbox", { name: "Check felucca.mp4" }));
+  await recording(async (calls) => {
+    await userEvent.keyboard("1");
+    await expect.poll(() => moved(calls)).toEqual({ itemIds: [felucca], folderId: 5 });
+  });
+  expect(getPaneSet()).toEqual([pyramid, sphinx]);
 });
 
 test("the number pad's digits are the same keys", async () => {

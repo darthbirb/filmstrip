@@ -6,7 +6,7 @@ import { restoredBannerLine } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
 import { neighbour } from "./delete";
-import { getPaneItem, getPaneOrigin, showInPane } from "./pane-store";
+import { getPaneItem, getPaneOrigin, paneMovesOn, showInPane } from "./pane-store";
 
 /**
  * Takes files out of the Trash, to where each came from or to a folder picked, and says what
@@ -16,7 +16,7 @@ import { getPaneItem, getPaneOrigin, showInPane } from "./pane-store";
 export async function restoreFiles(itemIds: number[], to: FolderEntry | null = null) {
   const shown = getPaneItem();
   const origin = getPaneOrigin();
-  const next = shown !== null && itemIds.includes(shown) ? await neighbour(origin, itemIds) : shown;
+  const next = paneMovesOn(itemIds) ? await neighbour(origin, itemIds) : shown;
   const done = await restoreItems(itemIds, to?.id ?? null).catch(() => null);
   if (!done) return;
   const { batch, report } = done;

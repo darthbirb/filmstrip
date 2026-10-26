@@ -57,7 +57,9 @@ export function useFrameLayout() {
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setOverlay(null);
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setOverlay(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

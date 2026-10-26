@@ -4,14 +4,21 @@ import { render } from "vitest-browser-react";
 
 import { recording } from "../../dev/recording";
 import { folderItems, undoLast } from "../../ipc/commands";
-import { setNews } from "../navigation/foot-slot";
+import { getNews, setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { Navigation } from "../navigation/Navigation";
 import { openFolders, setOpenFolders } from "../navigation/open-folders";
-import { getPaneItem, showInPane } from "../pane/pane-store";
+import {
+  addToPane,
+  getPaneItem,
+  getPaneOrigin,
+  getPaneSet,
+  paneSetLimit,
+  showInPane,
+} from "../pane/pane-store";
 import { type Place, setPlace } from "../place";
 import { showReport } from "../undo/report-store";
-import { Dragging, scrollTreeNear } from "./drag";
+import { Dragging, PaneDropRing, scrollTreeNear } from "./drag";
 import { Grid } from "./Grid";
 import { clearChecked, getSelection } from "./selection";
 
@@ -199,6 +206,129 @@ test("a branch dragged by a tile it lists wears that tile's picture", async () =
   expect(ghost()?.textContent).toBe("Move 6 files to People");
   expect(ghost()?.querySelector("img")?.getAttribute("src")).toBe(picture);
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+});
+
+/** The grid beside a stand-in pane at the window's right edge, taking a drop as the open pane does. */
+async function renderWithPane() {
+  await page.viewport(1200, 800);
+  render(
+    <>
+      <div style={{ display: "flex", height: 600 }}>
+        <div style={{ flex: 1 }}>
+          <Grid mode="uniform" />
+        </div>
+        <aside aria-label="Pane" data-drop="pane" style={{ position: "relative", width: 320 }}>
+          <p>pane</p>
+          <PaneDropRing />
+        </aside>
+      </div>
+      <Dragging />
+    </>,
+  );
+  await expect.element(tile("sphinx.jpg")).toBeVisible();
+}
+
+/** Presses on a tile and moves onto the pane, and leaves the button down. */
+async function dragToPane(file: string) {
+  const from = tile(file).element();
+  const to = page.getByRole("complementary", { name: "Pane" }).element();
+  from.dispatchEvent(pointer("pointerdown", centre(from)));
+  window.dispatchEvent(pointer("pointermove", centre(to)));
+  window.dispatchEvent(pointer("pointermove", centre(to)));
+}
+const lit = () => document.querySelector("[data-pane-lit]") !== null;
+
+test("a tile dragged onto the pane lights it and is added after what it shows", async () => {
+  await renderWithPane();
+  const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
+  showInPane(pyramid, CAIRO);
+  await dragToPane("sphinx.jpg");
+  expect(ghost()?.textContent).toBe("Add 1 file to the pane");
+  expect(lit()).toBe(true);
+  letGo();
+  expect(getPaneSet()).toEqual([pyramid, sphinx]);
+  await expect.poll(lit).toBe(false);
+  expect(getNews()).toBeNull();
+});
+
+test("over the pane at the window's right edge the ghost sits to the pointer's left", async () => {
+  await renderWithPane();
+  showInPane(await idOf("pyramid.jpg"), CAIRO);
+  await dragToPane("sphinx.jpg");
+  const pane = page.getByRole("complementary", { name: "Pane" }).element();
+  const box = ghost()?.getBoundingClientRect();
+  letGo();
+  expect(box?.right).toBeLessThanOrEqual(document.documentElement.clientWidth);
+  expect(box?.right).toBeLessThan(centre(pane).clientX);
+  expect(box?.left).toBeGreaterThan(0);
+});
+
+test("over an empty pane a set is shown in its place, in the order carried", async () => {
+  await renderWithPane();
+  const [felucca, sphinx] = [await idOf("felucca.mp4"), await idOf("sphinx.jpg")];
+  await userEvent.click(page.getByRole("checkbox", { name: "Check sphinx.jpg" }));
+  await userEvent.click(page.getByRole("checkbox", { name: "Check felucca.mp4" }));
+  await dragToPane("sphinx.jpg");
+  expect(ghost()?.textContent).toBe("Show 2 files in the pane");
+  letGo();
+  expect(getPaneSet()).toEqual([sphinx, felucca]);
+  expect(getPaneOrigin()).toEqual(CAIRO);
+  // The drop leaves the set checked, so Escape in the grid still clears it.
+  expect(getSelection().ids).toHaveLength(2);
+});
+
+test("files already shown are refused, and a full pane refuses, the pane unlit", async () => {
+  await renderWithPane();
+  const pyramid = await idOf("pyramid.jpg");
+  showInPane(pyramid, CAIRO);
+  await dragToPane("pyramid.jpg");
+  expect(ghost()?.textContent).toContain("Already in the pane");
+  expect(ghost()?.querySelector("[data-icon=prohibit]")).not.toBeNull();
+  expect(lit()).toBe(false);
+  letGo();
+  expect(getPaneSet()).toEqual([pyramid]);
+
+  const limit = paneSetLimit();
+  addToPane(
+    Array.from({ length: limit - 1 }, (_, at) => 1000 + at),
+    CAIRO,
+  );
+  await dragToPane("sphinx.jpg");
+  expect(ghost()?.textContent).toContain(`The pane shows ${limit} at most`);
+  expect(lit()).toBe(false);
+  letGo();
+  expect(getPaneSet()).toHaveLength(limit);
+  expect(getNews()).toBeNull();
+});
+
+test("past the limit what fits goes in, and the line says how many of how many", async () => {
+  await renderWithPane();
+  const limit = paneSetLimit();
+  const [felucca, pyramid, sphinx] = [
+    await idOf("felucca.mp4"),
+    await idOf("pyramid.jpg"),
+    await idOf("sphinx.jpg"),
+  ];
+  showInPane(5000, CAIRO);
+  addToPane(
+    Array.from({ length: limit - 2 }, (_, at) => 1000 + at),
+    CAIRO,
+  );
+  for (const name of ["felucca.mp4", "pyramid.jpg", "sphinx.jpg"]) {
+    await userEvent.click(page.getByRole("checkbox", { name: `Check ${name}` }));
+  }
+  expect(getSelection().ids).toEqual([felucca, pyramid, sphinx]);
+  await dragToPane("pyramid.jpg");
+  expect(ghost()?.textContent).toBe("Add 1 of 3 files to the pane");
+  letGo();
+  expect(getPaneSet()).toHaveLength(limit);
+  expect(getPaneSet().slice(-1)).toEqual([felucca]);
+  expect(getPaneSet()).not.toContain(pyramid);
+  expect(getPaneSet()).not.toContain(sphinx);
+  expect(getNews()).toEqual({
+    kind: "said",
+    line: `Added 1 of 3 files to the pane. It shows ${limit} at most.`,
+  });
 });
 
 test("near the tree's foot it scrolls a row's height a second, at 60 Hz as at 144 Hz", async () => {

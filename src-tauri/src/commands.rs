@@ -1318,6 +1318,16 @@ pub async fn item_detail(state: State<'_, AppState>, item_id: i64) -> Result<Opt
     run(&state, move |conn| detail_of(conn, item_id, &thumbs)).await
 }
 
+/// Several items in full, for a pane showing a set, in the order asked; nothing for each one gone.
+#[tauri::command]
+pub async fn items_detail(
+    state: State<'_, AppState>,
+    item_ids: Vec<i64>,
+) -> Result<Vec<Option<ItemDetail>>> {
+    let thumbs = state.thumbs.clone();
+    run(&state, move |conn| details_of(conn, &item_ids, &thumbs)).await
+}
+
 /// Where an item's file was, for a pane showing one that has gone: a retired row still knows.
 #[tauri::command]
 pub async fn item_path(state: State<'_, AppState>, item_id: i64) -> Result<Option<String>> {
@@ -1567,6 +1577,18 @@ fn file_path(conn: &Connection, item_id: i64, file: &items::ItemFile) -> Result<
         return paths::trash_path(&file.uuid, &file.disk_name);
     }
     paths::item_path(conn, file.folder_id, &file.disk_name)
+}
+
+/// Each of these items in full, in the order given, with nothing for one that has gone.
+pub fn details_of(
+    conn: &Connection,
+    item_ids: &[i64],
+    thumbs: &Path,
+) -> Result<Vec<Option<ItemDetail>>> {
+    item_ids
+        .iter()
+        .map(|&id| detail_of(conn, id, thumbs))
+        .collect()
 }
 
 /// An item in full, with the paths to its file and its thumbnail.
@@ -2399,6 +2421,47 @@ mod tests {
             detail_of(&conn, id, &thumbs).unwrap(),
             None,
             "a trashed item is gone"
+        );
+    }
+
+    #[test]
+    fn items_details_come_in_the_order_asked_with_nothing_for_one_gone() {
+        let base = scratch("details");
+        let app = app_dir(&base);
+        let library = base.join("library");
+        std::fs::create_dir_all(library.join("Cairo")).unwrap();
+        std::fs::write(library.join("Cairo/pyramid.jpg"), "abc").unwrap();
+        std::fs::write(library.join("Cairo/sphinx.jpg"), "abcd").unwrap();
+        let conn = conn();
+        let root = library.to_str().unwrap();
+        register_source(&conn, root, SourceKind::Library, Some("Pictures"), &app).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let id = |name: &str| -> i64 {
+            conn.query_row("SELECT id FROM item WHERE disk_name = ?1", [name], |r| {
+                r.get(0)
+            })
+            .unwrap()
+        };
+        let (pyramid, sphinx) = (id("pyramid.jpg"), id("sphinx.jpg"));
+        let thumbs = base.join("thumbs");
+
+        let names = |found: Vec<Option<ItemDetail>>| -> Vec<Option<String>> {
+            found
+                .into_iter()
+                .map(|one| one.map(|detail| detail.row.disk_name))
+                .collect()
+        };
+        assert_eq!(
+            names(details_of(&conn, &[sphinx, pyramid], &thumbs).unwrap()),
+            [
+                Some("sphinx.jpg".to_owned()),
+                Some("pyramid.jpg".to_owned())
+            ]
+        );
+        items::retire(&conn, sphinx).unwrap();
+        assert_eq!(
+            names(details_of(&conn, &[sphinx, pyramid, -1], &thumbs).unwrap()),
+            [None, Some("pyramid.jpg".to_owned()), None]
         );
     }
 

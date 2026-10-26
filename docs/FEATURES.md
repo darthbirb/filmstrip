@@ -83,7 +83,7 @@ drawn. **Not started** — neither.
 | Zoom and pan a picture | Built | DECISIONS.md "The pane" |
 | Video playback | Built, on a plate of its own | DECISIONS.md "The pane"; the mute is not yet kept between items |
 | Frame steps, a named speed set and the volume | Drawn | #68, `docs/design/pane.dc.html`; waiting on the probe to record a frame rate |
-| Several items at once, scaled to fit together | Drawn | #66, dragging items onto the pane, PRODUCT.md "The three panels"; `docs/design/pane.dc.html` |
+| Several items at once, scaled to fit together | Built | #66, dragging files onto the pane adds them, twelve at most, at one scale in the rows that draw them largest; × takes one out, a click or Escape returns to one; videos loop muted, one at a time with sound |
 | A folder shown in the pane rather than an item | Drawn | #67, its own thing, not a second mode; `docs/design/pane.dc.html` |
 | Tiled compare and multi-view panes | **Dropped on purpose.** The pane has one mode. |
 

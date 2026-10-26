@@ -20,6 +20,7 @@ version through `npx`:
 | `npx --yes pnpm@12.4.1 lint` | Biome, format and lint |
 | `npx --yes pnpm@12.4.1 check` | TypeScript |
 | `npx --yes pnpm@12.4.1 test` | component tests |
+| `npx --yes pnpm@12.4.1 test:timing` | component timing tests, one file at a time |
 | `npx --yes pnpm@12.4.1 test:e2e` | end-to-end tests |
 | `npx --yes pnpm@12.4.1 check:docs` | doc pointers resolve, comments stay short |
 | `cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check` | Rust format |
@@ -31,8 +32,9 @@ version through `npx`:
 
 Every script is in `package.json`, and the tools they call are in `node_modules/.bin`, so where
 `npx --yes pnpm@12.4.1` cannot run, npm runs the same scripts from what is already installed:
-`npm run lint`, `check`, `check:docs`, `test`, `test:e2e`, `dev` and `tauri`. Flags for the
-script go after `--`: `npm run dev -- --port 1422 --strictPort`, `npm run tauri -- dev`.
+`npm run lint`, `check`, `check:docs`, `test`, `test:timing`, `test:e2e`, `dev` and `tauri`.
+Flags for the script go after `--`: `npm run dev -- --port 1422 --strictPort`,
+`npm run tauri -- dev`.
 
 Only `install` needs pnpm, and only when `pnpm-lock.yaml` has changed; never install with npm,
 which ignores the lockfile. CI installs fresh from the lockfile on every pull request, so a
@@ -78,6 +80,11 @@ Three ways, cheapest first.
   runs them one at a time; CI does both on every pull request, and fails if that selects
   nothing. Its bound is never loosened to make it pass. A limit that only guards against a hang,
   many times longer than the work, does not bound the code, so its test stays in the plain run.
+  **The frontend's are `*.timing.test.tsx`**, which `test` leaves out and `test:timing` runs one
+  file at a time (`vitest.timing.config.ts`); CI runs it after the component tests, and it fails
+  when it finds no file. The pane's frame-rate tests are two, measuring with `src/dev/set-bench.tsx`;
+  by hand, in a headed browser on the dev server, the console runs
+  `(await import("/src/dev/set-bench.tsx")).benchSet(24, { motion: "resize" })`.
 - **A test that needs ffmpeg is `#[ignore]`d**, so a plain `cargo test` needs nothing
   downloaded. `pwsh scripts/fetch-ffmpeg.ps1` puts the build the release carries in
   `src-tauri/target/tools`, where those tests look before PATH, and

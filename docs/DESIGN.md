@@ -146,6 +146,8 @@ spacing:
   strip-step: 1.5rem
   strip-step-height: 3.25rem
   strip-fade: 3rem
+  pane-set-least: 2.25rem
+  pane-set-least-long: 4rem
   menu: 14rem
   dialog: 41rem
   dialog-height: 27rem
@@ -556,6 +558,12 @@ measured, never a breakpoint. DECISIONS.md "The interface size" has the reasonin
   rest and standing on the panel; and a `strip`-tall filmstrip, its frames `strip-inset` from its top and bottom and
   `tile-gap` apart, each the `--aspect-strip` shape whatever the picture's own. Its ends are
   padded clear of the steps that float over them.
+- **The pane shows `--pane-set` files at most**, twelve, a count rather than a length, set from
+  the frame rate measured with that many originals on screen, and plays `--pane-set-playing` of
+  its clips at once, two, set from the frames they drop. Dropped together they share one scale,
+  and none is drawn under `pane-set-least` on its shorter side or `pane-set-least-long` on its
+  longer, so its × and a video's mute fit a `tile-inset` in. A file with no shape to draw stands
+  in at that floor.
 - **Settings** is `dialog` wide and `dialog-height` tall, never more than the window, with a
   `dialog-rail`-wide rail of sections.
 
@@ -708,8 +716,9 @@ toward the rest surface.
   in `fg-dim`, `raised-hi` with `fg` under the pointer. Folders come under an eyebrow heading
   before the files, which then take one of their own.
 - **Drag ghost.** One `control`-tall line following the pointer, `--ghost-x` and `--ghost-y` from
-  its tip: `veil` glass at the `control` corner in a `line-control-hi` ring, with the overlay
-  shadow. It holds the pressed file's picture, or the first carried one's that has one, as a
+  its tip, or as far to its left where the window has no room on the right, as over the pane:
+  `veil` glass at the `control` corner in a `line-control-hi` ring, with the overlay shadow. It
+  holds the pressed file's picture, or the first carried one's that has one, as a
   `ghost-thumb` square at the `badge` corner, the rest stacked `--ghost-stack` behind it in
   `line-strong`, then its words in `ui` `fg`: the count, the act, or after a `danger` prohibit the
   reason. A tree row that will take the drop lifts to the `wash` inside a 2px `plate` ring, its
@@ -773,6 +782,20 @@ toward the rest surface.
   on the `heading` room above the run, a `tile-gap` over its first row.
 - **The pane's picture.** Sized by its own shape and centred in what the pane has left, at the
   `control` corner, with nothing drawn behind it: the space around it is the pane.
+- **The pane's set.** Several files at one scale, each its original at its own shape and the
+  `control` corner, in rows centred in the media area, `tile-gap` apart, each file on its row's
+  middle line. A file the area holds below the floor stands centred in a band the floor's size
+  across its row. The header counts them and their size in tabular `ui` `fg-mid` and is no
+  disclosure; the action bar goes. Under the pointer or the keyboard's focus a file shows a badge
+  button with × a `tile-inset` in from its band's top-right; a video loops muted with its mute
+  badge button a `tile-inset` in from the bottom-left, the speaker struck through until it has the
+  sound; past the clips that play, one holds still on its first frame until it is given the
+  sound. A file with nothing to draw, or whose original fails with no thumbnail, is its extension
+  in `small` `fg-dim` on the hatch. While a drag over it will be taken, the whole pane wears the
+  accepting row's 2px `plate` ring inside its edge at the `control` corner, and no wash.
+- **Badge button.** A glyph that acts on a picture: a `badge` square at the `badge` corner on
+  `veil`, its glyph `glyph-small` in `fg`, `hover-wash` under the pointer and the focus ring for
+  the keyboard; the cover's pencil is one too.
 - **Pane disclosure.** The pane's header row: a chevron and the item's shape, length and size in
   tabular `ui` figures. A `wash` under the pointer; opened, it rests on `raised` in `fg` and the
   chevron turns down.
@@ -973,7 +996,8 @@ toward the rest surface.
   stacking.
 - **Line.** What an act did, in the Band's slot and shape without its alarm: a `glyph` in `fg-dim`
   (a check after an act, the undo arrow after an undo), the sentence in `ui`, the way back under it
-  as a raised Undo button, and a dismiss. It shares the one slot with the Band, and the newest of
+  as a raised Undo button, and a dismiss. An act that changed nothing in the library, as a drop on
+  the pane past its limit, has no Undo, and leaves the folded rail. It shares the one slot with the Band, and the newest of
   the two replaces the other. Folded, the rail keeps the Undo glyph button alone, its sentence in
   the tooltip; "Nothing to undo." comes out beside the rail on `panel` with the overlay shadow, as
   does "The clipboard holds no files.", with the clipboard glyph.

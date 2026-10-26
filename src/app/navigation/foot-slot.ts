@@ -14,6 +14,8 @@ export type FootNews =
   | { kind: "done"; line: string; batchId: string }
   /** An export that ended, and the zip it wrote, which Explorer can show; nothing to undo. */
   | { kind: "exported"; line: string; path?: string }
+  /** What an act did that changed nothing in the library, so there is nothing to undo. */
+  | { kind: "said"; line: string }
   /** What an undo brought back, and the batch it took back. */
   | { kind: "undone"; line: string; batchId?: string }
   | { kind: "nothing" }

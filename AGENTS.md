@@ -32,7 +32,8 @@ queue, with the owner stepping in only where a pull request asks. The `queue` sk
 - `npx --yes pnpm@12.4.1 install` — install
 - `npx --yes pnpm@12.4.1 dev --port 1422 --strictPort` — dev server for checking the UI
 - `npx --yes pnpm@12.4.1 tauri dev` — the real app in its own window
-- `npx --yes pnpm@12.4.1 lint | check | check:docs | test | test:e2e` — the frontend gates
+- `npx --yes pnpm@12.4.1 lint | check | check:docs | test | test:timing | test:e2e` — the
+  frontend gates; `test:timing` runs the frame-rate tests alone, one file at a time
 - `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` and
   `cargo test -- --ignored --test-threads=1 ::timing::`, each with
   `--manifest-path src-tauri/Cargo.toml` — the Rust gates; the last runs the timing tests alone

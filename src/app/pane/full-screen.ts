@@ -19,13 +19,18 @@ export function useFullScreen() {
   return useSyncExternalStore(subscribe, getFullScreen);
 }
 
-/** Escape leaves, wherever the focus is: in full screen there is nothing else for it to close. */
+/**
+ * Escape leaves, wherever the focus is: in full screen there is nothing else for it to close. It
+ * claims the press, so a listener that runs after it does not act on it too.
+ */
 export function useEscapeLeavesFullScreen() {
   const shown = useFullScreen();
   useEffect(() => {
     if (!shown) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setFullScreen(false);
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      setFullScreen(false);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

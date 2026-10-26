@@ -659,6 +659,68 @@ thumbnail, at the size the original would fit at, from the shape the index read 
 rotated recording's true shape are read when the thumbnail is made; "Capture dates" and "Video
 and ffmpeg" above say how.
 
+## Several files in the pane
+
+**Files dragged onto the pane are drawn at one scale**, drawn by Claude Design on Pane › several
+and built on 20 October 2026: one picture made of several, in the same pane and the same mode.
+**"One scale" is one pixel scale**, the figure the zoom plate reads, so a 640-wide clip stands a
+tenth as wide as a 6000-wide photograph beside it. Equal cells are the tiled compare PRD.md drops,
+and one height in justified rows is equal cells by another measure.
+
+- **The pane tries every split of the files, in the order added, into rows** and keeps the one
+  that draws them largest. Scales within a millionth of the largest count as equal, which only
+  absorbs rounding; of equal splits it keeps the fewest rows, then the earlier rows fuller, as
+  text wraps. Ties are routine, since rows of one height reorder freely, and the rule leaves every
+  set exactly one layout. The search is a table of the least height each run of files can take in
+  so many rows, bisected on the scale, so it costs the same for every split there is.
+- **The scale stops at 100%**, as a lone picture's does, and never draws any file past the media
+  area. **One floor outranks the stop**, `pane-set-least`: no file is drawn under a badge and two
+  insets on its shorter side, or two badges and three on its longer, so its × and a video's mute
+  always fit. **The room outranks the floor**: a file the floor would push past the area is drawn
+  at the most the area holds, in a band the floor's size across its row. The cap cuts back only
+  the floor's lift; the set's scale already keeps every file inside the area.
+- **Each file draws its original, never its thumbnail.** A 320px thumbnail swapped for the
+  original as the room grows is the stand-in "The pane" turned down.
+- **A drop adds, a click replaces.** Files dragged onto the open pane join the end of what it
+  shows, in the order carried, or take its place while it shows nothing; a click anywhere shows
+  one alone again. Each file keeps the place it was carried from, which it takes with it when it
+  is shown alone; the strip stays on the first's. A file already shown is neither added nor
+  counted, so a drop of only those is refused, as one into a full pane is; past the limit what
+  fits goes in and the foot's Line says how many of how many, with no Undo since the library did
+  not change. A folded pane's rail takes no drop, and Explorer's files are never taken: they are
+  not in the index until they land in a folder.
+- **The limit is twelve, a third of what held.** A set that holds still costs nothing to show, so
+  the measure is one that draws every frame: on 26 October 2026, in the headless Edge the tests
+  use on the owner's machine, a 1500 × 900 pane of 6000 × 4000 JPEG originals was resized every
+  frame, down to half its width and back each second, so the set was laid out and drawn again at
+  a new scale each time. Twelve, 24 and 36 held the display's 60 a second, no more than four
+  frames in 300 late; 48 fell to 52 in one run of two, and 72 to 30. Twelve leaves the margin a
+  slower machine and CI's runner need. `src/app/pane/set-frame-rate.timing.test.tsx` holds
+  `pane-set` to it, run alone.
+- **Two clips play at once, `pane-set-playing`.** Measured the same way among twelve, each 1080p
+  clip a second in before the count: two dropped none of their frames in three runs of five
+  seconds, though two pace the window to their own 30 a second, as they do on a bare page; three
+  dropped some in every run, up to one in a hundred, and four up to one in twenty. Past the two,
+  a clip holds on its first frame, and the one given the sound plays in place of the later of
+  the two. The same test holds the two under one dropped frame in a hundred.
+- **Videos loop from the start, muted**, each with its own mute; giving one the sound takes it
+  from the one that had it, so one plays aloud at a time.
+- **A file with no shape stands in at the floor**, landscape, its extension on the hatch as the
+  lone pane shows it: a file of another kind, or a picture whose original fails with no
+  thumbnail when the index lacks its shape. Refusing it at the drop would turn away a file the
+  pane already shows alone; drawn, it counts, takes the arrows' focus and its ×, as any file does.
+- **The set is one tab stop.** The arrows move in reading order, Enter shows one alone, and Tab
+  reaches the focused file's ×. × takes a file out and does nothing to it, the focus passing to
+  the next, or the one before; the last but one leaves the ordinary pane, its picture focused.
+  **Escape shows the first alone only with the focus in the pane**, and only once a menu, a drag,
+  full screen, the folded pane open over the grid and a checked set have each taken their own
+  Escape, whichever order their listeners were added in, so after a drop Escape in the
+  grid still clears the grid's set and leaves the pane alone.
+- **A file deleted, moved to another folder or gone leaves the set**, and the rest stay; only when
+  every file goes does the pane move on, as after deleting the one it shows. A set has no one file
+  for the bar or a destination key to act on, so the bar goes and a key with nothing checked
+  moves nothing, its Line saying to check the ones to move.
+
 ## Right-click menus
 
 **A right-click is a shortcut to what the interface already does**, drawn by Claude Design and
