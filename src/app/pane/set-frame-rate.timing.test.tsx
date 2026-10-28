@@ -25,6 +25,7 @@ test("the clips that play at once, among the limit's worth, drop no more than on
   await benchSet(paneSetLimit(), { clips: paneSetPlaying(), ms: 1000 });
   const bench = await benchSet(paneSetLimit(), { clips: paneSetPlaying(), ms: 5000, spans: 3 });
   expect(bench.spans.every((span) => span.due > 0)).toBe(true);
+  console.info(`dropped ${bench.spans.map((span) => `${span.dropped}/${span.due}`).join(" ")}`);
   const shares = bench.spans.map((span) => span.dropped / span.due).sort((a, b) => a - b);
   expect(shares[Math.floor(shares.length / 2)]).toBeLessThan(0.01);
 });
