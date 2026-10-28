@@ -695,14 +695,20 @@ and one height in justified rows is equal cells by another measure.
   frame, down to half its width and back each second, so the set was laid out and drawn again at
   a new scale each time. Twelve, 24 and 36 held the display's 60 a second, no more than four
   frames in 300 late; 48 fell to 52 in one run of two, and 72 to 30. Twelve leaves the margin a
-  slower machine and CI's runner need. `src/app/pane/set-frame-rate.timing.test.tsx` holds
-  `pane-set` to it, run alone.
-- **Two clips play at once, `pane-set-playing`.** Measured the same way among twelve, each 1080p
-  clip a second in before the count: two dropped none of their frames in three runs of five
-  seconds, though two pace the window to their own 30 a second, as they do on a bare page; three
-  dropped some in every run, up to one in a hundred, and four up to one in twenty. Past the two,
-  a clip holds on its first frame, and the one given the sound plays in place of the later of
-  the two. The same test holds the two under one dropped frame in a hundred.
+  slower machine and CI's runner need: there, the same day, twelve held 60 with at most one frame
+  in 300 late, while 48 fell to 45 in one run and held 57 in another.
+  `src/app/pane/set-frame-rate.timing.test.tsx` holds `pane-set` to it, run alone.
+- **Two clips play at once, `pane-set-playing`.** It was set from counts that measured the test
+  clip, not the window: three dropped some frames in every run, four up to one in twenty. But the
+  clip, recorded with `setTimeout(1000 / 30)`, which waits 33ms, ran faster than the window's 30 a
+  second and dropped its spare frames however idle, and its two-second loop dropped more at each
+  seam; on CI two dropped up to 1.36%. Counted again on 26 October 2026 with a clip paced at 34ms
+  and longer than the count, among twelve, on the owner's machine and on CI's runner alike, two,
+  three, four and six clips each dropped none of their frames in three runs of twelve seconds,
+  the window held at its 30 a second. No count yet finds where frames go, so two stands until one
+  does. Past the two, a clip holds on its first frame, and the one given the sound plays in place
+  of the later of the two. The same test holds the two under one dropped frame in a hundred, in
+  the middle of three five-second spans, so one hitch on a shared runner does not fail it.
 - **Videos loop from the start, muted**, each with its own mute; giving one the sound takes it
   from the one that had it, so one plays aloud at a time.
 - **A file with no shape stands in at the floor**, landscape, its extension on the hatch as the

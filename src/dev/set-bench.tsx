@@ -49,8 +49,8 @@ export type BenchOptions = {
   height?: number;
 };
 
-// Settling, and the clips' first 30 frames, before the count starts.
-const LEAD = 4000;
+// Covers the wait before the count, so no clip loops inside it.
+const LEAD = 6000;
 
 const movies = new Map<number, Promise<string>>();
 
