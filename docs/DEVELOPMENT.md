@@ -186,11 +186,26 @@ review. The ruleset takes Review from any source, so it is as trustworthy as the
 workflows that can set it, as Gates is. The reviewer runs the branch in a worktree of its own
 under the main checkout's git-ignored `.claude/worktrees/`, never in the author's checkout or a
 folder beside it, and removes it when the review ends, both with `scripts/review-worktree.sh`.
-`scripts/review-worktree.test.sh` tests that script in CI's Gates job, against a throwaway clone
-under the runner's temp folder: it never follows a junction, refuses a locked worktree, and
-leaves nothing registered or on disk. Locally, pass it a folder under `.claude/worktrees/`.
-The dev server ignores that folder. Cargo in a nested worktree also reads the main
-checkout's `.cargo/config.toml`, so a key the worktree's own file drops still applies there.
+
+A review worktree has no `node_modules` of its own. It sits inside the main checkout, so Node,
+TypeScript and `npm run` find the checkout's packages by walking up, and `vite.config.ts` lets
+Vite serve files from the checkout's `node_modules` when it runs from `.claude/worktrees/`, so
+the bundled fonts load there too. The gates run there only through `npm run`: pnpm reinstalls
+before a script when its state names another folder, and a link into the checkout would let it
+rewrite the checkout's modules with paths that die with the worktree. Whatever writes the
+worktree's own `node_modules` stays in the worktree and goes with it. As a backstop, opening or
+closing one first looks through the checkout's `node_modules` for a link, a shim or pnpm's state
+naming any worktree, and if it finds one refuses and removes nothing, so nothing dangles; a
+`npx --yes pnpm@12.4.1 install --frozen-lockfile` in the checkout relinks it.
+
+`scripts/review-worktree.test.sh` tests that script in CI's Gates job, after the install,
+against a throwaway clone under the runner's temp folder: it never follows a junction, refuses a
+locked worktree, leaves nothing registered or on disk, keeps a package manager's writes out of
+the clone's `node_modules`, refuses to close while those name a worktree, and loads Vite's
+config from a worktree to see it allow the clone's `node_modules`. Locally, pass it a folder
+under `.claude/worktrees/`. The dev server ignores that folder. Cargo in a nested worktree also
+reads the main checkout's `.cargo/config.toml`, so a key the worktree's own file drops still
+applies there.
 
 ## Porting from ggallery
 
