@@ -796,7 +796,8 @@ toward the rest surface.
 - **A folder in the pane.** The pane's four parts, filled by a folder. The header's disclosure
   holds its name in `fg`, ending in an ellipsis, then its count pill, which never leaves, or
   `offline` in `small` `fg-dim`. The cover stands in the picture's place at its own shape and
-  the `control` corner, with the band's pencil and *Cover* plate; an empty folder has the empty
+  the `control` corner, with the band's pencil and *Cover* plate, or the extension on the hatch
+  when it has nothing to draw, at its own shape or 4:3; an empty folder has the empty
   state there instead, and an offline one the grid's offline state. The bar holds Open, a raised
   worded button with the `goInto` arrow that gives way in an ellipsis, then Show in Explorer and
   the ⋯ from the right. The strip's frames all sit back, none ringed. Gone, the empty state says

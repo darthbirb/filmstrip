@@ -9,72 +9,48 @@ import {
 } from "react";
 
 import type { FolderDetail } from "../../ipc/bindings/FolderDetail";
-import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
+import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import { Button } from "../../ui/Button";
 import { CountPill } from "../../ui/Count";
 import { EmptyState } from "../../ui/EmptyState";
-import { Glyph } from "../../ui/Glyph";
 import { GlyphButton } from "../../ui/GlyphButton";
 import { Menu, type MenuGroups } from "../../ui/Menu";
 import { Plate } from "../../ui/Plate";
 import { PushDown } from "../../ui/PushDown";
 import { CoverPicker } from "../grid/CoverPicker";
 import { OfflinePlace } from "../grid/EmptyPlace";
-import { FolderFacts } from "../grid/FolderBand";
+import { FolderFacts, folderPlace, folderTitle } from "../grid/FolderBand";
 import { fromFocus, placeMenu } from "../menus/ground";
 import { useIndex } from "../navigation/index-store";
 import { openFolders } from "../navigation/open-folders";
 import { useClipboard } from "../paste/clipboard";
 import { type Place, setPlace } from "../place";
-import { updatePreferences, usePreferences } from "../preferences";
+import { usePreferences } from "../preferences";
+import { DETAILS_ID, DetailsToggle } from "./DetailsToggle";
+import { StandIn } from "./PaneSet";
 import type { FolderShown } from "./pane-detail";
 import { FolderStrip } from "./Strip";
 import { useItemDetail } from "./useItemDetail";
-import { fitScale, type Size } from "./zoom";
+import { fitScale, type Size, STAND_IN_SHAPE } from "./zoom";
 
 type Ready = Extract<FolderShown, { status: "ready" }>;
-
-const DETAILS_ID = "pane-details";
-
-const placeOf = (detail: FolderDetail): Place & { kind: "folder" } => ({
-  kind: "folder",
-  sourceId: detail.sourceId,
-  path: detail.path,
-});
-
-const titleOf = (detail: FolderDetail, source: SourceSummary) =>
-  detail.path.at(-1)?.title ?? source.title;
 
 /**
  * A folder's header row: the way into full screen, then its name and its count, opening onto its
  * band's rows. Gone, only the fold is left. Pane › folder.
  */
 export function FolderPaneHeader({ shown, into }: { shown: FolderShown; into: ReactNode }) {
-  const open = usePreferences().details ?? false;
   if (shown.status !== "ready") return null;
   const { detail, source } = shown;
   return (
-    <div className="flex min-w-0 items-center gap-1.5">
-      {into}
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={DETAILS_ID}
-        onClick={() => updatePreferences({ details: !open })}
-        className="focus-ring flex h-control w-full min-w-0 items-center gap-2 rounded-control px-2 text-left text-fg-mid text-ui tabular-nums transition-colors duration-(--motion-quick) hover:bg-wash hover:text-fg aria-expanded:bg-raised aria-expanded:text-fg motion-reduce:transition-none"
-      >
-        <Glyph
-          name="chevronRight"
-          className={`text-fg-dim text-icon transition-transform duration-(--motion-quick) ease-out motion-reduce:transition-none ${open ? "rotate-90" : ""}`}
-        />
-        <span className="min-w-0 truncate text-fg">{titleOf(detail, source)}</span>
-        {source.reachable ? (
-          <CountPill own={detail.ownCount} all={detail.allCount} />
-        ) : (
-          <span className="shrink-0 text-fg-dim text-small">offline</span>
-        )}
-      </button>
-    </div>
+    <DetailsToggle into={into}>
+      <span className="min-w-0 truncate text-fg">{folderTitle(detail, source)}</span>
+      {source.reachable ? (
+        <CountPill own={detail.ownCount} all={detail.allCount} />
+      ) : (
+        <span className="shrink-0 text-fg-dim text-small">offline</span>
+      )}
+    </DetailsToggle>
   );
 }
 
@@ -96,8 +72,8 @@ export function FolderPane({ shown }: { shown: FolderShown }) {
   }
   if (shown.status !== "ready") return null;
   const { detail, source } = shown;
-  const place = placeOf(detail);
-  const title = titleOf(detail, source);
+  const place = folderPlace(detail);
+  const title = folderTitle(detail, source);
   let picture: ReactNode;
   if (!source.reachable) {
     picture = (
@@ -130,35 +106,38 @@ export function FolderPane({ shown }: { shown: FolderShown }) {
   );
 }
 
-/** The cover at its own shape, as any picture stands, with the band's pencil; it does not zoom. */
+/**
+ * The cover at its own shape, as any picture stands, with the band's pencil; it does not zoom. An
+ * original that cannot be drawn gives way to its thumbnail, and with neither its extension stands in.
+ */
 function FolderCover({ detail, title }: { detail: FolderDetail; title: string }) {
   const area = useRef<HTMLDivElement>(null);
   const room = useSize(area);
   const cover = useItemDetail(detail.coverFileId);
   const item = cover.status === "ready" ? cover.item : null;
   const [own, setOwn] = useState<Size | null>(null);
+  const [failed, setFailed] = useState(0);
   const [drawn, setDrawn] = useState(false);
-  let src: string | undefined;
-  if (item?.kind === "image") src = convertFileSrc(item.path);
-  else if (item?.thumb) src = convertFileSrc(item.thumb);
+  const src = item ? drawable(item)[failed] : undefined;
   const known = item?.width && item.height ? { width: item.width, height: item.height } : null;
   const size = known ?? own;
-  const scale = size && room ? fitScale(room, size) : null;
+  const standIn = cover.status !== "loading" && src === undefined;
+  const box = room && (size ? scaled(size, fitScale(room, size)) : standIn ? filled(room) : null);
   // The picker opens beside the picture, which names itself for it to anchor to.
   const anchor = `--pane-cover-${detail.id}`;
-  const style =
-    size && scale !== null
-      ? { anchorName: anchor, width: size.width * scale, height: size.height * scale }
-      : { anchorName: anchor, position: "absolute", opacity: 0 };
+  const style = box
+    ? { anchorName: anchor, ...box }
+    : { anchorName: anchor, position: "absolute", opacity: 0 };
   return (
     <div ref={area} className="relative grid min-h-0 min-w-0 place-items-center">
-      {(src || size) && (
+      {cover.status !== "loading" && (
         <span
           style={style as CSSProperties}
           className="relative overflow-hidden rounded-control bg-inset"
         >
-          {src && (
+          {src ? (
             <img
+              key={failed}
               src={src}
               alt={`Cover of ${title}`}
               draggable={false}
@@ -167,8 +146,11 @@ function FolderCover({ detail, title }: { detail: FolderDetail; title: string })
                 setOwn({ width, height });
                 setDrawn(true);
               }}
+              onError={() => setFailed((count) => count + 1)}
               className={`size-full object-cover ${drawn ? "" : "opacity-0"}`}
             />
+          ) : (
+            <StandIn ext={item?.ext ?? ""} />
           )}
           {detail.coverItemId !== null && (
             <Plate look="mark" className="absolute bottom-1.5 left-1.5">
@@ -186,6 +168,26 @@ function FolderCover({ detail, title }: { detail: FolderDetail; title: string })
     </div>
   );
 }
+
+/** What can draw the cover, best first: a picture's original, then the thumbnail made from it. */
+function drawable(item: ItemDetail) {
+  const sources: string[] = [];
+  if (item.kind === "image") sources.push(convertFileSrc(item.path));
+  if (item.thumb) sources.push(convertFileSrc(item.thumb));
+  return sources;
+}
+
+const scaled = (size: Size, scale: number): Size => ({
+  width: size.width * scale,
+  height: size.height * scale,
+});
+
+/** A stand-in with no shape of its own takes the most of the room its stand-in shape can. */
+const filled = (room: Size) =>
+  scaled(
+    STAND_IN_SHAPE,
+    Math.min(room.width / STAND_IN_SHAPE.width, room.height / STAND_IN_SHAPE.height),
+  );
 
 /**
  * The folder's menu laid out as a bar, as a file's bar is its tile's: Open, the one worded button,
@@ -265,6 +267,7 @@ function useRoomFor(
       setRoomy(whole + 2 * (gap + square) <= element.clientWidth - padding);
     };
     measure();
+    void document.fonts.ready.then(measure);
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => observer.disconnect();

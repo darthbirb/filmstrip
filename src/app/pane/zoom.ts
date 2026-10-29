@@ -4,6 +4,9 @@
 export type Point = { x: number; y: number };
 export type Size = { width: number; height: number };
 
+/** The shape a file stands in at when nothing says its own. */
+export const STAND_IN_SHAPE: Size = { width: 4, height: 3 };
+
 /**
  * A zoomed picture: a multiple of the scale it fits at, and the image point, in its own pixels, at
  * the centre of the area. Null is fit. Neither is a screen size, so a re-fit keeps the same view.

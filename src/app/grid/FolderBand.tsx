@@ -70,19 +70,23 @@ export function FolderBand() {
 
 type FactsProps = { detail: FolderDetail; source: SourceSummary };
 
-const folderTitle = (detail: FolderDetail, source: SourceSummary) =>
+/** A folder's name, or its source's for a source's top level. */
+export const folderTitle = (detail: FolderDetail, source: SourceSummary) =>
   detail.path.at(-1)?.title ?? source.title;
+
+/** The place a folder is, to go to or to ask its menu for. */
+export const folderPlace = (detail: FolderDetail): Place & { kind: "folder" } => ({
+  kind: "folder",
+  sourceId: detail.sourceId,
+  path: detail.path,
+});
 
 /**
  * A folder's rows, Path, Status with Favourite, Labels, Tags and the Note, each editing where it
  * stands: one component in the band and in the pane. Pane › folder.
  */
 export function FolderFacts({ detail, source }: FactsProps) {
-  const place: Place & { kind: "folder" } = {
-    kind: "folder",
-    sourceId: detail.sourceId,
-    path: detail.path,
-  };
+  const place = folderPlace(detail);
   const { favourites } = useIndex();
   const favourite = favourites.some((one) => one.folderId === detail.id);
   const offline = !source.reachable;

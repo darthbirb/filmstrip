@@ -93,6 +93,8 @@ export function Navigation() {
   landingOutside.current = () => null;
   const ground = useRef<PlaceMenu>(() => ({ groups: [] }));
   ground.current = () => ({ groups: [] });
+  // A menu built at one render can run at a later one, by which time the tree may have shut.
+  const drawn = useRef<readonly TreeRow[]>([]);
   useEffect(() => {
     setDropResolver((id, carried) => landing.current(id, carried));
     setOutsideResolver((id, paths) => landingOutside.current(id, paths));
@@ -111,6 +113,7 @@ export function Navigation() {
     sortingRow(sources, () => void addFolder("sorting")),
     trashRow(totals?.trash),
   ];
+  drawn.current = rows;
   const places = new Map<string, Place>([
     [SORTING_ID, { kind: "sorting" }],
     [TRASH_ID, { kind: "trash" }],
@@ -251,7 +254,7 @@ export function Navigation() {
     const rename = () => {
       setTaken(null);
       setDraft(null);
-      if (!rows.some((row) => row.id === id))
+      if (!drawn.current.some((row) => row.id === id))
         openFolders(path.slice(0, -1).map((crumb) => crumb.id));
       setRenaming(id);
     };

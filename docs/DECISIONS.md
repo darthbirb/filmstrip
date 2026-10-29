@@ -742,7 +742,8 @@ and no way in but Show in Pane; a click on any file leaves it.
   disclosure and its saved preference, so a change in one shows in the other at once.
 - **The cover is the band's, at its own shape**, the original of the file that stands for it,
   with its pencil and Cover plate; `folder_detail` names that file. It does not zoom: it stands
-  for the folder.
+  for the folder. An original the window cannot draw gives way to its thumbnail, and with neither
+  its extension stands in, as for a file, so the pencil is always there to choose another.
 - **The bar is the folder's menu laid out**, as a file's bar is its tile's: Open, the one worded
   button, never leaves and goes there, its row selected, the pane keeping the folder; Show in
   Explorer folds into the ⋯ when Open's whole name and two squares do not fit; the ⋯ holds every
