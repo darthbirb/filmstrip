@@ -15,13 +15,17 @@ evidence; the diff, the tests and the running code are.
    `git show origin/main:scripts/review-worktree.sh | bash -s -- open <n> <sha>`, from any
    checkout of this repository, so the script is main's whatever branch that checkout is on.
    The fetch makes main's copy of the script current and the head commit present.
-   It goes under the main checkout's git-ignored `.claude/worktrees/`, replaces one an earlier
-   review left, and links the checkout's `node_modules` in when the dependencies match. When it
-   says they differ, run no frontend gates there, since they would find the checkout's modules
-   anyway; say in the review that CI ran them. Install nothing. When done, run it again with
-   `-- close <n>`; never remove the worktree or its `node_modules`
-   another way. Never switch the author's checkout, and never make a folder beside it. Scratch
-   files go in your scratchpad. Edit, commit and push nothing.
+   It goes under the main checkout's git-ignored `.claude/worktrees/` and replaces one an earlier
+   review left. It has no `node_modules` of its own: Node, `npm run` and Vite find the checkout's,
+   in the folder it sits in. Run the frontend gates there only with `npm run <script>`
+   (DEVELOPMENT.md "Where pnpm cannot run"); never run pnpm in it, not even `npx pnpm test`, and
+   never install, link or relink packages in it, since pnpm reinstalls before a script runs. When
+   it says the dependencies differ, run no frontend gates there, since they would find the
+   checkout's modules anyway; say in the review that CI ran them. When done, run it again with
+   `-- close <n>`; never remove the worktree another way. Close refuses, and removes nothing,
+   when the checkout's `node_modules` names a worktree; repair nothing, and say so in your final
+   message so the owner can. Never switch the author's checkout, and never make a folder beside it.
+   Scratch files go in your scratchpad. Edit, commit and push nothing.
 3. Post the review body, ending in its verdict line, on the commit you reviewed:
    `gh api -X POST repos/darthbirb/filmstrip/pulls/<n>/reviews -f commit_id=<sha> -f event=COMMENT -F body=@<file>`.
 4. Only on a pass, and only if the head is still the commit you reviewed and the pull request is
