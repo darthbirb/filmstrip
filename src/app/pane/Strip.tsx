@@ -28,7 +28,15 @@ export function Strip() {
   return <Track items={items} current={current} from={from} />;
 }
 
-type TrackProps = { items: ItemRow[]; current: number; from: Place | null };
+/** A folder's own files, none of them shown yet: a frame or the forward step shows the first. */
+export function FolderStrip({ place }: { place: Place }) {
+  const items = useGridItems(place);
+  if (!items || items.length === 0) return null;
+  return <Track items={items} current={null} from={place} />;
+}
+
+/** `current` is none while the pane shows the place itself, standing before its first frame. */
+type TrackProps = { items: ItemRow[]; current: number | null; from: Place | null };
 
 function Track({ items, current, from }: TrackProps) {
   const scroller = useRef<HTMLDivElement>(null);
@@ -175,7 +183,7 @@ function Track({ items, current, from }: TrackProps) {
       <StepButton
         side="end"
         label="Next"
-        disabled={index < 0 || index >= items.length - 1}
+        disabled={(current !== null && index < 0) || index >= items.length - 1}
         onClick={() => show(index + 1)}
       />
     </div>

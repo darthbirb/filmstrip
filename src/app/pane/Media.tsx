@@ -6,7 +6,7 @@ import { useContextMenu } from "../../ui/Menu";
 import { itemMenu } from "../menus/item-menu";
 import { useZoom, ZoomPlate } from "./useZoom";
 import { Video } from "./VideoPlate";
-import type { Size } from "./zoom";
+import { type Size, STAND_IN_SHAPE } from "./zoom";
 
 type Props = {
   item: ItemDetail;
@@ -119,5 +119,7 @@ export function Media({ item, fill = false }: Props) {
 }
 
 function aspect(item: ItemDetail) {
-  return item.width && item.height ? item.width / item.height : 4 / 3;
+  return item.width && item.height
+    ? item.width / item.height
+    : STAND_IN_SHAPE.width / STAND_IN_SHAPE.height;
 }

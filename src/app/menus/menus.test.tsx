@@ -216,6 +216,7 @@ test("a folder's row holds every verb a place has; a source's adds the Sources s
   const source = screen.getByRole("treeitem", { name: "Pictures 1 of 6" });
   const sourceMenu = await menuOn(screen, source, "Pictures");
   expect(labels(sourceMenu)).toEqual([
+    "Show in Pane",
     "New Folder",
     "Favourite",
     "Assign Key…",
@@ -239,6 +240,7 @@ test("a folder's row holds every verb a place has; a source's adds the Sources s
   const trips = screen.getByRole("treeitem", { name: "Trips 2 of 5" });
   const folderMenu = await menuOn(screen, trips, "Trips");
   expect(labels(folderMenu)).toEqual([
+    "Show in Pane",
     "New Folder",
     "Favourite",
     "Assign Key…",
@@ -294,6 +296,7 @@ test("an offline source and its folders keep what needs no drive", async () => {
       const archive = screen.getByRole("treeitem", { name: "Archive offline" });
       const menu = await menuOn(screen, archive, "Archive");
       expect(labels(menu)).toEqual([
+        "Show in Pane",
         "Favourite",
         "Assign Key…",
         "Select Everything Inside",
@@ -309,6 +312,7 @@ test("an offline source and its folders keep what needs no drive", async () => {
       // Favourite, a key and a set are the index's, as the folder's band offers the first two too.
       const folder = screen.getByRole("treeitem", { name: "Old 0 of 0" });
       expect(labels(await menuOn(screen, folder, "Old"))).toEqual([
+        "Show in Pane",
         "Favourite",
         "Assign Key…",
         "Select Everything Inside",

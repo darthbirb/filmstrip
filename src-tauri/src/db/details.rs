@@ -52,6 +52,8 @@ pub struct FolderDetail {
     pub note: Option<String>,
     /// The file chosen as its cover, while that file is live at or below it.
     pub cover_item_id: Option<i64>,
+    /// The file that stands for it, chosen or the first, while it holds one.
+    pub cover_file_id: Option<i64>,
     /// The picture that stands for it, once its thumbnail is made. Filled by the command.
     pub cover: Option<String>,
     #[serde(skip)]
@@ -100,6 +102,7 @@ pub fn detail(conn: &Connection, folder_id: i64) -> Result<Option<FolderDetail>>
             .as_ref()
             .map(|(id, _)| *id)
             .filter(|id| Some(*id) == chosen),
+        cover_file_id: cover.as_ref().map(|(id, _)| *id),
         cover: None,
         cover_uuid: cover.map(|(_, uuid)| uuid),
         own_count: folders::own_count(conn, folder_id)?,
@@ -483,6 +486,7 @@ mod tests {
             "nearest first"
         );
         assert_eq!(standing.cover_item_id, None);
+        assert_eq!(standing.cover_file_id, Some(hotel));
 
         conn.execute(
             "UPDATE folder SET cover_item_id = ?1 WHERE id = ?2",

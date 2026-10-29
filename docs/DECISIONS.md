@@ -727,6 +727,33 @@ and one height in justified rows is equal cells by another measure.
   for the bar or a destination key to act on, so the bar goes and a key with nothing checked
   moves nothing, its Line saying to check the ones to move.
 
+## A folder in the pane
+
+**A folder can stand where a file stands**, drawn by Claude Design on Pane › folder and built on
+26 October 2026. It is its own thing, not a second mode: the pane keeps its four parts, and only
+what fills them changes, as a video fills them differently from a photograph. There is no switch
+and no way in but Show in Pane; a click on any file leaves it.
+
+- **Show in Pane heads every folder's and source's menu**, on its row, its favourite's row, the
+  grid's ground and a search's folder card, as Full Screen heads a tile's, since both only look;
+  the pane's own ⋯ leaves it out. An offline one keeps it, since the pane reads only the index. A sorting
+  source's folder has none: its band has no rows to show. Shown again, the same folder stays.
+- **The details are the band's rows**, one component in both places, behind the pane's own
+  disclosure and its saved preference, so a change in one shows in the other at once.
+- **The cover is the band's, at its own shape**, the original of the file that stands for it,
+  with its pencil and Cover plate; `folder_detail` names that file. It does not zoom: it stands
+  for the folder. An original the window cannot draw gives way to its thumbnail, and with neither
+  its extension stands in, as for a file, so the pencil is always there to choose another.
+- **The bar is the folder's menu laid out**, as a file's bar is its tile's: Open, the one worded
+  button, never leaves and goes there, its row selected, the pane keeping the folder; Show in
+  Explorer folds into the ⋯ when Open's whole name and two squares do not fit; the ⋯ holds every
+  other row in the menu's order, read from navigation's menu each time it is drawn.
+- **The strip runs through the folder's own files, none of them ringed**; a frame or the forward
+  step shows that file, the folder becoming the place it was clicked in.
+- **The pane follows the folder, not its path**, so a move or a rename inside the app keeps it.
+  Deleted in the app, or its source removed, the pane shows nothing, as after deleting a file;
+  "This Folder Has Gone" over its path is for a folder that went any other way.
+
 ## Right-click menus
 
 **A right-click is a shortcut to what the interface already does**, drawn by Claude Design and

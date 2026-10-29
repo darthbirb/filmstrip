@@ -308,6 +308,7 @@ function NameField({
   const taken = renaming.taken ?? null;
   useEffect(() => {
     field.current?.select();
+    field.current?.scrollIntoView({ block: "nearest" });
   }, []);
   // The answer to Enter came back taken: the keyboard is where the name gets mended.
   useEffect(() => {

@@ -1,20 +1,19 @@
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import { formatBytes, formatCount, formatDimensions, formatDuration } from "../../lib/format";
 import { EmptyState } from "../../ui/EmptyState";
-import { Glyph } from "../../ui/Glyph";
 import { GlyphButton } from "../../ui/GlyphButton";
 import { PushDown } from "../../ui/PushDown";
-import { updatePreferences, usePreferences } from "../preferences";
+import { usePreferences } from "../preferences";
 import { Actions } from "./Actions";
 import { Details } from "./Details";
+import { DETAILS_ID, DetailsToggle } from "./DetailsToggle";
+import { FolderPane, FolderPaneHeader } from "./FolderPane";
 import { setFullScreen, useFullScreen } from "./full-screen";
 import { Media } from "./Media";
 import { PaneSet } from "./PaneSet";
-import { usePaneDetail, usePaneSetDetail } from "./pane-detail";
+import { usePaneDetail, usePaneFolderDetail, usePaneSetDetail } from "./pane-detail";
 import { usePaneSet } from "./pane-store";
 import { Strip } from "./Strip";
-
-const DETAILS_ID = "pane-details";
 
 /**
  * The pane's header row: the way into full screen, then the item's shape and size, opening onto
@@ -24,7 +23,7 @@ export function PaneHeader() {
   const shown = usePaneDetail();
   const set = usePaneSet();
   const several = usePaneSetDetail();
-  const open = usePreferences().details ?? false;
+  const folder = usePaneFolderDetail();
   const full = useFullScreen();
   const into = (
     <GlyphButton
@@ -34,6 +33,7 @@ export function PaneHeader() {
       onClick={() => setFullScreen(!full)}
     />
   );
+  if (folder.status !== "empty") return <FolderPaneHeader shown={folder} into={into} />;
   // Details are about one file, so a set's header counts them and is not a disclosure.
   if (set.length > 1) {
     return (
@@ -47,22 +47,9 @@ export function PaneHeader() {
   }
   if (shown.status !== "ready") return null;
   return (
-    <div className="flex min-w-0 items-center gap-1.5">
-      {into}
-      <button
-        type="button"
-        aria-expanded={open}
-        aria-controls={DETAILS_ID}
-        onClick={() => updatePreferences({ details: !open })}
-        className="focus-ring flex h-control w-full min-w-0 items-center gap-2 rounded-control px-2 text-left text-fg-mid text-ui tabular-nums transition-colors duration-(--motion-quick) hover:bg-wash hover:text-fg aria-expanded:bg-raised aria-expanded:text-fg motion-reduce:transition-none"
-      >
-        <Glyph
-          name="chevronRight"
-          className={`text-fg-dim text-icon transition-transform duration-(--motion-quick) ease-out motion-reduce:transition-none ${open ? "rotate-90" : ""}`}
-        />
-        <span className="min-w-0 flex-1 truncate">{summary(shown.item)}</span>
-      </button>
-    </div>
+    <DetailsToggle into={into}>
+      <span className="min-w-0 flex-1 truncate">{summary(shown.item)}</span>
+    </DetailsToggle>
   );
 }
 
@@ -71,7 +58,9 @@ export function Pane() {
   const shown = usePaneDetail();
   const set = usePaneSet();
   const several = usePaneSetDetail();
+  const folder = usePaneFolderDetail();
   const open = usePreferences().details ?? false;
+  if (folder.status !== "empty") return <FolderPane shown={folder} />;
   if (set.length > 1) {
     // The bar goes, as wherever there is no one file to act on. Pane › several.
     return (

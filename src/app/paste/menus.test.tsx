@@ -67,7 +67,7 @@ test("Paste follows New Folder counting what the clipboard holds, and the Box's 
   await copyCover();
   await renderTree();
   const people = await menuOf(/^People /);
-  expect(people.slice(0, 2)).toEqual(["New Folder", "Paste 1 File"]);
+  expect(people.slice(0, 3)).toEqual(["Show in Pane", "New Folder", "Paste 1 File"]);
   await userEvent.keyboard("{Escape}");
 
   expect(await menuOf(/^Sorting Box /)).toEqual(["Paste 1 File"]);

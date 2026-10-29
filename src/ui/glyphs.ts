@@ -11,6 +11,7 @@ export const GLYPHS = {
   chevronDown: { icon: "caret-down", code: 0xe136 },
   folder: { icon: "folder", code: 0xe24a },
   folderOpen: { icon: "folder-open", code: 0xe256 },
+  goInto: { icon: "arrow-right", code: 0xe06c },
   folders: { icon: "folders", code: 0xe260 },
   folderDashed: { icon: "folder-simple-dashed", code: 0xec2a },
   source: { icon: "hard-drives", code: 0xe2a0 },

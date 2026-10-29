@@ -109,7 +109,7 @@ test("the ground opens the place's own menu under its name, the rows its row has
   await rightClickGround();
   await expect.element(menu()).toBeVisible();
   expect(read()).toEqual({ heading: "Cairo", rows: row.rows });
-  expect(row.rows.slice(0, 2)).toEqual(["New Folder", "Paste 1 File"]);
+  expect(row.rows.slice(0, 3)).toEqual(["Show in Pane", "New Folder", "Paste 1 File"]);
 
   await recording(async (calls) => {
     await page.getByRole("menuitem", { name: "Paste 1 File" }).click();
@@ -199,7 +199,7 @@ test("an empty folder's grid is a tab stop of its own, so the keyboard reaches i
   await userEvent.keyboard("{Shift>}{F10}{/Shift}");
   await expect.element(menu()).toBeVisible();
   expect(read().heading).toBe("People");
-  expect(read().rows.slice(0, 2)).toEqual(["New Folder", "Paste 1 File"]);
+  expect(read().rows.slice(0, 3)).toEqual(["Show in Pane", "New Folder", "Paste 1 File"]);
 });
 
 test("Rename from the ground puts the folder's row in its field, opening the folders above it", async () => {

@@ -34,7 +34,7 @@ import { type Place, setPlace, usePlace } from "../place";
 import { addToSearch, searchFor } from "../search/search";
 import { stopsIn, TagsRow, takeOff, titleOf } from "../tags/TagsRow";
 import { CoverPicker } from "./CoverPicker";
-import { detailChanged, useBandOpen, useFolderDetail } from "./folder-detail";
+import { detailChanged, diskPath, useBandOpen, useFolderDetail } from "./folder-detail";
 
 const STATUSES = [
   { value: "none", label: "No Status" },
@@ -55,22 +55,42 @@ export function FolderBand() {
   const source = sources?.find((candidate) => candidate.id === folder?.sourceId);
   return (
     <PushDown open={open && detail !== null} className="min-h-0">
-      {folder && detail && source && <Body place={folder} detail={detail} source={source} />}
+      {folder && detail && source && (
+        // Positioned, so the radios a segmented group hides are clipped with the rest of it.
+        <div className="relative flex h-full gap-4.5 overflow-y-auto pr-3 pb-3 pl-3.5">
+          <Cover detail={detail} title={folderTitle(detail, source)} source={source} />
+          <div className="min-w-0 flex-1">
+            <FolderFacts detail={detail} source={source} />
+          </div>
+        </div>
+      )}
     </PushDown>
   );
 }
 
-type BodyProps = {
-  place: Place & { kind: "folder" };
-  detail: FolderDetail;
-  source: SourceSummary;
-};
+type FactsProps = { detail: FolderDetail; source: SourceSummary };
 
-function Body({ place, detail, source }: BodyProps) {
+/** A folder's name, or its source's for a source's top level. */
+export const folderTitle = (detail: FolderDetail, source: SourceSummary) =>
+  detail.path.at(-1)?.title ?? source.title;
+
+/** The place a folder is, to go to or to ask its menu for. */
+export const folderPlace = (detail: FolderDetail): Place & { kind: "folder" } => ({
+  kind: "folder",
+  sourceId: detail.sourceId,
+  path: detail.path,
+});
+
+/**
+ * A folder's rows, Path, Status with Favourite, Labels, Tags and the Note, each editing where it
+ * stands: one component in the band and in the pane. Pane › folder.
+ */
+export function FolderFacts({ detail, source }: FactsProps) {
+  const place = folderPlace(detail);
   const { favourites } = useIndex();
   const favourite = favourites.some((one) => one.folderId === detail.id);
   const offline = !source.reachable;
-  const title = place.path.at(-1)?.title ?? source.title;
+  const title = folderTitle(detail, source);
   const labels = detail.tags.filter((tag) => tag.key !== null);
   const tags = detail.tags.filter((tag) => tag.key === null);
   const where = { root: place.path.length === 1, offline };
@@ -149,15 +169,7 @@ function Body({ place, detail, source }: BodyProps) {
     />,
   ]);
 
-  return (
-    // Positioned, so the radios a segmented group hides are clipped with the rest of it.
-    <div className="relative flex h-full gap-4.5 overflow-y-auto pr-3 pb-3 pl-3.5">
-      <Cover detail={detail} title={title} source={source} />
-      <div className="min-w-0 flex-1">
-        <Facts facts={facts} />
-      </div>
-    </div>
-  );
+  return <Facts facts={facts} />;
 }
 
 /** The picture that stands for it; the drive's own when it is away, and a frame when it is empty. */
@@ -224,7 +236,7 @@ function BandPath({ place, source }: { place: Place & { kind: "folder" }; source
   const { indexedAt, reachable, root } = source;
   const below = place.path.slice(1);
   if (!reachable) {
-    const path = [root.replace(/[\\/]+$/, ""), ...below.map((crumb) => crumb.title)].join("\\");
+    const path = diskPath(root, place.path);
     return (
       <span className="flex flex-wrap gap-x-2">
         <span>{path}</span>

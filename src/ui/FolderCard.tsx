@@ -1,3 +1,5 @@
+import type { MouseEvent } from "react";
+
 import type { Matched } from "../ipc/bindings/Matched";
 import { CountPill } from "./Count";
 import { Glyph } from "./Glyph";
@@ -14,6 +16,8 @@ type Props = {
   /** The picture that stands for it, as a URL the window can load. */
   cover?: string;
   onOpen: () => void;
+  /** Its folder's menu, from a right-click or the menu key on the card. */
+  onMenu?: (event: MouseEvent<HTMLButtonElement>) => void;
   /** Asks the same question again inside this folder. */
   onScope: () => void;
 };
@@ -23,7 +27,17 @@ type Props = {
  * key first. Two targets: the card is the folder, so a click goes into it; the glass is the
  * search, so a click asks again inside it. Artboards › A search is a place.
  */
-export function FolderCard({ title, own, count, above, matched, cover, onOpen, onScope }: Props) {
+export function FolderCard({
+  title,
+  own,
+  count,
+  above,
+  matched,
+  cover,
+  onOpen,
+  onMenu,
+  onScope,
+}: Props) {
   return (
     // The glass is the card's sibling, not its child: a button cannot hold a button.
     <div className="relative w-card shrink-0">
@@ -31,6 +45,7 @@ export function FolderCard({ title, own, count, above, matched, cover, onOpen, o
         type="button"
         title={`Open ${title}`}
         onClick={onOpen}
+        onContextMenu={onMenu}
         className="focus-ring flex w-full gap-2.5 rounded-control bg-panel p-2 text-left inset-ring inset-ring-line transition-colors duration-(--motion-quick) hover:bg-inset hover:inset-ring-line-strong motion-reduce:transition-none"
       >
         <span className="h-card-cover w-card-cover shrink-0 overflow-hidden rounded-badge bg-raised">

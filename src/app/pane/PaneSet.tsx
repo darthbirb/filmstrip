@@ -291,7 +291,7 @@ function SetFile(props: FileProps) {
 }
 
 /** What is drawn for a file with nothing to draw: its extension on the hatch. */
-function StandIn({ ext }: { ext: string }) {
+export function StandIn({ ext }: { ext: string }) {
   return (
     <span className="hatch grid size-full place-items-center rounded-control text-fg-dim text-small">
       {ext.toUpperCase() || "File"}

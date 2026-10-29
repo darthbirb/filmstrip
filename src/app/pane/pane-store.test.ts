@@ -3,6 +3,8 @@ import { beforeEach, expect, test } from "vitest";
 import type { Place } from "../place";
 import {
   addToPane,
+  dropPaneFolder,
+  getPaneFolder,
   getPaneItem,
   getPaneOrigin,
   getPaneSet,
@@ -11,6 +13,7 @@ import {
   paneFileOrigin,
   paneSetLimit,
   paneSetPlaying,
+  showFolderInPane,
   showInPane,
   whenShownInPane,
 } from "./pane-store";
@@ -90,4 +93,39 @@ test("a click shows one file alone again", () => {
   addToPane([2, 3], CAIRO);
   showInPane(3, CAIRO);
   expect(getPaneSet()).toEqual([3]);
+});
+
+test("a folder takes a file's place, and a file or a drop takes the folder's", () => {
+  showInPane(1, CAIRO);
+  let asked = 0;
+  const stop = whenShownInPane(() => {
+    asked += 1;
+  });
+  showFolderInPane(6, 1);
+  expect(getPaneFolder()).toEqual({ folderId: 6, sourceId: 1 });
+  expect(getPaneItem()).toBeNull();
+  expect(getPaneSet()).toEqual([]);
+  // Shown again it stays as it was, though the pane is still asked to show itself.
+  const shown = getPaneFolder();
+  showFolderInPane(6, 1);
+  expect(getPaneFolder()).toBe(shown);
+  expect(asked).toBe(2);
+  stop();
+
+  showInPane(2, CAIRO);
+  expect(getPaneFolder()).toBeNull();
+
+  showFolderInPane(6, 1);
+  expect(paneDrop([3, 4], 12)).toEqual({ kind: "add", adds: [3, 4], of: 2, replaces: true });
+  addToPane([3, 4], TRIPS);
+  expect(getPaneFolder()).toBeNull();
+  expect(getPaneSet()).toEqual([3, 4]);
+});
+
+test("the pane lets go of its folder only when told this one is going", () => {
+  showFolderInPane(6, 1);
+  dropPaneFolder((shown) => shown.folderId === 4);
+  expect(getPaneFolder()).toEqual({ folderId: 6, sourceId: 1 });
+  dropPaneFolder((shown) => shown.sourceId === 1);
+  expect(getPaneFolder()).toBeNull();
 });

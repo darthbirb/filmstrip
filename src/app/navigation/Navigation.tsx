@@ -27,8 +27,9 @@ import { type Landing, type Resolver, setDropResolver, useDrag } from "../grid/d
 import { type CheckedFile, checkBranch } from "../grid/selection";
 import { DIGITS } from "../keys";
 import { libraryChanged } from "../library";
-import { type GroundMenu, placeHeader, setGroundMenu } from "../menus/ground";
+import { type Against, fromFocus, type PlaceMenu, setPlaceMenu } from "../menus/ground";
 import { openMovePicker } from "../pane/move-picker";
+import { showFolderInPane } from "../pane/pane-store";
 import { counted, getClipboard } from "../paste/clipboard";
 import { openPick, pasteInto, sortingPlaces } from "../paste/copy";
 import {
@@ -90,16 +91,18 @@ export function Navigation() {
     () => null,
   );
   landingOutside.current = () => null;
-  const ground = useRef<GroundMenu>(() => ({ groups: [] }));
+  const ground = useRef<PlaceMenu>(() => ({ groups: [] }));
   ground.current = () => ({ groups: [] });
+  // A menu built at one render can run at a later one, by which time the tree may have shut.
+  const drawn = useRef<readonly TreeRow[]>([]);
   useEffect(() => {
     setDropResolver((id, carried) => landing.current(id, carried));
     setOutsideResolver((id, paths) => landingOutside.current(id, paths));
-    setGroundMenu((place, at) => ground.current(place, at));
+    setPlaceMenu((place, against) => ground.current(place, against));
     return () => {
       setDropResolver(() => null);
       setOutsideResolver(() => null);
-      setGroundMenu(() => ({ groups: [] }));
+      setPlaceMenu(() => ({ groups: [] }));
     };
   }, []);
 
@@ -110,6 +113,7 @@ export function Navigation() {
     sortingRow(sources, () => void addFolder("sorting")),
     trashRow(totals?.trash),
   ];
+  drawn.current = rows;
   const places = new Map<string, Place>([
     [SORTING_ID, { kind: "sorting" }],
     [TRASH_ID, { kind: "trash" }],
@@ -250,7 +254,7 @@ export function Navigation() {
     const rename = () => {
       setTaken(null);
       setDraft(null);
-      if (!rows.some((row) => row.id === id))
+      if (!drawn.current.some((row) => row.id === id))
         openFolders(path.slice(0, -1).map((crumb) => crumb.id));
       setRenaming(id);
     };
@@ -292,6 +296,14 @@ export function Navigation() {
           .catch(() => undefined),
     };
     if (source.kind === "sorting") return { groups: [[...pasteHere, star]] };
+    // It only looks, as Full Screen heads a tile's menu; the pane reads the index, so offline too.
+    const showInPane: MenuAction = {
+      id: "show-in-pane",
+      label: "Show in Pane",
+      glyph: "panel",
+      flip: true,
+      onSelect: () => showFolderInPane(folder, source.id),
+    };
     const title = path.at(-1)?.title ?? source.title;
     const assign: MenuAction = {
       id: "assign-key",
@@ -339,13 +351,13 @@ export function Navigation() {
         groups: sourceMenu(
           source,
           rename,
-          { newFolder, star, assign, search, inside, exportHere },
+          { showInPane, newFolder, star, assign, search, inside, exportHere },
           pasteHere,
         ),
       };
     }
     // A folder whose drive is away keeps what only the index holds, as its source's row does.
-    if (!source.reachable) return { groups: [[star, assign], [inside]] };
+    if (!source.reachable) return { groups: [[showInPane, star, assign], [inside]] };
     const moveTo: MenuAction = {
       id: "move",
       label: "Move to…",
@@ -369,7 +381,7 @@ export function Navigation() {
     };
     return {
       groups: [
-        [newFolder, ...pasteHere, star, assign, moveTo],
+        [showInPane, newFolder, ...pasteHere, star, assign, moveTo],
         [
           searchHere("Search in Folder"),
           inside,
@@ -383,11 +395,10 @@ export function Navigation() {
     };
   };
 
-  const menuFor = (id: string) => menuAt(id, places.get(id), FROM_ROW);
+  const menuFor = (id: string) => menuAt(id, places.get(id), fromFocus);
 
   // Its row's menu under its name, since it is not on its row; what it opens, opens where it was.
-  ground.current = (place, at) => {
-    const against: Against = { anchor: () => at, sheet: placeHeader };
+  ground.current = (place, against) => {
     if (place.kind === "sorting") {
       return { heading: "Sorting Box", groups: sortingMenu(against).groups };
     }
@@ -525,10 +536,13 @@ function keyGroups(keys: readonly DestinationKey[], folder: number): MenuGroups 
 function sourceMenu(
   source: SourceSummary,
   rename: () => void,
-  rows: Record<"newFolder" | "star" | "assign" | "search" | "inside" | "exportHere", MenuAction>,
+  rows: Record<
+    "showInPane" | "newFolder" | "star" | "assign" | "search" | "inside" | "exportHere",
+    MenuAction
+  >,
   paste: readonly MenuAction[],
 ): MenuGroups {
-  const { newFolder, star, assign, search, inside, exportHere } = rows;
+  const { showInPane, newFolder, star, assign, search, inside, exportHere } = rows;
   const folder = source.rootFolderId;
   const reveal: MenuAction = {
     id: "reveal",
@@ -539,7 +553,7 @@ function sourceMenu(
   const naming = renameRow(rename);
   // New Folder is on it because a source's row is the only row that stands for its top level.
   return [
-    source.reachable ? [newFolder, ...paste, star, assign] : [star, assign],
+    source.reachable ? [showInPane, newFolder, ...paste, star, assign] : [showInPane, star, assign],
     source.reachable
       ? [search, inside, reveal, exportHere, naming, readAgainRow(folder)]
       : [inside, naming],
@@ -562,21 +576,6 @@ function sourceMenu(
 }
 
 const placeFolderPath = (place: Place | undefined) => (place?.kind === "folder" ? place.path : []);
-
-/** What a menu's follow-ups open against: a menu, a picker, and the export sheet hung under it. */
-type Against = { anchor: () => MenuAnchor; sheet: () => HTMLElement | null };
-
-/** A row's menu has handed the focus back to the row by the time a verb runs. */
-const FROM_ROW: Against = {
-  anchor: () => {
-    const element = document.activeElement;
-    return element instanceof HTMLElement ? { element } : { x: 0, y: 0 };
-  },
-  sheet: () => {
-    const element = document.activeElement;
-    return element instanceof HTMLElement ? element : null;
-  },
-};
 
 function revealFolderRow(folder: number): MenuAction {
   return {

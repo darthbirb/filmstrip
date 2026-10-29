@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 
+import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { formatCount } from "../../lib/format";
 import { Button } from "../../ui/Button";
 import { countText } from "../../ui/Count";
@@ -33,16 +34,10 @@ export function EmptyPlace({ place }: { place: Place }) {
     // A folder below the source's own counts everything it held, as the source counts all of it.
     const parent = place.path.at(-2);
     const node = parent && children.get(parent.id)?.find((child) => child.id === folder.id);
-    return (
-      <EmptyState
-        glyph="unplugged"
-        title={`${source.title} Is Offline`}
-        note={
-          node
-            ? `${formatCount(node.allCount)} items in ${folder.title} when last indexed.`
-            : `${formatCount(source.itemCount)} items when last indexed.`
-        }
-      />
+    return node ? (
+      <OfflinePlace source={source} held={{ count: node.allCount, in: folder.title }} />
+    ) : (
+      <OfflinePlace source={source} held={{ count: source.itemCount }} />
     );
   }
 
@@ -76,5 +71,23 @@ export function EmptyPlace({ place }: { place: Place }) {
         </Button>
       ))}
     </EmptyState>
+  );
+}
+
+/** A place whose drive is away: whose drive, and what was there, `in` a folder below its source's own. */
+export function OfflinePlace({
+  source,
+  held,
+}: {
+  source: SourceSummary;
+  held: { count: number; in?: string };
+}) {
+  const where = held.in === undefined ? "" : ` in ${held.in}`;
+  return (
+    <EmptyState
+      glyph="unplugged"
+      title={`${source.title} Is Offline`}
+      note={`${formatCount(held.count)} items${where} when last indexed.`}
+    />
   );
 }

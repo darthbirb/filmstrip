@@ -13,6 +13,9 @@ type Shown = {
 };
 
 let shown: Shown | null = null;
+/** A folder shown in the file's place, while no file is. Pane › folder. */
+export type PaneFolder = { folderId: number; sourceId: number };
+let folder: PaneFolder | null = null;
 const listeners = new Set<() => void>();
 const requests = new Set<() => void>();
 const NOTHING: readonly number[] = [];
@@ -27,6 +30,7 @@ function alone(itemId: number, from: Place | null): Shown {
 
 export function showInPane(itemId: number | null, from: Place | null = null) {
   shown = itemId === null ? null : alone(itemId, from);
+  folder = null;
   changed();
   if (itemId !== null) for (const request of requests) request();
 }
@@ -44,6 +48,31 @@ export function whenShownInPane(listener: () => void) {
   return () => {
     requests.delete(listener);
   };
+}
+
+/** Shows a folder in the pane, rather than a file; the folder it already shows stays as it is. */
+export function showFolderInPane(folderId: number, sourceId: number) {
+  if (folder?.folderId !== folderId) {
+    shown = null;
+    folder = { folderId, sourceId };
+    changed();
+  }
+  for (const request of requests) request();
+}
+
+export function getPaneFolder() {
+  return folder;
+}
+
+export function usePaneFolder() {
+  return useSyncExternalStore(subscribe, getPaneFolder);
+}
+
+/** The pane lets go of its folder when this says it should: deleted, or its source removed. */
+export function dropPaneFolder(going: (shown: PaneFolder) => boolean) {
+  if (!folder || !going(folder)) return;
+  folder = null;
+  changed();
 }
 
 export function getPaneItem() {
@@ -128,6 +157,7 @@ export function addToPane(ids: readonly number[], from: Place | null) {
   const places = new Map(base.places);
   for (const id of adds) places.set(id, from);
   shown = { ...base, set: [...base.set, ...adds], places };
+  folder = null;
   changed();
   if (was === null) for (const request of requests) request();
 }
