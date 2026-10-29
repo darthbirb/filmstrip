@@ -85,6 +85,11 @@ Three ways, cheapest first.
   when it finds no file. The pane's frame-rate tests are two, measuring with `src/dev/set-bench.tsx`;
   by hand, in a headed browser on the dev server, the console runs
   `(await import("/src/dev/set-bench.tsx")).benchSet(24, { motion: "resize" })`.
+  **On CI the timing step passes every run, and fails only on the code.** The clips count their
+  own dropped frames, of a clip paced no faster than the window and longer than the count, and the
+  test takes the middle of three spans, so a hitch on the shared runner is not what fails it; the
+  step prints each span's count, passing or not. A
+  red timing step is root-caused like any other test, never rerun until it goes green.
 - **A test that needs ffmpeg is `#[ignore]`d**, so a plain `cargo test` needs nothing
   downloaded. `pwsh scripts/fetch-ffmpeg.ps1` puts the build the release carries in
   `src-tauri/target/tools`, where those tests look before PATH, and

@@ -45,7 +45,9 @@ export async function clip(width: number, height: number, ms: number) {
     context.fillStyle = `hsl(${((now - start) / 4) % 360} 50% 45%)`;
     context.fillRect(0, 0, width, height);
     track.requestFrame();
-    await new Promise((resolve) => setTimeout(resolve, 1000 / 30));
+    // A frame's gap is never under the 33.3ms a window drawing 30 a second takes: setTimeout cuts
+    // 1000 / 30 to 33, and a clip faster than the window drops its spare frames however idle.
+    await new Promise((resolve) => setTimeout(resolve, 34));
   }
   recorder.stop();
   await stopped;
