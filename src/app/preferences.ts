@@ -27,6 +27,10 @@ export type Preferences = {
   exportDir?: string;
   /** How the last export named its files. */
   exportNaming?: Naming;
+  /** A video's volume, from 0 to 1, kept while muted for the unmute to return to. */
+  volume?: number;
+  /** Whether videos play muted. */
+  muted?: boolean;
 };
 
 /** The kinds of place that keep an order of their own; the Trash runs by its days. */
@@ -111,6 +115,8 @@ function validated(value: unknown): Partial<Preferences> {
     sort,
     exportDir,
     exportNaming,
+    volume,
+    muted,
   } = value as Record<string, unknown>;
   const valid: Partial<Preferences> = {};
   if (typeof scale === "number" && Number.isFinite(scale)) valid.scale = nearestScale(scale);
@@ -127,6 +133,8 @@ function validated(value: unknown): Partial<Preferences> {
   if (sorts) valid.sort = sorts;
   if (typeof exportDir === "string" && exportDir !== "") valid.exportDir = exportDir;
   if (exportNaming === "keep" || exportNaming === "folders") valid.exportNaming = exportNaming;
+  if (typeof volume === "number" && volume >= 0 && volume <= 1) valid.volume = volume;
+  if (typeof muted === "boolean") valid.muted = muted;
   return valid;
 }
 

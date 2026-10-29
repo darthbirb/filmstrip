@@ -51,6 +51,7 @@ export function Media({ item, fill = false }: Props) {
         src={convertFileSrc(item.path)}
         poster={thumb}
         durationMs={item.durationMs}
+        frameUs={item.frameUs}
         failed={state === "failed"}
         onError={() => setState("failed")}
       />

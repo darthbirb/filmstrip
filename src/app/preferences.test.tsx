@@ -103,3 +103,13 @@ test("each kind of place's order comes back, and one that does not read falls ba
   await loadPreferences();
   expect(getPreferences().sort).toEqual({});
 });
+
+test("a video's volume and mute come back, and a level outside 0 to 1 does not", async () => {
+  stored = { volume: 0.4, muted: true };
+  await loadPreferences();
+  expect(getPreferences()).toMatchObject({ volume: 0.4, muted: true });
+
+  stored = { volume: 1.5, muted: "yes" };
+  await loadPreferences();
+  expect(getPreferences()).toEqual({ scale: 1 });
+});
