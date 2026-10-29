@@ -991,6 +991,44 @@ mod tests {
         assert!(!names(&zip).contains(&"Trips/hotel.jpg".to_owned()));
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn a_file_that_fails_partway_through_leaves_no_half_entry_and_the_rest_go_in() {
+        use std::os::windows::io::AsRawHandle;
+        use windows_sys::Win32::Storage::FileSystem::LockFile;
+        let lib = library("cut-short");
+        let pyramid = lib.dir.join("pictures/Trips/Cairo/pyramid.jpg");
+        std::fs::write(&pyramid, vec![b'p'; 2 * CHUNK]).unwrap();
+        // Another handle locks all past the first chunk: that chunk reads, the next one fails.
+        let locker = File::open(&pyramid).unwrap();
+        let chunk = u32::try_from(CHUNK).unwrap();
+        assert_ne!(
+            unsafe { LockFile(locker.as_raw_handle(), chunk, 0, u32::MAX, 0) },
+            0
+        );
+        let (outcome, zip) = lib.export(
+            &Scope::Files {
+                item_ids: vec![lib.id("pyramid.jpg"), lib.id("Sphinx.jpg")],
+            },
+            Naming::Keep,
+            &Script::default(),
+        );
+        assert_eq!(outcome.end, End::Written);
+        assert_eq!((outcome.whole, outcome.written), (2, 1));
+        let [skipped] = outcome.skipped.as_slice() else {
+            panic!("{:?}", outcome.skipped)
+        };
+        assert_eq!(
+            (skipped.name.as_str(), &skipped.reason),
+            ("pyramid.jpg", &Reason::InUse)
+        );
+        assert_eq!(names(&zip), ["Pictures/Trips/Cairo/Sphinx.jpg"]);
+        assert_eq!(
+            held(&zip),
+            [("Pictures/Trips/Cairo/Sphinx.jpg".into(), "sphinx".into())]
+        );
+    }
+
     #[test]
     fn a_file_moved_after_the_export_began_goes_in_from_where_it_went() {
         let lib = library("moved");
