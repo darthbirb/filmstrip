@@ -29,6 +29,18 @@ type Props<T extends string> = {
   act?: Act;
   /** In the grid's header, which of its widths the word gives way at. */
   words?: keyof typeof WORDS;
+  /**
+   * On a video's plate: the choice alone as a figure, `in-pane` while `active`, with the menu
+   * opening upward, its right edge on the plate's.
+   */
+  plate?: { active: boolean };
+};
+
+const TRIGGER = {
+  control:
+    "focus-ring flex h-control min-w-0 shrink-0 items-center gap-2 whitespace-nowrap rounded-control bg-raised pr-1.5 pl-2.5 text-fg text-ui inset-ring inset-ring-line-control transition-colors duration-(--motion-quick) hover:bg-raised-hi hover:inset-ring-line-control-hi active:bg-inset aria-expanded:bg-raised-hi aria-expanded:inset-ring-line-control-hi motion-reduce:transition-none",
+  plate:
+    "focus-ring flex h-full shrink-0 items-center whitespace-nowrap rounded-badge tabular-nums transition-colors duration-(--motion-quick) motion-reduce:transition-none",
 };
 
 /** One named choice among a few: a button showing it, opening a menu of all of them. DESIGN.md "Components". */
@@ -42,6 +54,7 @@ export function Dropdown<T extends string>({
   title,
   act,
   words,
+  plate,
 }: Props<T>) {
   const id = useId();
   const listId = `${id}-list`;
@@ -97,12 +110,16 @@ export function Dropdown<T extends string>({
           if (!menu.current?.matches(":popover-open")) menu.current?.showPopover();
         }}
         style={{ anchorName: anchor } as CSSProperties}
-        className="focus-ring flex h-control min-w-0 shrink-0 items-center gap-2 whitespace-nowrap rounded-control bg-raised pr-1.5 pl-2.5 text-fg text-ui inset-ring inset-ring-line-control transition-colors duration-(--motion-quick) hover:bg-raised-hi hover:inset-ring-line-control-hi active:bg-inset aria-expanded:bg-raised-hi aria-expanded:inset-ring-line-control-hi motion-reduce:transition-none"
+        className={
+          plate
+            ? `${TRIGGER.plate} ${plate.active ? "text-in-pane" : "text-fg-mid hover:text-fg"}`
+            : TRIGGER.control
+        }
       >
         <span className="sr-only">{label}: </span>
         {glyph && <Glyph name={glyph} className="text-glyph" />}
         <span className={`truncate ${words ? WORDS[words] : ""}`}>{chosen?.label}</span>
-        <Glyph name="chevronDown" className="text-fg-dim text-glyph-small" />
+        {!plate && <Glyph name="chevronDown" className="text-fg-dim text-glyph-small" />}
       </button>
       <div
         ref={menu}
@@ -114,16 +131,23 @@ export function Dropdown<T extends string>({
           if (opened) menu.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus();
         }}
         style={
-          {
-            positionAnchor: anchor,
-            top: "anchor(bottom)",
-            [align === "end" ? "right" : "left"]:
-              align === "end" ? "anchor(right)" : "anchor(left)",
-            minWidth: "anchor-size(width)",
-            positionTryFallbacks: "flip-block",
-          } as CSSProperties
+          (plate
+            ? {
+                positionAnchor: anchor,
+                bottom: "anchor(top)",
+                right: "anchor(right)",
+                positionTryFallbacks: "flip-block",
+              }
+            : {
+                positionAnchor: anchor,
+                top: "anchor(bottom)",
+                [align === "end" ? "right" : "left"]:
+                  align === "end" ? "anchor(right)" : "anchor(left)",
+                minWidth: "anchor-size(width)",
+                positionTryFallbacks: "flip-block",
+              }) as CSSProperties
         }
-        className="inset-auto m-0 mt-1 flex-col rounded-control border-0 bg-raised p-1 text-fg shadow-overlay inset-ring inset-ring-line-control-hi open:flex"
+        className={`inset-auto m-0 flex-col rounded-control border-0 bg-raised p-1 text-fg shadow-overlay inset-ring inset-ring-line-control-hi open:flex ${plate ? "-mr-tile-gap mb-1" : "mt-1"}`}
       >
         <div
           id={listId}

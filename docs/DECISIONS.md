@@ -626,8 +626,19 @@ not name, and play is told apart by being the one filled and in white, not by a 
 because the header row above already reads the same length; then the mute. The elapsed is on
 screen nowhere else, so it never leaves, nor do play and the track, which holds a least width of
 its own. Paused, the plate stays up; playing, it goes a moment after the pointer leaves the
-picture, and comes back for the keyboard. Frame steps and a set of speeds are drawn and wait for
-a frame rate the probe does not record yet.
+picture, and comes back for the keyboard.
+
+**A frame step is a frame of the file's own rate, never a guess**, built on 29 October 2026. The
+probe records one frame's length from the stream's average rate, else its base rate, and a step
+lands in the middle of the next frame, so float error never shows the one before; it pauses
+first, so a step always leaves the plate still. ggallery stepped a nominal 1/30s, which on a 24p
+clip is a step to the wrong frame. A file probed before the rate was read keeps a plate without
+steps rather than being read again. **The speeds are a named four, 0.5× to 2×, in a list rather
+than a button that cycles**, since cycling makes going back one a press three times; the list
+ends rather than wraps. The speed holds from video to video but is 1× at each launch, because a
+clip found days later racing at 2× looks broken; volume and mute are saved preferences, as the
+details' fold is. As the plate narrows the speed leaves before the steps, being the one control
+about a preference rather than the clip, and the two steps leave together.
 
 **Full screen is a state of the pane, not a place you go**, drawn on 15 September 2026 and built
 the day after. The pane takes the frame below the bar and keeps every part it has; the bar stays,

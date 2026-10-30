@@ -187,6 +187,8 @@
   --spacing-indent: 1.75rem;
   --spacing-chevron: 1.25rem;
   --spacing-control: 2rem;
+  /* A video's volume column, as tall as the speed list's four options. */
+  --spacing-volume: 8.875rem;
   --spacing-chip: 1.625rem;
   /* The × a chip shows to take it off, inside the chip's own height. */
   --spacing-chip-remove: 1.125rem;

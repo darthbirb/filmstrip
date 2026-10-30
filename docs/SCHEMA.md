@@ -110,6 +110,8 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   folder's new ancestry.
 - `item.probed_at` is set when the file is read for its shape and dates, and cleared when a walk
   refreshes the row because the file changed. NULL means it is still to be read.
+- `item.frame_us` is one of a video's frames in microseconds, written by the same read and
+  cleared with `probed_at`. NULL for a file with no rate, and for one read before migration 10.
 - `captured_at` is only ever the file's own metadata, and `captured_src` says which: `exif` or
   `container`. Neither is ever filled with a guess.
 

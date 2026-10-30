@@ -8,6 +8,10 @@ import type { SourceKind } from "./SourceKind";
  */
 export type ItemDetail = { codec: string | null, bitrate: number | null, 
 /**
+ * One of a video's frames, in microseconds, once its probe has read the rate.
+ */
+frameUs: number | null, 
+/**
  * Seconds since 1970; from EXIF, the camera's clock read as UTC. DECISIONS.md "Capture dates".
  */
 capturedAt: number | null, capturedSrc: "exif" | "container" | null, addedAt: number, 

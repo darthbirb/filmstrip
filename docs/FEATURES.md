@@ -81,8 +81,8 @@ drawn. **Not started** — neither.
 | A filmstrip of the place it came from | Built | |
 | Full screen | Built | |
 | Zoom and pan a picture | Built | DECISIONS.md "The pane" |
-| Video playback | Built, on a plate of its own | DECISIONS.md "The pane"; the mute is not yet kept between items |
-| Frame steps, a named speed set and the volume | Drawn | #68, `docs/design/pane.dc.html`; waiting on the probe to record a frame rate |
+| Video playback | Built, on a plate of its own | DECISIONS.md "The pane"; volume and mute are saved preferences |
+| Frame steps, a named speed set and the volume | Built | #68, `,` `.` step a frame of the probe's rate, `<` `>` along 0.5× to 2×, Space plays, `M` mutes; a file probed before the rate was read has no steps |
 | Several items at once, scaled to fit together | Built | #66, dragging files onto the pane adds them, twelve at most, at one scale in the rows that draw them largest; × takes one out, a click or Escape returns to one; videos loop muted, one at a time with sound |
 | A folder shown in the pane rather than an item | Built | #67, its own thing, not a second mode: Show in Pane heads a folder's, a source's and a search's folder card's menu, offline too; its cover, name and count, the band's rows as its details, Open, Show in Explorer and the folder's menu on the bar, and a strip of its own files; DECISIONS.md "A folder in the pane" |
 | Tiled compare and multi-view panes | **Dropped on purpose.** The pane has one mode. |
