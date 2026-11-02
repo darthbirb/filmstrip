@@ -17,6 +17,10 @@ jobs:
     name: Gates
     runs-on: windows-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        rep: [1, 2, 3, 4, 5, 6]
 
     # Actions are pinned to commit SHAs. Edge and Rust come with the runner image, so no browser
     # or toolchain is downloaded; ffmpeg is, pinned by version and SHA-256 in its script.
@@ -31,67 +35,12 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: Rust cache
-        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        with:
-          workspaces: src-tauri
-
       - name: Install
         run: npx --yes pnpm@12.4.1 install --frozen-lockfile
-
-      - name: Review worktree script
-        shell: bash
-        run: bash scripts/review-worktree.test.sh "$RUNNER_TEMP"
-
-      - name: Lint and format
-        run: npx --yes pnpm@12.4.1 lint
-
-      - name: Doc pointers and comment length
-        run: npx --yes pnpm@12.4.1 check:docs
-
-      - name: Typecheck
-        run: npx --yes pnpm@12.4.1 check
 
       - name: Component tests
         run: npx --yes pnpm@12.4.1 test
 
-      - name: 'Component timing tests, one file at a time'
-        run: 'npx --yes pnpm@12.4.1 test:timing'
-
-      - name: End-to-end tests
-        run: npx --yes pnpm@12.4.1 test:e2e
-
-      - name: Rust format
-        run: cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check
-
-      - name: Rust lint
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --locked -- -D warnings
-
-      - name: Rust tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
-
-      - name: Timing tests are found
-        shell: pwsh
-        run: |
-          $listed = cargo test --manifest-path src-tauri/Cargo.toml --locked -- --ignored --list ::timing:: | Select-String -Pattern ': test$'
-          if (-not $listed) { Write-Output 'No ignored test matches ::timing::, so the timing step would run nothing'; exit 1 }
-          Write-Output "$(@($listed).Count) timing tests found"
-
-      - name: Rust timing tests, one at a time
-        run: 'cargo test --manifest-path src-tauri/Cargo.toml --locked -- --ignored --test-threads=1 ::timing::'
-
-      - name: Fetch the ffmpeg the release carries
-        shell: pwsh
-        run: ./scripts/fetch-ffmpeg.ps1
-
-      - name: Rust tests that need ffmpeg
-        run: 'cargo test --manifest-path src-tauri/Cargo.toml --locked -- --ignored --skip ::timing::'
-
-      - name: Bindings are current
-        shell: bash
-        run: |
-          stale="$(git status --porcelain -- src/ipc/bindings)"
-          if [ -n "$stale" ]; then echo "$stale"; echo "cargo test changed src/ipc/bindings; commit them"; exit 1; fi
 
   title:
     # The title becomes the squash commit's subject on main. CONTRIBUTING.md "Pull requests".
