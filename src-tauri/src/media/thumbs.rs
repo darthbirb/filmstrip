@@ -228,6 +228,7 @@ mod tests {
                 .duration_ms
                 .is_some_and(|ms| (1_900..=2_100).contains(&ms))
         );
+        assert_eq!(learned.frame_us, Some(100_000), "a frame of ffprobe's rate");
         let poster = image::open(&out).unwrap();
         assert!(
             poster.height() > poster.width(),

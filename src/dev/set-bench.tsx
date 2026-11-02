@@ -84,6 +84,7 @@ function detail(id: number, video: boolean, durationMs: number): ItemDetail {
     scrub: null,
     codec: null,
     bitrate: null,
+    frameUs: null,
     capturedAt: null,
     capturedSrc: null,
     addedAt: 1_750_000_000,

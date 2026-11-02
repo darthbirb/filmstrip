@@ -11,7 +11,7 @@ import { Frame } from "../frame/Frame";
 import { Grid } from "../grid/Grid";
 import { clearChecked, toggleChecked } from "../grid/selection";
 import { type Place, setPlace } from "../place";
-import { updatePreferences } from "../preferences";
+import { getPreferences, updatePreferences } from "../preferences";
 import { deleteFiles } from "./delete";
 import { getFullScreen, setFullScreen, useEscapeLeavesFullScreen } from "./full-screen";
 import { Pane, PaneHeader } from "./Pane";
@@ -335,6 +335,33 @@ test("a file deleted leaves the set, and the rest stay", async () => {
   await expect.element(file("sphinx.jpg")).toBeVisible();
   await deleteFiles([id("pyramid.jpg")]);
   await expect.poll(getPaneSet).toEqual([id("sphinx.jpg"), id("felucca.mp4")]);
+});
+
+test("the clip given the sound plays at the saved volume, and the saved mute stays as it was", async () => {
+  updatePreferences({ volume: 0.2, muted: true });
+  const sorting = await folderItems(2);
+  const other = sorting.find((row) => row.diskName === "clip.mp4");
+  if (!other) throw new Error("the mock has no clip.mp4");
+  const url = await clip(320, 180, 600);
+  undoServe = serveFiles({ "felucca.mp4": url, "clip.mp4": url });
+  showInPane(id("felucca.mp4"), CAIRO);
+  addToPane([other.id, id("pyramid.jpg")], { kind: "sorting" });
+  await render(<Harness />);
+  const group = page.getByRole("group", { name: "3 Files" });
+  await expect.element(group).toBeVisible();
+  const videos = () => [...group.element().querySelectorAll("video")];
+  await expect.poll(() => videos().length).toBe(2);
+
+  const unmute = group.getByRole("button", { name: "Unmute" });
+  await expect.poll(() => unmute.elements().length).toBe(2);
+  await unmute.first().click();
+  await expect.poll(() => videos().map((video) => video.muted)).toEqual([false, true]);
+  expect(videos()[0]?.volume).toBeCloseTo(0.2, 6);
+  expect(getPreferences().muted).toBe(true);
+
+  updatePreferences({ volume: 0.7 });
+  await expect.poll(() => videos()[0]?.volume).toBeCloseTo(0.7, 6);
+  updatePreferences({ volume: 1, muted: false });
 });
 
 test("videos loop muted, and unmuting one takes the sound from the one that had it", async () => {

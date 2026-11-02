@@ -42,28 +42,3 @@ Consider the old drawing's scrubber: a 16px channel at the grid's edge with a sq
 to jump anywhere; the position is the information. Investigate whether it replaces the
 scrollbar or sits beside it. The pass that drew it recommends building the other ten first, and
 only building this if the largest folders still feel unnavigable afterwards.
-
-## Frame steps, speeds and the volume on the video plate · DRAWN
-
-The plate replaced the window's controls with play, the track, the time and the mute (#68). It
-still needs a frame back and forward, a fixed set of speeds, a way to set the volume, and keys.
-
-Drawn in Pane › 02, the column beside "A video", in the built plate's own values:
-
-- Seven controls: play, the two frame steps, the track, the time, the mute, then the speed's
-  figure. As the plate narrows the speed goes first, then both steps together, then the total,
-  then the mute; play, the track and the elapsed never leave. Measured, never a width: the
-  drawing's rows are at 200, 170, 130 and 100px.
-- A step is one frame at the length the probe reads, and pauses first if the clip is playing. At
-  the first frame the back step is `fg-faint` and does nothing; at the last, the forward one. A
-  file with no frame rate has no steps.
-- The speeds are 0.5×, 1×, 1.5× and 2×, in a dropdown's list opening upward from the figure, its
-  right edge on the plate's. The figure is `fg-mid` at 1× and `in-pane` off it. The speed holds
-  from video to video until the app closes and is 1× at launch.
-- The volume rises over the mute under the pointer, in the speed list's surface and height. A
-  click on the glyph still mutes; a click, drag or wheel on the column sets the level and
-  unmutes; Up and Down on the focused mute move it a tenth. Volume and mute are saved
-  preferences.
-- Keys, while the focus is on the video or in its plate: `,` and `.` step, `<` and `>` change the
-  speed without wrapping, Space plays and pauses, `M` mutes. The video takes the focus as a
-  zoomable picture does.

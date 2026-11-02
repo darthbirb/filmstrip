@@ -79,7 +79,8 @@ pub fn upsert(conn: &Connection, item: &NewItem) -> Result<i64> {
             "UPDATE item
                 SET ext = ?1, hash = ?2, size_bytes = ?3, mtime = ?4, kind = ?5,
                     width = ?6, height = ?7, duration_ms = ?8, codec = ?9, bitrate = ?10,
-                    captured_at = ?11, captured_src = ?12, probed_at = NULL, deleted_at = NULL
+                    captured_at = ?11, captured_src = ?12, frame_us = NULL, probed_at = NULL,
+                    deleted_at = NULL
               WHERE id = ?13",
             params![
                 item.ext,
@@ -630,6 +631,8 @@ pub struct ItemDetail {
     pub row: ItemRow,
     pub codec: Option<String>,
     pub bitrate: Option<i64>,
+    /// One of a video's frames, in microseconds, once its probe has read the rate.
+    pub frame_us: Option<i64>,
     /// Seconds since 1970; from EXIF, the camera's clock read as UTC. DECISIONS.md "Capture dates".
     pub captured_at: Option<i64>,
     #[ts(type = "\"exif\" | \"container\" | null")]
@@ -651,7 +654,7 @@ pub fn detail(conn: &Connection, id: i64) -> Result<Option<ItemDetail>> {
         .query_row(
             &format!(
                 "SELECT {ROW}, i.codec, i.bitrate, i.captured_at, i.captured_src, i.added_at,
-                        i.trashed_at, s.id, s.kind
+                        i.trashed_at, s.id, s.kind, i.frame_us
                    FROM item i JOIN source s ON s.id = i.source_id
                   WHERE i.id = ?1 AND (i.deleted_at IS NULL OR i.trashed_at IS NOT NULL)"
             ),
@@ -667,6 +670,7 @@ pub fn detail(conn: &Connection, id: i64) -> Result<Option<ItemDetail>> {
                     trashed_at: r.get(17)?,
                     source_id: r.get(18)?,
                     source_kind: SourceKind::parse(&r.get::<_, String>(19)?),
+                    frame_us: r.get(20)?,
                     folders: Vec::new(),
                     path: String::new(),
                 })
@@ -712,8 +716,8 @@ pub fn file_of(conn: &Connection, id: i64) -> Result<Option<ItemFile>> {
 pub fn record_media(conn: &Connection, id: i64, media: &Probe) -> Result<()> {
     conn.execute(
         "UPDATE item SET width = ?1, height = ?2, duration_ms = ?3, codec = ?4, bitrate = ?5,
-                         captured_at = ?6, captured_src = ?7, probed_at = ?8
-          WHERE id = ?9",
+                         captured_at = ?6, captured_src = ?7, frame_us = ?8, probed_at = ?9
+          WHERE id = ?10",
         params![
             media.width,
             media.height,
@@ -722,6 +726,7 @@ pub fn record_media(conn: &Connection, id: i64, media: &Probe) -> Result<()> {
             media.bitrate,
             media.captured_at,
             media.captured_src,
+            media.frame_us,
             now(),
             id,
         ],
@@ -1255,6 +1260,22 @@ mod tests {
         };
         record_media(&conn, picture, &learned).unwrap();
         assert!(unread(false).is_empty());
+
+        let read = Probe {
+            duration_ms: Some(12_000),
+            frame_us: Some(41_667),
+            ..Probe::default()
+        };
+        record_media(&conn, clip, &read).unwrap();
+        let frame = |id| detail(&conn, id).unwrap().unwrap().frame_us;
+        assert_eq!(frame(clip), Some(41_667));
+        let changed_clip = NewItem {
+            kind: "video".into(),
+            size_bytes: 5,
+            ..sample(1, root, "b.mp4")
+        };
+        upsert(&conn, &changed_clip).unwrap();
+        assert_eq!(frame(clip), None, "a changed file's frame is read again");
 
         let changed = NewItem {
             size_bytes: 5,
