@@ -711,17 +711,44 @@ and one height in justified rows is equal cells by another measure.
   slower machine and CI's runner need: there, the same day, twelve held 60 with at most one frame
   in 300 late, while 48 fell to 45 in one run and held 57 in another.
   `src/app/pane/set-frame-rate.timing.test.tsx` holds `pane-set` to it, run alone.
-- **Two clips play at once, `pane-set-playing`.** It was set from counts that measured the test
-  clip, not the window: three dropped some frames in every run, four up to one in twenty. But the
-  clip, recorded with `setTimeout(1000 / 30)`, which waits 33ms, ran faster than the window's 30 a
-  second and dropped its spare frames however idle, and its two-second loop dropped more at each
-  seam; on CI two dropped up to 1.36%. Counted again on 26 October 2026 with a clip paced at 34ms
-  and longer than the count, among twelve, on the owner's machine and on CI's runner alike, two,
-  three, four and six clips each dropped none of their frames in three runs of twelve seconds,
-  the window held at its 30 a second. No count yet finds where frames go, so two stands until one
-  does. Past the two, a clip holds on its first frame, and the one given the sound plays in place
-  of the later of the two. The same test holds the two under one dropped frame in a hundred, in
-  the middle of three five-second spans, so one hitch on a shared runner does not fail it.
+- **Four clips play at once, `pane-set-playing`, one short of the last that held here.** Counted
+  on 2 November 2026 with the 37ms clip, longer than the count, among twelve originals in a
+  1500 × 900 pane, in runs of three five-second spans, three to nine runs a count over two or
+  three probes: the frames dropped of those due over all its runs, and the pace, how far the
+  clips' own clocks moved against the window's. Pace was counted for four to six; elsewhere it is
+  the frames due a second over the 26.1 a second, or 26.4 on CI, that clips keeping time showed.
+
+  | Clips | Owner's machine, dropped        | Pace        | CI's runner, dropped | Pace        |
+  | ----- | ------------------------------- | ----------- | -------------------- | ----------- |
+  | 2     | 0 of 2352                       | 1.00        | 0 of 2384            | 1.00        |
+  | 3     | 8 of 3530, in 1 of 9 spans      | 1.00        | 0 of 3574            | 1.00        |
+  | 4     | 28 of 14113, in 3 of 27 spans   | 0.998–1.000 | 0 of 9534            | 1.000       |
+  | 5     | 0 of 11778                      | 1.000       | 0 of 5960            | 1.000       |
+  | 6     | 205 of 19096, in all 27 spans   | 0.895–0.902 | 0 of 14299           | 1.000       |
+  | 8     | 260 of 6343                     | about 0.67  | 230 of 7353          | about 0.77  |
+  | 10    | 597 of 6339                     | about 0.54  | 342 of 7399          | about 0.62  |
+  | 12    | 841 of 6358                     | about 0.45  | 742 of 7587          | about 0.53  |
+
+  Past the edge the clips share a fixed budget: six to twelve were due about 141 frames a second
+  between them here, however many, and eight to twelve about 165 on CI, so each falls behind and
+  shows the picture slowed. The window held its 30 a second through six, and ran off it past.
+  Six is where it goes here, the clips at 0.90 pace, and CI held six and fell at eight. Five held
+  on both, but at 131 of the 141 here, and a clip at 30 a second rather than the test's 26 would
+  take 150 at five and 120 at four. So four.
+
+  **One noisy span does not set the edge.** Three dropped 8 of 392 in one span of one run, the
+  rest none, and four dropped in 3 of its 27 spans, 15 of 520 at most, while five above them
+  dropped none in six runs; six dropped in every span of every run. A count is judged across its runs, never by one
+  span, and the test takes the middle of three spans, so one hitch on a shared runner does not
+  fail it. **The dropped share alone does not see six:** its middle span dropped 0.84%, under the
+  bound of one in a hundred, with the clips at 0.90. So the test holds the four under that bound
+  and their pace above 0.95, halfway between 0.998, the slowest that held, and 0.902, the fastest
+  that fell. Set to six, it fails on the pace alone.
+
+  Two stood before this: it was set from counts that measured the test clip, not the window, and
+  on 26 October 2026, with a 34ms clip, two, three, four and six dropped none here and on CI, a
+  count that did not measure pace. Past the four, a clip holds on its first frame, and the one
+  given the sound plays in place of the last of the four.
 - **The test clip waits 37ms between frames, 74 after its first, in two timers.**
   `src/dev/media.test.ts` holds every gap to the 33.3ms a window at 30 a second takes, and 34ms
   left no room to. A recording keeps whole milliseconds and its stamps sit off the pushes, by up
@@ -731,7 +758,7 @@ and one height in justified rows is equal cells by another measure.
   wait is two; the first gap, which only lengthens, can spare it. The average cannot be the
   measure: `setTimeout(33)` averaged 33.7ms there and 34 on CI, above the window, with up to two
   gaps in five at 33 or less. So the test also holds the usual gap 3ms clear of the window, which
-  fails every run at 34ms. The counts above used 34ms.
+  fails every run at 34ms. The counts of 26 October used 34ms, those of 2 November 37ms.
 - **No pace bounds the stamps under heavy load, so the test can still fail there.** With 16
   above-normal CPU hogs on 8 logical cores, 1 of 216 fresh pages failed the minimum: its gaps ran
   74, 48, 32, 38 with every pushed gap 37.7ms or more, one frame stamped about 6ms off its

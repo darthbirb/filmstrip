@@ -394,10 +394,10 @@ test("videos loop muted, and unmuting one takes the sound from the one that had 
   expect(drawn.bottom - plate.bottom).toBeCloseTo(inset, 0);
 });
 
-test("two clips play at once, and the rest hold still until one is given the sound", async () => {
+test("four clips play at once, and the rest hold still until one is given the sound", async () => {
   const felucca = await itemDetail(id("felucca.mp4"));
   if (!felucca) throw new Error("the mock has no felucca.mp4");
-  const clips = [1, 2, 3].map(
+  const clips = [1, 2, 3, 4, 5].map(
     (n): ItemDetail => ({
       ...felucca,
       id: 9100 + n,
@@ -416,11 +416,12 @@ test("two clips play at once, and the rest hold still until one is given the sou
       <PaneSet items={clips} />
     </div>,
   );
-  const group = page.getByRole("group", { name: "3 Files" });
+  const group = page.getByRole("group", { name: "5 Files" });
   const videos = () => [...group.element().querySelectorAll("video")];
-  await expect.poll(() => videos().map((video) => !video.paused)).toEqual([true, true, false]);
-  await expect.poll(() => group.getByRole("button", { name: "Unmute" }).elements().length).toBe(3);
-  await group.getByRole("button", { name: "Unmute" }).nth(2).click();
-  await expect.poll(() => videos().map((video) => !video.paused)).toEqual([true, false, true]);
-  expect(videos().map((video) => video.muted)).toEqual([true, true, false]);
+  const playing = () => videos().map((video) => !video.paused);
+  await expect.poll(playing).toEqual([true, true, true, true, false]);
+  await expect.poll(() => group.getByRole("button", { name: "Unmute" }).elements().length).toBe(5);
+  await group.getByRole("button", { name: "Unmute" }).nth(4).click();
+  await expect.poll(playing).toEqual([true, true, true, false, true]);
+  expect(videos().map((video) => video.muted)).toEqual([true, true, true, true, false]);
 });

@@ -569,9 +569,9 @@ measured, never a breakpoint. DECISIONS.md "The interface size" has the reasonin
   padded clear of the steps that float over them.
 - **The pane shows `--pane-set` files at most**, twelve, a count rather than a length, set from
   the frame rate measured with that many originals on screen, and plays `--pane-set-playing` of
-  its clips at once, two, set from the frames they drop. Dropped together they share one scale,
-  and none is drawn under `pane-set-least` on its shorter side or `pane-set-least-long` on its
-  longer, so its × and a video's mute fit a `tile-inset` in. A file with no shape to draw stands
+  its clips at once, four, set from where more fall behind and drop frames. Dropped together they
+  share one scale, and none is drawn under `pane-set-least` on its shorter side or
+  `pane-set-least-long` on its longer, so its × and a video's mute fit a `tile-inset` in. A file with no shape to draw stands
   in at that floor.
 - **Settings** is `dialog` wide and `dialog-height` tall, never more than the window, with a
   `dialog-rail`-wide rail of sections.
