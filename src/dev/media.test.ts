@@ -23,8 +23,8 @@ test("a recorded clip never shows two frames closer than a window drawing 30 a s
     const seen = gaps.map((gap) => Math.round(gap * 1000)).join(",");
     expect(gaps.length, seen).toBeGreaterThan(20);
     expect(Math.min(...gaps), seen).toBeGreaterThanOrEqual(1 / 30);
-    // The usual gap clears the window by what the recorder's stamps can take off one, so a frame
-    // stamped late cannot fail the line above. DECISIONS.md "Several files in the pane".
+    // The line above can pass a pace with no room left, so the usual gap must also clear the window
+    // by the 3ms quiet runs took off a gap. DECISIONS.md "Several files in the pane".
     const usual = [...gaps].sort((a, b) => a - b)[Math.floor(gaps.length / 2)] ?? 0;
     expect(usual, seen).toBeGreaterThan(1 / 30 + 0.003);
   } finally {

@@ -47,9 +47,9 @@ export async function clip(width: number, height: number, ms: number) {
     context.fillStyle = `hsl(${((now - start) / 4) % 360} 50% 45%)`;
     context.fillRect(0, 0, width, height);
     track.requestFrame();
-    // No gap may fall under the 33.3ms a window at 30 a second takes, or frames drop; a recorder's
-    // stamp can sit 3ms off its push, a page's first frame more, and one wait past 36ms can land on
-    // Windows' 15.6ms tick. DECISIONS.md "Several files in the pane".
+    // Frames drop if a gap falls under the 33.3ms a window at 30 a second takes, and a recording's
+    // stamps sit off their pushes. The steady wait is two timers, as one past 36ms can land on
+    // Windows' 15.6ms tick; the first gap can spare that. DECISIONS.md "Several files in the pane".
     if (now === start) await wait(37);
     await wait(30);
     await wait(7);
