@@ -58,6 +58,9 @@ const LEAD = 6000;
 // the count plays.
 const LEAST = LEAD + 15_000;
 
+/** A clip's length, and its object URL once recorded. */
+export type Recording = { ms: number; url: Promise<string> };
+
 /**
  * A clip at least as long as asked, recorded `least` long or longer by `record` and kept for the
  * next ask it is long enough for. A recording that fails is not kept.
@@ -75,9 +78,6 @@ export function recordings(record: (ms: number) => Promise<string>, least: numbe
     return made;
   };
 }
-
-/** A clip's length, and its object URL once recorded. */
-export type Recording = { ms: number; url: Promise<string> };
 
 /** One clip for every bench, recorded the first time: it records in real time. */
 const movie = recordings((ms) => clip(VIDEO.width, VIDEO.height, ms), LEAST);
@@ -131,12 +131,12 @@ export async function benchSet(
     height = 900,
   }: BenchOptions = {},
 ): Promise<Bench> {
-  const movieOf = clips > 0 ? movie(LEAD + spans * ms) : null;
-  const recorded = movieOf ? await movieOf.url : null;
+  const take = clips > 0 ? movie(LEAD + spans * ms) : null;
+  const recorded = take ? await take.url : null;
   const isClip = (at: number) =>
     Math.floor(((at + 1) * clips) / count) > Math.floor((at * clips) / count);
   const files = Array.from({ length: count }, (_, at) =>
-    detail(at + 1, isClip(at), movieOf?.ms ?? 0),
+    detail(at + 1, isClip(at), take?.ms ?? 0),
   );
   const urls: Record<string, string> = {};
   for (const file of files) {
