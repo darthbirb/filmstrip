@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
+import { inSight } from "../../dev/in-sight";
 import { photograph, serveFiles } from "../../dev/media";
 import { recording } from "../../dev/recording";
 import {
@@ -328,7 +329,8 @@ test("a video cover with no thumbnail and no shape stands in at the stand-in sha
       showFolderInPane(6, 1);
       const screen = await render(<Harness />);
       const stand = pane(screen).getByText("MP4", { exact: true });
-      await expect.element(stand).toBeVisible();
+      // toBeVisible passes while the cover is held at opacity 0, before its room is measured.
+      await expect.poll(() => inSight(stand)).toBe(true);
       await expect
         .element(pane(screen).getByRole("button", { name: /^Choose Cover/ }))
         .toBeVisible();
