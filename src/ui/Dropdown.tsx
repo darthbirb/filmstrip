@@ -2,6 +2,7 @@ import { type CSSProperties, type KeyboardEvent, useId, useRef, useState } from 
 
 import { Glyph } from "./Glyph";
 import type { GlyphName } from "./glyphs";
+import { keepEscape } from "./Menu";
 
 type Option<T extends string> = { value: T; label: string; glyph?: GlyphName };
 
@@ -80,6 +81,7 @@ export function Dropdown<T extends string>({
   };
 
   const onMenuKeyDown = (event: KeyboardEvent) => {
+    keepEscape(event);
     const list = targets();
     const at = list.indexOf(document.activeElement as HTMLElement);
     const moves: Record<string, number> = {

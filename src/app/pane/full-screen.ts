@@ -20,8 +20,8 @@ export function useFullScreen() {
 }
 
 /**
- * Escape leaves, wherever the focus is: in full screen there is nothing else for it to close. It
- * claims the press, so a listener that runs after it does not act on it too.
+ * Escape leaves, wherever the focus is, unless what is open over it keeps the press, as a menu and
+ * a list do. It claims the press, so a listener that runs after it does not act on it too.
  */
 export function useEscapeLeavesFullScreen() {
   const shown = useFullScreen();

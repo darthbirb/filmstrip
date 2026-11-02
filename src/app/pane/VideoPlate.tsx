@@ -226,9 +226,10 @@ export function VideoPlate({ video, durationMs, frameUs = null, near = true }: P
   const step = (by: number) => {
     if (!frame) return;
     video.pause();
-    const now = frameAt(video.currentTime, frame);
+    // A clip played to its end sits past its last frame, and shows that frame.
+    const now = Math.min(frameAt(video.currentTime, frame), lastFrame);
     if (by < 0 ? now <= 0 : now >= lastFrame) playback.refresh();
-    else playback.seek((Math.min(Math.max(now + by, 0), lastFrame) + 0.5) * frame);
+    else playback.seek((now + by + 0.5) * frame);
   };
 
   const onKeys = (event: KeyboardEvent | globalThis.KeyboardEvent) => {
@@ -399,6 +400,21 @@ export function VideoPlate({ video, durationMs, frameUs = null, near = true }: P
   );
 }
 
+let closeVolume: (() => void) | null = null;
+
+// Added at load, so it runs before the capture listeners effects add: selection's and search's
+// act on Escape too, and a listener added as the column opens would come after them.
+window.addEventListener(
+  "keydown",
+  (event) => {
+    if (event.key !== "Escape" || !closeVolume) return;
+    event.preventDefault();
+    event.stopPropagation();
+    closeVolume();
+  },
+  true,
+);
+
 type VolumeProps = { volume: number; muted: boolean; onMute: () => void };
 
 /** The mute, with the level rising over it under the pointer or the focus; setting it unmutes. */
@@ -409,6 +425,17 @@ function Volume({ volume, muted, onMute }: VolumeProps) {
   const [held, setHeld] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const open = (pointer || focus || held) && !dismissed;
+
+  useEffect(() => {
+    if (!open) return;
+    closeVolume = () => {
+      setDismissed(true);
+      setHeld(false);
+    };
+    return () => {
+      closeVolume = null;
+    };
+  }, [open]);
 
   useEffect(() => {
     const element = holder.current;
@@ -426,9 +453,9 @@ function Volume({ volume, muted, onMute }: VolumeProps) {
     if (!rule || rule.height <= 0) return;
     setLevel(1 - (event.clientY - rule.top) / rule.height);
   };
-  const close = () => {
+  const leave = () => {
     setPointer(false);
-    setDismissed(false);
+    if (!focus) setDismissed(false);
   };
   const percent = `${volume * 100}%`;
 
@@ -438,7 +465,7 @@ function Volume({ volume, muted, onMute }: VolumeProps) {
       ref={holder}
       className="relative flex h-full shrink-0"
       onPointerEnter={() => setPointer(true)}
-      onPointerLeave={close}
+      onPointerLeave={leave}
       onFocus={(event) => setFocus(event.target.matches(":focus-visible"))}
       onBlur={(event: FocusEvent<HTMLElement>) => {
         if (event.currentTarget.contains(event.relatedTarget)) return;
@@ -447,13 +474,9 @@ function Volume({ volume, muted, onMute }: VolumeProps) {
       }}
       onKeyDown={(event) => {
         const by = { ArrowUp: 1, ArrowDown: -1 }[event.key];
-        if (by !== undefined) {
-          event.preventDefault();
-          nudge(by);
-        } else if (event.key === "Escape" && open) {
-          event.stopPropagation();
-          setDismissed(true);
-        }
+        if (by === undefined) return;
+        event.preventDefault();
+        nudge(by);
       }}
     >
       <PlateGlyph

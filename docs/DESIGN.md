@@ -580,8 +580,8 @@ measured, never a breakpoint. DECISIONS.md "The interface size" has the reasonin
 
 Depth is lightness first: `well`, `ground`, `panel` and `raised` step apart, and a hairline of
 `line` marks a panel's edge. One shadow exists, `shadow-overlay`: a folded panel opened over the
-grid at `--z-overlay`, the Settings dialog, an open menu, and a video's volume column. Menus and the dialog sit in the
-browser's top layer, so nothing clips them.
+grid at `--z-overlay`, the Settings dialog, an open menu, and a video's volume column. Menus and
+the dialog sit in the browser's top layer, so nothing clips them.
 
 ## Shapes
 
@@ -872,23 +872,22 @@ toward the rest surface.
   One that acts takes `hover-wash` under the pointer and the focus ring, never a new ground.
 - **Video plate.** A video's controls, over the picture's foot a `tile-gap` in from its edges and
   as wide as the picture rather than the pane: `control`-tall at the `control` corner on `veil`,
-  holding play, the frame back and forward, the track, the time, the mute and the speed, `tile-gap`
-  apart. Every glyph on it is `glyph`, play included; play is the one filled and in `in-pane`, and
-  the steps and the mute are `fg-mid`, `fg` under the pointer and `in-pane` while muted. A step at
-  the clip's first or last frame falls to `fg-faint`; a clip with no frame rate has none. The
-  speed is its figure in `small` tabular figures, `fg-mid` at 1× and `in-pane` off it; pressed, a
-  dropdown's list of the four opens upward, its right edge on the plate's. Under the pointer or
-  the focus the mute raises the volume over itself: a `control`-wide, `volume`-tall column on
-  `raised` at the `control` corner, with a `line-control-hi` ring and `shadow-overlay`, holding
-  the track stood up and thickened, filling with `in-pane` from its foot. The track is a `progress`-tall pill of `track` filling with
-  `in-pane`, at least `1.5rem` wide; under the pointer or the keyboard's focus it thickens and a
-  `thumb`-cornered thumb stands at the position, taller and ringed in `track-ring` while held. Its
-  target is the plate's whole height across the track. The time is `small` tabular figures in
-  `in-pane`, the elapsed then a slash and the total. **As the plate narrows the speed leaves
-  first, then both steps together, then the total, its slash with it, then the mute**; play, the
-  track and the elapsed never leave. Each
-  goes when what is left would squeeze the track below its least, measured, never at a width
-  written down. Paused, the plate is always up; playing, it is up while the pointer is on the
+  holding play, the frame back and forward, the track, the time, the mute and the speed,
+  `tile-gap` apart. Every glyph on it is `glyph`, play included; play is the one filled and in
+  `in-pane`, and the steps and the mute are `fg-mid`, `fg` under the pointer and `in-pane` while
+  muted. A step at the clip's first or last frame falls to `fg-faint`; a clip with no frame rate
+  has none. The speed is its figure in `small` tabular figures, `fg-mid` at 1× and `in-pane` off
+  it; pressed, a dropdown's list of the four opens upward, its right edge on the plate's. Under the
+  pointer or the focus the mute raises the volume over itself: a `control`-wide, `volume`-tall
+  column on `raised` at the `control` corner, with a `line-control-hi` ring and `shadow-overlay`,
+  holding the track stood up and thickened, filling with `in-pane` from its foot. The track is a
+  `progress`-tall pill of `track` filling with `in-pane`, at least `1.5rem` wide; under the pointer
+  or the keyboard's focus it thickens and a `thumb`-cornered thumb stands at the position, taller
+  and ringed in `track-ring` while held. Its target is the plate's whole height across the track.
+  The time is `small` tabular figures in `in-pane`, the elapsed then a slash and the total. **As
+  the plate narrows the speed leaves first, then both steps together, then the total, its slash
+  with it, then the mute**; play, the track and the elapsed never leave. Each goes when what is
+  left would squeeze the track below its least, measured, never at a width written down. Paused, the plate is always up; playing, it is up while the pointer is on the
   picture, for `--linger` after it leaves, and while the keyboard's focus is in it.
 - **Zoom.** Nothing on the picture at fit. Off fit, a plate a `tile-inset` inside the media area's
   bottom-left states the scale, and is the way back: under the pointer the figure becomes the `fit`

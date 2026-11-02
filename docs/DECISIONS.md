@@ -632,8 +632,10 @@ picture, and comes back for the keyboard.
 probe records one frame's length from the stream's average rate, else its base rate, and a step
 lands in the middle of the next frame, so float error never shows the one before; it pauses
 first, so a step always leaves the plate still. ggallery stepped a nominal 1/30s, which on a 24p
-clip is a step to the wrong frame. A file probed before the rate was read keeps a plate without
-steps rather than being read again. **The speeds are a named four, 0.5× to 2×, in a list rather
+clip is a step to the wrong frame. **On a variable-rate file a step is the average frame**, so it
+skips some real frames and repeats others: the file has one rate to read, and the base rate can
+be a time base rather than anything its frames keep to. A file probed before the rate was read
+keeps a plate without steps rather than being read again. **The speeds are a named four, 0.5× to 2×, in a list rather
 than a button that cycles**, since cycling makes going back one a press three times; the list
 ends rather than wraps. The speed holds from video to video but is 1× at each launch, because a
 clip found days later racing at 2× looks broken; volume and mute are saved preferences, as the

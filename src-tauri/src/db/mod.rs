@@ -195,6 +195,53 @@ mod tests {
     }
 
     #[test]
+    fn migration_10_leaves_a_populated_library_as_it_was_with_no_frame_read() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE schema_version (version INTEGER NOT NULL);")
+            .unwrap();
+        for (version, sql) in MIGRATIONS.iter().filter(|(version, _)| *version < 10) {
+            conn.execute_batch(sql).unwrap();
+            conn.execute("INSERT INTO schema_version VALUES (?1)", [version])
+                .unwrap();
+        }
+        let source = sources::add(
+            &conn,
+            Path::new("D:/library"),
+            "Library",
+            sources::SourceKind::Library,
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO item (uuid, source_id, folder_id, disk_name, ext, size_bytes, mtime, kind,
+                               width, height, duration_ms, codec, bitrate, added_at, probed_at)
+             VALUES ('u', ?1, ?2, 'clip.mp4', 'mp4', 9, 1, 'video',
+                     1920, 1080, 12000, 'h264', 8000000, 2, 3)",
+            [
+                source.id,
+                folders::source_root_folder(&conn, source.id).unwrap(),
+            ],
+        )
+        .unwrap();
+
+        migrate(&mut conn).unwrap();
+
+        let (read_at, codec, frame): (Option<i64>, String, Option<i64>) = conn
+            .query_row(
+                "SELECT probed_at, codec, frame_us FROM item WHERE uuid = 'u'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            read_at,
+            Some(3),
+            "a file read before keeps that it was read"
+        );
+        assert_eq!(codec, "h264");
+        assert_eq!(frame, None);
+    }
+
+    #[test]
     fn an_item_cannot_exist_outside_a_folder() {
         let mut conn = Connection::open_in_memory().unwrap();
         migrate(&mut conn).unwrap();

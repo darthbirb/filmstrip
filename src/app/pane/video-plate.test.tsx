@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { afterEach, beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
+import { checkAll, clearChecked, getSelection, useSelectionKeys } from "../grid/selection";
 import { getPreferences, updatePreferences } from "../preferences";
+import { getFullScreen, setFullScreen, useEscapeLeavesFullScreen } from "./full-screen";
 import { getSpeed, setSpeed } from "./speed";
 import { Video, VideoPlate } from "./VideoPlate";
 
@@ -15,6 +17,8 @@ let clips: string[] = [];
 beforeEach(() => {
   updatePreferences({ volume: 1, muted: false });
   setSpeed(1);
+  setFullScreen(false);
+  clearChecked();
 });
 afterEach(() => {
   for (const clip of clips) URL.revokeObjectURL(clip);
@@ -193,8 +197,9 @@ test("a step moves one frame of the probe's length, and at either end that step 
   (forward.element() as HTMLElement).click();
   await expect.element(forward).toHaveAttribute("aria-disabled", "true");
   expect(video.currentTime).toBe(72);
+  // The last frame is what shows at the very end, so the step back goes to the one before it.
   await back.click();
-  expect(video.currentTime).toBeCloseTo(71.98, 6);
+  expect(video.currentTime).toBeCloseTo(71.94, 6);
 });
 
 test("the speed opens the four upward over the figure, and the choice holds from video to video", async () => {
@@ -354,6 +359,80 @@ test("the volume goes once the pointer leaves, though a click left the focus on 
   await expect.element(mute).toHaveFocus();
   await expect.element(level).toBeVisible();
   await expect.element(mute).toHaveAttribute("aria-keyshortcuts", "M");
+});
+
+/** Stands for the app's own listeners, which also answer Escape. */
+function AppKeys({ children }: { children: ReactNode }) {
+  useSelectionKeys([1, 2]);
+  useEscapeLeavesFullScreen();
+  return children;
+}
+
+async function renderInApp() {
+  await page.viewport(1000, 700);
+  const screen = await render(
+    <AppKeys>
+      <Bare width={560} frameUs={FRAME} />
+    </AppKeys>,
+  );
+  await expect.element(screen.getByRole("toolbar", { name: "Playback" })).toBeVisible();
+  return screen;
+}
+
+test("in full screen Escape closes the speed list and the focus goes back to the figure", async () => {
+  setFullScreen(true);
+  const screen = await renderInApp();
+  const figure = screen.getByRole("button", { name: "Speed: 1×" });
+  await figure.click();
+  const list = screen.getByRole("listbox", { name: "Speed" });
+  await expect.element(list).toBeVisible();
+
+  await userEvent.keyboard("{Escape}");
+  await expect.element(list).not.toBeInTheDocument();
+  await expect.element(figure).toHaveFocus();
+  expect(getFullScreen()).toBe(true);
+
+  await userEvent.keyboard("{Escape}");
+  await expect.poll(getFullScreen).toBe(false);
+});
+
+test("Escape on a volume the keyboard raised closes it and leaves what is checked", async () => {
+  const screen = await renderInApp();
+  checkAll([1, 2]);
+  const level = screen.getByRole("slider", { name: "Volume" });
+  (screen.getByRole("slider", { name: "Seek" }).element() as HTMLElement).focus();
+  await userEvent.keyboard("{Tab}");
+  await expect.element(level).toBeVisible();
+
+  await userEvent.keyboard("{Escape}");
+  await expect.element(level).not.toBeInTheDocument();
+  expect(getSelection().ids).toHaveLength(2);
+
+  // The pointer passing over does not bring back what the keyboard put away.
+  await userEvent.hover(screen.getByRole("button", { name: "Mute" }));
+  await userEvent.hover(screen.getByRole("button", { name: "Play" }));
+  await expect.element(level).not.toBeInTheDocument();
+
+  await userEvent.keyboard("{Escape}");
+  await expect.poll(() => getSelection().ids).toHaveLength(0);
+});
+
+test("Escape closes a volume the pointer raised, with the focus elsewhere and only that", async () => {
+  setFullScreen(true);
+  const screen = await renderInApp();
+  const level = screen.getByRole("slider", { name: "Volume" });
+  const mute = screen.getByRole("button", { name: "Mute" });
+  (screen.getByRole("slider", { name: "Seek" }).element() as HTMLElement).focus();
+  await userEvent.hover(mute);
+  await expect.element(level).toBeVisible();
+
+  await userEvent.keyboard("{Escape}");
+  await expect.element(level).not.toBeInTheDocument();
+  expect(getFullScreen()).toBe(true);
+
+  await userEvent.hover(screen.getByRole("button", { name: "Play" }));
+  await userEvent.hover(mute);
+  await expect.element(level).toBeVisible();
 });
 
 /** A short clip the browser can play, drawn here rather than kept as a file. */
