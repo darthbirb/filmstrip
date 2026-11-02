@@ -20,6 +20,36 @@ beforeEach(() => {
   setFullScreen(false);
 });
 
+test("an open auto popover closes at Escape first, with the focus outside it; a manual one never holds full screen", async () => {
+  const screen = await render(
+    <>
+      <Watcher />
+      <div data-testid="auto" popover="auto">
+        A list
+      </div>
+      <div data-testid="manual" popover="manual">
+        Offers
+      </div>
+    </>,
+  );
+  const auto = screen.getByTestId("auto").element() as HTMLElement;
+  const manual = screen.getByTestId("manual").element() as HTMLElement;
+  setFullScreen(true);
+  await expect.element(screen.getByText("full")).toBeVisible();
+
+  auto.showPopover();
+  expect(auto.contains(document.activeElement)).toBe(false);
+  await userEvent.keyboard("{Escape}");
+  await expect.poll(() => auto.matches(":popover-open")).toBe(false);
+  expect(getFullScreen()).toBe(true);
+
+  manual.showPopover();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(screen.getByText("docked")).toBeVisible();
+  expect(manual.matches(":popover-open")).toBe(true);
+  manual.hidePopover();
+});
+
 test("Escape leaves full screen, and is not listened for the rest of the time", async () => {
   const screen = await render(<Watcher />);
   await expect.element(screen.getByText("docked")).toBeVisible();

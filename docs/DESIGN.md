@@ -887,8 +887,9 @@ toward the rest surface.
   The time is `small` tabular figures in `in-pane`, the elapsed then a slash and the total. **As
   the plate narrows the speed leaves first, then both steps together, then the total, its slash
   with it, then the mute**; play, the track and the elapsed never leave. Each goes when what is
-  left would squeeze the track below its least, measured, never at a width written down. Paused, the plate is always up; playing, it is up while the pointer is on the
-  picture, for `--linger` after it leaves, and while the keyboard's focus is in it.
+  left would squeeze the track below its least, measured, never at a width written down. Paused,
+  the plate is always up; playing, it is up while the pointer is on the picture, for `--linger`
+  after it leaves, and while the keyboard's focus is in it.
 - **Zoom.** Nothing on the picture at fit. Off fit, a plate a `tile-inset` inside the media area's
   bottom-left states the scale, and is the way back: under the pointer the figure becomes the `fit`
   glyph and **Fit**. The media area clips the picture at its `control` corner at every scale. The

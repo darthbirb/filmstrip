@@ -453,6 +453,10 @@ function Volume({ volume, muted, onMute }: VolumeProps) {
     if (!rule || rule.height <= 0) return;
     setLevel(1 - (event.clientY - rule.top) / rule.height);
   };
+  const enter = () => {
+    setPointer(true);
+    if (!focus) setDismissed(false);
+  };
   const leave = () => {
     setPointer(false);
     if (!focus) setDismissed(false);
@@ -464,7 +468,7 @@ function Volume({ volume, muted, onMute }: VolumeProps) {
     <span
       ref={holder}
       className="relative flex h-full shrink-0"
-      onPointerEnter={() => setPointer(true)}
+      onPointerEnter={enter}
       onPointerLeave={leave}
       onFocus={(event) => setFocus(event.target.matches(":focus-visible"))}
       onBlur={(event: FocusEvent<HTMLElement>) => {

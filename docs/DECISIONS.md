@@ -635,12 +635,12 @@ first, so a step always leaves the plate still. ggallery stepped a nominal 1/30s
 clip is a step to the wrong frame. **On a variable-rate file a step is the average frame**, so it
 skips some real frames and repeats others: the file has one rate to read, and the base rate can
 be a time base rather than anything its frames keep to. A file probed before the rate was read
-keeps a plate without steps rather than being read again. **The speeds are a named four, 0.5× to 2×, in a list rather
-than a button that cycles**, since cycling makes going back one a press three times; the list
-ends rather than wraps. The speed holds from video to video but is 1× at each launch, because a
-clip found days later racing at 2× looks broken; volume and mute are saved preferences, as the
-details' fold is. As the plate narrows the speed leaves before the steps, being the one control
-about a preference rather than the clip, and the two steps leave together.
+keeps a plate without steps rather than being read again. **The speeds are a named four, 0.5× to
+2×, in a list rather than a button that cycles**, since cycling makes going back one a press three
+times; the list ends rather than wraps. The speed holds from video to video but is 1× at each
+launch, because a clip found days later racing at 2× looks broken; volume and mute are saved
+preferences, as the details' fold is. As the plate narrows the speed leaves before the steps,
+being the one control about a preference rather than the clip, and the two steps leave together.
 
 **Full screen is a state of the pane, not a place you go**, drawn on 15 September 2026 and built
 the day after. The pane takes the frame below the bar and keeps every part it has; the bar stays,

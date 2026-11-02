@@ -396,6 +396,26 @@ test("in full screen Escape closes the speed list and the focus goes back to the
   await expect.poll(getFullScreen).toBe(false);
 });
 
+test("in full screen Escape still closes the speed list once a press on its padding has moved the focus out", async () => {
+  setFullScreen(true);
+  const screen = await renderInApp();
+  await screen.getByRole("button", { name: "Speed: 1×" }).click();
+  const list = screen.getByRole("listbox", { name: "Speed" });
+  await expect.element(list).toBeVisible();
+  const menu = list.element().parentElement as HTMLElement;
+
+  await userEvent.click(page.elementLocator(menu), { position: { x: 2, y: 20 } });
+  await expect.element(list).toBeVisible();
+  expect(menu.contains(document.activeElement)).toBe(false);
+
+  await userEvent.keyboard("{Escape}");
+  await expect.element(list).not.toBeInTheDocument();
+  expect(getFullScreen()).toBe(true);
+
+  await userEvent.keyboard("{Escape}");
+  await expect.poll(getFullScreen).toBe(false);
+});
+
 test("Escape on a volume the keyboard raised closes it and leaves what is checked", async () => {
   const screen = await renderInApp();
   checkAll([1, 2]);
