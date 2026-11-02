@@ -4,7 +4,7 @@ import { page } from "vitest/browser";
 import { benchSet, displayRate } from "../../dev/set-bench";
 import { paneSetLimit, paneSetPlaying } from "./pane-store";
 
-// `pane-set` and `pane-set-playing` are set from these measurements.
+// These hold `pane-set` and `pane-set-playing` to the counts they were set from.
 // DECISIONS.md "Several files in the pane".
 
 test("the limit's worth of originals holds the frame rate while the pane is resized", {
@@ -17,7 +17,7 @@ test("the limit's worth of originals holds the frame rate while the pane is resi
   expect(bench.late / bench.intervals).toBeLessThan(0.1);
 });
 
-test("the clips that play at once, among the limit's worth, drop no more than one frame in 100", {
+test("the clips that play at once, among the limit's worth, keep time and drop under 1%", {
   timeout: 180_000,
 }, async () => {
   await page.viewport(1600, 1000);
@@ -25,7 +25,11 @@ test("the clips that play at once, among the limit's worth, drop no more than on
   await benchSet(paneSetLimit(), { clips: paneSetPlaying(), ms: 1000 });
   const bench = await benchSet(paneSetLimit(), { clips: paneSetPlaying(), ms: 5000, spans: 3 });
   expect(bench.spans.every((span) => span.due > 0)).toBe(true);
-  console.info(`dropped ${bench.spans.map((span) => `${span.dropped}/${span.due}`).join(" ")}`);
-  const shares = bench.spans.map((span) => span.dropped / span.due).sort((a, b) => a - b);
-  expect(shares[Math.floor(shares.length / 2)]).toBeLessThan(0.01);
+  const counts = bench.spans.map((span) => `${span.dropped}/${span.due}`).join(" ");
+  const paces = bench.spans.map((span) => span.pace.toFixed(3)).join(" ");
+  console.info(`dropped ${counts}, pace ${paces}`);
+  const middle = (values: number[]) =>
+    [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+  expect(middle(bench.spans.map((span) => span.dropped / span.due))).toBeLessThan(0.01);
+  expect(middle(bench.spans.map((span) => span.pace))).toBeGreaterThan(0.95);
 });

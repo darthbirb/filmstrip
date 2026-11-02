@@ -7,15 +7,18 @@ import { addToPane, showInPane } from "../app/pane/pane-store";
 import type { ItemDetail } from "../ipc/bindings/ItemDetail";
 import { clip, photograph, serveFiles } from "./media";
 
-// Frame rate with several originals in the pane, which `pane-set` is set from. It runs in a
-// timing test, and in a headed browser on the dev server by importing this module there.
-// DECISIONS.md "Several files in the pane".
+// Frame rate, and the clips' dropped frames and pace, with several originals in the pane: what
+// `pane-set` and `pane-set-playing` are held to. It runs in a timing test, and in a headed browser
+// on the dev server by importing this module there. DECISIONS.md "Several files in the pane".
 
 const PHOTO = { width: 6000, height: 4000 };
 const VIDEO = { width: 1920, height: 1080 };
 
-/** Of the frames the clips were due to show over a span of the count, how many they dropped. */
-export type Span = { dropped: number; due: number };
+/**
+ * Of the frames the clips were due to show over a span of the count, how many they dropped, and
+ * how far their clocks moved against the window's, on average: 1 keeps time.
+ */
+export type Span = { dropped: number; due: number; pace: number };
 
 /** Frames a second, the median gap between them, how many came late, and the clips' own frames. */
 export type Bench = {
@@ -26,6 +29,7 @@ export type Bench = {
   /** Of the frames the clips were due to show over the whole count, how many they dropped. */
   dropped: number;
   due: number;
+  pace: number;
   /** The same, span by span. */
   spans: Span[];
 };
@@ -52,17 +56,33 @@ export type BenchOptions = {
 // Covers the wait before the count, so no clip loops inside it.
 const LEAD = 6000;
 
-const movies = new Map<number, Promise<string>>();
+// The lead and three five-second spans, the timing test's count, so its warm-up records the clip
+// the count plays.
+const LEAST = LEAD + 15_000;
 
-/** One clip of this length for every bench, recorded the first time: it records in real time. */
-function movie(ms: number) {
-  let made = movies.get(ms);
-  if (!made) {
-    made = clip(VIDEO.width, VIDEO.height, ms);
-    movies.set(ms, made);
-  }
-  return made;
+/** A clip's length, and its object URL once recorded. */
+export type Recording = { ms: number; url: Promise<string> };
+
+/**
+ * A clip at least as long as asked, recorded `least` long or longer by `record` and kept for the
+ * next ask it is long enough for. A recording that fails is not kept.
+ */
+export function recordings(record: (ms: number) => Promise<string>, least: number) {
+  let kept: Recording | undefined;
+  return (ms: number): Recording => {
+    if (kept && kept.ms >= ms) return kept;
+    const length = Math.max(ms, least);
+    const made = { ms: length, url: record(length) };
+    kept = made;
+    made.url.catch(() => {
+      if (kept === made) kept = undefined;
+    });
+    return made;
+  };
 }
+
+/** One clip for every bench, recorded the first time: it records in real time. */
+const movie = recordings((ms) => clip(VIDEO.width, VIDEO.height, ms), LEAST);
 
 function detail(id: number, video: boolean, durationMs: number): ItemDetail {
   const shape = video ? VIDEO : PHOTO;
@@ -113,11 +133,11 @@ export async function benchSet(
     height = 900,
   }: BenchOptions = {},
 ): Promise<Bench> {
-  const length = LEAD + spans * ms;
+  const take = clips > 0 ? movie(LEAD + spans * ms) : null;
+  const recorded = take ? await take.url : null;
   const isClip = (at: number) =>
     Math.floor(((at + 1) * clips) / count) > Math.floor((at * clips) / count);
-  const files = Array.from({ length: count }, (_, at) => detail(at + 1, isClip(at), length));
-  const recorded = clips > 0 ? await movie(length) : null;
+  const files = Array.from({ length: count }, (_, at) => detail(at + 1, isClip(at), take?.ms ?? 0));
   const urls: Record<string, string> = {};
   for (const file of files) {
     urls[file.diskName] =
@@ -174,9 +194,15 @@ export async function benchSet(
     // Settled, so the first decodes are not what is counted: a second, and every clip a second in.
     await frames(1000);
     await until(() => videos.every((one) => one.getVideoPlaybackQuality().totalVideoFrames >= 30));
-    const quality = () => videos.map((one) => one.getVideoPlaybackQuality());
-    const marks = [quality()];
-    const times = videos.map((one) => one.currentTime);
+    type Mark = { at: number; quality: VideoPlaybackQuality[]; clocks: number[] };
+    const mark = (): Mark => ({
+      at: performance.now(),
+      quality: videos.map((one) => one.getVideoPlaybackQuality()),
+      clocks: videos.map((one) => one.currentTime),
+    });
+    const begun = mark();
+    const marks = [begun];
+    const times = [...begun.clocks];
     let looped = false;
     let start: number | undefined;
     const drawn = await frames(spans * ms, (now) => {
@@ -190,20 +216,28 @@ export async function benchSet(
         if (one.currentTime < (times[index] ?? 0)) looped = true;
         times[index] = one.currentTime;
       });
-      if (now - start >= marks.length * ms && marks.length < spans) marks.push(quality());
+      if (now - start >= marks.length * ms && marks.length < spans) marks.push(mark());
     });
-    marks.push(quality());
+    marks.push(mark());
     if (looped) throw new Error("a clip looped inside the count, which its own seam can drop");
-    const span = (from: VideoPlaybackQuality[], to: VideoPlaybackQuality[]): Span => {
+    const span = (from: Mark, to: Mark): Span => {
       const total = (pick: (one: VideoPlaybackQuality) => number) =>
-        to.reduce((sum, one, index) => sum + pick(one) - pick(from[index] ?? one), 0);
+        to.quality.reduce(
+          (sum, one, index) => sum + pick(one) - pick(from.quality[index] ?? one),
+          0,
+        );
+      const moved = to.clocks.reduce(
+        (sum, one, index) => sum + one - (from.clocks[index] ?? one),
+        0,
+      );
       return {
         dropped: total((one) => one.droppedVideoFrames),
         due: total((one) => one.totalVideoFrames),
+        pace: videos.length > 0 ? moved / videos.length / ((to.at - from.at) / 1000) : 1,
       };
     };
-    const each = marks.slice(1).map((to, index) => span(marks[index] ?? to, to));
-    const whole = span(marks[0] ?? [], marks.at(-1) ?? []);
+    const each = marks.slice(1).map((to, index) => span(marks[index] ?? begun, to));
+    const whole = span(begun, marks.at(-1) ?? begun);
     const intervals = drawn.slice(1).map((at, index) => at - (drawn[index] ?? at));
     const sorted = [...intervals].sort((a, b) => a - b);
     const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
