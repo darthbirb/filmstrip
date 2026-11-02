@@ -21,7 +21,7 @@ export function suite(timing: boolean) {
         include: timing ? [TIMING] : ["src/**/*.test.{ts,tsx}"],
         exclude: timing ? configDefaults.exclude : [...configDefaults.exclude, TIMING],
         fileParallelism: !timing,
-        silent: false,
+        ...(timing ? { silent: false } : {}),
         setupFiles: ["./src/dev/test-setup.ts"],
         browser: {
           enabled: true,

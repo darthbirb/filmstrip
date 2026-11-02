@@ -19,6 +19,8 @@ export async function photograph(width: number, height: number, hue = 30) {
   return URL.createObjectURL(blob);
 }
 
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /** A WebM clip of this size and length, recorded from a canvas as it changes colour. */
 export async function clip(width: number, height: number, ms: number) {
   const canvas = document.createElement("canvas");
@@ -45,9 +47,12 @@ export async function clip(width: number, height: number, ms: number) {
     context.fillStyle = `hsl(${((now - start) / 4) % 360} 50% 45%)`;
     context.fillRect(0, 0, width, height);
     track.requestFrame();
-    // A frame's gap is never under the 33.3ms a window drawing 30 a second takes: setTimeout cuts
-    // 1000 / 30 to 33, and a clip faster than the window drops its spare frames however idle.
-    await new Promise((resolve) => setTimeout(resolve, 34));
+    // No gap may fall under the 33.3ms a window at 30 a second takes, or frames drop; a recorder's
+    // stamp can sit 3ms off its push, a page's first frame more, and one wait past 36ms can land on
+    // Windows' 15.6ms tick. DECISIONS.md "Several files in the pane".
+    if (now === start) await wait(37);
+    await wait(30);
+    await wait(7);
   }
   recorder.stop();
   await stopped;
