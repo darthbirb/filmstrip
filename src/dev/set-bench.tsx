@@ -135,9 +135,7 @@ export async function benchSet(
   const recorded = take ? await take.url : null;
   const isClip = (at: number) =>
     Math.floor(((at + 1) * clips) / count) > Math.floor((at * clips) / count);
-  const files = Array.from({ length: count }, (_, at) =>
-    detail(at + 1, isClip(at), take?.ms ?? 0),
-  );
+  const files = Array.from({ length: count }, (_, at) => detail(at + 1, isClip(at), take?.ms ?? 0));
   const urls: Record<string, string> = {};
   for (const file of files) {
     urls[file.diskName] =
