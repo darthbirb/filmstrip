@@ -68,7 +68,7 @@ jobs:
         with:
           name: e2e-failures-${{ github.run_attempt }}
           path: test-results/
-          if-no-files-found: ignore
+          if-no-files-found: warn
           retention-days: 7
 
       - name: Rust format
