@@ -20,7 +20,7 @@ tauri-build = { version = "2.7", features = [] }
 
 [dependencies]
 tauri = { version = "2.12", features = ["protocol-asset"] }
-rusqlite = { version = "0.40", features = ["bundled", "backup"] }
+rusqlite = { version = "0.41", features = ["bundled", "backup"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
@@ -35,7 +35,7 @@ tauri-plugin-opener = "2"
 # The system's own folder picker: the app draws no part of choosing. DESIGN.md "Shapes".
 tauri-plugin-dialog = "2"
 # An export's zip, stored and never compressed, so no codec is built in.
-zip = { version = "=9.0.5", default-features = false }
+zip = { version = "=9.1.2", default-features = false }
 # An export names a file from when it was taken, in the zone the pane shows it in.
 chrono = { version = "=0.4.45", default-features = false, features = ["clock"] }
 

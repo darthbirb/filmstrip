@@ -16,6 +16,7 @@ import { useContextMenu } from "../../ui/Menu";
 import { dragging } from "../grid/drag";
 import { getSelection } from "../grid/selection";
 import { itemMenu } from "../menus/item-menu";
+import { usePreferences } from "../preferences";
 import { getFullScreen } from "./full-screen";
 import { focusNextPicture } from "./Media";
 import { leavePane, paneFileOrigin, paneSetPlaying, showInPane } from "./pane-store";
@@ -192,10 +193,15 @@ function SetFile(props: FileProps) {
   const video = useRef<HTMLVideoElement>(null);
   const thumb = item.thumb ? convertFileSrc(item.thumb) : undefined;
   const tab = stop ? 0 : -1;
+  const { volume = 1 } = usePreferences();
 
   useEffect(() => {
     if (video.current) video.current.muted = !voiced;
   }, [voiced]);
+
+  useEffect(() => {
+    if (video.current) video.current.volume = volume;
+  }, [volume]);
 
   useEffect(() => {
     const clip = video.current;

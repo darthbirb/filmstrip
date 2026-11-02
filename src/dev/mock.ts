@@ -279,6 +279,8 @@ function detail(itemId: number): ItemDetail | null {
     ...row,
     codec: video ? "h264" : null,
     bitrate: video ? 8_000_000 : null,
+    // clip.mp4 stands for a file probed before the rate was read, so it has no frame steps.
+    frameUs: video && row.diskName !== "clip.mp4" ? 33_367 : null,
     capturedAt: takenAt(row),
     capturedSrc: dated ? (video ? "container" : "exif") : null,
     addedAt: ADDED_AT,

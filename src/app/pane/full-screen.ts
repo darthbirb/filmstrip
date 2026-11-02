@@ -20,15 +20,16 @@ export function useFullScreen() {
 }
 
 /**
- * Escape leaves, wherever the focus is: in full screen there is nothing else for it to close. It
- * claims the press, so a listener that runs after it does not act on it too.
+ * Escape leaves, wherever the focus is, unless what is open over it keeps the press, as a menu and
+ * a list do. An auto popover is the browser's to close, even with the focus outside it; a manual
+ * one never closes at Escape. It claims the press, so a later listener does not act on it too.
  */
 export function useEscapeLeavesFullScreen() {
   const shown = useFullScreen();
   useEffect(() => {
     if (!shown) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || document.querySelector('[popover="auto"]:popover-open')) return;
       event.preventDefault();
       setFullScreen(false);
     };

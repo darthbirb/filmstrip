@@ -278,7 +278,7 @@ fn item_by_uuid(conn: &Connection, uuid: &str) -> Result<Option<i64>> {
 /// with the tags it carries itself. Every column is carried, whatever the schema has grown.
 fn carry(restored: &Connection, live: &Connection, id: i64, folder_id: i64) -> Result<i64> {
     let mut stmt = live.prepare("SELECT * FROM item WHERE id = ?1")?;
-    let names: Vec<String> = stmt.column_names().into_iter().map(str::to_owned).collect();
+    let names: Vec<String> = stmt.column_names().map(str::to_owned).collect();
     let values: Vec<Value> = stmt.query_row(params![id], |r| {
         (0..names.len()).map(|at| r.get::<_, Value>(at)).collect()
     })?;

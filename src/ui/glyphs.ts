@@ -69,6 +69,8 @@ export const GLYPHS = {
   pencil: { icon: "pencil-simple", code: 0xe3b4 },
   play: { icon: "play", code: 0xe3d0 },
   pause: { icon: "pause", code: 0xe39e },
+  frameBack: { icon: "caret-line-left", code: 0xe132 },
+  frameForward: { icon: "caret-line-right", code: 0xe130 },
   sound: { icon: "speaker-high", code: 0xe44a },
   muted: { icon: "speaker-slash", code: 0xe45a },
 } as const;

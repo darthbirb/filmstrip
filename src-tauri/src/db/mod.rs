@@ -32,6 +32,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (7, include_str!("migrations/007_search.sql")),
     (8, include_str!("migrations/008_indexed.sql")),
     (9, include_str!("migrations/009_folder_tag_rev.sql")),
+    (10, include_str!("migrations/010_frame.sql")),
 ];
 
 type Rewrite = fn(&Connection) -> Result<()>;
@@ -155,7 +156,7 @@ pub fn now() -> i64 {
 /// let go only once SQLite makes `waiting` wait for it. `waiting` refused at once, without
 /// waiting, finds the lock still held.
 #[cfg(test)]
-pub(crate) fn hold_write_lock(path: &Path, waiting: &Connection) {
+pub(crate) fn hold_write_lock(path: &Path, waiting: &mut Connection) {
     use std::cell::RefCell;
 
     thread_local! {
@@ -191,6 +192,53 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM data_version", [], |r| r.get(0))
             .unwrap();
         assert_eq!(rewritten, DATA_MIGRATIONS.len() as i64);
+    }
+
+    #[test]
+    fn migration_10_leaves_a_populated_library_as_it_was_with_no_frame_read() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE schema_version (version INTEGER NOT NULL);")
+            .unwrap();
+        for (version, sql) in MIGRATIONS.iter().filter(|(version, _)| *version < 10) {
+            conn.execute_batch(sql).unwrap();
+            conn.execute("INSERT INTO schema_version VALUES (?1)", [version])
+                .unwrap();
+        }
+        let source = sources::add(
+            &conn,
+            Path::new("D:/library"),
+            "Library",
+            sources::SourceKind::Library,
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO item (uuid, source_id, folder_id, disk_name, ext, size_bytes, mtime, kind,
+                               width, height, duration_ms, codec, bitrate, added_at, probed_at)
+             VALUES ('u', ?1, ?2, 'clip.mp4', 'mp4', 9, 1, 'video',
+                     1920, 1080, 12000, 'h264', 8000000, 2, 3)",
+            [
+                source.id,
+                folders::source_root_folder(&conn, source.id).unwrap(),
+            ],
+        )
+        .unwrap();
+
+        migrate(&mut conn).unwrap();
+
+        let (read_at, codec, frame): (Option<i64>, String, Option<i64>) = conn
+            .query_row(
+                "SELECT probed_at, codec, frame_us FROM item WHERE uuid = 'u'",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            read_at,
+            Some(3),
+            "a file read before keeps that it was read"
+        );
+        assert_eq!(codec, "h264");
+        assert_eq!(frame, None);
     }
 
     #[test]
