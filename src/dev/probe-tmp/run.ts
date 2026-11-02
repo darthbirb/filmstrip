@@ -104,18 +104,18 @@ async function played(url: string) {
   return shown;
 }
 
-export async function probe(variant: string, rounds = 2) {
+export async function probe(delay: number, rounds = 4) {
   for (let round_ = 0; round_ < rounds; round_++) {
-    const { blob, pushed, ticks } = await record(1500, 34, variant === "beat");
+    const { blob, pushed, ticks } = await record(1500, delay, true);
     const url = URL.createObjectURL(blob);
-    const shown = await played(url);
+    const shown = round_ === 0 ? await played(url) : [];
     URL.revokeObjectURL(url);
     const file = blocks(new Uint8Array(await blob.arrayBuffer()));
     console.log(
       `PROBE ${JSON.stringify({
-        variant,
+        variant: String(delay),
         round: round_,
-        delay: 34,
+        delay,
         pushed: round(gapsOf(pushed)),
         ticks: ticks.length,
         file: gapsOf(file),
