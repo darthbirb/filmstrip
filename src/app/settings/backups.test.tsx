@@ -22,6 +22,7 @@ const list = () => document.querySelector("section[aria-label='Backups of the in
 const rows = () => [
   ...(list()?.querySelectorAll(":scope > div:last-child > div:not(.push-down)") ?? []),
 ];
+// biome-ignore lint/performance/useDomNodeTextContent: the tests read a row as drawn, its cells split by line and space, which textContent runs together.
 const rowText = (at: number) => (rows()[at] as HTMLElement | undefined)?.innerText ?? "";
 const restoreOn = (at: number) =>
   rows()[at]?.querySelector<HTMLButtonElement>("button") ?? undefined;

@@ -441,7 +441,7 @@ function stayedFolder(node: FolderNode, parent: number, reason: Reason): Stayed 
   return { kind: "folder", id: node.id, name: node.title, at, reason };
 }
 
-function describe(batchId: string, steps: Step[]): Batch {
+function describeBatch(batchId: string, steps: Step[]): Batch {
   const files = steps.reduce(
     (sum, step) =>
       sum +
@@ -535,13 +535,13 @@ function record(steps: Step[]) {
   if (steps.length === 0) return null;
   const batchId = `mock-batch-${nextBatch++}`;
   journal.push({ batchId, steps });
-  return describe(batchId, steps);
+  return describeBatch(batchId, steps);
 }
 
 function takeBack(at: number): UndoReport {
   const [{ batchId, steps }] = journal.splice(at, 1) as [{ batchId: string; steps: Step[] }];
   // Described before anything comes back, as the Rust journal is.
-  const batch = describe(batchId, steps);
+  const batch = describeBatch(batchId, steps);
   for (const step of [...steps].reverse()) {
     switch (step.op) {
       case "move":
