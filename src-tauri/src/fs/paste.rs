@@ -756,10 +756,10 @@ mod tests {
 
     #[test]
     fn a_file_waits_out_another_connection_writing_rather_than_being_refused() {
-        let (conn, dir, lisbon) = library("busy");
+        let (mut conn, dir, lisbon) = library("busy");
         let a = write(&dir.join("Downloads/IMG_5001.jpg"), "a");
 
-        db::hold_write_lock(&dir.join("library.db"), &conn);
+        db::hold_write_lock(&dir.join("library.db"), &mut conn);
         let outcome = run(
             &conn,
             &journal::new_batch(),
