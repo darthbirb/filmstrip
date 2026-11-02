@@ -156,7 +156,7 @@ pub fn now() -> i64 {
 /// let go only once SQLite makes `waiting` wait for it. `waiting` refused at once, without
 /// waiting, finds the lock still held.
 #[cfg(test)]
-pub(crate) fn hold_write_lock(path: &Path, waiting: &Connection) {
+pub(crate) fn hold_write_lock(path: &Path, waiting: &mut Connection) {
     use std::cell::RefCell;
 
     thread_local! {
