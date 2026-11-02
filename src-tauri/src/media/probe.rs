@@ -10,6 +10,8 @@ pub struct Probe {
     pub width: Option<i64>,
     pub height: Option<i64>,
     pub duration_ms: Option<i64>,
+    /// One frame of a video, in microseconds: what a frame step moves by.
+    pub frame_us: Option<i64>,
     pub codec: Option<String>,
     pub bitrate: Option<i64>,
     pub captured_at: Option<i64>,
@@ -67,6 +69,7 @@ pub fn video(report: &Json) -> Probe {
             (width, height)
         };
         probe.codec = stream["codec_name"].as_str().map(str::to_owned);
+        probe.frame_us = frame_us(stream);
     }
     let format = &report["format"];
     probe.duration_ms = number(&format["duration"])
@@ -79,6 +82,19 @@ pub fn video(report: &Json) -> Probe {
         .filter(|at| *at > 0);
     probe.captured(created, "container");
     probe
+}
+
+/// One frame's length from the stream's average rate, else its base rate; a rate of `0/0` is
+/// how ffprobe says it does not know.
+fn frame_us(stream: &Json) -> Option<i64> {
+    ["avg_frame_rate", "r_frame_rate"]
+        .into_iter()
+        .find_map(|field| {
+            let (frames, seconds) = stream[field].as_str()?.split_once('/')?;
+            let (frames, seconds) = (frames.parse::<f64>().ok()?, seconds.parse::<f64>().ok()?);
+            let us = seconds / frames * 1_000_000.0;
+            (us.is_finite() && us >= 1.0).then(|| us.round() as i64)
+        })
 }
 
 /// Degrees a recording asks to be turned: the display matrix newer ffmpeg reports, or the older tag.
@@ -224,7 +240,10 @@ mod tests {
         let report = json!({
             "streams": [
                 { "codec_type": "audio", "codec_name": "aac" },
-                { "codec_type": "video", "codec_name": "h264", "width": 1920, "height": 1080 }
+                {
+                    "codec_type": "video", "codec_name": "h264", "width": 1920, "height": 1080,
+                    "avg_frame_rate": "30000/1001", "r_frame_rate": "30/1"
+                }
             ],
             "format": {
                 "duration": "12.345",
@@ -238,6 +257,7 @@ mod tests {
                 width: Some(1920),
                 height: Some(1080),
                 duration_ms: Some(12_345),
+                frame_us: Some(33_367),
                 codec: Some("h264".into()),
                 bitrate: Some(8_000_000),
                 captured_at: Some(1_718_188_401),
@@ -269,6 +289,27 @@ mod tests {
         assert_eq!(turned(tagged), (Some(1080), Some(1920)));
         let upside_down = with(json!({ "side_data_list": [{ "rotation": 180 }] }));
         assert_eq!(turned(upside_down), (Some(1920), Some(1080)));
+    }
+
+    #[test]
+    fn a_frame_is_read_from_the_average_rate_else_the_base_one_and_never_guessed() {
+        let frame = |stream: serde_json::Value| {
+            let mut stream = stream;
+            stream["codec_type"] = json!("video");
+            video(&json!({ "streams": [stream], "format": {} })).frame_us
+        };
+        assert_eq!(frame(json!({ "avg_frame_rate": "24/1" })), Some(41_667));
+        assert_eq!(frame(json!({ "avg_frame_rate": "25/1" })), Some(40_000));
+        assert_eq!(
+            frame(json!({ "avg_frame_rate": "0/0", "r_frame_rate": "60/1" })),
+            Some(16_667)
+        );
+        assert_eq!(
+            frame(json!({ "avg_frame_rate": "0/0", "r_frame_rate": "0/0" })),
+            None
+        );
+        assert_eq!(frame(json!({ "avg_frame_rate": "nonsense" })), None);
+        assert_eq!(frame(json!({})), None);
     }
 
     #[test]
