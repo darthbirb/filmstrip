@@ -52,17 +52,33 @@ export type BenchOptions = {
 // Covers the wait before the count, so no clip loops inside it.
 const LEAD = 6000;
 
-const movies = new Map<number, Promise<string>>();
+// The lead and three five-second spans, the timing test's count, so its warm-up records the clip
+// the count plays.
+const LEAST = LEAD + 15_000;
 
-/** One clip of this length for every bench, recorded the first time: it records in real time. */
-function movie(ms: number) {
-  let made = movies.get(ms);
-  if (!made) {
-    made = clip(VIDEO.width, VIDEO.height, ms);
-    movies.set(ms, made);
-  }
-  return made;
+/**
+ * A clip at least as long as asked, recorded `least` long or longer by `record` and kept for the
+ * next ask it is long enough for. A recording that fails is not kept.
+ */
+export function recordings(record: (ms: number) => Promise<string>, least: number) {
+  let kept: Recording | undefined;
+  return (ms: number): Recording => {
+    if (kept && kept.ms >= ms) return kept;
+    const length = Math.max(ms, least);
+    const made = { ms: length, url: record(length) };
+    kept = made;
+    made.url.catch(() => {
+      if (kept === made) kept = undefined;
+    });
+    return made;
+  };
 }
+
+/** A clip's length, and its object URL once recorded. */
+export type Recording = { ms: number; url: Promise<string> };
+
+/** One clip for every bench, recorded the first time: it records in real time. */
+const movie = recordings((ms) => clip(VIDEO.width, VIDEO.height, ms), LEAST);
 
 function detail(id: number, video: boolean, durationMs: number): ItemDetail {
   const shape = video ? VIDEO : PHOTO;
@@ -113,11 +129,13 @@ export async function benchSet(
     height = 900,
   }: BenchOptions = {},
 ): Promise<Bench> {
-  const length = LEAD + spans * ms;
+  const movieOf = clips > 0 ? movie(LEAD + spans * ms) : null;
+  const recorded = movieOf ? await movieOf.url : null;
   const isClip = (at: number) =>
     Math.floor(((at + 1) * clips) / count) > Math.floor((at * clips) / count);
-  const files = Array.from({ length: count }, (_, at) => detail(at + 1, isClip(at), length));
-  const recorded = clips > 0 ? await movie(length) : null;
+  const files = Array.from({ length: count }, (_, at) =>
+    detail(at + 1, isClip(at), movieOf?.ms ?? 0),
+  );
   const urls: Record<string, string> = {};
   for (const file of files) {
     urls[file.diskName] =
