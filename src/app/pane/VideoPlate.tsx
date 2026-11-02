@@ -38,6 +38,15 @@ const SPEED_OPTIONS = SPEEDS.map((value) => ({ value: String(value), label: spee
 
 type Playback = { paused: boolean; time: number; length: number };
 
+const SEEK_KEYS: Record<string, (playback: Playback) => number> = {
+  ArrowLeft: ({ time }) => time - STEP,
+  ArrowDown: ({ time }) => time - STEP,
+  ArrowRight: ({ time }) => time + STEP,
+  ArrowUp: ({ time }) => time + STEP,
+  Home: () => 0,
+  End: ({ length }) => length,
+};
+
 function read(video: HTMLVideoElement, known: number): Playback {
   const length = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : known;
   return { paused: video.paused, time: video.currentTime, length };
@@ -267,19 +276,11 @@ export function VideoPlate({ video, durationMs, frameUs = null, near = true }: P
     setHeld(seconds);
     playback.seek(seconds);
   };
-  const seekKeys: Record<string, () => number> = {
-    ArrowLeft: () => playback.time - STEP,
-    ArrowDown: () => playback.time - STEP,
-    ArrowRight: () => playback.time + STEP,
-    ArrowUp: () => playback.time + STEP,
-    Home: () => 0,
-    End: () => playback.length,
-  };
   const onSeekKeyDown = (event: KeyboardEvent) => {
-    const to = seekKeys[event.key];
+    const to = SEEK_KEYS[event.key];
     if (!to || event.ctrlKey || event.altKey || event.metaKey) return;
     event.preventDefault();
-    playback.seek(to());
+    playback.seek(to(playback));
   };
 
   const position = playback.length > 0 ? ((held ?? playback.time) / playback.length) * 100 : 0;
