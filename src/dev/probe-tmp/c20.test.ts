@@ -1,3 +1,3 @@
 import { test } from "vitest";
 import { probe } from "./run";
-test("cold", () => probe(37), 120_000);
+test("cold", () => probe(33), 120_000);

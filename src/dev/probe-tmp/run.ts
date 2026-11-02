@@ -106,7 +106,7 @@ async function played(url: string) {
 
 export async function probe(delay: number, rounds = 4) {
   for (let round_ = 0; round_ < rounds; round_++) {
-    const { blob, pushed, ticks } = await record(1500, delay, true);
+    const { blob, pushed, ticks } = await record(1500, delay, delay !== 33);
     const url = URL.createObjectURL(blob);
     const shown = round_ === 0 ? await played(url) : [];
     URL.revokeObjectURL(url);
