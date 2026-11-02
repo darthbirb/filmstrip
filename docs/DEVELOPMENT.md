@@ -101,7 +101,16 @@ Three ways, cheapest first.
   Windows and Chromium elsewhere, in the `en-GB` locale (`tests/browser.ts`). **Never jsdom** —
   see DECISIONS.md "Testing in a real browser, never jsdom".
 - **End-to-end tests** run in Playwright over `tests/e2e`, against the dev server on 1422.
-  Screenshots land in `test-results/`, which is git-ignored.
+  Screenshots land in `test-results/`, which is git-ignored. **A failed test leaves its trace
+  there**: a screenshot of the page as it failed, its accessibility tree in `error-context.md`,
+  and `trace.zip` with every step, console line and page error.
+  `npx playwright show-trace <path>/trace.zip` opens it. **The trace has no network log**: a
+  request that failed shows only where Edge logs it to the console, and one still pending at the
+  failure does not show at all. Playwright records the network only with DOM snapshots, and
+  those and the screencast would slow every passing test by a fifth.
+  **On CI, a failed end-to-end step uploads `test-results/`** as the artifact
+  `e2e-failures-<attempt>`, kept seven days. The run's Summary page lists it, or
+  `gh run download <run-id> -p "e2e-failures-*" -D <folder outside the repository>` fetches it.
 - **A check proves something at more than one size.** Sweep widths, and fail on any console
   error. One size proves one size.
 
