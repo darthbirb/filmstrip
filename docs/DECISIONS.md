@@ -722,6 +722,25 @@ and one height in justified rows is equal cells by another measure.
   does. Past the two, a clip holds on its first frame, and the one given the sound plays in place
   of the later of the two. The same test holds the two under one dropped frame in a hundred, in
   the middle of three five-second spans, so one hitch on a shared runner does not fail it.
+- **The test clip waits 37ms between frames, 74 after its first, in two timers.**
+  `src/dev/media.test.ts` holds every gap to the 33.3ms a window at 30 a second takes, and 34ms
+  left no room to. A recording keeps whole milliseconds and its stamps sit off the pushes, by up
+  to 3ms in CI's runs and quiet ones here, so 34ms showed 33 and 32 with no timer at fault, a late
+  timer only ever lengthening a gap. The first frame a page records came up to 6ms late. One timer
+  past 36ms lands on Windows' 15.6ms tick on the owner's machine and paces at 47ms, so the steady
+  wait is two; the first gap, which only lengthens, can spare it. The average cannot be the
+  measure: `setTimeout(33)` averaged 33.7ms there and 34 on CI, above the window, with up to two
+  gaps in five at 33 or less. So the test also holds the usual gap 3ms clear of the window, which
+  fails every run at 34ms. The counts above used 34ms.
+- **No pace bounds the stamps under heavy load, so the test can still fail there.** With 16
+  above-normal CPU hogs on 8 logical cores, 1 of 216 fresh pages failed the minimum: its gaps ran
+  74, 48, 32, 38 with every pushed gap 37.7ms or more, one frame stamped about 6ms off its
+  neighbours, which neither rounding nor the first frame explains. 34ms under that load would
+  have failed 23 of 72, shortest 29, and 18 of its 28 short gaps were not the first. Under 8
+  normal-priority hogs 96 of 96 passed, and idle 24 of 24. The same load also left one clip 22
+  gaps against the test's floor of more than 20, its playback having skipped frames. The pace is
+  not widened again for either. Forgiving a short gap that repays a long one would change what
+  the test's title promises, so that stays the owner's call.
 - **Videos loop from the start, muted**, each with its own mute; giving one the sound takes it
   from the one that had it, so one plays aloud at a time.
 - **A file with no shape stands in at the floor**, landscape, its extension on the hatch as the
