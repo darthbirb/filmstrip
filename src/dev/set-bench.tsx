@@ -7,9 +7,9 @@ import { addToPane, showInPane } from "../app/pane/pane-store";
 import type { ItemDetail } from "../ipc/bindings/ItemDetail";
 import { clip, photograph, serveFiles } from "./media";
 
-// Frame rate with several originals in the pane, which `pane-set` is set from. It runs in a
-// timing test, and in a headed browser on the dev server by importing this module there.
-// DECISIONS.md "Several files in the pane".
+// Frame rate, and the clips' dropped frames and pace, with several originals in the pane: what
+// `pane-set` and `pane-set-playing` are held to. It runs in a timing test, and in a headed browser
+// on the dev server by importing this module there. DECISIONS.md "Several files in the pane".
 
 const PHOTO = { width: 6000, height: 4000 };
 const VIDEO = { width: 1920, height: 1080 };
@@ -28,6 +28,8 @@ export type Bench = {
   due: number;
   /** The same, span by span. */
   spans: Span[];
+  /** How far the clips' clocks moved over the count against the window's, on average; 1 on time. */
+  pace: number;
 };
 
 /** What the window does while its frames are counted. */
@@ -195,6 +197,8 @@ export async function benchSet(
     const quality = () => videos.map((one) => one.getVideoPlaybackQuality());
     const marks = [quality()];
     const times = videos.map((one) => one.currentTime);
+    const clocks = [...times];
+    const counted = performance.now();
     let looped = false;
     let start: number | undefined;
     const drawn = await frames(spans * ms, (now) => {
@@ -211,6 +215,12 @@ export async function benchSet(
       if (now - start >= marks.length * ms && marks.length < spans) marks.push(quality());
     });
     marks.push(quality());
+    const moved = videos.reduce(
+      (sum, one, index) => sum + one.currentTime - (clocks[index] ?? 0),
+      0,
+    );
+    const pace =
+      videos.length > 0 ? moved / videos.length / ((performance.now() - counted) / 1000) : 1;
     if (looped) throw new Error("a clip looped inside the count, which its own seam can drop");
     const span = (from: VideoPlaybackQuality[], to: VideoPlaybackQuality[]): Span => {
       const total = (pick: (one: VideoPlaybackQuality) => number) =>
@@ -227,7 +237,7 @@ export async function benchSet(
     const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
     const late = intervals.filter((gap) => gap > median * 1.5).length;
     const rate = (drawn.length - 1) / (((drawn.at(-1) ?? 0) - (drawn[0] ?? 0)) / 1000);
-    return { rate, median, late, intervals: intervals.length, ...whole, spans: each };
+    return { rate, median, late, intervals: intervals.length, ...whole, spans: each, pace };
   } finally {
     react.unmount();
     host.remove();
