@@ -14,8 +14,11 @@ import { clip, photograph, serveFiles } from "./media";
 const PHOTO = { width: 6000, height: 4000 };
 const VIDEO = { width: 1920, height: 1080 };
 
-/** Of the frames the clips were due to show over a span of the count, how many they dropped. */
-export type Span = { dropped: number; due: number };
+/**
+ * Of the frames the clips were due to show over a span of the count, how many they dropped, and
+ * how far their clocks moved against the window's, on average: 1 keeps time.
+ */
+export type Span = { dropped: number; due: number; pace: number };
 
 /** Frames a second, the median gap between them, how many came late, and the clips' own frames. */
 export type Bench = {
@@ -26,10 +29,9 @@ export type Bench = {
   /** Of the frames the clips were due to show over the whole count, how many they dropped. */
   dropped: number;
   due: number;
+  pace: number;
   /** The same, span by span. */
   spans: Span[];
-  /** How far the clips' clocks moved over the count against the window's, on average; 1 on time. */
-  pace: number;
 };
 
 /** What the window does while its frames are counted. */
@@ -192,11 +194,15 @@ export async function benchSet(
     // Settled, so the first decodes are not what is counted: a second, and every clip a second in.
     await frames(1000);
     await until(() => videos.every((one) => one.getVideoPlaybackQuality().totalVideoFrames >= 30));
-    const quality = () => videos.map((one) => one.getVideoPlaybackQuality());
-    const marks = [quality()];
-    const times = videos.map((one) => one.currentTime);
-    const clocks = [...times];
-    const counted = performance.now();
+    type Mark = { at: number; quality: VideoPlaybackQuality[]; clocks: number[] };
+    const mark = (): Mark => ({
+      at: performance.now(),
+      quality: videos.map((one) => one.getVideoPlaybackQuality()),
+      clocks: videos.map((one) => one.currentTime),
+    });
+    const begun = mark();
+    const marks = [begun];
+    const times = [...begun.clocks];
     let looped = false;
     let start: number | undefined;
     const drawn = await frames(spans * ms, (now) => {
@@ -210,32 +216,34 @@ export async function benchSet(
         if (one.currentTime < (times[index] ?? 0)) looped = true;
         times[index] = one.currentTime;
       });
-      if (now - start >= marks.length * ms && marks.length < spans) marks.push(quality());
+      if (now - start >= marks.length * ms && marks.length < spans) marks.push(mark());
     });
-    marks.push(quality());
-    const moved = videos.reduce(
-      (sum, one, index) => sum + one.currentTime - (clocks[index] ?? 0),
-      0,
-    );
-    const pace =
-      videos.length > 0 ? moved / videos.length / ((performance.now() - counted) / 1000) : 1;
+    marks.push(mark());
     if (looped) throw new Error("a clip looped inside the count, which its own seam can drop");
-    const span = (from: VideoPlaybackQuality[], to: VideoPlaybackQuality[]): Span => {
+    const span = (from: Mark, to: Mark): Span => {
       const total = (pick: (one: VideoPlaybackQuality) => number) =>
-        to.reduce((sum, one, index) => sum + pick(one) - pick(from[index] ?? one), 0);
+        to.quality.reduce(
+          (sum, one, index) => sum + pick(one) - pick(from.quality[index] ?? one),
+          0,
+        );
+      const moved = to.clocks.reduce(
+        (sum, one, index) => sum + one - (from.clocks[index] ?? one),
+        0,
+      );
       return {
         dropped: total((one) => one.droppedVideoFrames),
         due: total((one) => one.totalVideoFrames),
+        pace: videos.length > 0 ? moved / videos.length / ((to.at - from.at) / 1000) : 1,
       };
     };
-    const each = marks.slice(1).map((to, index) => span(marks[index] ?? to, to));
-    const whole = span(marks[0] ?? [], marks.at(-1) ?? []);
+    const each = marks.slice(1).map((to, index) => span(marks[index] ?? begun, to));
+    const whole = span(begun, marks.at(-1) ?? begun);
     const intervals = drawn.slice(1).map((at, index) => at - (drawn[index] ?? at));
     const sorted = [...intervals].sort((a, b) => a - b);
     const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
     const late = intervals.filter((gap) => gap > median * 1.5).length;
     const rate = (drawn.length - 1) / (((drawn.at(-1) ?? 0) - (drawn[0] ?? 0)) / 1000);
-    return { rate, median, late, intervals: intervals.length, ...whole, spans: each, pace };
+    return { rate, median, late, intervals: intervals.length, ...whole, spans: each };
   } finally {
     react.unmount();
     host.remove();
