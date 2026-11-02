@@ -10,6 +10,9 @@ export default defineConfig({
     launchOptions,
     locale,
     baseURL: "http://localhost:1422",
+    // A trace's DOM snapshots and screencast slow every passing test by a fifth. DEVELOPMENT.md "Tests".
+    trace: { mode: "retain-on-failure", snapshots: false, screenshots: false },
+    screenshot: "only-on-failure",
   },
   webServer: {
     command: "npm run dev -- --port 1422",
