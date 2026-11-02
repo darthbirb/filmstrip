@@ -734,16 +734,22 @@ and one height in justified rows is equal cells by another measure.
   shows the picture slowed. The window held its 30 a second through six, and ran off it past.
   Six is where it goes here, the clips at 0.90 pace, and CI held six and fell at eight. Five held
   on both, but at 131 of the 141 here, and a clip at 30 a second rather than the test's 26 would
-  take 150 at five and 120 at four. So four.
+  take 150 at five and 120 at four. So four. **It holds for the bench's clip, not for footage.**
+  That clip is a MediaRecorder WebM, VP8 of flat colour at about 26 a second, which the browser
+  decodes in software. Phone footage at 60 a second in H.264 or HEVC, which WebView2 usually
+  decodes in hardware, is not measured, and the budget above does not carry to it either way.
+  #158 counts the edge with such clips.
 
   **One noisy span does not set the edge.** Three dropped 8 of 392 in one span of one run, the
   rest none, and four dropped in 3 of its 27 spans, 15 of 520 at most, while five above them
-  dropped none in six runs; six dropped in every span of every run. A count is judged across its runs, never by one
-  span, and the test takes the middle of three spans, so one hitch on a shared runner does not
-  fail it. **The dropped share alone does not see six:** its middle span dropped 0.84%, under the
-  bound of one in a hundred, with the clips at 0.90. So the test holds the four under that bound
-  and their pace above 0.95, halfway between 0.998, the slowest that held, and 0.902, the fastest
-  that fell. Set to six, it fails on the pace alone.
+  dropped none in six runs; six dropped in every span of every run. A count is judged across its
+  runs, never by one span, and the test takes the middle of three spans for both its bounds, so
+  one hitch on a shared runner fails neither. **The dropped share alone does not see six:** its
+  middle span dropped 0.84%, under the bound of one in a hundred, with the clips at 0.90. So the
+  test holds the four under that bound and their pace above 0.95, halfway between 0.998, the
+  slowest that held, and 0.902, the fastest that fell. Set to six, it failed on the pace alone,
+  0.902 over the count. No span is near the line: six's 30 spans here were due 694 to 719 frames,
+  0.885 to 0.917 of what clips keeping time show, and four's lowest was 0.98.
 
   Two stood before this: it was set from counts that measured the test clip, not the window, and
   on 26 October 2026, with a 34ms clip, two, three, four and six dropped none here and on CI, a
