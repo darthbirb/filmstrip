@@ -649,6 +649,7 @@ mod tests {
     use crate::fs::stayed::Whereabouts;
     use crate::fs::undo;
     use std::cell::{Cell, RefCell};
+    use std::rc::Rc;
 
     /// A library with Trips/Lisbon, holding tram.jpg, and beside it Downloads, outside the library.
     fn library(name: &str) -> (Connection, PathBuf, i64) {
@@ -721,6 +722,18 @@ mod tests {
             .collect();
         names.sort();
         names
+    }
+
+    /// Holds `dir` to `names` once a file another program puts beside them for a moment, as some
+    /// do when a file just written moves away, has gone again.
+    fn settles_to(dir: &Path, names: &[&str]) {
+        let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let mut seen = names_in(dir);
+        while seen != names && std::time::Instant::now() < until {
+            std::thread::sleep(std::time::Duration::from_millis(1));
+            seen = names_in(dir);
+        }
+        assert_eq!(seen, names);
     }
 
     #[test]
@@ -1015,7 +1028,7 @@ mod tests {
         let back = undo::undo_batch(&conn, &batch).unwrap();
         assert!(back.stayed.is_empty(), "{:?}", back.stayed);
         assert_eq!((back.files_back, back.folders_back), (2, 2));
-        assert_eq!(names_in(&dir.join("library/Trips/Lisbon")), ["tram.jpg"]);
+        settles_to(&dir.join("library/Trips/Lisbon"), &["tram.jpg"]);
         assert!(came.iter().all(|id| rows::is_trashed(&conn, *id).unwrap()));
         assert!(dir.join("Downloads/Alexandria/Day 1/a.jpg").is_file());
         assert!(loose.is_file(), "undo never touches the originals");
@@ -1035,6 +1048,56 @@ mod tests {
             again.unwrap().refused.is_empty(),
             "the names are free again"
         );
+    }
+
+    #[test]
+    fn undo_takes_away_a_folder_another_program_put_a_file_in_for_a_moment() {
+        let (conn, dir, lisbon) = library("undo-past-theirs");
+        write(&dir.join("Downloads/Alexandria/a.jpg"), "a");
+        let batch = journal::new_batch();
+        let entries = [dir.join("Downloads/Alexandria")];
+        run(&conn, &batch, lisbon, &entries, &Script::default()).unwrap();
+        let tries = Rc::new(Cell::new(0));
+        let counted = Rc::clone(&tries);
+        crate::fs::folders::just_before_taking_away(move |at| {
+            counted.set(counted.get() + 1);
+            match counted.get() {
+                1 => std::fs::write(at.join("A.JPG.tmp"), "theirs").unwrap(),
+                2 => std::fs::remove_file(at.join("A.JPG.tmp")).unwrap(),
+                _ => {}
+            }
+        });
+
+        let back = undo::undo_batch(&conn, &batch).unwrap();
+        assert!(back.stayed.is_empty(), "{:?}", back.stayed);
+        assert_eq!((back.files_back, back.folders_back), (1, 1));
+        assert_eq!(tries.get(), 2);
+        settles_to(&dir.join("library/Trips/Lisbon"), &["tram.jpg"]);
+        assert_eq!(
+            folders::child_id(&conn, lisbon, "Alexandria").unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn a_file_put_in_a_folder_the_copy_made_keeps_it_through_undo() {
+        let (conn, dir, lisbon) = library("undo-kept");
+        write(&dir.join("Downloads/Alexandria/a.jpg"), "a");
+        let batch = journal::new_batch();
+        let entries = [dir.join("Downloads/Alexandria")];
+        run(&conn, &batch, lisbon, &entries, &Script::default()).unwrap();
+        let theirs = write(&dir.join("library/Trips/Lisbon/Alexandria/theirs.jpg"), "t");
+
+        let back = undo::undo_batch(&conn, &batch).unwrap();
+        assert_eq!((back.files_back, back.folders_back), (1, 0));
+        assert_eq!(back.stayed.len(), 1, "{:?}", back.stayed);
+        assert!(theirs.is_file(), "an undo never destroys");
+        assert!(
+            folders::child_id(&conn, lisbon, "Alexandria")
+                .unwrap()
+                .is_some()
+        );
+        assert_eq!(journal::latest_batch(&conn).unwrap(), Some(batch));
     }
 
     #[test]
@@ -1082,7 +1145,7 @@ mod tests {
         crate::db::jobs::complete(&conn, job).unwrap();
         let back = undo::undo_last(&conn).unwrap().unwrap();
         assert_eq!((back.batch.batch_id, back.files_back), (batch, 4));
-        assert_eq!(names_in(&lisbon_dir), ["tram.jpg"]);
+        settles_to(&lisbon_dir, &["tram.jpg"]);
     }
 
     #[test]
@@ -1126,7 +1189,7 @@ mod tests {
         let back = undo::undo_batch(&conn, &batch).unwrap();
         assert!(back.stayed.is_empty(), "{:?}", back.stayed);
         assert_eq!((back.files_back, back.folders_back), (4, 3));
-        assert_eq!(names_in(&porto), ["tram.jpg"]);
+        settles_to(&porto, &["tram.jpg"]);
     }
 
     #[test]
@@ -1198,7 +1261,7 @@ mod tests {
         assert!(back.stayed.is_empty(), "{:?}", back.stayed);
         assert_eq!(back.files_back, 2);
         assert!(journal::batch(&conn, &batch).unwrap().is_empty());
-        assert_eq!(names_in(&lisbon_dir), ["tram.jpg"]);
+        settles_to(&lisbon_dir, &["tram.jpg"]);
         assert_eq!(undo::undo_last(&conn).unwrap(), None);
     }
 
@@ -1228,7 +1291,7 @@ mod tests {
         assert!(back.stayed.is_empty(), "{:?}", back.stayed);
         assert_eq!((back.files_back, back.folders_back), (1, 1));
         assert!(journal::batch(&conn, &batch).unwrap().is_empty());
-        assert_eq!(names_in(&dir.join("library/Trips/Lisbon")), ["tram.jpg"]);
+        settles_to(&dir.join("library/Trips/Lisbon"), &["tram.jpg"]);
         assert_eq!(undo::undo_last(&conn).unwrap(), None);
     }
 
@@ -1252,7 +1315,7 @@ mod tests {
         let back = undo::undo_batch(&conn, &batch).unwrap();
         assert!(back.stayed.is_empty(), "{:?}", back.stayed);
         assert_eq!(back.files_back, 1);
-        assert_eq!(names_in(&dir.join("library/Trips/Lisbon")), ["tram.jpg"]);
+        settles_to(&dir.join("library/Trips/Lisbon"), &["tram.jpg"]);
     }
 
     #[test]

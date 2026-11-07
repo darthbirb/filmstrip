@@ -291,6 +291,28 @@ mod tests {
     }
 
     #[test]
+    fn a_folder_made_goes_once_another_programs_file_has_passed_through_it() {
+        let dir = scratch("passing");
+        let (conn, trips) = library(&dir);
+        let batch = journal::new_batch();
+        folders::create(&conn, trips, "Lisbon", &batch).unwrap();
+        let mut tries = 0;
+        folders::just_before_taking_away(move |at| {
+            tries += 1;
+            match tries {
+                1 => std::fs::write(at.join("TRAM.JPG.tmp"), "theirs").unwrap(),
+                2 => std::fs::remove_file(at.join("TRAM.JPG.tmp")).unwrap(),
+                _ => {}
+            }
+        });
+
+        let report = undo_batch(&conn, &batch).unwrap();
+        assert_eq!((report.folders_back, report.stayed.len()), (1, 0));
+        assert!(!dir.join("library/Trips/Lisbon").exists());
+        assert_eq!(journal::latest_batch(&conn).unwrap(), None);
+    }
+
+    #[test]
     fn a_batch_already_undone_cannot_be_undone_twice() {
         let dir = scratch("twice");
         let (conn, trips) = library(&dir);

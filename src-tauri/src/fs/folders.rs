@@ -3,6 +3,7 @@
 //! change is journalled, so it can be undone. DECISIONS.md "Undo".
 
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
@@ -368,7 +369,7 @@ pub(super) fn unmake(conn: &Connection, folder_id: i64) -> Result<()> {
         )));
     }
     let dir = paths::folder_dir(conn, folder_id)?;
-    match std::fs::remove_dir(&dir) {
+    match take_away(&dir) {
         Ok(()) => {}
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
         // Files the index has not read yet: removing the directory would take them with it.
@@ -393,12 +394,65 @@ pub(super) fn unmake_copy(conn: &Connection, folder_id: i64) -> Result<()> {
     if folders::holds_anything(conn, folder_id)? {
         return Err(holds());
     }
-    match std::fs::remove_dir(paths::folder_dir(conn, folder_id)?) {
+    match take_away(&paths::folder_dir(conn, folder_id)?) {
         Ok(()) => {}
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
         Err(_) => return Err(holds()),
     }
     folders::retire_subtree_at(conn, folder_id, now()).map(|_| ())
+}
+
+/// How long a directory an undo takes away may hold another program's file before it stays.
+const PASSING: Duration = Duration::from_millis(250);
+
+/// Removes a directory an undo takes away, only ever while it is empty, trying again while
+/// another program's file passes through it. DECISIONS.md "Undo".
+fn take_away(dir: &Path) -> std::io::Result<()> {
+    let until = Instant::now() + PASSING;
+    let mut meanwhile = meanwhile();
+    loop {
+        meanwhile(dir);
+        match std::fs::remove_dir(dir) {
+            Err(err)
+                if err.kind() == std::io::ErrorKind::DirectoryNotEmpty
+                    && Instant::now() < until =>
+            {
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            done => return done,
+        }
+    }
+}
+
+#[cfg(test)]
+type Meanwhile = Box<dyn FnMut(&Path)>;
+
+#[cfg(test)]
+thread_local! {
+    static JUST_BEFORE: std::cell::RefCell<Option<Meanwhile>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Runs `then` with the directory this thread's next undo takes away, just before each try at
+/// it: where a test puts what another program leaves there.
+#[cfg(test)]
+pub(crate) fn just_before_taking_away(then: impl FnMut(&Path) + 'static) {
+    JUST_BEFORE.with(|hook| *hook.borrow_mut() = Some(Box::new(then)));
+}
+
+#[cfg(test)]
+fn meanwhile() -> impl FnMut(&Path) {
+    let mut hook = JUST_BEFORE.with(|hook| hook.borrow_mut().take());
+    move |dir| {
+        if let Some(then) = hook.as_mut() {
+            then(dir);
+        }
+    }
+}
+
+#[cfg(not(test))]
+fn meanwhile() -> impl FnMut(&Path) {
+    |_| {}
 }
 
 fn refuse_clash(conn: &Connection, parent_id: i64, title: &str, own: Option<i64>) -> Result<()> {
