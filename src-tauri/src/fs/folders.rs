@@ -409,9 +409,13 @@ const PASSING: Duration = Duration::from_millis(250);
 /// another program's file passes through it. DECISIONS.md "Undo".
 fn take_away(dir: &Path) -> std::io::Result<()> {
     let until = Instant::now() + PASSING;
-    let mut meanwhile = meanwhile();
+    #[cfg(test)]
+    let mut meanwhile = JUST_BEFORE.with(|hook| hook.borrow_mut().take());
     loop {
-        meanwhile(dir);
+        #[cfg(test)]
+        if let Some(then) = meanwhile.as_mut() {
+            then(dir);
+        }
         match std::fs::remove_dir(dir) {
             Err(err)
                 if err.kind() == std::io::ErrorKind::DirectoryNotEmpty
@@ -440,21 +444,6 @@ pub(crate) fn just_before_taking_away(then: impl FnMut(&Path) + 'static) {
     JUST_BEFORE.with(|hook| *hook.borrow_mut() = Some(Box::new(then)));
 }
 
-#[cfg(test)]
-fn meanwhile() -> impl FnMut(&Path) {
-    let mut hook = JUST_BEFORE.with(|hook| hook.borrow_mut().take());
-    move |dir| {
-        if let Some(then) = hook.as_mut() {
-            then(dir);
-        }
-    }
-}
-
-#[cfg(not(test))]
-fn meanwhile() -> impl FnMut(&Path) {
-    |_| {}
-}
-
 fn refuse_clash(conn: &Connection, parent_id: i64, title: &str, own: Option<i64>) -> Result<()> {
     match folders::child_id(conn, parent_id, title)? {
         Some(id) if Some(id) != own => Err(taken(conn, parent_id, title)),
@@ -478,7 +467,7 @@ mod tests {
     use super::*;
     use crate::db::sources::SourceKind;
     use crate::db::{self, sources};
-    use crate::fs::walk;
+    use crate::fs::{names_in, walk};
     use std::path::{Path, PathBuf};
 
     fn scratch(name: &str) -> PathBuf {
@@ -669,15 +658,6 @@ mod tests {
             std::fs::create_dir(to).unwrap();
             std::fs::write(to.join("theirs.jpg"), "theirs").unwrap();
         });
-    }
-
-    fn names_in(dir: &Path) -> Vec<String> {
-        let mut names: Vec<String> = std::fs::read_dir(dir)
-            .unwrap()
-            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
-            .collect();
-        names.sort();
-        names
     }
 
     #[test]

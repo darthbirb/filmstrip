@@ -613,7 +613,7 @@ fn copy(
 mod tests {
     use super::*;
     use crate::db::{self, sources::SourceKind};
-    use crate::fs::walk;
+    use crate::fs::{settles_to, walk};
     use std::cell::{Cell, RefCell};
 
     /// Pictures holds cover.jpg and Trips, with two files and Cairo under it; the Sorting Box's
@@ -703,13 +703,6 @@ mod tests {
             assert!(!part.exists(), "the part never outlives the export");
             (outcome, dest)
         }
-
-        fn leftovers(&self) -> Vec<String> {
-            std::fs::read_dir(self.dir.join("Exports"))
-                .unwrap()
-                .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
-                .collect()
-        }
     }
 
     type Meanwhile = Box<dyn FnOnce()>;
@@ -795,7 +788,7 @@ mod tests {
             lib.dir.join("pictures/Trips/Cairo/pyramid.jpg").is_file(),
             "the library is only read"
         );
-        assert_eq!(lib.leftovers(), ["Trips.zip"]);
+        settles_to(&lib.dir.join("Exports"), &["Trips.zip"]);
     }
 
     #[test]
@@ -887,7 +880,7 @@ mod tests {
             assert_eq!(outcome.end, End::Cancelled);
             assert_eq!(outcome.closed, halt == Halt::Stop);
             assert!(!zip.exists());
-            assert!(lib.leftovers().is_empty(), "{:?}", lib.leftovers());
+            settles_to(&lib.dir.join("Exports"), &[]);
         }
     }
 
@@ -952,7 +945,7 @@ mod tests {
         let (outcome, _) = lib.export(&scope, Naming::Keep, &Script::default());
         assert_eq!(outcome.end, End::Taken);
         assert_eq!(std::fs::read_to_string(&dest).unwrap(), "theirs");
-        assert_eq!(lib.leftovers(), ["Trips.zip"]);
+        settles_to(&lib.dir.join("Exports"), &["Trips.zip"]);
 
         std::fs::remove_file(&dest).unwrap();
         let theirs = dest.clone();
@@ -960,7 +953,7 @@ mod tests {
         let (outcome, _) = lib.export(&scope, Naming::Keep, &script);
         assert_eq!(outcome.end, End::Taken);
         assert_eq!(std::fs::read_to_string(&dest).unwrap(), "theirs");
-        assert_eq!(lib.leftovers(), ["Trips.zip"]);
+        settles_to(&lib.dir.join("Exports"), &["Trips.zip"]);
     }
 
     #[test]
@@ -1105,7 +1098,7 @@ mod tests {
         );
         assert_eq!((outcome.end, outcome.skipped.len()), (End::Nothing, 1));
         assert!(!zip.exists());
-        assert!(lib.leftovers().is_empty());
+        settles_to(&lib.dir.join("Exports"), &[]);
     }
 
     #[test]
