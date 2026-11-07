@@ -647,7 +647,7 @@ mod tests {
     use crate::db::{self, items as rows};
     use crate::fs::acts::Act;
     use crate::fs::stayed::Whereabouts;
-    use crate::fs::{names_in, settles_to, undo};
+    use crate::fs::{settles_to, undo};
     use std::cell::{Cell, RefCell};
     use std::rc::Rc;
 
@@ -778,7 +778,7 @@ mod tests {
         let outcome = run(&conn, &batch, lisbon, &entries, &Script::default()).unwrap();
         assert_eq!((outcome.whole, outcome.done), (2, 2));
         let landed = dir.join("library/Trips/Lisbon/Alexandria");
-        assert_eq!(names_in(&landed), ["Day 1", "Day 2"]);
+        settles_to(&landed, &["Day 1", "Day 2"]);
         assert!(landed.join("Day 1/a.jpg").is_file());
         assert!(landed.join("Day 2/b.jpg").is_file());
         let alexandria = folders::child_id(&conn, lisbon, "Alexandria")
@@ -1043,7 +1043,7 @@ mod tests {
             counted.set(counted.get() + 1);
             match counted.get() {
                 1 => std::fs::write(at.join("A.JPG.tmp"), "theirs").unwrap(),
-                2 => std::fs::remove_file(at.join("A.JPG.tmp")).unwrap(),
+                2 => crate::fs::remove_once_let_go(&at.join("A.JPG.tmp")),
                 _ => {}
             }
         });
@@ -1158,7 +1158,7 @@ mod tests {
         );
         assert!(porto.join("Alexandria/Day 1/a.jpg").is_file());
         assert!(porto.join("Alexandria/Day 2/b.jpg").is_file());
-        assert!(names_in(&dir.join("library/Trips/Lisbon")).is_empty());
+        settles_to(&dir.join("library/Trips/Lisbon"), &[]);
         let fresh = folders::child_id(&conn, trips, "Lisbon").unwrap().unwrap();
         assert!(rows::live_under(&conn, fresh).unwrap().is_empty());
         assert_eq!(rows::live_under(&conn, lisbon).unwrap().len(), 5);
@@ -1360,7 +1360,7 @@ mod tests {
                 folder: true
             }
         );
-        assert_eq!(names_in(&theirs), ["theirs.jpg"]);
+        settles_to(&theirs, &["theirs.jpg"]);
         assert!(journal::batch(&conn, &batch).unwrap().is_empty());
     }
 
@@ -1535,6 +1535,6 @@ mod tests {
         )
         .unwrap();
         assert_eq!(outcome.refused[0].reason, Reason::InUse);
-        assert_eq!(names_in(&dir.join("library/Trips/Lisbon")), ["tram.jpg"]);
+        settles_to(&dir.join("library/Trips/Lisbon"), &["tram.jpg"]);
     }
 }

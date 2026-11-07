@@ -27,7 +27,7 @@ pub fn turn() -> MutexGuard<'static, ()> {
 
 /// The names in `dir`, sorted.
 #[cfg(test)]
-pub(crate) fn names_in(dir: &std::path::Path) -> Vec<String> {
+fn names_in(dir: &std::path::Path) -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(dir)
         .unwrap()
         .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
@@ -57,4 +57,22 @@ pub(crate) fn settled_names(
 #[cfg(test)]
 pub(crate) fn settles_to(dir: &std::path::Path, names: &[&str]) {
     assert_eq!(settled_names(dir, |seen| seen == names), names);
+}
+
+/// Removes `file` once another program that opened it, as some do a file just written, lets go.
+#[cfg(test)]
+pub(crate) fn remove_once_let_go(file: &std::path::Path) {
+    const SHARING_VIOLATION: i32 = 32;
+    let until = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        match std::fs::remove_file(file) {
+            Err(err)
+                if err.raw_os_error() == Some(SHARING_VIOLATION)
+                    && std::time::Instant::now() < until =>
+            {
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+            done => return done.unwrap(),
+        }
+    }
 }

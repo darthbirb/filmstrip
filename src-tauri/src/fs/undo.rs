@@ -304,7 +304,7 @@ mod tests {
             counted.set(counted.get() + 1);
             match counted.get() {
                 1 => std::fs::write(at.join("TRAM.JPG.tmp"), "theirs").unwrap(),
-                2 => std::fs::remove_file(at.join("TRAM.JPG.tmp")).unwrap(),
+                2 => crate::fs::remove_once_let_go(&at.join("TRAM.JPG.tmp")),
                 _ => {}
             }
         });

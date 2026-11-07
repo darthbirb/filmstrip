@@ -467,7 +467,7 @@ mod tests {
     use super::*;
     use crate::db::sources::SourceKind;
     use crate::db::{self, sources};
-    use crate::fs::{names_in, walk};
+    use crate::fs::{settles_to, walk};
     use std::path::{Path, PathBuf};
 
     fn scratch(name: &str) -> PathBuf {
@@ -546,11 +546,7 @@ mod tests {
         assert_eq!(journal::latest_batch(&conn).unwrap(), None);
 
         assert!(rename(&conn, cairo, "CAIRO", &journal::new_batch()).unwrap());
-        let names: Vec<String> = std::fs::read_dir(root.join("Trips"))
-            .unwrap()
-            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
-            .collect();
-        assert_eq!(names, ["CAIRO"]);
+        settles_to(&root.join("Trips"), &["CAIRO"]);
     }
 
     #[test]
@@ -671,8 +667,8 @@ mod tests {
             Reason::of(&err),
             Reason::NameTaken { folder: true, .. }
         ));
-        assert_eq!(names_in(&root.join("Trips/Giza")), ["theirs.jpg"]);
-        assert_eq!(names_in(&root.join("Trips/Cairo")), ["pyramid.jpg"]);
+        settles_to(&root.join("Trips/Giza"), &["theirs.jpg"]);
+        settles_to(&root.join("Trips/Cairo"), &["pyramid.jpg"]);
         assert_eq!(
             folders::title(&conn, cairo).unwrap().as_deref(),
             Some("Cairo")
@@ -693,8 +689,8 @@ mod tests {
             Reason::of(&err),
             Reason::NameTaken { folder: true, .. }
         ));
-        assert_eq!(names_in(&root.join("People/Cairo")), ["theirs.jpg"]);
-        assert_eq!(names_in(&root.join("Trips/Cairo")), ["pyramid.jpg"]);
+        settles_to(&root.join("People/Cairo"), &["theirs.jpg"]);
+        settles_to(&root.join("Trips/Cairo"), &["pyramid.jpg"]);
         assert_eq!(folders::parent(&conn, cairo).unwrap(), Some(trips));
     }
 
@@ -712,8 +708,8 @@ mod tests {
             back.stayed[0].reason,
             Reason::NameTaken { folder: true, .. }
         ));
-        assert_eq!(names_in(&root.join("Trips/Cairo")), ["theirs.jpg"]);
-        assert_eq!(names_in(&root.join("Trips/Giza")), ["pyramid.jpg"]);
+        settles_to(&root.join("Trips/Cairo"), &["theirs.jpg"]);
+        settles_to(&root.join("Trips/Giza"), &["pyramid.jpg"]);
     }
 
     #[test]
@@ -730,7 +726,7 @@ mod tests {
             back.stayed[0].reason,
             Reason::NameTaken { folder: true, .. }
         ));
-        assert_eq!(names_in(&root.join("Trips/Lisbon")), ["theirs.jpg"]);
+        settles_to(&root.join("Trips/Lisbon"), &["theirs.jpg"]);
         assert!(!folders::is_live(&conn, made).unwrap());
     }
 
