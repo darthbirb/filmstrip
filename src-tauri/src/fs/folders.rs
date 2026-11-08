@@ -3,6 +3,7 @@
 //! change is journalled, so it can be undone. DECISIONS.md "Undo".
 
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
@@ -368,7 +369,7 @@ pub(super) fn unmake(conn: &Connection, folder_id: i64) -> Result<()> {
         )));
     }
     let dir = paths::folder_dir(conn, folder_id)?;
-    match std::fs::remove_dir(&dir) {
+    match take_away(&dir) {
         Ok(()) => {}
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
         // Files the index has not read yet: removing the directory would take them with it.
@@ -393,12 +394,54 @@ pub(super) fn unmake_copy(conn: &Connection, folder_id: i64) -> Result<()> {
     if folders::holds_anything(conn, folder_id)? {
         return Err(holds());
     }
-    match std::fs::remove_dir(paths::folder_dir(conn, folder_id)?) {
+    match take_away(&paths::folder_dir(conn, folder_id)?) {
         Ok(()) => {}
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
         Err(_) => return Err(holds()),
     }
     folders::retire_subtree_at(conn, folder_id, now()).map(|_| ())
+}
+
+/// How long a directory an undo takes away may hold another program's file before it stays.
+const PASSING: Duration = Duration::from_millis(250);
+
+/// Removes a directory an undo takes away, only ever while it is empty, trying again while
+/// another program's file passes through it. DECISIONS.md "Undo".
+fn take_away(dir: &Path) -> std::io::Result<()> {
+    let until = Instant::now() + PASSING;
+    #[cfg(test)]
+    let mut meanwhile = JUST_BEFORE.with(|hook| hook.borrow_mut().take());
+    loop {
+        #[cfg(test)]
+        if let Some(then) = meanwhile.as_mut() {
+            then(dir);
+        }
+        match std::fs::remove_dir(dir) {
+            Err(err)
+                if err.kind() == std::io::ErrorKind::DirectoryNotEmpty
+                    && Instant::now() < until =>
+            {
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            done => return done,
+        }
+    }
+}
+
+#[cfg(test)]
+type Meanwhile = Box<dyn FnMut(&Path)>;
+
+#[cfg(test)]
+thread_local! {
+    static JUST_BEFORE: std::cell::RefCell<Option<Meanwhile>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Runs `then` with the directory this thread's next undo takes away, just before each try at
+/// it: where a test puts what another program leaves there.
+#[cfg(test)]
+pub(crate) fn just_before_taking_away(then: impl FnMut(&Path) + 'static) {
+    JUST_BEFORE.with(|hook| *hook.borrow_mut() = Some(Box::new(then)));
 }
 
 fn refuse_clash(conn: &Connection, parent_id: i64, title: &str, own: Option<i64>) -> Result<()> {
@@ -424,7 +467,7 @@ mod tests {
     use super::*;
     use crate::db::sources::SourceKind;
     use crate::db::{self, sources};
-    use crate::fs::walk;
+    use crate::fs::{settles_to, walk};
     use std::path::{Path, PathBuf};
 
     fn scratch(name: &str) -> PathBuf {
@@ -503,11 +546,7 @@ mod tests {
         assert_eq!(journal::latest_batch(&conn).unwrap(), None);
 
         assert!(rename(&conn, cairo, "CAIRO", &journal::new_batch()).unwrap());
-        let names: Vec<String> = std::fs::read_dir(root.join("Trips"))
-            .unwrap()
-            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
-            .collect();
-        assert_eq!(names, ["CAIRO"]);
+        settles_to(&root.join("Trips"), &["CAIRO"]);
     }
 
     #[test]
@@ -617,15 +656,6 @@ mod tests {
         });
     }
 
-    fn names_in(dir: &Path) -> Vec<String> {
-        let mut names: Vec<String> = std::fs::read_dir(dir)
-            .unwrap()
-            .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
-            .collect();
-        names.sort();
-        names
-    }
-
     #[test]
     fn a_rename_onto_a_folder_that_appeared_just_before_it_is_refused_and_both_stay() {
         let (conn, root, _, trips) = library("late-rename");
@@ -637,8 +667,8 @@ mod tests {
             Reason::of(&err),
             Reason::NameTaken { folder: true, .. }
         ));
-        assert_eq!(names_in(&root.join("Trips/Giza")), ["theirs.jpg"]);
-        assert_eq!(names_in(&root.join("Trips/Cairo")), ["pyramid.jpg"]);
+        settles_to(&root.join("Trips/Giza"), &["theirs.jpg"]);
+        settles_to(&root.join("Trips/Cairo"), &["pyramid.jpg"]);
         assert_eq!(
             folders::title(&conn, cairo).unwrap().as_deref(),
             Some("Cairo")
@@ -659,8 +689,8 @@ mod tests {
             Reason::of(&err),
             Reason::NameTaken { folder: true, .. }
         ));
-        assert_eq!(names_in(&root.join("People/Cairo")), ["theirs.jpg"]);
-        assert_eq!(names_in(&root.join("Trips/Cairo")), ["pyramid.jpg"]);
+        settles_to(&root.join("People/Cairo"), &["theirs.jpg"]);
+        settles_to(&root.join("Trips/Cairo"), &["pyramid.jpg"]);
         assert_eq!(folders::parent(&conn, cairo).unwrap(), Some(trips));
     }
 
@@ -678,8 +708,8 @@ mod tests {
             back.stayed[0].reason,
             Reason::NameTaken { folder: true, .. }
         ));
-        assert_eq!(names_in(&root.join("Trips/Cairo")), ["theirs.jpg"]);
-        assert_eq!(names_in(&root.join("Trips/Giza")), ["pyramid.jpg"]);
+        settles_to(&root.join("Trips/Cairo"), &["theirs.jpg"]);
+        settles_to(&root.join("Trips/Giza"), &["pyramid.jpg"]);
     }
 
     #[test]
@@ -696,7 +726,7 @@ mod tests {
             back.stayed[0].reason,
             Reason::NameTaken { folder: true, .. }
         ));
-        assert_eq!(names_in(&root.join("Trips/Lisbon")), ["theirs.jpg"]);
+        settles_to(&root.join("Trips/Lisbon"), &["theirs.jpg"]);
         assert!(!folders::is_live(&conn, made).unwrap());
     }
 

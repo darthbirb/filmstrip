@@ -1042,6 +1042,12 @@ it.
   journal as it comes back and what failed stays, so trying again takes back only what stayed.
 - **An undo never destroys.** A folder the app made is taken back only while it is still empty,
   on disk as well as in the index: files the index has not read yet would go with it otherwise.
+- **A folder that will not go is tried again for a quarter of a second.** Some programs put a
+  file of their own beside one just written as it moves away and take it back a millisecond or
+  two later: on the owner's machine, `A.JPG.tmp` beside `a.jpg`. An undo straight after a copy
+  moves exactly such files out, and the folder they leave would otherwise stay, said to hold
+  something it no longer does. Only the removal is tried again, which the disk refuses while
+  anything is in the directory, so a file that stays still keeps its folder.
 - **One change to the disk at a time.** A walk that read a directory while a verb renamed it would
   find the old name gone and retire everything under it. So the walk takes a turn per source and
   a verb waits for the turn, which bounds the wait by one source's walk, never the whole pass.

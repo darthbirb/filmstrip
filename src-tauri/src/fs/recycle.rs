@@ -343,6 +343,7 @@ impl Bin for RecycleBin {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+    use crate::fs::{settled_names, settles_to};
     use std::cell::RefCell;
 
     /// A stand-in for the shell, doing to each file what the real one might.
@@ -424,16 +425,6 @@ pub(crate) mod tests {
         dir
     }
 
-    fn names(dir: &Path) -> Vec<String> {
-        let mut found: Vec<String> = std::fs::read_dir(dir)
-            .unwrap()
-            .flatten()
-            .map(|entry| entry.file_name().to_string_lossy().into_owned())
-            .collect();
-        found.sort();
-        found
-    }
-
     /// `trash/one.jpg`, with `others` more names for it in `elsewhere/`, as a dedup tool or a
     /// link-based backup leaves a file.
     fn one_with_names(dir: &Path, others: u32) -> PathBuf {
@@ -457,7 +448,7 @@ pub(crate) mod tests {
             let recycled = dir.join("bin/one.jpg");
             assert_eq!(std::fs::read_to_string(&recycled).unwrap(), "one");
             assert_eq!(identity(&recycled).unwrap().links, others + 1);
-            assert!(names(&dir.join("trash")).is_empty());
+            settles_to(&dir.join("trash"), &[]);
         }
     }
 
@@ -471,7 +462,7 @@ pub(crate) mod tests {
         assert_eq!(send(&bin, &file).unwrap(), Sent::Refused);
         assert_eq!(bin.asked.borrow().as_slice(), std::slice::from_ref(&file));
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
-        assert_eq!(names(&dir.join("trash")), ["one.jpg"]);
+        settles_to(&dir.join("trash"), &["one.jpg"]);
         assert_eq!(identity(&file).unwrap().links, 1);
     }
 
@@ -486,7 +477,7 @@ pub(crate) mod tests {
                 Sent::Refused
             );
             assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
-            assert_eq!(names(&dir.join("trash")), ["one.jpg"]);
+            settles_to(&dir.join("trash"), &["one.jpg"]);
             assert_eq!(identity(&file).unwrap().links, others + 1);
         }
     }
@@ -502,7 +493,7 @@ pub(crate) mod tests {
                 Sent::Refused
             );
             assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
-            assert_eq!(names(&dir.join("trash")), ["one.jpg"]);
+            settles_to(&dir.join("trash"), &["one.jpg"]);
             assert_eq!(identity(&file).unwrap().links, others + 1);
         }
     }
@@ -514,7 +505,7 @@ pub(crate) mod tests {
 
         let bin = Fake::new(Stand::Relinks(dir.join("bin")));
         assert_eq!(send(&bin, &file).unwrap(), Sent::Recycled);
-        assert!(names(&dir.join("trash")).is_empty());
+        settles_to(&dir.join("trash"), &[]);
         assert_eq!(
             std::fs::read_to_string(dir.join("bin/one.jpg")).unwrap(),
             "one"
@@ -531,7 +522,7 @@ pub(crate) mod tests {
 
             let bin = Fake::new(Stand::DeletesWhileLinked(outside.clone()));
             assert_eq!(send(&bin, &file).unwrap(), Sent::Refused, "{others}");
-            assert_eq!(names(&dir.join("trash")), ["one.jpg"]);
+            settles_to(&dir.join("trash"), &["one.jpg"]);
             assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
             assert_eq!(identity(&file).unwrap().links, others + 2);
             assert!(
@@ -592,8 +583,11 @@ pub(crate) mod tests {
         let bin = Fake::new(Stand::Recycles(dir.join("bin")));
 
         assert_eq!(send(&bin, &file).unwrap(), Sent::Recycled);
-        assert!(names(&trash).is_empty());
-        assert_eq!(names(&dir.join("bin")).len(), 1);
+        settles_to(&trash, &[]);
+        assert_eq!(
+            settled_names(&dir.join("bin"), |seen| seen.len() == 1).len(),
+            1
+        );
     }
 
     #[test]
@@ -605,7 +599,7 @@ pub(crate) mod tests {
 
         assert_eq!(send(&bin, &file).unwrap(), Sent::Refused);
         assert!(bin.asked.borrow().is_empty());
-        assert_eq!(names(&dir.join("trash")), ["one.jpg"]);
+        settles_to(&dir.join("trash"), &["one.jpg"]);
         assert_eq!(identity(&file).unwrap().links, 2);
         assert!(!dir.join("bin").exists());
     }
@@ -626,13 +620,13 @@ pub(crate) mod tests {
             let sent = send(&bin, &file).unwrap();
             if deleted {
                 assert_eq!(sent, Sent::Refused);
-                assert_eq!(names(&dir.join("trash")), ["one.jpg"]);
+                settles_to(&dir.join("trash"), &["one.jpg"]);
                 assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
-                assert_eq!(names(&dir.join("bin")), ["$Rold.jpg"]);
+                settles_to(&dir.join("bin"), &["$Rold.jpg"]);
             } else {
                 assert_eq!(sent, Sent::Recycled);
-                assert!(names(&dir.join("trash")).is_empty());
-                assert_eq!(names(&dir.join("bin")), ["$Rold.jpg", "one.jpg"]);
+                settles_to(&dir.join("trash"), &[]);
+                settles_to(&dir.join("bin"), &["$Rold.jpg", "one.jpg"]);
             }
         }
     }
@@ -656,7 +650,7 @@ pub(crate) mod tests {
         std::fs::write(&file, "one").unwrap();
         std::fs::hard_link(&file, &hold).unwrap();
         assert_eq!(send(&bin, &file).unwrap(), Sent::Recycled);
-        assert!(names(&dir.join("trash")).is_empty());
+        settles_to(&dir.join("trash"), &[]);
 
         // Cut short after the shell deleted it outright: the hold is the file.
         std::fs::write(&hold, "two").unwrap();
@@ -665,7 +659,7 @@ pub(crate) mod tests {
             Sent::Refused
         );
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "two");
-        assert_eq!(names(&dir.join("trash")), ["one.jpg"]);
+        settles_to(&dir.join("trash"), &["one.jpg"]);
 
         // Cut short after the bin took it: the hold is the file again, and is sent once more.
         std::fs::hard_link(&file, &hold).unwrap();
@@ -673,7 +667,7 @@ pub(crate) mod tests {
         let again = Fake::new(Stand::Recycles(dir.join("bin")));
         assert_eq!(send(&again, &file).unwrap(), Sent::Recycled);
         assert_eq!(again.asked.borrow().as_slice(), std::slice::from_ref(&file));
-        assert!(names(&dir.join("trash")).is_empty());
+        settles_to(&dir.join("trash"), &[]);
         for twin in ["bin/two.jpg", "bin/one.jpg"] {
             assert_eq!(std::fs::read_to_string(dir.join(twin)).unwrap(), "two");
         }
@@ -693,7 +687,7 @@ pub(crate) mod tests {
             Sent::Refused
         );
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
-        assert_eq!(names(&dir.join("trash")), ["one.jpg"]);
+        settles_to(&dir.join("trash"), &["one.jpg"]);
         assert_eq!(identity(&file).unwrap().links, 2);
     }
 
@@ -731,15 +725,15 @@ pub(crate) mod tests {
         assert_eq!(std::fs::read_to_string(&orphan).unwrap(), "orphan");
         assert_eq!(std::fs::read_to_string(&linked).unwrap(), "linked");
         assert_eq!(identity(&linked).unwrap().links, 2);
-        assert_eq!(
-            names(&shard),
-            [
+        settles_to(
+            &shard,
+            &[
                 ".beside.jpg.recycling",
                 ".recycling",
                 "beside.jpg",
                 "linked.jpg",
-                "orphan.jpg"
-            ]
+                "orphan.jpg",
+            ],
         );
     }
 }

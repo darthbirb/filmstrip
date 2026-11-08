@@ -504,7 +504,7 @@ mod tests {
     use crate::db::sources::{self, SourceKind};
     use crate::db::{self, folders, items, journal, tags};
     use crate::fs::recycle::tests::{Fake, Stand};
-    use crate::fs::walk;
+    use crate::fs::{settled_names, walk};
     use std::cell::Cell;
 
     fn scratch(name: &str) -> PathBuf {
@@ -633,11 +633,9 @@ mod tests {
                 .unwrap();
             assert_eq!(mode, "delete", "a backup stands as one file");
         }
+        let no_part = |names: &[String]| names.iter().all(|name| !name.starts_with('.'));
         assert!(
-            std::fs::read_dir(&backups)
-                .unwrap()
-                .flatten()
-                .all(|entry| !entry.file_name().to_string_lossy().starts_with('.')),
+            no_part(&settled_names(&backups, no_part)),
             "no part is left behind"
         );
     }

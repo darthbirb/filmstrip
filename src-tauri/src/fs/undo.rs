@@ -178,7 +178,9 @@ mod tests {
     use crate::db::{self, folders as rows, sources};
     use crate::fs::acts::Act;
     use crate::fs::{folders, items, walk};
+    use std::cell::Cell;
     use std::path::{Path, PathBuf};
+    use std::rc::Rc;
     use std::sync::mpsc;
     use std::time::Duration;
 
@@ -288,6 +290,30 @@ mod tests {
         assert_eq!((report.folders_back, report.stayed.len()), (0, 1));
         assert!(dir.join("library/Trips/Lisbon/tram.jpg").is_file());
         assert_eq!(journal::latest_batch(&conn).unwrap(), Some(batch));
+    }
+
+    #[test]
+    fn a_folder_made_goes_once_another_programs_file_has_passed_through_it() {
+        let dir = scratch("passing");
+        let (conn, trips) = library(&dir);
+        let batch = journal::new_batch();
+        folders::create(&conn, trips, "Lisbon", &batch).unwrap();
+        let tries = Rc::new(Cell::new(0));
+        let counted = Rc::clone(&tries);
+        folders::just_before_taking_away(move |at| {
+            counted.set(counted.get() + 1);
+            match counted.get() {
+                1 => std::fs::write(at.join("TRAM.JPG.tmp"), "theirs").unwrap(),
+                2 => crate::fs::remove_once_let_go(&at.join("TRAM.JPG.tmp")),
+                _ => {}
+            }
+        });
+
+        let report = undo_batch(&conn, &batch).unwrap();
+        assert_eq!((report.folders_back, report.stayed.len()), (1, 0));
+        assert_eq!(tries.get(), 2);
+        assert!(!dir.join("library/Trips/Lisbon").exists());
+        assert_eq!(journal::latest_batch(&conn).unwrap(), None);
     }
 
     #[test]
