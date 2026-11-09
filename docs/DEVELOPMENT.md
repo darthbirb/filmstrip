@@ -97,6 +97,10 @@ Three ways, cheapest first.
   CI does both on every pull request. Run them after touching video. For video in `tauri dev`,
   fetch it beside the debug build:
   `pwsh scripts/fetch-ffmpeg.ps1 -Into src-tauri/target/debug/tools`.
+  The script tries the download four times, 15 seconds apart, before it fails, and CI keeps
+  what it fetched in its cache, keyed on the pinned version and SHA-256.
+  `pwsh scripts/fetch-ffmpeg.test.ps1 <temp>` checks the retries and the refusal against a server
+  of its own on `127.0.0.1`, downloading nothing; CI runs it in Gates.
 - **Component tests** run in Vitest's browser mode over `src/**/*.test.tsx`, on Edge under
   Windows and Chromium elsewhere, in the `en-GB` locale (`tests/browser.ts`). **Never jsdom** —
   see DECISIONS.md "Testing in a real browser, never jsdom".
