@@ -101,7 +101,10 @@ Three ways, cheapest first.
   Windows and Chromium elsewhere, in the `en-GB` locale (`tests/browser.ts`). **Never jsdom** —
   see DECISIONS.md "Testing in a real browser, never jsdom".
 - **End-to-end tests** run in Playwright over `tests/e2e`, against the dev server on 1422.
-  Screenshots land in `test-results/`, which is git-ignored. **A failed test leaves its trace
+  **They reach it at `127.0.0.1`, never `localhost`.** `localhost` names two loopback addresses
+  and Vite listens on only one of them, so any connection Edge opens to the other is refused and
+  the page depends on Edge falling back every time; `server.spec.ts` fails when an address the
+  suite names refuses. Screenshots land in `test-results/`, which is git-ignored. **A failed test leaves its trace
   there**: a screenshot of the page as it failed, its accessibility tree in `error-context.md`,
   and `trace.zip` with every step, console line and page error.
   `npx playwright show-trace <path>/trace.zip` opens it. **The trace has no network log**: a
