@@ -228,8 +228,10 @@ Nightly: it runs the Gates on `main`'s latest commit unless a push, scheduled or
 already passed on it. GitHub mails a scheduled run's failure to whoever last changed its
 schedule, the owner, as it mails a failed push run to the owner who merged. The Release workflow
 builds the Nightly only from a commit a run has passed on; otherwise it keeps the last one and
-says so in its summary, and the next day's runs try again. To test `main` sooner, run CI by hand
-from the Actions tab. Why a schedule: DECISIONS.md "Testing main on a schedule".
+says so in its summary, and the next day's runs try again. So a Release run by hand builds only
+once the Gates have passed on `main`'s latest commit: wait for that commit's push run to finish
+green first. To test `main` sooner, run CI by hand from the Actions tab. Why a schedule:
+DECISIONS.md "Testing main on a schedule".
 
 ## Porting from ggallery
 

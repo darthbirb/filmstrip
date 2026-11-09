@@ -37,6 +37,7 @@ jobs:
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          # The same query as ci.yml's Already passed job; change both together.
           runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&status=success" \
             --jq '[.workflow_runs[] | select(.event != "pull_request")] | length')
           if [ "$runs" -eq 0 ]; then

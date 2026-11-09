@@ -30,8 +30,10 @@ jobs:
     steps:
       - name: Has a run on main's latest commit passed?
         id: runs
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
+        # The same query as release.yml's gate; change both together.
         run: |
           runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&status=success" \
             --jq '[.workflow_runs[] | select(.event != "pull_request")] | length')
