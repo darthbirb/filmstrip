@@ -70,5 +70,11 @@ the issues and pull requests; "continue the queue" picks up where it left off.
   pull request of the owner's is waiting for review or a fix.
 - The owner decides only what the `deliver` skill's "When the owner decides" names; everything
   else decides itself. A `needs-human` pull request waits for the owner while the queue goes on.
-- When the queue empties, run the Release workflow (`gh workflow run release.yml`) if anything
-  merged, so the Nightly in `latest\` (`scripts/update-latest.ps1`) is current.
+- When the queue empties and anything merged, bring the Nightly in `latest\`
+  (`scripts/update-latest.ps1`) up to date. Release builds only a commit the Gates have passed
+  on, so wait for CI's push run on `main`'s new head first: take the head with
+  `gh api repos/darthbirb/filmstrip/commits/main --jq .sha`, find its run with
+  `gh run list --workflow ci.yml --branch main --event push --commit <sha> --json databaseId`
+  (it can take a few seconds to appear), and `gh run watch <id> --exit-status`. Green: run
+  `gh workflow run release.yml`. Red, or no push run at all: dispatch nothing, and log it in
+  `.queue/log.md` for the next run; a red `main` is fixed before new work.
