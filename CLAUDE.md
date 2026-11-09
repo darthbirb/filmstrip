@@ -11,5 +11,8 @@
 - **MCP servers are pinned in `.mcp.json`.** Playwright drives a real browser; shadcn reads
   component registries without writing files. Never run `npx shadcn add` — read the item and
   write the file yourself.
+- **Keep tests and scripts plain.** No PowerShell script blocks run as background jobs,
+  hand-made network servers or listeners, encoded or generated commands, or busy loops to load
+  the CPU. Fail a download against an unreachable source; use the project's own test runners.
 - **Use absolute paths.** The shell keeps its working directory between calls, so one `cd`
   leaks into every command after it.
