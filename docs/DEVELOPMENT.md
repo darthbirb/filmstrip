@@ -98,7 +98,7 @@ Three ways, cheapest first.
   fetch it beside the debug build:
   `pwsh scripts/fetch-ffmpeg.ps1 -Into src-tauri/target/debug/tools`.
   The script tries the download four times, 15 seconds apart, before it fails, and CI keeps
-  what it fetched in its cache, keyed on the pinned version and SHA-256.
+  what it fetched in its cache, keyed on the script itself.
   `pwsh scripts/fetch-ffmpeg.test.ps1 <temp>` checks the retries against a `file:` source every
   attempt fails on, downloading nothing; CI runs it in Gates.
 - **Component tests** run in Vitest's browser mode over `src/**/*.test.tsx`, on Edge under

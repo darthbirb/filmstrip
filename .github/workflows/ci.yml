@@ -122,19 +122,11 @@ jobs:
       - name: Rust timing tests, one at a time
         run: 'cargo test --manifest-path src-tauri/Cargo.toml --locked -- --ignored --test-threads=1 ::timing::'
 
-      - name: The ffmpeg pin
-        id: ffmpeg
-        shell: pwsh
-        run: |
-          $pin = Select-String -Path scripts/fetch-ffmpeg.ps1 -Pattern "^\`$(version|sha256) = '([^']+)'$"
-          if (@($pin).Count -ne 2) { Write-Output 'fetch-ffmpeg.ps1 no longer pins $version and $sha256 on lines of their own'; exit 1 }
-          $pin | ForEach-Object { "$($_.Matches[0].Groups[1].Value)=$($_.Matches[0].Groups[2].Value)" } >> $env:GITHUB_OUTPUT
-
       - name: Cached ffmpeg
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: src-tauri/target/tools
-          key: ffmpeg-${{ runner.os }}-${{ steps.ffmpeg.outputs.version }}-${{ steps.ffmpeg.outputs.sha256 }}
+          key: ffmpeg-${{ runner.os }}-${{ hashFiles('scripts/fetch-ffmpeg.ps1') }}
 
       - name: Fetch the ffmpeg the release carries
         shell: pwsh
