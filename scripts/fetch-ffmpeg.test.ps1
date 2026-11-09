@@ -1,5 +1,5 @@
 # Runs fetch-ffmpeg.ps1 against a source every download attempt fails on, so nothing is fetched.
-# DEVELOPMENT.md "Tests". Like any run of the script, it clears src-tauri	argetfmpeg-fetch.
+# DEVELOPMENT.md "Tests". Like any run of the script, it clears src-tauri/target/ffmpeg-fetch.
 # Usage: pwsh scripts/fetch-ffmpeg.test.ps1 <temp>   (CI passes the runner's temp)
 param([Parameter(Mandatory)][string]$Temp)
 
