@@ -66,14 +66,14 @@ try {
   }
   Expand-Archive -Path $zip -DestinationPath $work
   $build = Join-Path $work $name
-  $from = @{
+  $parts = @{
     'ffmpeg.exe'         = 'bin\ffmpeg.exe'
     'ffprobe.exe'        = 'bin\ffprobe.exe'
     'ffmpeg-LICENSE.txt' = 'LICENSE'
     'ffmpeg-README.txt'  = 'README.txt'
   }
-  foreach ($to in $from.Keys) {
-    Copy-Item -LiteralPath (Join-Path $build $from[$to]) -Destination (Join-Path $Into $to) -Force
+  foreach ($to in $parts.Keys) {
+    Copy-Item -LiteralPath (Join-Path $build $parts[$to]) -Destination (Join-Path $Into $to) -Force
   }
   Set-Content -LiteralPath $noticeFile -Value $notice -NoNewline
 } finally {
