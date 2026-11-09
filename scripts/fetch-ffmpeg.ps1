@@ -3,7 +3,12 @@
 #
 #   pwsh scripts/fetch-ffmpeg.ps1                                     # target\tools, for the tests
 #   pwsh scripts/fetch-ffmpeg.ps1 -Into src-tauri\target\debug\tools  # beside the tauri dev build
-param([string]$Into = (Join-Path (Split-Path -Parent $PSScriptRoot) 'src-tauri\target\tools'))
+#   -From and -PauseSeconds are for scripts/fetch-ffmpeg.test.ps1.
+param(
+  [string]$Into = (Join-Path (Split-Path -Parent $PSScriptRoot) 'src-tauri\target\tools'),
+  [string]$From,
+  [int]$PauseSeconds = 15
+)
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -12,6 +17,8 @@ $version = '9.0.2'
 $name = "ffmpeg-$version-essentials_build"
 $url = "https://github.com/GyanD/codexffmpeg/releases/download/$version/$name.zip"
 $sha256 = '60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba'
+$source = if ($From) { $From } else { $url }
+$attempts = 4
 
 $notice = @"
 ffmpeg.exe and ffprobe.exe are FFmpeg $version, the "essentials" build by Gyan Doshi
@@ -41,21 +48,32 @@ Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $work, $Into | Out-Null
 try {
   $zip = Join-Path $work "$name.zip"
-  Invoke-WebRequest -Uri $url -OutFile $zip
+  for ($attempt = 1; ; $attempt++) {
+    try {
+      Invoke-WebRequest -Uri $source -OutFile $zip
+      break
+    } catch {
+      if ($attempt -ge $attempts) { throw }
+      Remove-Item -Force $zip -ErrorAction SilentlyContinue
+      Write-Host "Download attempt $attempt of $attempts failed: $($_.Exception.Message)"
+      Write-Host "Trying again in $PauseSeconds seconds."
+      Start-Sleep -Seconds $PauseSeconds
+    }
+  }
   $actual = (Get-FileHash -Algorithm SHA256 -Path $zip).Hash.ToLowerInvariant()
   if ($actual -ne $sha256) {
     throw "$name.zip has SHA-256 $actual, not the pinned $sha256; refusing it."
   }
   Expand-Archive -Path $zip -DestinationPath $work
   $build = Join-Path $work $name
-  $from = @{
+  $parts = @{
     'ffmpeg.exe'         = 'bin\ffmpeg.exe'
     'ffprobe.exe'        = 'bin\ffprobe.exe'
     'ffmpeg-LICENSE.txt' = 'LICENSE'
     'ffmpeg-README.txt'  = 'README.txt'
   }
-  foreach ($to in $from.Keys) {
-    Copy-Item -LiteralPath (Join-Path $build $from[$to]) -Destination (Join-Path $Into $to) -Force
+  foreach ($to in $parts.Keys) {
+    Copy-Item -LiteralPath (Join-Path $build $parts[$to]) -Destination (Join-Path $Into $to) -Force
   }
   Set-Content -LiteralPath $noticeFile -Value $notice -NoNewline
 } finally {
