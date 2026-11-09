@@ -219,6 +219,18 @@ under `.claude/worktrees/`. The dev server ignores that folder. Cargo in a neste
 reads the main checkout's `.cargo/config.toml`, so a key the worktree's own file drops still
 applies there.
 
+## Testing main
+
+CI's Gates run on every pull request and every push to `main`. A merge a workflow makes, as the
+Dependabot workflow's auto-merge does, pushes with that workflow's own token, and GitHub starts
+no run from such a push. So CI also runs on a schedule, at 01:17 UTC, two hours before the
+Nightly: it runs the Gates on `main`'s latest commit unless a push, scheduled or manual run has
+already passed on it. GitHub mails a scheduled run's failure to whoever last changed its
+schedule, the owner, as it mails a failed push run to the owner who merged. The Release workflow
+builds the Nightly only from a commit a run has passed on; otherwise it keeps the last one and
+says so in its summary, and the next day's runs try again. To test `main` sooner, run CI by hand
+from the Actions tab. Why a schedule: DECISIONS.md "Testing main on a schedule".
+
 ## Porting from ggallery
 
 ggallery, the private predecessor, sits beside this repository at `../ggallery` and holds a

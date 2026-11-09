@@ -1431,6 +1431,19 @@ installed on a Windows machine, the engine WebView2 shares, so the numbers are r
 the same tests drive Chromium, the same engine; where the platforms differ (a right-click opens
 its menu on press off Windows) the app works on both.
 
+## Testing main on a schedule
+
+A commit the Dependabot workflow's auto-merge lands has no push run, because the workflow's own
+token made the push. Starting one from that workflow does not work: it ends as soon as it arms
+the merge, long before GitHub makes it, so a `workflow_run` on it or a dispatch from it would
+run before the merge lands, and the merge itself, made with the same token, starts no workflow.
+A run dispatched with that token would also belong to the bot, and nobody would be mailed when
+it failed. A personal access token would fix both, but no long-lived secret is kept on GitHub. A
+daily scheduled run has none of these problems: it covers a merge made any way, its failure
+mails the owner, and run two hours before the Nightly it settles whether that commit is fit to
+build. The cost is up to a day between a merge and its test, which Dependabot's weekly updates
+can bear.
+
 ## The mark
 
 The mark is a filmstrip: an opaque dark body, and five colour frames parted by dark gaps, each

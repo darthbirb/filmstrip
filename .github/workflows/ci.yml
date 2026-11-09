@@ -4,17 +4,43 @@ on:
   pull_request:
   push:
     branches: [main]
+  # A merge a workflow makes starts no push run; this tests main before the Nightly is built.
+  # DEVELOPMENT.md "Testing main".
+  schedule:
+    - cron: "17 1 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  passed:
+    name: Already passed
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      actions: read
+    outputs:
+      passed: ${{ steps.runs.outputs.passed }}
+    steps:
+      - name: Has a run on main's latest commit passed?
+        id: runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&status=success" \
+            --jq '[.workflow_runs[] | select(.event != "pull_request")] | length')
+          if [ "$runs" -gt 0 ]; then echo "passed=true" >> "$GITHUB_OUTPUT"; fi
+
   gates:
     name: Gates
+    needs: passed
+    if: ${{ !cancelled() && needs.passed.outputs.passed != 'true' }}
     runs-on: windows-latest
     timeout-minutes: 30
 

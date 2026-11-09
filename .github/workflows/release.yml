@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: release-${{ github.ref }}
@@ -22,9 +23,9 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
-      # Dependabot's merges land with the workflow token, which starts no push runs, and a push to
-      # main is not a release anyway; hence a schedule, skipping a day main did not move.
-      - name: Has main moved since the last Nightly?
+      # A push to main is not a release; hence a schedule, skipping a day main did not move, and
+      # building only a commit Gates passed on. DEVELOPMENT.md "Testing main".
+      - name: Has main moved since the last Nightly, and passed Gates?
         id: moved
         if: github.ref_type != 'tag'
         shell: bash
@@ -33,6 +34,15 @@ jobs:
         run: |
           built=$(gh release view nightly --repo "$GITHUB_REPOSITORY" --json targetCommitish --jq .targetCommitish 2>/dev/null || true)
           if [ "$built" = "$GITHUB_SHA" ] && [ "$GITHUB_EVENT_NAME" = schedule ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          runs=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$GITHUB_SHA&status=success" \
+            --jq '[.workflow_runs[] | select(.event != "pull_request")] | length')
+          if [ "$runs" -eq 0 ]; then
+            why="Gates have not passed on ${GITHUB_SHA::7}, so the Nightly stays as it was."
+            echo "::warning::$why"
+            echo "$why" >> "$GITHUB_STEP_SUMMARY"
             echo "skip=true" >> "$GITHUB_OUTPUT"
           fi
 
