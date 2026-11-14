@@ -87,6 +87,16 @@ jobs:
       - name: Component tests
         run: npx --yes pnpm@12.4.1 test
 
+      - name: Cached ffmpeg
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: src-tauri/target/tools
+          key: ffmpeg-${{ runner.os }}-${{ hashFiles('scripts/fetch-ffmpeg.ps1') }}
+
+      - name: Fetch the ffmpeg the release carries
+        shell: pwsh
+        run: ./scripts/fetch-ffmpeg.ps1
+
       - name: 'Component timing tests, one file at a time'
         run: 'npx --yes pnpm@12.4.1 test:timing'
 
@@ -121,16 +131,6 @@ jobs:
 
       - name: Rust timing tests, one at a time
         run: 'cargo test --manifest-path src-tauri/Cargo.toml --locked -- --ignored --test-threads=1 ::timing::'
-
-      - name: Cached ffmpeg
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: src-tauri/target/tools
-          key: ffmpeg-${{ runner.os }}-${{ hashFiles('scripts/fetch-ffmpeg.ps1') }}
-
-      - name: Fetch the ffmpeg the release carries
-        shell: pwsh
-        run: ./scripts/fetch-ffmpeg.ps1
 
       - name: Rust tests that need ffmpeg
         run: 'cargo test --manifest-path src-tauri/Cargo.toml --locked -- --ignored --skip ::timing::'

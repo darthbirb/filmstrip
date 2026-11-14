@@ -41,9 +41,14 @@ export type Motion =
   /** The pane is resized every frame, so the set is laid out and drawn again at a new scale. */
   | "resize";
 
+/** A clip already made, played in place of the recorded one. */
+export type Clip = { url: string; ms: number; width: number; height: number; ext: string };
+
 export type BenchOptions = {
-  /** How many of the files are 1080p clips playing; the rest are 6000 × 4000 photographs. */
+  /** How many of the files are clips playing; the rest are 6000 × 4000 photographs. */
   clips?: number;
+  /** The clip they play; the 1080p recording when none is given. */
+  clip?: Clip;
   motion?: Motion;
   /** How long each span of the count lasts. */
   ms?: number;
@@ -84,15 +89,16 @@ export function recordings(record: (ms: number) => Promise<string>, least: numbe
 /** One clip for every bench, recorded the first time: it records in real time. */
 const movie = recordings((ms) => clip(VIDEO.width, VIDEO.height, ms), LEAST);
 
-function detail(id: number, video: boolean, durationMs: number): ItemDetail {
-  const shape = video ? VIDEO : PHOTO;
-  const name = video ? `clip-${id}.webm` : `photo-${id}.jpg`;
+function detail(id: number, video: Clip | null, durationMs: number): ItemDetail {
+  const shape = video ?? PHOTO;
+  const ext = video ? video.ext : "jpg";
+  const name = video ? `clip-${id}.${ext}` : `photo-${id}.jpg`;
   return {
     id,
     uuid: `set-${id}`,
     folderId: 6,
     diskName: name,
-    ext: video ? "webm" : "jpg",
+    ext,
     kind: video ? "video" : "image",
     sizeBytes: 4_000_000,
     mtime: 1_750_000_000,
@@ -117,8 +123,8 @@ function detail(id: number, video: boolean, durationMs: number): ItemDetail {
 }
 
 /**
- * Puts `count` originals in a pane `width` by `height`, `clips` of them 1080p clips spread among
- * the photographs and every one playing, waits until every one is drawn, and times the frames the
+ * Puts `count` originals in a pane `width` by `height`, `clips` of them `clip` spread among the
+ * photographs and every one playing, waits until every one is drawn, and times the frames the
  * window draws over `spans` spans of `ms` while `motion` goes on. The clips run longer than the
  * count, so none loops inside it. It replaces the IPC mock and the pane's contents.
  */
@@ -126,6 +132,7 @@ export async function benchSet(
   count: number,
   {
     clips = 0,
+    clip,
     motion = "still",
     ms = 3000,
     spans = 1,
@@ -133,16 +140,23 @@ export async function benchSet(
     height = 900,
   }: BenchOptions = {},
 ): Promise<Bench> {
-  const take = clips > 0 ? movie(LEAD + spans * ms) : null;
+  const take = clips > 0 && !clip ? movie(LEAD + spans * ms) : null;
   const recorded = take ? await take.url : null;
+  const played: Clip | null =
+    clip ?? (recorded && take ? { ...VIDEO, url: recorded, ms: take.ms, ext: "webm" } : null);
+  if (played && played.ms < LEAD + spans * ms) {
+    throw new Error(`a ${played.ms}ms clip would loop inside the count`);
+  }
   const isClip = (at: number) =>
     Math.floor(((at + 1) * clips) / count) > Math.floor((at * clips) / count);
-  const files = Array.from({ length: count }, (_, at) => detail(at + 1, isClip(at), take?.ms ?? 0));
+  const files = Array.from({ length: count }, (_, at) =>
+    detail(at + 1, isClip(at) ? played : null, played?.ms ?? 0),
+  );
   const urls: Record<string, string> = {};
   for (const file of files) {
     urls[file.diskName] =
-      file.kind === "video" && recorded
-        ? recorded
+      file.kind === "video" && played
+        ? played.url
         : await photograph(PHOTO.width, PHOTO.height, (file.id * 47) % 360);
   }
   const unserve = serveFiles(urls);
@@ -251,7 +265,8 @@ export async function benchSet(
     else root.style.removeProperty("--pane-set-playing");
     showInPane(null);
     unserve();
-    for (const url of new Set(Object.values(urls))) if (url !== recorded) URL.revokeObjectURL(url);
+    for (const url of new Set(Object.values(urls)))
+      if (url !== played?.url) URL.revokeObjectURL(url);
   }
 }
 

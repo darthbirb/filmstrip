@@ -2,6 +2,7 @@ import { playwright } from "@vitest/browser-playwright";
 import { configDefaults, defineConfig, mergeConfig } from "vitest/config";
 
 import { launchOptions, locale } from "./tests/browser.ts";
+import { footage, removeFootage } from "./tests/footage.ts";
 import viteConfig from "./vite.config.ts";
 
 const TIMING = "src/**/*.timing.test.{ts,tsx}";
@@ -28,6 +29,7 @@ export function suite(timing: boolean) {
           headless: true,
           provider: playwright({ launchOptions, contextOptions: { locale } }),
           instances: [{ browser: "chromium" }],
+          commands: { footage, removeFootage },
         },
       },
     }),

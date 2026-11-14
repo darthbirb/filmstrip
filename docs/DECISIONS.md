@@ -734,11 +734,9 @@ and one height in justified rows is equal cells by another measure.
   shows the picture slowed. The window held its 30 a second through six, and ran off it past.
   Six is where it goes here, the clips at 0.90 pace, and CI held six and fell at eight. Five held
   on both, but at 131 of the 141 here, and a clip at 30 a second rather than the test's 26 would
-  take 150 at five and 120 at four. So four. **It holds for the bench's clip, not for footage.**
-  That clip is a MediaRecorder WebM, VP8 of flat colour at about 26 a second, which the browser
-  decodes in software. Phone footage at 60 a second in H.264 or HEVC, which WebView2 usually
-  decodes in hardware, is not measured, and the budget above does not carry to it either way.
-  #158 counts the edge with such clips.
+  take 150 at five and 120 at four. So four. That clip is a MediaRecorder WebM, VP8 of flat
+  colour at about 26 a second, which the browser decodes in software, so the budget does not
+  carry to phone footage either way; it is counted on its own, below, and four holds there too.
 
   **One noisy span does not set the edge.** Three dropped 8 of 392 in one span of one run, the
   rest none, and four dropped in 3 of its 27 spans, 15 of 520 at most, while five above them
@@ -755,6 +753,30 @@ and one height in justified rows is equal cells by another measure.
   on 26 October 2026, with a 34ms clip, two, three, four and six dropped none here and on CI, a
   count that did not measure pace. Past the four, a clip holds on its first frame, and the one
   given the sound plays in place of the last of the four.
+- **Phone footage plays four at once with room to spare.** Counted on 14 November 2026 with
+  clips the bundled ffmpeg makes as the test runs, `tests/footage.ts`, never committed or
+  downloaded: a moving test card under fresh grain, so every frame costs bits, 22 seconds long,
+  at about what a phone records. H.264 High at 1080p30 and 17 Mbit/s, 1080p60 and 25, and 4K30
+  and 45; HEVC at 1080p60 and 15, and 4K30 and 30. Four played among twelve originals in the
+  1500 × 900 pane, as above, in runs of three five-second spans after a warm-up, two runs here:
+
+  | Clip          | Owner's machine, dropped | Pace  |
+  | ------------- | ------------------------ | ----- |
+  | H.264 1080p30 | 0 of 3617                | 1.000 |
+  | H.264 1080p60 | 0 of 7214                | 1.000 |
+  | H.264 4K30    | 0 of 3611                | 1.000 |
+
+  Here the headless Edge decodes them in hardware, as `mediaCapabilities` reports, and the window
+  kept the clips' own rate, 30 or 60 a second. **HEVC is not counted**: the tests' Edge reports
+  it unsupported, so its tests skip and say so. Whether the app's WebView2 plays it depends on
+  the machine's HEVC decoder, and it is counted wherever the tests' Edge does.
+
+  **The edge in hardware is a decoder's limit, not a budget.** Probed once each here, 1080p60
+  held six and eight, none dropped; at twelve none dropped either, but the clips' pace was 0.750
+  in every span, three of the twelve standing still. 4K30 held six; eight dropped 144 of 1209 in
+  its first span, pace 0.901, then held; twelve were never all drawn within the bench's minute.
+  So the four set from the WebM keeps a margin of two for 4K and more for 1080p, and
+  `src/app/pane/set-frame-rate.timing.test.tsx` holds each clip to the same bounds as the WebM.
 - **The test clip waits 37ms between frames, 74 after its first, in two timers.**
   `src/dev/media.test.ts` holds every gap to the 33.3ms a window at 30 a second takes, and 34ms
   left no room to. A recording keeps whole milliseconds and its stamps sit off the pushes, by up
