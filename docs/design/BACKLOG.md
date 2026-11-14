@@ -64,10 +64,16 @@ Drawn in Artboards › The Trash's limits:
   rest go to the Trash as one batch and the banner lists the refused ones with their sizes. A file
   larger than Total Size is refused the same way. The bin refusing the send keeps the file where
   it was and says so.
-- **The foot**: expiry by age, by size, and both, each with no Undo; its line stacks above an
-  act's line rather than replacing it. The Recycle Bin refusing an expired file keeps it in the
-  Trash and says so once, again only when the count of refused files grows, with Show in Trash.
-  After Empty Trash, and Empty Trash with files that would not go.
+- **The foot**: expiry by age, by size, and both, each with no Undo. Its line keeps the slot's
+  rule, one at a time and the newest replacing the other: it replaces an act's line, and a Band
+  or the next act's line replaces it; Ctrl+Z still reaches the act. The Recycle Bin refusing an
+  expired file keeps it in the Trash, still counting toward Total Size, and says so once, again
+  only when the count of refused files grows, with Show in Trash. After Empty Trash, and Empty
+  Trash with files that would not go.
+- **A restore that loses the race to expiry**: the Trash's restore banner, with the expired rows
+  under their own heading, In the Recycle Bin, and no row button; Retry only while a row still in
+  the Trash could succeed. A Ctrl+Z on a delete some or all of whose files expired is the same.
+- **Size per File** is asked only at Delete; lowering it sends nothing from the Trash.
 
 When built: the `recycle` glyph is new to the app's bundle. DECISIONS.md "The pane" still says
 nothing purges and emptying the Trash is under Later, and "Undo" says the journal's pruning
