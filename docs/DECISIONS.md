@@ -1047,7 +1047,11 @@ it.
   two later: on the owner's machine, `A.JPG.tmp` beside `a.jpg`. An undo straight after a copy
   moves exactly such files out, and the folder they leave would otherwise stay, said to hold
   something it no longer does. Only the removal is tried again, which the disk refuses while
-  anything is in the directory, so a file that stays still keeps its folder.
+  anything is in the directory, so a file that stays still keeps its folder. A folder deleted
+  and the originals a move between drives leaves behind go the same way, through
+  `fs::take_away`; a delete also looks again, for as long, while it finds a file it does not
+  show, and names the file that kept the folder when one stays. A directory around one where
+  something stayed cannot empty, so it is tried once and not waited on.
 - **One change to the disk at a time.** A walk that read a directory while a verb renamed it would
   find the old name gone and retire everything under it. So the walk takes a turn per source and
   a verb waits for the turn, which bounds the wait by one source's walk, never the whole pass.

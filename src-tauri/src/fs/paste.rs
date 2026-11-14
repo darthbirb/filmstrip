@@ -1039,7 +1039,7 @@ mod tests {
         run(&conn, &batch, lisbon, &entries, &Script::default()).unwrap();
         let tries = Rc::new(Cell::new(0));
         let counted = Rc::clone(&tries);
-        crate::fs::folders::just_before_taking_away(move |at| {
+        crate::fs::just_before_taking_away(move |at| {
             counted.set(counted.get() + 1);
             match counted.get() {
                 1 => std::fs::write(at.join("A.JPG.tmp"), "theirs").unwrap(),
