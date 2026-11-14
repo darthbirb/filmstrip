@@ -153,6 +153,26 @@ test("once no clip that played at a fall is left, every clip plays again at once
   expect(held.wait).toBe(KEEP.retry);
 });
 
+test("once no clip that played at a fall is left, the count that fell and its wait are forgotten", () => {
+  const nine = Array.from({ length: 9 }, (_, at) => at + 4);
+  const fell = run([1, 2, 3], budget(2), 4);
+  expect(fell.counts.at(-1)).toBe(2);
+  // Nine added, then three tried again after the calm spell and once more after its wait.
+  const again = run([1, 2, 3, ...nine], budget(2), 41, { from: fell.held });
+  expect(again.counts.at(-1)).toBe(2);
+  expect(again.held.ceiling).toBe(3);
+  expect(again.held.wait).toBe(KEEP.retry * 2);
+  const lifted = run(nine, budget(2), 1, { from: again.held });
+  expect(lifted.counts).toEqual([9]);
+  expect(lifted.held.ceiling).toBeNull();
+  expect(lifted.held.wait).toBe(KEEP.retry);
+  // The nine's first fall waits a minute, where the three's next would have waited four.
+  const { held, counts } = run(nine, budget(2), 3, { from: lifted.held });
+  expect(counts).toEqual([9, 9, 2]);
+  expect(held.ceiling).toBe(9);
+  expect(held.wait).toBe(KEEP.retry);
+});
+
 test("a clip that played at a fall, still in the set, keeps the limit", () => {
   const settled = run(FIVE, budget(3), 20);
   expect(settled.counts.at(-1)).toBe(3);
