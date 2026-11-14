@@ -1,5 +1,5 @@
-// Fails on a doc pointer to a heading that does not exist, on a comment block longer than
-// MAX_COMMENT_LINES, and on DESIGN.md's tokens disagreeing with app.css.
+// Fails on a doc pointer to no heading, a comment block over MAX_COMMENT_LINES, DESIGN.md's
+// tokens disagreeing with app.css, and biome.json's schema naming another Biome than the pin.
 // DEVELOPMENT.md "Keeping the docs true".
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -165,6 +165,15 @@ function checkDesignTokens() {
   }
 }
 
+function checkBiomeSchema() {
+  const pinned = JSON.parse(read("package.json")).devDependencies["@biomejs/biome"];
+  const schema = JSON.parse(read("biome.json")).$schema;
+  const expected = `https://biomejs.dev/schemas/${pinned}/schema.json`;
+  if (schema !== expected) {
+    failures.push(`biome.json  $schema is ${schema}, but package.json pins Biome ${pinned}`);
+  }
+}
+
 for (const dir of SCANNED) {
   for (const entry of readdirSync(join(ROOT, dir), { recursive: true, withFileTypes: true })) {
     if (!entry.isFile()) continue;
@@ -177,6 +186,7 @@ for (const dir of SCANNED) {
 }
 for (const file of PROSE) checkPointers(file, read(file));
 checkDesignTokens();
+checkBiomeSchema();
 
 for (const failure of failures) console.error(failure);
 console.log(`${pointers} pointers checked, ${failures.length} problems`);
