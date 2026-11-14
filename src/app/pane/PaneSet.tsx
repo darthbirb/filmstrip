@@ -18,8 +18,9 @@ import { getSelection } from "../grid/selection";
 import { itemMenu } from "../menus/item-menu";
 import { usePreferences } from "../preferences";
 import { getFullScreen } from "./full-screen";
+import { useKeepTime } from "./keep-time";
 import { focusNextPicture } from "./Media";
-import { leavePane, paneFileOrigin, paneSetPlaying, showInPane } from "./pane-store";
+import { leavePane, paneFileOrigin, showInPane } from "./pane-store";
 import { arrange, type Least, layOutSet, type Placed } from "./set-layout";
 import type { Size } from "./zoom";
 
@@ -53,7 +54,9 @@ export function PaneSet({ items }: { items: readonly ItemDetail[] }) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: the shapes string stands for the sizes it is made from
   const layout = useMemo(() => layOutSet(sizes, room.area, room.gap, room.least), [shapes, room]);
   const ring = items.some((item) => item.id === ringed) ? ringed : (items[0]?.id ?? null);
-  const playing = playingClips(items, voiced);
+  const order = playOrder(items, voiced);
+  const limit = useKeepTime(area, order);
+  const playing = new Set(order.slice(0, limit));
 
   useLayoutEffect(() => {
     const id = focusing.current;
@@ -362,14 +365,13 @@ function useEscapeShowsFirst(first: number | null) {
 }
 
 /**
- * The clips that play: the one with the sound, then the rest in the order added, up to
- * `pane-set-playing`. DECISIONS.md "Several files in the pane".
+ * The order clips play in, and the reverse of the order they pause in: the one with the sound,
+ * then the rest in the order added. DECISIONS.md "Several files in the pane".
  */
-function playingClips(items: readonly ItemDetail[], voiced: number | null) {
+function playOrder(items: readonly ItemDetail[], voiced: number | null) {
   const clips = items.filter((item) => item.kind === "video").map((item) => item.id);
   const first = voiced !== null && clips.includes(voiced) ? [voiced] : [];
-  const rest = clips.filter((id) => id !== voiced);
-  return new Set([...first, ...rest].slice(0, paneSetPlaying()));
+  return [...first, ...clips.filter((id) => id !== voiced)];
 }
 
 function known(item: ItemDetail): Size | null {

@@ -568,9 +568,10 @@ measured, never a breakpoint. DECISIONS.md "The interface size" has the reasonin
   `tile-gap` apart, each the `--aspect-strip` shape whatever the picture's own. Its ends are
   padded clear of the steps that float over them.
 - **The pane shows `--pane-set` files at most**, twelve, a count rather than a length, set from
-  the frame rate measured with that many originals on screen, and plays `--pane-set-playing` of
-  its clips at once, four, set from where more fall behind and drop frames. Dropped together they
-  share one scale, and none is drawn under `pane-set-least` on its shorter side or
+  the frame rate measured with that many originals on screen. It plays every clip among them that
+  the machine keeps time with; the ones added last pause while it falls behind, holding the frame
+  they reached with nothing drawn on them, so a paused clip has no shape of its own. Dropped
+  together they share one scale, and none is drawn under `pane-set-least` on its shorter side or
   `pane-set-least-long` on its longer, so its × and a video's mute fit a `tile-inset` in. A file
   with no shape to draw stands in at that floor.
 - **Settings** is `dialog` wide and `dialog-height` tall, never more than the window, with a
