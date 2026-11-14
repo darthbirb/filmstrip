@@ -33,14 +33,23 @@ pub(crate) const PASSING: Duration = Duration::from_millis(250);
 /// Removes a directory files have just left, only ever while it is empty, trying again while
 /// another program's file passes through it. DECISIONS.md "Undo".
 pub(crate) fn take_away(dir: &Path) -> std::io::Result<()> {
-    let until = Instant::now() + PASSING;
-    #[cfg(test)]
-    let mut meanwhile = TAKING_AWAY.with(|hook| hook.borrow_mut().take());
+    take_away_within(dir, PASSING)
+}
+
+/// `take_away` tried once, for a directory around one where something stayed: it cannot empty.
+pub(crate) fn take_away_once(dir: &Path) -> std::io::Result<()> {
+    take_away_within(dir, Duration::ZERO)
+}
+
+fn take_away_within(dir: &Path, passing: Duration) -> std::io::Result<()> {
+    let until = Instant::now() + passing;
     loop {
         #[cfg(test)]
-        if let Some(then) = meanwhile.as_mut() {
-            then(dir);
-        }
+        TAKING_AWAY.with(|hook| {
+            if let Some(then) = hook.borrow_mut().as_mut() {
+                then(dir);
+            }
+        });
         match std::fs::remove_dir(dir) {
             Err(err)
                 if err.kind() == std::io::ErrorKind::DirectoryNotEmpty
@@ -62,8 +71,8 @@ thread_local! {
         const { std::cell::RefCell::new(None) };
 }
 
-/// Runs `then` with the directory this thread's next `take_away` removes, just before each try at
-/// it: where a test puts what another program leaves there.
+/// Runs `then` with each directory this thread's `take_away` removes from now on, just before each
+/// try at it: where a test puts what another program leaves there.
 #[cfg(test)]
 pub(crate) fn just_before_taking_away(then: impl FnMut(&Path) + 'static) {
     TAKING_AWAY.with(|hook| *hook.borrow_mut() = Some(Box::new(then)));

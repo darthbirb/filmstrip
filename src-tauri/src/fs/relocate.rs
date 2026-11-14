@@ -2,10 +2,11 @@
 //! is a rename; between drives it is a copy, checked, and only then the original's removal, so a
 //! move cut short leaves the original where it was. DECISIONS.md "Undo".
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use crate::error::{AppError, Result};
-use crate::fs::{noclobber, take_away};
+use crate::fs::{noclobber, take_away, take_away_once};
 
 /// Windows' ERROR_NOT_SAME_DEVICE: a rename cannot cross from one drive to another.
 const NOT_SAME_DEVICE: i32 = 17;
@@ -39,25 +40,33 @@ pub fn taken_as(taken: impl FnOnce() -> AppError) -> impl FnOnce(AppError) -> Ap
 pub(crate) fn copy_across(from: &Path, to: &Path) -> Result<()> {
     let mut made = Vec::new();
     if let Err(err) = copy_into(from, to, from.is_dir(), &mut made) {
-        for (_, copy) in made.iter().rev() {
-            let _ = if copy.is_dir() {
-                take_away(copy)
-            } else {
-                std::fs::remove_file(copy)
-            };
-        }
+        remove_deepest_first(made.iter().map(|(_, copy)| copy.as_path()));
         return Err(err);
     }
     // The copy is whole, so the move has happened and the index follows it; an original that will
     // not go, or anything that arrived in it since it was read, is left for the next walk.
-    for (original, _) in made.iter().rev() {
-        let _ = if original.is_dir() {
-            take_away(original)
-        } else {
-            std::fs::remove_file(original)
-        };
-    }
+    remove_deepest_first(made.iter().map(|(original, _)| original.as_path()));
     Ok(())
+}
+
+/// Removes what `made` lists, each directory listed before what is in it, as far as it will go. A
+/// directory around one where something stayed is tried once, not given the time a passing file is.
+fn remove_deepest_first<'a>(made: impl DoubleEndedIterator<Item = &'a Path>) {
+    let mut stayed_in = HashSet::new();
+    for path in made.rev() {
+        let removed = if !path.is_dir() {
+            std::fs::remove_file(path)
+        } else if stayed_in.contains(path) {
+            take_away_once(path)
+        } else {
+            take_away(path)
+        };
+        if removed.is_err()
+            && let Some(parent) = path.parent()
+        {
+            stayed_in.insert(parent);
+        }
+    }
 }
 
 /// Copies `from` to `to`, never onto anything there, recording each pair it wrote in `made`.
@@ -92,7 +101,7 @@ fn copy_into(
 mod tests {
     use super::*;
     use crate::fs::settles_to;
-    use std::cell::Cell;
+    use std::cell::{Cell, RefCell};
     use std::path::PathBuf;
     use std::rc::Rc;
 
@@ -221,7 +230,11 @@ mod tests {
     fn theirs_passes_through_the_next_directory_taken_away() -> Rc<Cell<u32>> {
         let tries = Rc::new(Cell::new(0));
         let counted = Rc::clone(&tries);
+        let mut first = None;
         crate::fs::just_before_taking_away(move |at| {
+            if first.get_or_insert_with(|| at.to_path_buf()) != at {
+                return;
+            }
             counted.set(counted.get() + 1);
             match counted.get() {
                 1 => std::fs::write(at.join("PYRAMID.JPG.tmp"), "theirs").unwrap(),
@@ -243,6 +256,34 @@ mod tests {
         assert!(!dir.join("from/Cairo").exists());
         assert_eq!(tries.get(), 2);
         settles_to(&dir.join("Cairo"), &["pyramid.jpg"]);
+    }
+
+    #[test]
+    fn a_folder_around_one_where_a_file_stayed_is_tried_once() {
+        let dir = scratch("stayed-two-deep");
+        std::fs::create_dir_all(dir.join("from/Cairo/Night")).unwrap();
+        std::fs::write(dir.join("from/Cairo/Night/stars.jpg"), "stars").unwrap();
+        let tried = Rc::new(RefCell::new(Vec::new()));
+        let seen = Rc::clone(&tried);
+        crate::fs::just_before_taking_away(move |at| {
+            if seen.borrow().is_empty() {
+                std::fs::write(at.join("theirs.jpg"), "theirs").unwrap();
+            }
+            seen.borrow_mut().push(at.to_path_buf());
+        });
+
+        copy_across(&dir.join("from/Cairo"), &dir.join("Cairo")).unwrap();
+        let tries_at = |at: &Path| tried.borrow().iter().filter(|tried| *tried == at).count();
+        assert!(tries_at(&dir.join("from/Cairo/Night")) > 1);
+        assert_eq!(tries_at(&dir.join("from/Cairo")), 1);
+        assert_eq!(
+            std::fs::read_to_string(dir.join("from/Cairo/Night/theirs.jpg")).unwrap(),
+            "theirs"
+        );
+        assert_eq!(
+            std::fs::read_to_string(dir.join("Cairo/Night/stars.jpg")).unwrap(),
+            "stars"
+        );
     }
 
     #[cfg(windows)]
