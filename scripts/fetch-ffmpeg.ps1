@@ -10,6 +10,7 @@ param(
   [int]$PauseSeconds = 15
 )
 
+Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 
@@ -75,12 +76,13 @@ try {
   foreach ($to in $parts.Keys) {
     Copy-Item -LiteralPath (Join-Path $build $parts[$to]) -Destination (Join-Path $Into $to) -Force
   }
+  & (Join-Path $PSScriptRoot 'check-ffmpeg.ps1') -In $Into
   Set-Content -LiteralPath $noticeFile -Value $notice -NoNewline
 } finally {
   Remove-Item -Recurse -Force $work -ErrorAction SilentlyContinue
 }
 
-Get-ChildItem -LiteralPath $Into | ForEach-Object {
+Get-ChildItem -LiteralPath $Into -File | ForEach-Object {
   '{0,-20} {1,8:N1} MB' -f $_.Name, ($_.Length / 1MB)
 } | Write-Host
 Write-Host "ffmpeg $version is in $Into."
