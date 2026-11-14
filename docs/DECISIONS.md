@@ -745,14 +745,15 @@ and one height in justified rows is equal cells by another measure.
     counts three five-second spans, and a change inside them starts the wait over. A loop counts
     as the clip's length there, since clips started together loop together:
 
-    | Clips         | Owner's machine, playing | Dropped     | Pace        |
-    | ------------- | ------------------------ | ----------- | ----------- |
-    | Recorded WebM | 7                        | 0 of 2726   | 0.986–1.000 |
-    | H.264 1080p30 | 12                       | 8 of 5388   | 0.998–1.000 |
-    | H.264 1080p60 | 12                       | 15 of 10786 | 0.997–1.000 |
-    | H.264 4K30    | 8                        | 6 of 3598   | 0.999–1.000 |
+    | Clips         | Owner's machine, playing | Dropped     | Pace        | CI's runner, playing | Dropped   | Pace        |
+    | ------------- | ------------------------ | ----------- | ----------- | -------------------- | --------- | ----------- |
+    | Recorded WebM | 7                        | 0 of 2726   | 0.986–1.000 | 10                   | 0 of 3943 | 0.981–1.000 |
+    | H.264 1080p30 | 12                       | 8 of 5388   | 0.998–1.000 | 8                    | 0 of 3591 | 1.000       |
+    | H.264 1080p60 | 12                       | 15 of 10786 | 0.997–1.000 | 5                    | 7 of 4471 | 0.989–0.996 |
+    | H.264 4K30    | 8                        | 6 of 3598   | 0.999–1.000 | 3                    | 2 of 1327 | 0.973–1.000 |
 
-    Here the clips decode in hardware and the WebM in software, as above. 4K settled on eight in
+    Here the clips decode in hardware and the WebM in software, as above; CI's runner decodes them
+    all in software, from this pull request's Gates run, and settled 4K on three, which kept time. 4K settled on eight in
     both of two runs, its first counting 8 of 2995 dropped. 1080p60 held all twelve, where the
     probe below once saw three of twelve stand still. HEVC is not counted, as below. The
     measure's numbers are not tokens: they draw nothing, and a test that needs them reads `KEEP`.
