@@ -39,10 +39,10 @@ test("a recording that fails is not kept, so the next bench records again", asyn
   expect(calls).toBe(2);
 });
 
-test("a clip given that would loop inside the count is refused before the pane is touched", async () => {
-  const clip = { url: "blob:footage", ms: 20_000, width: 1920, height: 1080, ext: "mp4" };
-  await expect(benchSet(12, { clips: 4, clip, ms: 5000, spans: 3 })).rejects.toThrow(
-    "a 20000ms clip would loop inside the count",
+test("a clip given that would loop in more than one span is refused before the pane is touched", async () => {
+  const clip = { url: "blob:footage", ms: 14_000, width: 1920, height: 1080, ext: "mp4" };
+  await expect(benchSet(12, { clips: 12, clip, ms: 5000, spans: 3 })).rejects.toThrow(
+    "a 14000ms clip would loop in more than one span of the count",
   );
   expect(document.querySelector("[data-file]")).toBeNull();
 });

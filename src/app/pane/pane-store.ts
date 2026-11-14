@@ -131,11 +131,6 @@ export function paneSetLimit() {
   return count("--pane-set");
 }
 
-/** The most clips in the pane's set that play at once. DESIGN.md "Layout". */
-export function paneSetPlaying() {
-  return count("--pane-set-playing");
-}
-
 export function paneDrop(carried: readonly number[], limit = paneSetLimit()): PaneDrop {
   const replaces = shown === null;
   const held = new Set(shown?.set ?? []);

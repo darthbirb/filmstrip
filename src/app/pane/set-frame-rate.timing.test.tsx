@@ -3,10 +3,10 @@ import { commands, page } from "vitest/browser";
 
 import type { Footage } from "../../../tests/footage";
 import { type Bench, benchSet, displayRate } from "../../dev/set-bench";
-import { paneSetLimit, paneSetPlaying } from "./pane-store";
+import { paneSetLimit } from "./pane-store";
 
-// These hold `pane-set` and `pane-set-playing` to the counts they were set from.
-// DECISIONS.md "Several files in the pane".
+// These hold `pane-set` to the count it was set from, and the clips the pane settles on playing
+// to keeping time. DECISIONS.md "Several files in the pane".
 
 test("the limit's worth of originals holds the frame rate while the pane is resized", {
   timeout: 180_000,
@@ -18,14 +18,12 @@ test("the limit's worth of originals holds the frame rate while the pane is resi
   expect(bench.late / bench.intervals).toBeLessThan(0.1);
 });
 
-test("the clips that play at once, among the limit's worth, keep time and drop under 1%", {
-  timeout: 180_000,
+test("the clips the pane settles on playing, of the limit's worth, keep time and drop under 1%", {
+  timeout: 600_000,
 }, async () => {
   await page.viewport(1600, 1000);
-  // The first clips a browser decodes start slow whatever the set, so one run warms it.
-  await benchSet(paneSetLimit(), { clips: paneSetPlaying(), ms: 1000 });
-  const bench = await benchSet(paneSetLimit(), { clips: paneSetPlaying(), ms: 5000, spans: 3 });
-  keepsTime(bench, "recorded webm");
+  const limit = paneSetLimit();
+  keepsTime(await benchSet(limit, { clips: limit, ms: 5000, spans: 3 }), "recorded webm");
 });
 
 afterAll(() => commands.removeFootage());
@@ -42,7 +40,7 @@ const PHONE: (Footage & { type: string })[] = (
 ).map((one) => ({ ...one, seconds: 22 }));
 
 test.for(PHONE)(
-  "the clips that play at once keep time with $codec at $height p$fps",
+  "the clips the pane settles on playing keep time with $codec at $height p$fps",
   {
     timeout: 600_000,
   },
@@ -61,13 +59,8 @@ test.for(PHONE)(
     await page.viewport(1600, 1000);
     const url = await commands.footage(footage);
     const clip = { url, ms: footage.seconds * 1000, width, height, ext: "mp4" };
-    await benchSet(paneSetLimit(), { clips: paneSetPlaying(), clip, ms: 1000 });
-    const bench = await benchSet(paneSetLimit(), {
-      clips: paneSetPlaying(),
-      clip,
-      ms: 5000,
-      spans: 3,
-    });
+    const limit = paneSetLimit();
+    const bench = await benchSet(limit, { clips: limit, clip, ms: 5000, spans: 3 });
     keepsTime(bench, `${label}, ${decoding.powerEfficient ? "hardware" : "software"}`);
   },
 );
@@ -76,7 +69,10 @@ function keepsTime(bench: Bench, label: string) {
   expect(bench.spans.every((span) => span.due > 0)).toBe(true);
   const counts = bench.spans.map((span) => `${span.dropped}/${span.due}`).join(" ");
   const paces = bench.spans.map((span) => span.pace.toFixed(3)).join(" ");
-  console.info(`${label}: window ${bench.rate.toFixed(1)}/s, dropped ${counts}, pace ${paces}`);
+  console.info(
+    `${label}: ${bench.playing} playing, window ${bench.rate.toFixed(1)}/s, dropped ${counts}, pace ${paces}`,
+  );
+  expect(bench.playing).toBeGreaterThan(0);
   const middle = (values: number[]) =>
     [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
   expect(middle(bench.spans.map((span) => span.dropped / span.due))).toBeLessThan(0.01);

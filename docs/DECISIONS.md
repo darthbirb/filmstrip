@@ -711,12 +711,58 @@ and one height in justified rows is equal cells by another measure.
   slower machine and CI's runner need: there, the same day, twelve held 60 with at most one frame
   in 300 late, while 48 fell to 45 in one run and held 57 in another.
   `src/app/pane/set-frame-rate.timing.test.tsx` holds `pane-set` to it, run alone.
-- **Four clips play at once, `pane-set-playing`, one short of the last that held here.** Counted
-  on 2 November 2026 with the 37ms clip, longer than the count, among twelve originals in a
-  1500 × 900 pane, in runs of three five-second spans, three to nine runs a count over two or
-  three probes: the frames dropped of those due over all its runs, and the pace, how far the
-  clips' own clocks moved against the window's. Pace was counted for four to six; elsewhere it is
-  the frames due a second over the 26.1 a second, or 26.4 on CI, that clips keeping time showed.
+- **Every clip in the set plays while this machine keeps time with them, and the clips added last
+  pause while it does not.** The owner's choice on #175: no fixed count, since one fixed count
+  either holds back a machine with room or slows the picture on one without. Four 4K clips that
+  CI decodes in software ran at about three-quarters of their pace, while the owner's machine held
+  eight at 1080p60. Comparable players set no count either. The pane measures the clips it plays,
+  `src/app/pane/keep-time.ts`, by what the bench counts below. That is the frames each dropped of
+  those due, from `getVideoPlaybackQuality`, and its pace, how far its clock moved against the
+  window's.
+  - **It measures in two-second spans and judges by the last three.** A span is behind when the
+    clips' pace is under 0.95 or they dropped 1% of their frames, the timing test's bounds. Two
+    behind of the last three is a fall, so one hitch never is, as the test never takes one span
+    either. The first span after any change is not measured, since a clip starting up is slow on
+    any machine. A clip that looped in a span, or that runs under two spans, is left out of it,
+    because its clock cannot tell a loop from a stall.
+  - **A fall pauses as many as the measure says cannot hold.** The clips showed a share of the
+    frames due at their pace: their pace times the share not dropped. That budget keeps the
+    playing count times that share, over 0.95, rounded down, and the pane plays that many: at
+    least one fewer than before, never under one. Twelve at 0.3 go to three in one step, not one a
+    span. Clips pause from the end of the play order. The clip with the sound comes first, then the
+    rest in the order added. A paused clip holds on the frame it reached, as clips past the old
+    count held on their first, and nothing is drawn on it.
+  - **After a calm spell, ten seconds with no fall, one more resumes**, and so on while there is
+    room. **The count that fell waits a minute from the fall** before it is tried again, and twice
+    as long each time it falls there again, up to eight minutes. A count that holds through a calm
+    spell is forgotten. Without that wait, a machine one clip short would fall every sixteen
+    seconds, over a third of the time with every clip slowed. New clips in the set forget the count
+    that fell, since they may weigh less. A hidden window is not measured, and the measure starts
+    over once it shows.
+  - **What each settled on**, twelve clips of each kind in the 1500 × 900 pane, on 14 November
+    2026. The timing test waits until the count playing has not changed for fourteen seconds,
+    which happens only once every clip plays or the pane waits on a count that fell. It then
+    counts three five-second spans, and a change inside them starts the wait over. A loop counts
+    as the clip's length there, since clips started together loop together:
+
+    | Clips         | Owner's machine, playing | Dropped     | Pace        |
+    | ------------- | ------------------------ | ----------- | ----------- |
+    | Recorded WebM | 7                        | 0 of 2726   | 0.986–1.000 |
+    | H.264 1080p30 | 12                       | 8 of 5388   | 0.998–1.000 |
+    | H.264 1080p60 | 12                       | 15 of 10786 | 0.997–1.000 |
+    | H.264 4K30    | 8                        | 6 of 3598   | 0.999–1.000 |
+
+    Here the clips decode in hardware and the WebM in software, as above. 4K settled on eight in
+    both of two runs, its first counting 8 of 2995 dropped. 1080p60 held all twelve, where the
+    probe below once saw three of twelve stand still. HEVC is not counted, as below. The
+    measure's numbers are not tokens: they draw nothing, and a test that needs them reads `KEEP`.
+
+- **The bounds were set from the test clip's edge.** Counted on 2 November 2026, before the pane
+  measured itself, with the 37ms clip among twelve originals in a 1500 × 900 pane. These were runs
+  of three five-second spans, three to nine runs a count over two or three probes. Each run counted
+  the frames dropped of those due and the pace, how far the clips' own clocks moved against the
+  window's. Pace was counted for four to six. Elsewhere it is the frames due a second over the 26.1
+  a second, or 26.4 on CI, that clips keeping time showed.
 
   | Clips | Owner's machine, dropped        | Pace        | CI's runner, dropped | Pace        |
   | ----- | ------------------------------- | ----------- | -------------------- | ----------- |
@@ -729,39 +775,31 @@ and one height in justified rows is equal cells by another measure.
   | 10    | 597 of 6339                     | about 0.54  | 342 of 7399          | about 0.62  |
   | 12    | 841 of 6358                     | about 0.45  | 742 of 7587          | about 0.53  |
 
-  Past the edge the clips share a fixed budget: six to twelve were due about 141 frames a second
-  between them here, however many, and eight to twelve about 165 on CI, so each falls behind and
-  shows the picture slowed. The window held its 30 a second through six, and ran off it past.
-  Six is where it goes here, the clips at 0.90 pace, and CI held six and fell at eight. Five held
-  on both, but at 131 of the 141 here, and a clip at 30 a second rather than the test's 26 would
-  take 150 at five and 120 at four. So four. That clip is a MediaRecorder WebM, VP8 of flat
-  colour at about 26 a second, which the browser decodes in software, so the budget does not
-  carry to phone footage either way. It is counted on its own, below: four 4K clips fall behind
-  where they decode in software.
+  Past the edge the clips share a fixed budget. Six to twelve were due about 141 frames a second
+  between them here, however many there were, and eight to twelve about 165 on CI. So each clip
+  falls behind and shows the picture slowed, which is why a fall's step is the share shown. The
+  window held its 30 a second through six, and ran off it past. That clip is a MediaRecorder WebM,
+  VP8 of flat colour at about 26 a second, which the browser decodes in software. Its budget does
+  not carry to phone footage either way, so that is counted on its own, below.
 
-  **One noisy span does not set the edge.** Three dropped 8 of 392 in one span of one run, the
-  rest none, and four dropped in 3 of its 27 spans, 15 of 520 at most, while five above them
-  dropped none in six runs; six dropped in every span of every run. A count is judged across its
-  runs, never by one span, and the test takes the middle of three spans for both its bounds, so
-  one hitch on a shared runner fails neither. **The dropped share alone does not see six:** its
-  middle span dropped 0.84%, under the bound of one in a hundred, with the clips at 0.90. So the
-  test holds the four under that bound and their pace above 0.95, halfway between 0.998, the
-  slowest that held, and 0.902, the fastest that fell. Set to six, it failed on the pace alone,
-  0.902 over the count. No span is near the line: six's 30 spans here were due 694 to 719 frames,
+  **One noisy span does not set the edge.** Three dropped 8 of 392 in one span of one run, and
+  none in the rest. Four dropped in 3 of its 27 spans, 15 of 520 at most, while five above them
+  dropped none in six runs, and six dropped in every span of every run. So a count is judged
+  across spans, never by one, and the test takes the middle of three spans for both its bounds.
+  One hitch on a shared runner then fails neither. **The dropped share alone does not see six:**
+  its middle span dropped 0.84%, under the bound of one in a hundred, with the clips at 0.90. So
+  pace is bounded too, at 0.95, halfway between 0.998, the slowest that held, and 0.902, the
+  fastest that fell. No span is near the line: six's 30 spans here were due 694 to 719 frames,
   0.885 to 0.917 of what clips keeping time show, and four's lowest was 0.98.
-
-  Two stood before this: it was set from counts that measured the test clip, not the window, and
-  on 26 October 2026, with a 34ms clip, two, three, four and six dropped none here and on CI, a
-  count that did not measure pace. Past the four, a clip holds on its first frame, and the one
-  given the sound plays in place of the last of the four.
-- **Four phone clips keep time where they decode in hardware, and 4K falls behind in software.**
+- **Phone clips keep time where they decode in hardware, and 4K falls behind in software.**
   Counted on 14 November 2026 with clips the bundled ffmpeg makes as the test runs,
-  `tests/footage.ts`, never committed or downloaded: a moving test card under fresh grain, so
-  every frame costs bits, 22 seconds long, at about what a phone records. H.264 High at 1080p30
-  and 17 Mbit/s, 1080p60 and 25, and 4K30 and 45; HEVC at 1080p60 and 15, and 4K30 and 30. Four
-  played among twelve originals in the 1500 × 900 pane, as above, in runs of three five-second
-  spans after a warm-up, two runs on each machine. The headless Edge here decodes them in
-  hardware, as `mediaCapabilities` reports; CI's runner has no GPU and decodes them in software.
+  `tests/footage.ts`, never committed or downloaded. Each is a moving test card under fresh grain,
+  so every frame costs bits, 22 seconds long, at about what a phone records. That is H.264 High at
+  1080p30 and 17 Mbit/s, 1080p60 and 25, and 4K30 and 45; and HEVC at 1080p60 and 15, and 4K30
+  and 30. Four played among twelve originals in the 1500 × 900 pane, as above. These were runs of
+  three five-second spans after a warm-up, two runs on each machine. The headless Edge here
+  decodes them in hardware, as `mediaCapabilities` reports; CI's runner has no GPU and decodes
+  them in software.
 
   | Clip          | Owner's machine, dropped | Pace  | CI's runner, dropped          | Pace        |
   | ------------- | ------------------------ | ----- | ----------------------------- | ----------- |
@@ -772,16 +810,13 @@ and one height in justified rows is equal cells by another measure.
   **HEVC is not counted**: the tests' Edge reports it unsupported on both machines, so its tests
   skip and say so. Whether the app's WebView2 plays it depends on the machine's HEVC decoder.
 
-  **Probed once each past and below four.** Here, 1080p60 held six and eight; at twelve none
+  **Probed once each past and below four.** Here, 1080p60 held six and eight. At twelve none
   dropped, but the pace was 0.750 in every span, three of the twelve standing still. 4K30 held
-  six; eight dropped 144 of 1209 in its first span, at 0.901, then held; twelve were never all
+  six; eight dropped 144 of 1209 in its first span, at 0.901, then held. Twelve were never all
   drawn within the bench's minute. In hardware the edge is a decoder's limit, well past four. On
-  CI, 4K30 held one, two, and three, which dropped 6 of 1363 in one span, all at 1.000; 1080p60
-  held three, none dropped, and five dropped 330 of 4509 in every span while keeping time.
-
-  So four holds everything counted except 4K decoded in software, which falls to about 0.76 of
-  its pace, and three holds that too. Which to keep, more clips playing or every clip keeping
-  time, is the owner's, on #175.
+  CI, 4K30 held one, two, and three, which dropped 6 of 1363 in one span, all at 1.000. 1080p60
+  held three with none dropped, and five dropped 330 of 4509 in every span while keeping time.
+  These counts are why no one count fits both machines.
 - **The test clip waits 37ms between frames, 74 after its first, in two timers.**
   `src/dev/media.test.ts` holds every gap to the 33.3ms a window at 30 a second takes, and 34ms
   left no room to. A recording keeps whole milliseconds and its stamps sit off the pushes, by up

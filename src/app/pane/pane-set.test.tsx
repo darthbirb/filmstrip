@@ -409,7 +409,33 @@ test("videos loop muted, and unmuting one takes the sound from the one that had 
   expect(drawn.bottom - plate.bottom).toBeCloseTo(inset, 0);
 });
 
-test("four clips play at once, and the rest hold still until one is given the sound", async () => {
+/**
+ * Makes these clips report a machine that shows `room()` clips' worth of frames: past it, every
+ * playing clip drops its share.
+ */
+function machine(videos: () => HTMLVideoElement[], room: () => number) {
+  for (const video of videos()) {
+    const real = video.getVideoPlaybackQuality.bind(video);
+    let seen = 0;
+    let dropped = 0;
+    video.getVideoPlaybackQuality = () => {
+      const quality = real();
+      const playing = videos().filter((one) => !one.paused).length;
+      dropped += (quality.totalVideoFrames - seen) * Math.max(0, 1 - room() / playing);
+      seen = quality.totalVideoFrames;
+      return {
+        creationTime: quality.creationTime,
+        totalVideoFrames: quality.totalVideoFrames,
+        droppedVideoFrames: Math.round(dropped),
+        corruptedVideoFrames: quality.corruptedVideoFrames,
+      };
+    };
+  }
+}
+
+test("on a machine falling behind, the clips added last pause, and resume when there is room", {
+  timeout: 90_000,
+}, async () => {
   const felucca = await itemDetail(id("felucca.mp4"));
   if (!felucca) throw new Error("the mock has no felucca.mp4");
   const clips = [1, 2, 3, 4, 5].map(
@@ -424,7 +450,7 @@ test("four clips play at once, and the rest hold still until one is given the so
       path: `D:\\Pictures\\Cairo\\clip-${n}.webm`,
     }),
   );
-  const url = await clip(320, 180, 600);
+  const url = await clip(320, 180, 6000);
   undoServe = serveFiles(Object.fromEntries(clips.map((one) => [one.diskName, url])));
   await render(
     <div style={{ display: "flex", width: 640, height: 480 }}>
@@ -434,9 +460,15 @@ test("four clips play at once, and the rest hold still until one is given the so
   const group = page.getByRole("group", { name: "5 Files" });
   const videos = () => [...group.element().querySelectorAll("video")];
   const playing = () => videos().map((video) => !video.paused);
-  await expect.poll(playing).toEqual([true, true, true, true, false]);
+  await expect.poll(playing).toEqual([true, true, true, true, true]);
+  let room = 2;
+  machine(videos, () => room);
+  // Given the sound, the last added plays first and pauses last.
   await expect.poll(() => group.getByRole("button", { name: "Unmute" }).elements().length).toBe(5);
   await group.getByRole("button", { name: "Unmute" }).nth(4).click();
-  await expect.poll(playing).toEqual([true, true, true, false, true]);
+  await expect.poll(playing, { timeout: 30_000 }).toEqual([true, false, false, false, true]);
   expect(videos().map((video) => video.muted)).toEqual([true, true, true, true, false]);
+
+  room = 5;
+  await expect.poll(playing, { timeout: 30_000 }).toEqual([true, true, false, false, true]);
 });
