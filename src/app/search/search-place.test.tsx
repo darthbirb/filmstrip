@@ -1,4 +1,4 @@
-import { beforeEach, expect, test } from "vitest";
+import { beforeEach, expect, onTestFinished, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
@@ -137,6 +137,10 @@ test("an open auto popover closes at Escape first, with the focus outside it; a 
   const manual = document.createElement("div");
   manual.popover = "manual";
   document.body.append(auto, manual);
+  onTestFinished(() => {
+    auto.remove();
+    manual.remove();
+  });
 
   auto.showPopover();
   expect(auto.contains(document.activeElement)).toBe(false);
@@ -148,8 +152,6 @@ test("an open auto popover closes at Escape first, with the focus outside it; a 
   await userEvent.keyboard("{Escape}");
   expect(getPlace()).toEqual(TRIPS);
   expect(manual.matches(":popover-open")).toBe(true);
-  auto.remove();
-  manual.remove();
 });
 
 test("Search Everywhere asks again without the scope", async () => {

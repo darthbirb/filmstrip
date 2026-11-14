@@ -1,6 +1,6 @@
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC } from "@tauri-apps/api/mocks";
-import { beforeEach, expect, test } from "vitest";
+import { beforeEach, expect, onTestFinished, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
@@ -226,6 +226,10 @@ test("an open auto popover closes at Escape first, with the focus outside it; a 
   const manual = document.createElement("div");
   manual.popover = "manual";
   document.body.append(auto, manual);
+  onTestFinished(() => {
+    auto.remove();
+    manual.remove();
+  });
   await userEvent.click(box(0));
   await userEvent.click(box(1));
 
@@ -239,8 +243,6 @@ test("an open auto popover closes at Escape first, with the focus outside it; a 
   await userEvent.keyboard("{Escape}");
   expect(getSelection().ids).toEqual([]);
   expect(manual.matches(":popover-open")).toBe(true);
-  auto.remove();
-  manual.remove();
 });
 
 test("Ctrl+A in a field selects its text and checks nothing", async () => {
