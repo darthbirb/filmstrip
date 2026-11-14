@@ -126,6 +126,7 @@ test("a file that expired before it could be restored is in the Recycle Bin, and
   await expect.element(screen.getByText("In the Recycle Bin")).toBeVisible();
   await expect.element(screen.getByText("Expired after 30 days")).toBeVisible();
   expect(screen.getByRole("button", { name: "Retry" }).query()).toBeNull();
+  expect(screen.getByRole("button", { name: /in Explorer|in Trash|to…/ }).query()).toBeNull();
   expect((await trashLimits()).held.count).toBe(1);
 });
 
@@ -138,5 +139,6 @@ test("Ctrl+Z on a delete whose file expired brings back the rest, and says where
   await expect.element(screen.getByText("In the Recycle Bin")).toBeVisible();
   await expect.element(screen.getByText("Expired after 30 days")).toBeVisible();
   expect(screen.getByRole("button", { name: "Retry" }).query()).toBeNull();
+  expect(screen.getByRole("button", { name: /in Explorer|in Trash|to…/ }).query()).toBeNull();
   expect((await trashLimits()).held.count).toBe(0);
 });

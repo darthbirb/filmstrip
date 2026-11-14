@@ -94,18 +94,23 @@ pub fn run(conn: &Connection, bin: &dyn Bin, limits: Limits, now: i64) -> Result
         }
     }
     if let Some(bytes) = limits.total_bytes {
-        for one in items::trash_oldest_first(conn)? {
+        let waiting = items::trash_oldest_first(conn)?;
+        let mut total: i64 = waiting.iter().map(|one| one.bytes).sum();
+        for one in waiting {
+            if total <= bytes {
+                break;
+            }
             if refused.contains(&one.id) {
                 continue;
             }
             let _turn = super::turn();
-            if items::in_trash_tally(conn)?.bytes <= bytes {
-                break;
-            }
             match expire(conn, bin, one.id, Limit::Size { bytes })? {
-                Some(true) => said.by_size += 1,
+                Some(true) => {
+                    said.by_size += 1;
+                    total -= one.bytes;
+                }
                 Some(false) => refused.push(one.id),
-                None => {}
+                None => total -= one.bytes,
             }
         }
     }
@@ -526,6 +531,50 @@ mod tests {
             None,
             "said once, then gone"
         );
+    }
+
+    #[test]
+    fn a_line_about_one_file_that_expired_names_it_from_the_mark() {
+        let lib = library("named", &["moved.jpg", "back.jpg", "copied.jpg"]);
+        let (moved, back, copied) = (
+            lib.id("moved.jpg"),
+            lib.id("back.jpg"),
+            lib.id("copied.jpg"),
+        );
+        let kept = crate::fs::folders::create(&lib.conn, lib.cairo, "Kept", &journal::new_batch())
+            .unwrap();
+        let move_batch = journal::new_batch();
+        crate::fs::items::move_items(&lib.conn, &[moved], kept, &move_batch).unwrap();
+        trash::trash_items(&lib.conn, &[back], &journal::new_batch()).unwrap();
+        let restore_batch = journal::new_batch();
+        trash::restore_items(&lib.conn, &[back], None, &restore_batch).unwrap();
+        let copy_batch = journal::new_batch();
+        journal::record_item_copy(
+            &lib.conn,
+            &copy_batch,
+            &journal::ItemCopied {
+                item_id: copied,
+                folder_id: lib.cairo,
+                into: lib.cairo,
+            },
+        )
+        .unwrap();
+        for id in [moved, back, copied] {
+            trash::trash_items(&lib.conn, &[id], &journal::new_batch()).unwrap();
+            lib.age(id, 31, 1);
+        }
+
+        run(&lib.conn, &lib.bin(), limits(Some(30), None), NOW).unwrap();
+
+        let one = |batch: &str| match acts::describe(&lib.conn, batch).unwrap().act {
+            acts::Act::Move { one, .. }
+            | acts::Act::Restore { one, .. }
+            | acts::Act::Copy { one, .. } => one,
+            other => panic!("{other:?}"),
+        };
+        assert_eq!(one(&move_batch).as_deref(), Some("moved.jpg"));
+        assert_eq!(one(&restore_batch).as_deref(), Some("back.jpg"));
+        assert_eq!(one(&copy_batch).as_deref(), Some("copied.jpg"));
     }
 
     #[test]

@@ -1389,11 +1389,13 @@ promise the person has to keep in mind.
 
 - **At launch and every hour**, as a job of its own kind behind the walk, so it never holds the
   window. The hour is kept by the queue's own tick, which is handed the time, so a test moves the
-  clock rather than waiting on it.
+  clock rather than waiting on it. No run is queued while another waits or runs, so a run that
+  outlasts its hour is never joined by a second saying the same refusals.
 - **Age first, then size, oldest first.** Every file past the time to live goes; then, while the
-  Trash still weighs more than its total, the oldest that are left. Each file goes on its own turn
-  at the disk, its row going in the same transaction once the Recycle Bin has it, so an act
-  queued behind the run waits for one file, not the run.
+  Trash still weighs more than its total, the oldest that are left: weighed once, and lightened
+  by each file that goes or is found already gone. Each file goes on its own turn at the disk,
+  its row going in the same transaction once the Recycle Bin has it, so an act queued behind the
+  run waits for one file, not the run.
 - **A file the Recycle Bin refuses stays in the Trash under its row**, still counted against the
   total, and is tried again at every run. The foot says so once, when more are refused than at the
   last run, with Show in Trash; a run that only sent files says what went, with no Undo.

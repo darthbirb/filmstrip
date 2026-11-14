@@ -541,9 +541,10 @@ fn keep_time(inner: &QueueInner, conn: &Connection, now: i64) -> Result<()> {
     Ok(())
 }
 
-/// Queues the trash keeping its limits, unless a run is already waiting.
+/// Queues the trash keeping its limits, unless a run is already waiting or running: two at once
+/// would each say what the bin refused.
 pub fn enqueue_expiry(conn: &Connection) -> Result<()> {
-    if !table::is_pending(conn, kinds::EXPIRE, "{}")? {
+    if !table::is_queued(conn, kinds::EXPIRE, "{}")? {
         table::enqueue(conn, kinds::EXPIRE, "{}", kinds::PRIORITY_EXPIRE)?;
     }
     Ok(())
@@ -1140,6 +1141,11 @@ mod tests {
         assert_eq!(inner.expiry.next(), hour + EXPIRY_EVERY);
         keep_time(&inner, &conn, hour + EXPIRY_EVERY).unwrap();
         assert_eq!(waiting(&conn), 1, "one still waiting is enough");
+
+        let running = table::claim(&mut conn).unwrap().unwrap();
+        assert_eq!(running.kind, kinds::EXPIRE);
+        keep_time(&inner, &conn, hour + 2 * EXPIRY_EVERY).unwrap();
+        assert_eq!(waiting(&conn), 0, "nor is a second queued while one runs");
     }
 
     #[test]
