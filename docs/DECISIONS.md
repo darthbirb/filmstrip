@@ -740,10 +740,10 @@ and one height in justified rows is equal cells by another measure.
     count that fell and its wait, since it may weigh less, but the lowered count stays and climbs
     from there. A clip taken out forgets nothing, since what is left weighs no more. **Once no clip
     that was playing at a fall is left in the set, the pane forgets every fall**, and every clip
-    plays again as at first: no limit outlives the clips that set it. The pane changes a set a
-    clip at a time, a drop adding and × taking out, so this is what lifts a limit as heavy clips
-    are swapped for light ones. A hidden window is not measured, and the measure starts over once
-    it shows.
+    plays again as at first: no limit outlives the clips that set it. The pane never replaces a
+    set whole: a drop adds clips, × takes one out, and files deleted or moved away leave it, so
+    this is what lifts a limit as heavy clips are swapped for light ones. A hidden window is not
+    measured, and the measure starts over once it shows.
   - **What each settled on**, twelve clips of each kind in the 1500 × 900 pane, on 14 November
     2026. The timing test waits until the count playing has not changed for fourteen seconds,
     which happens only once every clip plays or the pane waits on a count that fell. It then
