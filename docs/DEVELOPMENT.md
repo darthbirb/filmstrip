@@ -302,6 +302,8 @@ source; the reasoning goes in DECISIONS.md, and the comment names the section.
 `check:docs` enforces both, over the source and the prose docs, and CI runs it. It also holds
 DESIGN.md's front matter to `src/styles/app.css`: every colour, radius, spacing and text token
 of the base look, at the same value, and every component reference pointing at a real token.
+Last, it holds `biome.json`'s `$schema` to the Biome version `package.json` pins, so a bump that
+moves Biome stays red until the schema follows: `npx biome migrate --write` rewrites it.
 
 ## Gotchas
 
