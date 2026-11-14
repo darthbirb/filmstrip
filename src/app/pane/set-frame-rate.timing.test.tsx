@@ -28,10 +28,11 @@ test("the clips the pane settles on playing, of the limit's worth, keep time and
 
 afterAll(() => commands.removeFootage());
 
-// What phones record, at about the rate they record it. DECISIONS.md "Several files in the pane".
-const PHONE: (Footage & { type: string })[] = (
+// What phones record, at about the rate they record it; `all` of them play where decoded in
+// hardware, so a pane that pauses more than it must fails. DECISIONS.md "Several files in the pane".
+const PHONE: (Footage & { type: string; all?: boolean })[] = (
   [
-    { codec: "h264", width: 1920, height: 1080, fps: 30, mbps: 17, type: "avc1.640033" },
+    { codec: "h264", width: 1920, height: 1080, fps: 30, mbps: 17, type: "avc1.640033", all: true },
     { codec: "h264", width: 1920, height: 1080, fps: 60, mbps: 25, type: "avc1.640033" },
     { codec: "h264", width: 3840, height: 2160, fps: 30, mbps: 45, type: "avc1.640033" },
     { codec: "hevc", width: 1920, height: 1080, fps: 60, mbps: 15, type: "hvc1.1.6.L153.B0" },
@@ -44,7 +45,7 @@ test.for(PHONE)(
   {
     timeout: 600_000,
   },
-  async ({ type, ...footage }, context) => {
+  async ({ type, all, ...footage }, context) => {
     const { codec, width, height, fps, mbps } = footage;
     const contentType = `video/mp4; codecs="${type}"`;
     const decoding = await navigator.mediaCapabilities.decodingInfo({
@@ -62,6 +63,7 @@ test.for(PHONE)(
     const limit = paneSetLimit();
     const bench = await benchSet(limit, { clips: limit, clip, ms: 5000, spans: 3 });
     keepsTime(bench, `${label}, ${decoding.powerEfficient ? "hardware" : "software"}`);
+    if (all && decoding.powerEfficient) expect(bench.playing).toBe(limit);
   },
 );
 

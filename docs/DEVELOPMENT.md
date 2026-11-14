@@ -85,8 +85,8 @@ Three ways, cheapest first.
   when it finds no file. The pane's frame-rate tests measure with `src/dev/set-bench.tsx`, and
   those that play phone footage need ffmpeg: `pwsh scripts/fetch-ffmpeg.ps1` first, as CI does
   before the step. `tests/footage.ts` makes each clip in `src-tauri/target/footage` as the test
-  asks for it and removes them all after. By hand, in a headed browser on the dev server, the console runs
-  `(await import("/src/dev/set-bench.tsx")).benchSet(24, { motion: "resize" })`.
+  asks for it and removes them all after. By hand, in a headed browser on the dev server, the
+  console runs `(await import("/src/dev/set-bench.tsx")).benchSet(24, { motion: "resize" })`.
   **On CI the timing step passes every run, and fails only on the code.** The clips count their
   own dropped frames, of a clip paced no faster than the window and longer than the count, and the
   test takes the middle of three spans, so a hitch on the shared runner is not what fails it; the

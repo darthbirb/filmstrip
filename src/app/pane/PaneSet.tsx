@@ -55,7 +55,8 @@ export function PaneSet({ items }: { items: readonly ItemDetail[] }) {
   const layout = useMemo(() => layOutSet(sizes, room.area, room.gap, room.least), [shapes, room]);
   const ring = items.some((item) => item.id === ringed) ? ringed : (items[0]?.id ?? null);
   const order = playOrder(items, voiced);
-  const playing = new Set(order.slice(0, useKeepTime(area, order)));
+  const limit = useKeepTime(area, order);
+  const playing = new Set(order.slice(0, limit));
 
   useLayoutEffect(() => {
     const id = focusing.current;

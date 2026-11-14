@@ -121,6 +121,25 @@ test("a new clip in the set is tried after a calm spell, though a count fell bef
   expect(counts).toContain(4);
 });
 
+test("a clip taken out keeps the count that fell and its wait", () => {
+  const settled = run(FIVE, budget(3), 60);
+  const { ceiling, wait, limit } = settled.held;
+  expect(ceiling).toBe(4);
+  expect(wait).toBe(KEEP.retry * 2);
+  const { held } = run([1, 2, 3, 4], budget(3), 1, { from: settled.held });
+  expect(held.ceiling).toBe(ceiling);
+  expect(held.wait).toBe(wait);
+  expect(held.limit).toBe(limit);
+});
+
+test("a set of clips all new plays every one again", () => {
+  const settled = run(FIVE, budget(3), 20);
+  expect(settled.counts.at(-1)).toBe(3);
+  const { held, counts } = run([11, 12, 13, 14, 15], budget(12), 1, { from: settled.held });
+  expect(counts).toEqual([5]);
+  expect(held.ceiling).toBeNull();
+});
+
 test("clips too short to tell a loop from a stall are not measured", () => {
   const { counts } = run(FIVE, budget(1), 40, { duration: (KEEP.span * 2) / 1000 - 0.1 });
   expect(counts.every((count) => count === 5)).toBe(true);

@@ -66,6 +66,7 @@ export function restart(held: Keeper): Keeper {
 /**
  * One span's step: `order` is every clip in play order, `readings` what those playing show now.
  * Two spans of the last three behind, and the clips added last pause; a calm spell, and one resumes.
+ * A clip new to the set forgets the count that fell, and a set all new plays every clip again.
  */
 export function observe(
   held: Keeper,
@@ -73,9 +74,12 @@ export function observe(
   readings: ReadonlyMap<number, Reading>,
   at: number,
 ): Keeper {
-  const clips = [...order].sort((a, b) => a - b).join();
+  const before = new Set(held.clips.split(",").filter(Boolean).map(Number));
+  const fresh = order.filter((id) => !before.has(id)).length;
   let next: Keeper = { ...held, since: held.since + 1 };
-  if (clips !== held.clips) next = { ...next, clips, ceiling: null, wait: KEEP.retry };
+  next.clips = [...order].sort((a, b) => a - b).join();
+  if (fresh > 0) next = { ...next, ceiling: null, wait: KEEP.retry };
+  if (fresh > 0 && fresh === order.length) next = { ...next, limit: Number.POSITIVE_INFINITY };
   const playing = order.slice(0, next.limit);
   const key = playing.join();
   const to = (limit: number): Keeper => ({
