@@ -219,6 +219,30 @@ test("in full screen the first Escape leaves it, and only the next one clears", 
   expect(getSelection().ids).toEqual([]);
 });
 
+test("an open auto popover closes at Escape first, with the focus outside it; a manual one never holds the selection", async () => {
+  await renderGrid();
+  const auto = document.createElement("div");
+  auto.popover = "auto";
+  const manual = document.createElement("div");
+  manual.popover = "manual";
+  document.body.append(auto, manual);
+  await userEvent.click(box(0));
+  await userEvent.click(box(1));
+
+  auto.showPopover();
+  expect(auto.contains(document.activeElement)).toBe(false);
+  await userEvent.keyboard("{Escape}");
+  await expect.poll(() => auto.matches(":popover-open")).toBe(false);
+  expect(getSelection().ids).toEqual([101, 102]);
+
+  manual.showPopover();
+  await userEvent.keyboard("{Escape}");
+  expect(getSelection().ids).toEqual([]);
+  expect(manual.matches(":popover-open")).toBe(true);
+  auto.remove();
+  manual.remove();
+});
+
 test("Ctrl+A in a field selects its text and checks nothing", async () => {
   await renderGrid();
   const field = document.createElement("input");

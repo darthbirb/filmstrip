@@ -122,6 +122,14 @@ export function keepEscape(event: KeyboardEvent) {
   if (event.key === "Escape") event.stopPropagation();
 }
 
+/**
+ * An open auto popover closes at Escape wherever the focus is, so the press is its alone. A manual
+ * one never closes at Escape, so it leaves the press to whatever else wants it.
+ */
+export function autoPopoverOpen() {
+  return document.querySelector('[popover="auto"]:popover-open') !== null;
+}
+
 function moveWithin(menu: RefObject<HTMLDivElement | null>, event: KeyboardEvent) {
   const list = rows(menu);
   const at = list.indexOf(document.activeElement as HTMLElement);

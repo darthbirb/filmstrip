@@ -1,5 +1,5 @@
 import { beforeEach, expect, test } from "vitest";
-import { page } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { folderItems } from "../../ipc/commands";
@@ -10,6 +10,7 @@ import { type Place, setPlace } from "../place";
 import { getPreferences, updatePreferences } from "../preferences";
 import { Grid } from "./Grid";
 import { SortOrder } from "./SortOrder";
+import { clearChecked, getSelection } from "./selection";
 import { TileSize } from "./TileSize";
 
 // Against the dev mock: Cairo (6) holds felucca.mp4, pyramid.jpg and sphinx.jpg, taken a minute
@@ -29,6 +30,7 @@ beforeEach(async () => {
   await page.viewport(1200, 800);
   updatePreferences({ sort: undefined });
   setPlace(CAIRO);
+  clearChecked();
 });
 
 function Harness() {
@@ -112,6 +114,28 @@ test("the menu lists the five keys, and a key picked starts the way it reads fir
 
   await screen.getByRole("button", { name: "Reverse · Shortest First" }).click();
   await expect.poll(tiles).toEqual(["felucca.mp4", "pyramid.jpg", "sphinx.jpg"]);
+});
+
+test("with files checked, Escape closes the list first though a click on its edge took the focus", async () => {
+  const screen = await render(<Harness />);
+  await screen.getByRole("checkbox", { name: "Check pyramid.jpg" }).click();
+  await screen.getByRole("checkbox", { name: "Check sphinx.jpg" }).click();
+  const checked = getSelection().ids;
+  expect(checked).toHaveLength(2);
+
+  await sortButton(screen).click();
+  const list = screen.getByRole("listbox", { name: "Sort" }).element().parentElement;
+  if (!list) throw new Error("the Sort list has no surface");
+  const edge = list.getBoundingClientRect();
+  await userEvent.click(list, { position: { x: edge.width / 2, y: edge.height - 2 } });
+  expect(list.contains(document.activeElement)).toBe(false);
+  expect(menuOpen()).toBe(true);
+
+  await userEvent.keyboard("{Escape}");
+  await expect.poll(menuOpen).toBe(false);
+  expect(getSelection().ids).toEqual(checked);
+  await userEvent.keyboard("{Escape}");
+  expect(getSelection().ids).toEqual([]);
 });
 
 test("Random disables Reverse in place, and its order holds until Shuffle draws another", async () => {

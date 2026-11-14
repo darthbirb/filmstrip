@@ -3,6 +3,7 @@ import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { BranchFile } from "../../ipc/bindings/BranchFile";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { folderBranchFiles } from "../../ipc/commands";
+import { autoPopoverOpen } from "../../ui/Menu";
 import { whenLibraryChanges } from "../library";
 import { getFullScreen } from "../pane/full-screen";
 import { getPaneItem } from "../pane/pane-store";
@@ -238,7 +239,8 @@ export function useSelectionKeys(order: readonly number[]) {
       }
       if (document.querySelector("dialog[open]")) return;
       if (event.key === "Escape" && !event.ctrlKey && !event.shiftKey) {
-        if (getFullScreen() || dragging() || held.selection.ids.length === 0) return;
+        if (autoPopoverOpen() || getFullScreen() || dragging()) return;
+        if (held.selection.ids.length === 0) return;
         event.preventDefault();
         clearChecked();
       } else if (event.key.toLowerCase() === "a" && event.ctrlKey && !event.shiftKey) {
