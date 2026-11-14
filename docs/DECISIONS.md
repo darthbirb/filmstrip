@@ -737,10 +737,13 @@ and one height in justified rows is equal cells by another measure.
     as long each time it falls there again, up to eight minutes. A count that holds through a calm
     spell is forgotten. Without that wait, a machine one clip short would fall every sixteen
     seconds, over a third of the time with every clip slowed. A clip new to the set forgets the
-    count that fell, since it may weigh less; a clip taken out forgets nothing, since what is left
-    weighs no more. A set of clips all new starts with every one playing again, so no limit
-    outlives the clips that set it. A hidden window is not measured, and the measure starts over
-    once it shows.
+    count that fell and its wait, since it may weigh less, but the lowered count stays and climbs
+    from there. A clip taken out forgets nothing, since what is left weighs no more. **Once no clip
+    that was playing at a fall is left in the set, the pane forgets every fall**, and every clip
+    plays again as at first: no limit outlives the clips that set it. The pane changes a set a
+    clip at a time, a drop adding and × taking out, so this is what lifts a limit as heavy clips
+    are swapped for light ones. A hidden window is not measured, and the measure starts over once
+    it shows.
   - **What each settled on**, twelve clips of each kind in the 1500 × 900 pane, on 14 November
     2026. The timing test waits until the count playing has not changed for fourteen seconds,
     which happens only once every clip plays or the pane waits on a count that fell. It then
@@ -748,21 +751,25 @@ and one height in justified rows is equal cells by another measure.
     as the clip's length there, since clips started together loop together. Each machine's column
     is how many clips it settled on playing, then what they dropped and their pace:
 
-    | Clips         | Here | Dropped     | Pace        | CI | Dropped   | Pace        |
-    | ------------- | ---- | ----------- | ----------- | -- | --------- | ----------- |
-    | Recorded WebM | 7    | 0 of 2726   | 0.986–1.000 | 10 | 0 of 3943 | 0.981–1.000 |
-    | H.264 1080p30 | 12   | 8 of 5388   | 0.998–1.000 | 8  | 0 of 3591 | 1.000       |
-    | H.264 1080p60 | 12   | 15 of 10786 | 0.997–1.000 | 5  | 7 of 4471 | 0.989–0.996 |
-    | H.264 4K30    | 8    | 6 of 3598   | 0.999–1.000 | 3  | 2 of 1327 | 0.973–1.000 |
+    | Clips         | Here | Dropped     | Pace        | CI   | Dropped    | Pace        |
+    | ------------- | ---- | ----------- | ----------- | ---- | ---------- | ----------- |
+    | Recorded WebM | 7–8  | 0 of 2726   | 0.986–1.000 | 8–10 | 0 of 7105  | 0.981–1.000 |
+    | H.264 1080p30 | 12   | 8 of 5388   | 0.998–1.000 | 6–8  | 7 of 6272  | 0.977–1.000 |
+    | H.264 1080p60 | 12   | 15 of 10786 | 0.997–1.000 | 4–5  | 11 of 8038 | 0.987–1.000 |
+    | H.264 4K30    | 8–9  | 6 of 3598   | 0.999–1.000 | 2–3  | 7 of 2197  | 0.947–1.000 |
 
-    Here the clips decode in hardware and the WebM in software, as above. Here, 4K settled on
-    eight in both of two runs, its first counting 8 of 2995 dropped, and 1080p60 held all twelve,
-    where the probe below once saw three of twelve stand still. CI's runner decodes them all in
-    software; its column is from this pull request's Gates run, where 4K settled on three and kept
-    time. HEVC is not counted, as below. The measure's numbers are not tokens: they draw nothing,
-    and a test that needs them reads `KEEP`. The timing test holds all twelve 1080p30 clips
-    playing where `mediaCapabilities` reports them decoded in hardware, so a pane that pauses
-    more than it must fails there too.
+    Here the clips decode in hardware and the WebM in software, as above. The dropped frames and
+    pace are from the second of four runs, and the counts span every run. Here, 4K settled on
+    eight in three runs and nine in the fourth, and 1080p60 held all twelve in every run, where
+    the probe below once saw three of twelve stand still. CI's runner decodes them all in
+    software, and its column spans two of this pull request's Gates runs, 43587317817 and
+    43589646232, dropped frames summed over both. The count a shared runner settles on varies:
+    the first run gave the higher of each range, the second the lower, and every count kept time.
+    4K settled on three, then on two, its middle span at 0.959 though one span fell to 0.947.
+    HEVC is not counted, as below. The measure's numbers are not tokens: they draw nothing, and a
+    test that needs them reads `KEEP`. The timing test holds all twelve 1080p30 clips playing
+    where `mediaCapabilities` reports them decoded in hardware, so a pane that pauses more than
+    it must fails there too.
 
 - **The bounds were set from the test clip's edge.** Counted on 2 November 2026, before the pane
   measured itself, with the 37ms clip among twelve originals in a 1500 × 900 pane. These were runs

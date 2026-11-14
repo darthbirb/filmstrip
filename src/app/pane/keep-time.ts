@@ -40,6 +40,8 @@ export type Keeper = {
   spans: readonly Measure[];
   /** The fewest clips found falling behind, tried again only after `wait` spans. */
   ceiling: number | null;
+  /** Every clip playing at a fall since the limit was last lifted. */
+  fell: readonly number[];
   wait: number;
   since: number;
 };
@@ -53,6 +55,7 @@ export function keeper(): Keeper {
     last: null,
     spans: [],
     ceiling: null,
+    fell: [],
     wait: KEEP.retry,
     since: 0,
   };
@@ -66,7 +69,8 @@ export function restart(held: Keeper): Keeper {
 /**
  * One span's step: `order` is every clip in play order, `readings` what those playing show now.
  * Two spans of the last three behind, and the clips added last pause; a calm spell, and one resumes.
- * A clip new to the set forgets the count that fell, and a set all new plays every clip again.
+ * A clip new to the set forgets the count that fell; once no clip that played at a fall is left,
+ * every clip plays again.
  */
 export function observe(
   held: Keeper,
@@ -75,11 +79,15 @@ export function observe(
   at: number,
 ): Keeper {
   const before = new Set(held.clips.split(",").filter(Boolean).map(Number));
-  const fresh = order.filter((id) => !before.has(id)).length;
-  let next: Keeper = { ...held, since: held.since + 1 };
-  next.clips = [...order].sort((a, b) => a - b).join();
-  if (fresh > 0) next = { ...next, ceiling: null, wait: KEEP.retry };
-  if (fresh > 0 && fresh === order.length) next = { ...next, limit: Number.POSITIVE_INFINITY };
+  let next: Keeper = {
+    ...held,
+    since: held.since + 1,
+    clips: [...order].sort((a, b) => a - b).join(),
+  };
+  if (order.some((id) => !before.has(id))) next = { ...next, ceiling: null, wait: KEEP.retry };
+  if (next.fell.length > 0 && !next.fell.some((id) => order.includes(id))) {
+    next = { ...next, limit: Number.POSITIVE_INFINITY, ceiling: null, wait: KEEP.retry, fell: [] };
+  }
   const playing = order.slice(0, next.limit);
   const key = playing.join();
   const to = (limit: number): Keeper => ({
@@ -103,6 +111,7 @@ export function observe(
     next = {
       ...next,
       ceiling: count,
+      fell: [...new Set([...next.fell, ...playing])],
       wait: again ? Math.min(next.wait * 2, KEEP.retryMost) : KEEP.retry,
       since: 0,
     };

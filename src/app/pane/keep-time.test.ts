@@ -2,15 +2,19 @@ import { expect, test } from "vitest";
 
 import { KEEP, type Keeper, keeper, observe, type Reading, restart } from "./keep-time";
 
-/** What each playing clip shows over a span, given how many play and which span it is. */
-type Machine = (playing: number, tick: number) => { pace: number; dropped: number };
+/** What each playing clip shows over a span, given which play and which span it is. */
+type Machine = (playing: readonly number[], tick: number) => { pace: number; dropped: number };
 
-/** A machine that shows `budget` clips' worth of frames a span, every clip slowed alike past it. */
+/**
+ * A machine that shows `budget` clips' worth of frames a span, every clip slowed alike past it;
+ * a clip `weighs` that many clips' worth.
+ */
 const budget =
-  (most: number | ((tick: number) => number)): Machine =>
+  (most: number | ((tick: number) => number), weighs = (_: number) => 1): Machine =>
   (playing, tick) => {
     const room = typeof most === "number" ? most : most(tick);
-    return { pace: Math.min(1, room / playing), dropped: 0 };
+    const load = playing.reduce((sum, id) => sum + weighs(id), 0);
+    return { pace: Math.min(1, room / load), dropped: 0 };
   };
 
 const FRAMES = 60;
@@ -27,7 +31,7 @@ function run(
   const counts: number[] = [];
   for (let tick = 0; tick < ticks; tick++) {
     const playing = order.slice(0, held.limit);
-    const shows = machine(playing.length, tick);
+    const shows = machine(playing, tick);
     for (const id of order) {
       const was = clocks.get(id) ?? { time: 0, duration, dropped: 0, due: 0, paused: true };
       const seconds = (shows.pace * KEEP.span) / 1000;
@@ -66,7 +70,7 @@ test("falling behind pauses the clips added last, as many as the measure says it
 });
 
 test("dropped frames alone are falling behind, a clip at a time when the measure is near", () => {
-  const drops: Machine = (playing) => ({ pace: 1, dropped: playing > 3 ? 0.03 : 0 });
+  const drops: Machine = (playing) => ({ pace: 1, dropped: playing.length > 3 ? 0.03 : 0 });
   const { counts } = run(FIVE, drops, 6 + KEEP.retry);
   expect(counts.slice(0, 7)).toEqual([5, 5, 5, 4, 4, 4, 3]);
   expect(counts.slice(6).every((count) => count === 3)).toBe(true);
@@ -132,12 +136,28 @@ test("a clip taken out keeps the count that fell and its wait", () => {
   expect(held.limit).toBe(limit);
 });
 
-test("a set of clips all new plays every one again", () => {
+test("once no clip that played at a fall is left, every clip plays again at once", () => {
+  const heavy = Array.from({ length: 12 }, (_, at) => at + 1);
+  const light = Array.from({ length: 9 }, (_, at) => at + 21);
+  // Room for nine light clips, or three heavy ones.
+  const machine = budget(9, (id) => (id > 20 ? 1 : 3));
+  const settled = run(heavy, machine, 20);
+  expect(settled.counts.at(-1)).toBe(3);
+  // Taken out and added a step at a time, as the pane allows: no tick sees a set all new.
+  const kept = run([1, 2, 3], machine, 1, { from: settled.held });
+  const added = run([1, 2, 3, ...light], machine, 1, { from: kept.held });
+  expect(added.counts[0]).toBeLessThan(light.length);
+  const { held, counts } = run(light, machine, 1, { from: added.held });
+  expect(counts).toEqual([9]);
+  expect(held.ceiling).toBeNull();
+  expect(held.wait).toBe(KEEP.retry);
+});
+
+test("a clip that played at a fall, still in the set, keeps the limit", () => {
   const settled = run(FIVE, budget(3), 20);
   expect(settled.counts.at(-1)).toBe(3);
-  const { held, counts } = run([11, 12, 13, 14, 15], budget(12), 1, { from: settled.held });
-  expect(counts).toEqual([5]);
-  expect(held.ceiling).toBeNull();
+  const { counts } = run([1, 6, 7, 8, 9], budget(3), 1, { from: settled.held });
+  expect(counts).toEqual([3]);
 });
 
 test("clips too short to tell a loop from a stall are not measured", () => {
