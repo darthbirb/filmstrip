@@ -13,7 +13,9 @@ use crate::db::sources::{self, SourceKind};
 use crate::db::{folders, in_transaction, items, journal, now, tags};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::stayed::{self, Stayed};
-use crate::fs::{items as fs_items, noclobber, paths, relocate, sanitize, trash, walk};
+use crate::fs::{
+    PASSING, items as fs_items, noclobber, paths, relocate, sanitize, take_away, trash, walk,
+};
 
 /// Makes a folder inside `parent_id` under `title`, as a directory and then a row.
 pub fn create(conn: &Connection, parent_id: i64, title: &str, batch_id: &str) -> Result<i64> {
@@ -226,7 +228,15 @@ pub fn delete(
     }
 
     let dir = paths::folder_dir(conn, folder_id)?;
-    let unseen = unseen_files(&dir)?;
+    let mut unseen = unseen_once_passed(&dir)?;
+    if unseen.is_empty()
+        && let Err(err) = clear_litter(&dir)
+    {
+        unseen = unseen_files(&dir)?;
+        if unseen.is_empty() {
+            return Err(err);
+        }
+    }
     if let Some(first) = unseen.first() {
         let holds = AppError::refused(Reason::Holds {
             name: file_name(first),
@@ -237,7 +247,6 @@ pub fn delete(
             .push(stayed::folder(conn, folder_id, &holds)?);
         return Ok(report);
     }
-    clear_litter(&dir)?;
 
     let retired_at = now();
     let subtree: Vec<PathBuf> = folders::descendants(conn, folder_id)?
@@ -312,6 +321,38 @@ pub fn first_unseen(dir: &Path) -> Result<Option<PathBuf>> {
     Ok(unseen_files(dir)?.into_iter().next())
 }
 
+/// The files `unseen_files` finds once another program's passing file has gone, or as they are
+/// after a quarter of a second. DECISIONS.md "Undo".
+fn unseen_once_passed(dir: &Path) -> Result<Vec<PathBuf>> {
+    let until = Instant::now() + PASSING;
+    #[cfg(test)]
+    let mut meanwhile = LOOKING.with(|hook| hook.borrow_mut().take());
+    loop {
+        #[cfg(test)]
+        if let Some(then) = meanwhile.as_mut() {
+            then(dir);
+        }
+        let unseen = unseen_files(dir)?;
+        if unseen.is_empty() || Instant::now() >= until {
+            return Ok(unseen);
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    static LOOKING: std::cell::RefCell<Option<crate::fs::Meanwhile>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Runs `then` with the directory this thread's next delete looks in, just before each look: where
+/// a test puts what another program leaves there.
+#[cfg(test)]
+fn just_before_looking_for_unseen(then: impl FnMut(&Path) + 'static) {
+    LOOKING.with(|hook| *hook.borrow_mut() = Some(Box::new(then)));
+}
+
 /// Every file under `dir` the index does not show, but for Windows' own litter.
 fn unseen_files(dir: &Path) -> Result<Vec<PathBuf>> {
     let mut found = Vec::new();
@@ -341,7 +382,7 @@ fn is_litter(path: &Path) -> bool {
 }
 
 /// Removes the litter and then each directory, deepest first and each only once it is empty, so a
-/// file that arrived since the check stops the removal rather than going with it.
+/// file that arrived since the check, and stays, stops the removal rather than going with it.
 fn clear_litter(dir: &Path) -> Result<()> {
     if !dir.is_dir() {
         return Ok(());
@@ -349,7 +390,7 @@ fn clear_litter(dir: &Path) -> Result<()> {
     for entry in walkdir::WalkDir::new(dir).contents_first(true) {
         let entry = entry.map_err(|err| AppError::invalid(err.to_string()))?;
         if entry.file_type().is_dir() {
-            std::fs::remove_dir(entry.path())?;
+            take_away(entry.path())?;
         } else if is_litter(entry.path()) {
             std::fs::remove_file(entry.path())?;
         }
@@ -402,48 +443,6 @@ pub(super) fn unmake_copy(conn: &Connection, folder_id: i64) -> Result<()> {
     folders::retire_subtree_at(conn, folder_id, now()).map(|_| ())
 }
 
-/// How long a directory an undo takes away may hold another program's file before it stays.
-const PASSING: Duration = Duration::from_millis(250);
-
-/// Removes a directory an undo takes away, only ever while it is empty, trying again while
-/// another program's file passes through it. DECISIONS.md "Undo".
-fn take_away(dir: &Path) -> std::io::Result<()> {
-    let until = Instant::now() + PASSING;
-    #[cfg(test)]
-    let mut meanwhile = JUST_BEFORE.with(|hook| hook.borrow_mut().take());
-    loop {
-        #[cfg(test)]
-        if let Some(then) = meanwhile.as_mut() {
-            then(dir);
-        }
-        match std::fs::remove_dir(dir) {
-            Err(err)
-                if err.kind() == std::io::ErrorKind::DirectoryNotEmpty
-                    && Instant::now() < until =>
-            {
-                std::thread::sleep(Duration::from_millis(1));
-            }
-            done => return done,
-        }
-    }
-}
-
-#[cfg(test)]
-type Meanwhile = Box<dyn FnMut(&Path)>;
-
-#[cfg(test)]
-thread_local! {
-    static JUST_BEFORE: std::cell::RefCell<Option<Meanwhile>> =
-        const { std::cell::RefCell::new(None) };
-}
-
-/// Runs `then` with the directory this thread's next undo takes away, just before each try at
-/// it: where a test puts what another program leaves there.
-#[cfg(test)]
-pub(crate) fn just_before_taking_away(then: impl FnMut(&Path) + 'static) {
-    JUST_BEFORE.with(|hook| *hook.borrow_mut() = Some(Box::new(then)));
-}
-
 fn refuse_clash(conn: &Connection, parent_id: i64, title: &str, own: Option<i64>) -> Result<()> {
     match folders::child_id(conn, parent_id, title)? {
         Some(id) if Some(id) != own => Err(taken(conn, parent_id, title)),
@@ -468,7 +467,9 @@ mod tests {
     use crate::db::sources::SourceKind;
     use crate::db::{self, sources};
     use crate::fs::{settles_to, walk};
+    use std::cell::Cell;
     use std::path::{Path, PathBuf};
+    use std::rc::Rc;
 
     fn scratch(name: &str) -> PathBuf {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -876,6 +877,71 @@ mod tests {
         assert!(folders::is_live(&conn, made).unwrap());
         let shown = first_unseen(&root.join("Trips/Lisbon")).unwrap();
         assert_eq!(shown, Some(root.join("Trips/Lisbon/.notes")));
+    }
+
+    /// Counts each try; on the first puts `name` in the folder, and on the second takes it away
+    /// unless `stays`.
+    fn theirs_passes(name: &'static str, stays: bool) -> (Rc<Cell<u32>>, impl FnMut(&Path)) {
+        let tries = Rc::new(Cell::new(0));
+        let counted = Rc::clone(&tries);
+        let hook = move |at: &Path| {
+            counted.set(counted.get() + 1);
+            match counted.get() {
+                1 => std::fs::write(at.join(name), "theirs").unwrap(),
+                2 if !stays => crate::fs::remove_once_let_go(&at.join(name)),
+                _ => {}
+            }
+        };
+        (tries, hook)
+    }
+
+    fn trashed_whole(conn: &Connection, root: &Path, cairo: i64, tries: &Cell<u32>) {
+        let report = delete(conn, cairo, Some(Contents::Trash), &journal::new_batch()).unwrap();
+        assert!(report.deleted, "{:?}", report.refused);
+        assert_eq!(tries.get(), 2);
+        assert!(!root.join("Trips/Cairo").exists());
+        assert!(!folders::is_live(conn, cairo).unwrap());
+    }
+
+    #[test]
+    fn a_folder_deleted_goes_once_another_programs_file_it_found_has_passed() {
+        let (conn, root, _, trips) = library("delete-passing-seen");
+        let cairo = folders::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        let (tries, hook) = theirs_passes("PYRAMID.JPG.tmp", false);
+        just_before_looking_for_unseen(hook);
+        trashed_whole(&conn, &root, cairo, &tries);
+    }
+
+    #[test]
+    fn a_folder_deleted_goes_once_another_programs_file_has_passed_through_it() {
+        let (conn, root, _, trips) = library("delete-passing");
+        let cairo = folders::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        let (tries, hook) = theirs_passes("PYRAMID.JPG.tmp", false);
+        crate::fs::just_before_taking_away(hook);
+        trashed_whole(&conn, &root, cairo, &tries);
+    }
+
+    #[test]
+    fn a_file_that_arrives_as_its_folder_goes_keeps_it_and_is_named() {
+        let (conn, root, _, trips) = library("delete-arrives");
+        let cairo = folders::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        let (_, hook) = theirs_passes("theirs.jpg", true);
+        crate::fs::just_before_taking_away(hook);
+
+        let report = delete(&conn, cairo, Some(Contents::Trash), &journal::new_batch()).unwrap();
+        assert!(!report.deleted);
+        assert_eq!(
+            report.refused[0].reason,
+            Reason::Holds {
+                name: "theirs.jpg".into(),
+                more: 0
+            }
+        );
+        assert_eq!(
+            std::fs::read_to_string(root.join("Trips/Cairo/theirs.jpg")).unwrap(),
+            "theirs"
+        );
+        assert!(folders::is_live(&conn, cairo).unwrap());
     }
 
     #[test]

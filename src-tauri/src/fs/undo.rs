@@ -300,7 +300,7 @@ mod tests {
         folders::create(&conn, trips, "Lisbon", &batch).unwrap();
         let tries = Rc::new(Cell::new(0));
         let counted = Rc::clone(&tries);
-        folders::just_before_taking_away(move |at| {
+        crate::fs::just_before_taking_away(move |at| {
             counted.set(counted.get() + 1);
             match counted.get() {
                 1 => std::fs::write(at.join("TRAM.JPG.tmp"), "theirs").unwrap(),
