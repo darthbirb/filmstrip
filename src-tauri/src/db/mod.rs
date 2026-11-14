@@ -86,8 +86,10 @@ pub fn in_transaction<T>(
 pub fn migrate(conn: &mut Connection) -> Result<()> {
     conn.pragma_update(None, "foreign_keys", "OFF")?;
     let result = migrate_inner(conn);
-    conn.pragma_update(None, "foreign_keys", "ON")?;
-    result
+    // Not pragma_update: its name check can read the file, and so mask the migration's error.
+    let restored = conn.execute_batch("PRAGMA foreign_keys=ON");
+    result?;
+    Ok(restored?)
 }
 
 fn migrate_inner(conn: &mut Connection) -> Result<()> {
@@ -239,6 +241,54 @@ mod tests {
         );
         assert_eq!(codec, "h264");
         assert_eq!(frame, None);
+    }
+
+    #[test]
+    fn a_failed_migration_returns_its_own_error_with_foreign_keys_back_on() {
+        use std::cell::RefCell;
+        use std::io::Write;
+        use std::path::PathBuf;
+
+        thread_local! {
+            static GARBLE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
+        }
+        fn garble_and_give_up(_: i32) -> bool {
+            if let Some(path) = GARBLE.with_borrow_mut(|path| path.take()) {
+                std::fs::OpenOptions::new()
+                    .write(true)
+                    .open(path)
+                    .and_then(|mut file| file.write_all(&[0xAB; 100]))
+                    .unwrap();
+            }
+            false
+        }
+
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-db/garbled");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("library.db");
+        let writer = Connection::open(&path).unwrap();
+        writer
+            .execute_batch("CREATE TABLE t (x INTEGER); BEGIN IMMEDIATE;")
+            .unwrap();
+        let mut conn = Connection::open(&path).unwrap();
+        GARBLE.set(Some(path));
+        conn.busy_handler(Some(garble_and_give_up)).unwrap();
+
+        let err = migrate(&mut conn).unwrap_err();
+
+        assert!(
+            matches!(
+                &err,
+                crate::error::AppError::Db(e)
+                    if e.sqlite_error_code() == Some(rusqlite::ErrorCode::DatabaseBusy)
+            ),
+            "the migration's own error, not the closing pragma's: {err}"
+        );
+        let on: i64 = conn
+            .query_row("PRAGMA foreign_keys", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(on, 1);
     }
 
     #[test]

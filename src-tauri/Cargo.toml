@@ -58,3 +58,4 @@ strip = true
 
 [dev-dependencies]
 proptest = "1.11.0"
+rusqlite = { version = "0.41", features = ["extra_check"] }
