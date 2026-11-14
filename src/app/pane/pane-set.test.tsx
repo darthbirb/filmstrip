@@ -329,7 +329,10 @@ test("Escape with the focus outside the pane leaves the set as it is", async () 
   showThree();
   const screen = await render(<Harness grid />);
   await expect.element(file("pyramid.jpg")).toBeVisible();
-  (screen.getByRole("main").getByRole("button").first().element() as HTMLElement).focus();
+  const tile = screen.getByRole("main").getByRole("button").first();
+  await expect.element(tile).toBeVisible();
+  (tile.element() as HTMLElement).focus();
+  expect(document.activeElement).toBe(tile.element());
   await userEvent.keyboard("{Escape}");
   expect(getPaneSet()).toHaveLength(3);
 });
