@@ -232,10 +232,10 @@ pub fn delete(
     if unseen.is_empty()
         && let Err(err) = clear_litter(&dir)
     {
-        unseen = unseen_files(&dir)?;
-        if unseen.is_empty() {
-            return Err(err);
-        }
+        unseen = match unseen_files(&dir) {
+            Ok(found) if !found.is_empty() => found,
+            _ => return Err(err),
+        };
     }
     if let Some(first) = unseen.first() {
         let holds = AppError::refused(Reason::Holds {
@@ -467,7 +467,7 @@ mod tests {
     use crate::db::sources::SourceKind;
     use crate::db::{self, sources};
     use crate::fs::{settles_to, walk};
-    use std::cell::Cell;
+    use std::cell::{Cell, RefCell};
     use std::path::{Path, PathBuf};
     use std::rc::Rc;
 
@@ -941,6 +941,31 @@ mod tests {
             std::fs::read_to_string(root.join("Trips/Cairo/theirs.jpg")).unwrap(),
             "theirs"
         );
+        assert!(folders::is_live(&conn, cairo).unwrap());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_folder_that_will_not_go_and_cannot_then_be_read_fails_for_why_it_would_not_go() {
+        use std::os::windows::fs::OpenOptionsExt;
+        const BACKUP_SEMANTICS: u32 = 0x0200_0000;
+        let (conn, _, _, trips) = library("delete-unreadable");
+        let cairo = folders::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        let held = Rc::new(RefCell::new(None));
+        let holding = Rc::clone(&held);
+        crate::fs::just_before_taking_away(move |at| {
+            holding.borrow_mut().get_or_insert_with(|| {
+                std::fs::OpenOptions::new()
+                    .read(true)
+                    .share_mode(0)
+                    .custom_flags(BACKUP_SEMANTICS)
+                    .open(at)
+                    .unwrap()
+            });
+        });
+
+        let err = delete(&conn, cairo, Some(Contents::Trash), &journal::new_batch()).unwrap_err();
+        assert!(matches!(err, AppError::Io(_)), "{err:?}");
         assert!(folders::is_live(&conn, cairo).unwrap());
     }
 
