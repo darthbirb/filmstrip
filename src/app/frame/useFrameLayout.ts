@@ -1,5 +1,6 @@
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { autoPopoverOpen } from "../../ui/Menu";
 import { getPreferences, updatePreferences } from "../preferences";
 
 export type Side = "nav" | "pane";
@@ -57,7 +58,7 @@ export function useFrameLayout() {
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || autoPopoverOpen()) return;
       event.preventDefault();
       setOverlay(null);
     };

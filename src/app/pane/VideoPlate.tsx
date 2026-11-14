@@ -14,6 +14,7 @@ import { formatDuration, formatElapsed } from "../../lib/format";
 import { Dropdown } from "../../ui/Dropdown";
 import { Glyph } from "../../ui/Glyph";
 import type { GlyphName } from "../../ui/glyphs";
+import { autoPopoverOpen } from "../../ui/Menu";
 import { getPreferences, updatePreferences, usePreferences } from "../preferences";
 import { SPEEDS, type Speed, setSpeed, speedLabel, stepSpeed, useSpeed } from "./speed";
 
@@ -408,7 +409,7 @@ let closeVolume: (() => void) | null = null;
 window.addEventListener(
   "keydown",
   (event) => {
-    if (event.key !== "Escape" || !closeVolume) return;
+    if (event.key !== "Escape" || !closeVolume || autoPopoverOpen()) return;
     event.preventDefault();
     event.stopPropagation();
     closeVolume();

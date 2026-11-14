@@ -1,4 +1,4 @@
-import { beforeEach, expect, test } from "vitest";
+import { beforeEach, expect, onTestFinished, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
@@ -126,6 +126,32 @@ test("Escape goes back once nothing checked is left to clear", async () => {
   expect(getPlace()?.kind).toBe("search");
   await userEvent.keyboard("{Escape}");
   expect(getPlace()).toEqual(TRIPS);
+});
+
+test("an open auto popover closes at Escape first, with the focus outside it; a manual one never holds the search", async () => {
+  setPlace(searching("path:Pictures/Trips cairo"));
+  const screen = await renderPlace();
+  await expect.element(screen.getByRole("button", { name: "pyramid.jpg" })).toBeVisible();
+  const auto = document.createElement("div");
+  auto.popover = "auto";
+  const manual = document.createElement("div");
+  manual.popover = "manual";
+  document.body.append(auto, manual);
+  onTestFinished(() => {
+    auto.remove();
+    manual.remove();
+  });
+
+  auto.showPopover();
+  expect(auto.contains(document.activeElement)).toBe(false);
+  await userEvent.keyboard("{Escape}");
+  await expect.poll(() => auto.matches(":popover-open")).toBe(false);
+  expect(getPlace()?.kind).toBe("search");
+
+  manual.showPopover();
+  await userEvent.keyboard("{Escape}");
+  expect(getPlace()).toEqual(TRIPS);
+  expect(manual.matches(":popover-open")).toBe(true);
 });
 
 test("Search Everywhere asks again without the scope", async () => {

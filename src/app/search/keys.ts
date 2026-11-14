@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 
+import { autoPopoverOpen } from "../../ui/Menu";
 import { dragging } from "../grid/drag";
 import { getSelection } from "../grid/selection";
 import { getFullScreen } from "../pane/full-screen";
@@ -29,7 +30,8 @@ export function useSearchKeys() {
       if (target?.closest("input, textarea, select, [contenteditable], [role=menu], [popover]")) {
         return;
       }
-      if (document.querySelector("dialog[open]") || getPlace()?.kind !== "search") return;
+      if (autoPopoverOpen() || document.querySelector("dialog[open]")) return;
+      if (getPlace()?.kind !== "search") return;
       if (getFullScreen() || dragging() || getSelection().ids.length > 0) return;
       event.preventDefault();
       goBack();

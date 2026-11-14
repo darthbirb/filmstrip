@@ -310,6 +310,21 @@ test("Escape over the folded pane opened over the grid only puts the pane away",
   expect(getPaneSet()).toHaveLength(3);
 });
 
+test("Escape closes a file's menu first though Tab took the focus to a tile, and keeps the set", async () => {
+  showThree();
+  await render(<Harness />);
+  await file("sphinx.jpg").click({ button: "right" });
+  const menu = page.getByRole("menu").element();
+  await expect.poll(() => menu.matches(":popover-open")).toBe(true);
+  await userEvent.tab();
+  expect(menu.matches(":popover-open")).toBe(true);
+  await expect.poll(() => files().element().contains(document.activeElement)).toBe(true);
+
+  await userEvent.keyboard("{Escape}");
+  await expect.poll(() => menu.matches(":popover-open")).toBe(false);
+  expect(getPaneSet()).toHaveLength(3);
+});
+
 test("Escape with the focus outside the pane leaves the set as it is", async () => {
   showThree();
   const screen = await render(<Harness grid />);

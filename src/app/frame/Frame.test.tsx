@@ -5,6 +5,7 @@ import { render } from "vitest-browser-react";
 
 import { inSight } from "../../dev/in-sight";
 import { Button } from "../../ui/Button";
+import { Menu } from "../../ui/Menu";
 import { showInPane, whenShownInPane } from "../pane/pane-store";
 import { getPreferences, updatePreferences } from "../preferences";
 import { Frame } from "./Frame";
@@ -86,6 +87,38 @@ test("a folded panel opens over the grid, and Escape puts it away", async () => 
 
   await userEvent.keyboard("{Escape}");
   await expect.poll(() => inSight(screen.getByText("pane content"))).toBe(false);
+});
+
+test("Escape over the open pane closes its list first, though a click on the list's edge took the focus", async () => {
+  await page.viewport(640, 480);
+  const screen = await render(
+    <div className="flex h-dvh flex-col">
+      <Frame
+        grid={<p>grid content</p>}
+        pane={
+          <Menu
+            label="More"
+            glyph="more"
+            groups={[[{ id: "rename", label: "Rename", glyph: "rename", onSelect: () => {} }]]}
+          />
+        }
+      />
+    </div>,
+  );
+  await screen.getByRole("button", { name: "Show Pane" }).click();
+  await screen.getByRole("button", { name: "More" }).click();
+  const menu = screen.getByRole("menu", { name: "More" }).element() as HTMLElement;
+  await expect.poll(() => menu.matches(":popover-open")).toBe(true);
+  const edge = menu.getBoundingClientRect();
+  await userEvent.click(menu, { position: { x: edge.width / 2, y: edge.height - 2 } });
+  expect(menu.contains(document.activeElement)).toBe(false);
+
+  await userEvent.keyboard("{Escape}");
+  await expect.poll(() => menu.matches(":popover-open")).toBe(false);
+  expect(inSight(screen.getByRole("button", { name: "More" }))).toBe(true);
+
+  await userEvent.keyboard("{Escape}");
+  await expect.poll(() => inSight(screen.getByRole("button", { name: "More" }))).toBe(false);
 });
 
 test("the open pane takes a drop and wears its overlay; its folded rail does neither", async () => {

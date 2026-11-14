@@ -1,5 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 
+import { autoPopoverOpen } from "../../ui/Menu";
+
 // Full screen is a state of the pane, not a place you navigate to: leaving puts the pane back in
 // whatever state it was in, docked or folded. DECISIONS.md "The pane".
 let full = false;
@@ -20,16 +22,15 @@ export function useFullScreen() {
 }
 
 /**
- * Escape leaves, wherever the focus is, unless what is open over it keeps the press, as a menu and
- * a list do. An auto popover is the browser's to close, even with the focus outside it; a manual
- * one never closes at Escape. It claims the press, so a later listener does not act on it too.
+ * Escape leaves, wherever the focus is, unless an open menu or list keeps the press. It claims the
+ * press, so a later listener does not act on it too.
  */
 export function useEscapeLeavesFullScreen() {
   const shown = useFullScreen();
   useEffect(() => {
     if (!shown) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || document.querySelector('[popover="auto"]:popover-open')) return;
+      if (event.key !== "Escape" || autoPopoverOpen()) return;
       event.preventDefault();
       setFullScreen(false);
     };
