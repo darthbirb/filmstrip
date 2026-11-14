@@ -1,5 +1,6 @@
 import type { FolderEntry } from "../../ipc/bindings/FolderEntry";
 import type { Reason } from "../../ipc/bindings/Reason";
+import type { Stayed } from "../../ipc/bindings/Stayed";
 import { restoreItems } from "../../ipc/commands";
 import { libraryChanged } from "../library";
 import { restoredBannerLine } from "../undo/lines";
@@ -13,7 +14,11 @@ import { getPaneItem, getPaneOrigin, paneMovesOn, showInPane } from "./pane-stor
  * happened: the line at the foot for what came back, the banner over the grid for what did not.
  * The pane moves on from a file that left the place it was shown in. DECISIONS.md "Undo".
  */
-export async function restoreFiles(itemIds: number[], to: FolderEntry | null = null) {
+export async function restoreFiles(
+  itemIds: number[],
+  to: FolderEntry | null = null,
+  expired: readonly Stayed[] = [],
+) {
   const shown = getPaneItem();
   const origin = getPaneOrigin();
   const next = paneMovesOn(itemIds) ? await neighbour(origin, itemIds) : shown;
@@ -21,8 +26,11 @@ export async function restoreFiles(itemIds: number[], to: FolderEntry | null = n
   if (!done) return;
   const { batch, report } = done;
   if (batch) afterAct(batch, report.refused.length);
-  const whole = report.restored + report.refused.length;
-  const [first] = report.refused;
+  const left = report.refused.filter((row) => row.at.kind !== "recycleBin");
+  const gone = [...expired, ...report.refused.filter((row) => row.at.kind === "recycleBin")];
+  const rows = [...left, ...gone];
+  const whole = report.restored + rows.length;
+  const [first] = rows;
   if (first) {
     // Where they were going: the folder picked, where the ones that came back went, or where
     // the one that stayed could not go.
@@ -31,13 +39,17 @@ export async function restoreFiles(itemIds: number[], to: FolderEntry | null = n
     const one = whole === 1 ? first.name : undefined;
     showReport({
       sentence: restoredBannerLine(report.restored, whole, where, to === null, one),
-      rows: report.refused,
+      rows,
       inTrash: "restoreTo",
-      retry: () =>
-        void restoreFiles(
-          report.refused.map((row) => row.id),
-          to,
-        ),
+      retry:
+        left.length > 0
+          ? () =>
+              void restoreFiles(
+                left.map((row) => row.id),
+                to,
+                gone,
+              )
+          : undefined,
     });
   } else {
     showReport(null);

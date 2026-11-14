@@ -44,6 +44,8 @@ import type { SourceSummary } from "./bindings/SourceSummary";
 import type { Suggestions } from "./bindings/Suggestions";
 import type { TagOffer } from "./bindings/TagOffer";
 import type { Trashed } from "./bindings/Trashed";
+import type { TrashLimit } from "./bindings/TrashLimit";
+import type { TrashSettings } from "./bindings/TrashSettings";
 import type { UndoReport } from "./bindings/UndoReport";
 import type { Vocabulary } from "./bindings/Vocabulary";
 import type { ZipPick } from "./bindings/ZipPick";
@@ -298,5 +300,11 @@ export const restoreBackup = (name: string) => invoke<Restored>("restore_backup"
 export const restoreForgets = (name: string) => invoke<Forgets>("restore_forgets", { name });
 
 export const setBackupsKept = (kept: number) => invoke<void>("set_backups_kept", { kept });
+
+export const trashLimits = () => invoke<TrashSettings>("trash_limits");
+
+/** One of the trash's limits; `null` is No Limit. */
+export const setTrashLimit = (limit: TrashLimit, value: number | null) =>
+  invoke<void>("set_trash_limit", { limit, value });
 
 export const launchBackupRefusal = () => invoke<Reason | null>("launch_backup_refusal");

@@ -5,6 +5,7 @@ import type { Stayed } from "../../ipc/bindings/Stayed";
 import type { UndoReport } from "../../ipc/bindings/UndoReport";
 import type { AppError } from "../../ipc/commands";
 import { formatCount } from "../../lib/format";
+import { expiredReason } from "../settings/expiry-words";
 
 // Every sentence an act and its undo say, as Artboards › Undo words them. DECISIONS.md "Undo".
 
@@ -324,6 +325,8 @@ export function reasonText(reason: Reason): string {
       return `${reason.source} is offline`;
     case "diskFull":
       return "The disk is full";
+    case "expired":
+      return expiredReason(reason.limit);
     case "other":
       return reason.message.charAt(0).toUpperCase() + reason.message.slice(1);
   }
@@ -339,8 +342,8 @@ export type StayedGroup = { heading: string; rows: Stayed[] };
 export function stayedGroups(stayed: readonly Stayed[], skipped = false): StayedGroup[] {
   const still = skipped ? "Skipped in" : "Still in";
   const keyOf = (one: Stayed) =>
-    one.at.kind === "trash"
-      ? "trash"
+    one.at.kind === "trash" || one.at.kind === "recycleBin"
+      ? one.at.kind
       : one.at.kind === "outside"
         ? `outside:${one.at.dir.toLowerCase()}`
         : `${one.reason.kind === "notOnDisk"}:${one.at.path.join("/")}`;
@@ -356,6 +359,8 @@ export function stayedGroups(stayed: readonly Stayed[], skipped = false): Stayed
       const [first] = rows;
       if (!first || first.at.kind === "trash")
         return { heading: "Still in the Trash", rows, depth: 0 };
+      if (first.at.kind === "recycleBin")
+        return { heading: "In the Recycle Bin", rows, depth: Number.MAX_SAFE_INTEGER };
       // Outside the library a directory goes by its own name, as Explorer's title bar has it.
       if (first.at.kind === "outside")
         return { heading: `${still} ${dirName(first.at.dir)}`, rows, depth: 0 };

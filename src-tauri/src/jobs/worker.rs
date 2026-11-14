@@ -8,8 +8,10 @@ use rusqlite::Connection;
 use crate::db::jobs::{self as table, QueuedJob};
 use crate::db::{self, items, journal};
 use crate::error::{AppError, Reason, Result};
+use crate::fs::expiry;
 use crate::fs::export as fs_export;
 use crate::fs::paste::{self, Halt};
+use crate::fs::recycle::RecycleBin;
 use crate::fs::stayed::Stayed;
 use crate::fs::{paths, walk};
 use crate::jobs::kinds::{self, CopyPayload, ExportPayload, FolderPayload, ItemPayload};
@@ -43,8 +45,22 @@ pub fn execute(inner: &QueueInner, conn: &mut Connection, job: &QueuedJob) -> Re
             export(inner, conn, job.id, &serde_json::from_str(&job.payload)?);
             Ok(Done::Finished)
         }
+        kinds::EXPIRE => finished(expire(inner, conn)),
         other => Err(AppError::invalid(format!("no job of the kind {other}"))),
     }
+}
+
+/// The trash keeping the limits Settings has now, said at the foot when it sent or was refused
+/// anything new. DECISIONS.md "Expiry goes to the Recycle Bin".
+fn expire(inner: &QueueInner, conn: &Connection) -> Result<()> {
+    let limits = crate::config::Config::load().trash_limits().into();
+    let expired = expiry::run(conn, &RecycleBin, limits, db::now())?;
+    if expired.worth_saying()
+        && let Some(say) = inner.expired.get()
+    {
+        say(&expired);
+    }
+    Ok(())
 }
 
 /// A copy into a folder, its line kept while it runs, and how it ended said once it has.

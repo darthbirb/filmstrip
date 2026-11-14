@@ -18,6 +18,10 @@ export type FootNews =
   | { kind: "said"; line: string }
   /** What an undo brought back, and the batch it took back. */
   | { kind: "undone"; line: string; batchId?: string }
+  /** What the Trash's limits sent to the Recycle Bin; nothing to undo. */
+  | { kind: "expired"; line: string }
+  /** Files the Recycle Bin refused as they expired, and the first of them to show in the Trash. */
+  | { kind: "expiryRefused"; sentence: string; detail: string; first: number | null }
   | { kind: "nothing" }
   /** Ctrl+V with no files on the clipboard. */
   | { kind: "noFiles" };

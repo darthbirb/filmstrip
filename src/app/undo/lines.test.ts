@@ -107,6 +107,9 @@ test("each reason is said in the banner's own words", () => {
   expect(reasonText({ kind: "permissionDenied" })).toBe("Permission denied");
   expect(reasonText({ kind: "notOnDisk", name: "a.jpg" })).toBe("No longer on disk");
   expect(reasonText({ kind: "holds", name: "notes.txt", more: 0 })).toBe("Holds notes.txt");
+  expect(reasonText({ kind: "expired", limit: { kind: "age", days: 14 } })).toBe(
+    "Expired after 14 days",
+  );
 });
 
 test("rows are grouped under the place each is still in, named from the folder they share", () => {
@@ -136,6 +139,15 @@ test("rows are grouped under the place each is still in, named from the folder t
     row("a.jpg", ["Pictures", "Cairo"], { kind: "notOnDisk", name: "a" }),
   ]);
   expect(gone[0]?.heading).toBe("Gone from Cairo");
+
+  const expired = { kind: "expired", limit: { kind: "age", days: 30 } } as const;
+  const binned: Stayed = { ...row("b.jpg", null, expired), at: { kind: "recycleBin" } };
+  const ordered = stayedGroups([binned, row("c.jpg", null, inUse), row("d.jpg", ["Inbox"], inUse)]);
+  expect(ordered.map((group) => group.heading)).toEqual([
+    "Still in the Trash",
+    "Still in Inbox",
+    "In the Recycle Bin",
+  ]);
 });
 
 test("a name field says where the name is taken, or why else it was refused", () => {

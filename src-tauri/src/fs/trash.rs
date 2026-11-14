@@ -6,7 +6,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::db::items::ItemRow;
+use crate::db::items::{ItemFile, ItemRow};
 use crate::db::journal::ItemRestored;
 use crate::db::{folders, in_transaction, items, journal, sources, tags};
 use crate::error::{AppError, Reason, Result};
@@ -259,16 +259,7 @@ pub fn recycle_items(
         let went = match items::file_of(conn, item_id)? {
             None => true,
             Some(_) if !items::is_trashed(conn, item_id)? => false,
-            Some(file) => {
-                let path = paths::trash_path(&file.uuid, &file.disk_name)?;
-                match recycle::send(bin, &path) {
-                    Ok(sent) => matches!(sent, Sent::Recycled | Sent::Gone),
-                    Err(err) => {
-                        eprintln!("recycle: {} was kept: {err}", path.display());
-                        false
-                    }
-                }
-            }
+            Some(file) => send_trashed(bin, &file)?,
         };
         if went {
             in_transaction(conn, |tx| items::forget_trashed(tx, item_id))?;
@@ -279,6 +270,19 @@ pub fn recycle_items(
         progress((at + 1) as f64 / item_ids.len() as f64);
     }
     Ok(recycled)
+}
+
+/// Sends a trashed file to the Recycle Bin: whether it went, or was already gone from the trash.
+/// One the bin refused, or the disk would not let go, stays where it is.
+pub fn send_trashed(bin: &dyn Bin, file: &ItemFile) -> Result<bool> {
+    let path = paths::trash_path(&file.uuid, &file.disk_name)?;
+    Ok(match recycle::send(bin, &path) {
+        Ok(sent) => matches!(sent, Sent::Recycled | Sent::Gone),
+        Err(err) => {
+            eprintln!("recycle: {} was kept: {err}", path.display());
+            false
+        }
+    })
 }
 
 /// What came of removing a source.

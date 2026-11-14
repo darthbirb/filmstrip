@@ -12,6 +12,7 @@ import { Caption, type Row, Rows } from "./Rows";
 import { Sources } from "./Sources";
 import { settingsHeld, useSettingsHeld } from "./settings-store";
 import { Tags } from "./Tags";
+import { Trash } from "./Trash";
 
 type Section = {
   id: string;
@@ -107,6 +108,14 @@ function useSections(asking?: number): Section[] {
       rows: [],
       body: <Backups />,
       fill: true,
+    },
+    {
+      id: "trash",
+      group: "Library",
+      title: "Trash",
+      glyph: "trash",
+      rows: [],
+      body: <Trash />,
     },
   ];
 }

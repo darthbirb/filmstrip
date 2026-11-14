@@ -5,6 +5,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
 
+use crate::db::expired::{self, Gone};
 use crate::db::{folders, items};
 use crate::error::{AppError, Reason, Result};
 
@@ -29,8 +30,8 @@ pub enum Thing {
 }
 
 /// Where something that stayed is now: a folder, named from its source's own folder down, the
-/// app's trash, or a directory outside the library that a copy was bringing it in from, with the
-/// folder it was bringing it into.
+/// app's trash, the Recycle Bin a file expired to, or a directory outside the library that a copy
+/// was bringing it in from, with the folder it was bringing it into.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[ts(export)]
@@ -41,16 +42,21 @@ pub enum Whereabouts {
         path: Vec<String>,
     },
     Trash,
+    RecycleBin,
     Outside {
         dir: String,
         into: i64,
     },
 }
 
-/// A file that stayed, and where it is.
+/// A file that stayed, and where it is: one that expired is in the Recycle Bin, whatever kept it.
 pub fn file(conn: &Connection, item_id: i64, err: &AppError) -> Result<Stayed> {
-    let file = items::file_of(conn, item_id)?
-        .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
+    let Some(file) = items::file_of(conn, item_id)? else {
+        return match expired::of(conn, item_id)? {
+            Some(gone) => Ok(self::gone(&gone)),
+            None => Err(AppError::invalid("that file is no longer in the index")),
+        };
+    };
     let at = if items::is_trashed(conn, item_id)? {
         Whereabouts::Trash
     } else {
@@ -63,6 +69,17 @@ pub fn file(conn: &Connection, item_id: i64, err: &AppError) -> Result<Stayed> {
         at,
         reason: Reason::of(err),
     })
+}
+
+/// A file that expired to the Recycle Bin before it was asked for.
+pub fn gone(gone: &Gone) -> Stayed {
+    Stayed {
+        kind: Thing::File,
+        id: gone.item_id,
+        name: gone.name.clone(),
+        at: Whereabouts::RecycleBin,
+        reason: Reason::Expired { limit: gone.limit },
+    }
 }
 
 /// A folder that stayed, and the folder it is in.

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import type { Batch } from "../../ipc/bindings/Batch";
+import type { Stayed } from "../../ipc/bindings/Stayed";
 import type { UndoReport } from "../../ipc/bindings/UndoReport";
 import { undoBatch, undoLast } from "../../ipc/commands";
 import { libraryChanged } from "../library";
@@ -17,8 +18,12 @@ export function afterAct(batch: Batch, stayed = 0, line = actLine(batch, stayed)
 
 let undoing = false;
 
-/** Takes back one batch, or the newest when none is named, and says what came back. */
-export async function undo(batchId?: string) {
+/**
+ * Takes back one batch, or the newest when none is named, and says what came back. What expired
+ * before it could is listed until the banner goes, and only what is still in the Trash is tried
+ * again.
+ */
+export async function undo(batchId?: string, expired: readonly Stayed[] = []) {
   if (undoing) return;
   undoing = true;
   try {
@@ -34,7 +39,9 @@ export async function undo(batchId?: string) {
       return;
     }
     await libraryChanged();
-    if (report.stayed.length === 0) {
+    const left = report.stayed.filter((row) => row.at.kind !== "recycleBin");
+    const gone = [...expired, ...report.stayed.filter((row) => row.at.kind === "recycleBin")];
+    if (left.length + gone.length === 0) {
       setNews({ kind: "undone", line: undoneLine(report), batchId: report.batch.batchId });
       return;
     }
@@ -43,8 +50,8 @@ export async function undo(batchId?: string) {
     const again = report.batch.batchId;
     showReport({
       sentence: undoBannerLine(report),
-      rows: report.stayed,
-      retry: () => void undo(again),
+      rows: [...left, ...gone],
+      retry: left.length > 0 ? () => void undo(again, gone) : undefined,
     });
   } finally {
     undoing = false;

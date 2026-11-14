@@ -60,7 +60,16 @@ fn reverse_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
     // Described before anything comes back, while every name is still where the act left it.
     let batch = acts::describe(conn, batch_id)?;
     let mut stayed = Vec::new();
+    let mut expired = 0;
     for entry in &entries {
+        if let Some(gone) = journal::expired(entry) {
+            journal::drop_entry(conn, entry.id)?;
+            if entry.op != journal::ITEM_COPY {
+                stayed.push(stayed::gone(&gone));
+                expired += 1;
+            }
+            continue;
+        }
         // What failed stays in the journal, or it could never be tried again.
         match reverse(conn, entry) {
             Ok(()) => journal::drop_entry(conn, entry.id)?,
@@ -70,7 +79,7 @@ fn reverse_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
     }
     let (files_left, folders_left) = acts::count(conn, &journal::batch(conn, batch_id)?)?;
     Ok(UndoReport {
-        files_back: batch.files.saturating_sub(files_left),
+        files_back: batch.files.saturating_sub(files_left + expired),
         folders_back: batch.folders.saturating_sub(folders_left),
         batch,
         stayed,

@@ -50,6 +50,8 @@ export const GLYPHS = {
   done: { icon: "check", code: 0xe182 },
   undo: { icon: "arrow-counter-clockwise", code: 0xe038 },
   backups: { icon: "clock-counter-clockwise", code: 0xe1a0 },
+  recycle: { icon: "recycle", code: 0xe75a },
+  infinity: { icon: "infinity", code: 0xe634 },
   moveTo: { icon: "folder-simple-plus", code: 0xe25e },
   newFolder: { icon: "folder-plus", code: 0xe258 },
   paste: { icon: "clipboard", code: 0xe196 },

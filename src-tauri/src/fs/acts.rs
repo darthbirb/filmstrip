@@ -8,6 +8,7 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use ts_rs::TS;
 
+use crate::db::expired::Gone;
 use crate::db::journal::{
     self, Change, Entry, FolderCopied, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed,
     ItemCopied, ItemMoved, ItemRenamed, ItemRestored, ItemTrashed, ItemsTagged, ItemsUntagged,
@@ -206,22 +207,37 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
             one: one_name(conn, &ids)?,
         });
     }
-    let trashed: Vec<ItemTrashed> = of(journal::ITEM_TRASH)
-        .map(forward)
+    let trashed: Vec<(i64, Option<Gone>)> = of(journal::ITEM_TRASH)
+        .map(|entry| {
+            Ok((
+                forward::<ItemTrashed>(entry)?.item_id,
+                journal::expired(entry),
+            ))
+        })
         .collect::<Result<_>>()?;
     let moved: Vec<ItemMoved> = of(journal::ITEM_MOVE).map(forward).collect::<Result<_>>()?;
     let carried: Vec<FolderMoved> = of(journal::FOLDER_MOVE)
         .map(forward)
         .collect::<Result<_>>()?;
     if !trashed.is_empty() {
-        let ids: Vec<i64> = trashed.iter().map(|one| one.item_id).collect();
-        let origins = ids
+        let files = trashed
             .iter()
-            .map(|id| items::file_of(conn, *id).map(|file| file.map_or(0, |file| file.folder_id)))
-            .collect::<Result<BTreeSet<i64>>>()?;
+            .map(|(id, gone)| match gone {
+                Some(gone) => Ok(Some((gone.folder_id, gone.name.clone()))),
+                None => Ok(items::file_of(conn, *id)?.map(|file| (file.folder_id, file.disk_name))),
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let origins = files
+            .iter()
+            .map(|file| file.as_ref().map_or(0, |(folder, _)| *folder))
+            .collect();
+        let one = match files.as_slice() {
+            [file] => file.as_ref().map(|(_, name)| name.clone()),
+            _ => None,
+        };
         return Ok(Act::Delete {
             from: only(conn, origins)?,
-            one: one_name(conn, &ids)?,
+            one,
         });
     }
     if let ([folder], []) = (carried.as_slice(), moved.as_slice()) {

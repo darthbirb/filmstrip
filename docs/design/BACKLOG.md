@@ -75,6 +75,6 @@ Drawn in Artboards › The Trash's limits:
   the Trash could succeed. A Ctrl+Z on a delete some or all of whose files expired is the same.
 - **Size per File** is asked only at Delete; lowering it sends nothing from the Trash.
 
-When built: the `recycle` glyph is new to the app's bundle. DECISIONS.md "The pane" still says
-nothing purges and emptying the Trash is under Later, and "Undo" says the journal's pruning
-is settled with the trash's limits; both change with the build.
+Built so far: the limits in Settings, expiry and the foot's lines, and the restore race (#184).
+Still to build: Empty Trash… (#185), and Delete keeping Size per File (#186). DECISIONS.md "The
+pane" still says nothing purges and emptying the Trash is under Later; that changes with #185.

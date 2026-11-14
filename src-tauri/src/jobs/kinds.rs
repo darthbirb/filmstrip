@@ -12,6 +12,8 @@ pub const SCRUB: &str = "scrub";
 pub const COPY_IN: &str = "copy_in";
 /// A zip written outside the library, which counts itself too.
 pub const EXPORT: &str = "export";
+/// The trash keeping its limits, at launch and every hour.
+pub const EXPIRE: &str = "expire";
 
 /// The kinds that walk the disk. Only one runs at a time: each retires what it did not see, so a
 /// second walk alongside would retire what the first had just found.
@@ -21,6 +23,8 @@ pub const PRIORITY_INDEX: i64 = 100;
 /// A copy or an export was asked for and is watched while it runs, so it starts before any
 /// thumbnail.
 pub const PRIORITY_COPY: i64 = 50;
+/// After any walk or copy already waiting, and before the thumbnails.
+pub const PRIORITY_EXPIRE: i64 = 40;
 pub const PRIORITY_THUMB: i64 = 20;
 pub const PRIORITY_SCRUB: i64 = 1;
 

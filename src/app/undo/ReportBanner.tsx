@@ -66,7 +66,10 @@ const GO =
 function Row({ row, inTrash }: { row: Stayed; inTrash: "show" | "restoreTo" }) {
   // Explorer has nothing to show for a file gone from disk or away, or one under the trash's own name.
   const showable =
-    row.at.kind !== "trash" && row.reason.kind !== "notOnDisk" && row.reason.kind !== "offline";
+    row.at.kind !== "trash" &&
+    row.at.kind !== "recycleBin" &&
+    row.reason.kind !== "notOnDisk" &&
+    row.reason.kind !== "offline";
   return (
     <div className={`${COLUMNS} ${LIST_ROW}`}>
       <span className="flex min-w-0 items-center gap-2 text-fg">

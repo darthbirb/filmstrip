@@ -12,6 +12,7 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 use ts_rs::TS;
 
+use crate::config::{TrashLimit, TrashLimits};
 use crate::db::details::{self, FolderDetail};
 use crate::db::folders::{self, FolderEntry, FolderNode};
 use crate::db::in_transaction;
@@ -28,6 +29,7 @@ use crate::error::{AppError, Reason, Result};
 use crate::fs::acts::{self, Batch};
 use crate::fs::backups::{self, Backup, Forgets, Restored, Shelf, Shelved, Taken};
 use crate::fs::clipboard;
+use crate::fs::expiry::{self, Due};
 use crate::fs::export::{self, Naming, Plan, Scope};
 use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
 use crate::fs::items::{self as fs_items, MoveReport};
@@ -1511,6 +1513,40 @@ pub async fn restore_forgets(state: State<'_, AppState>, name: String) -> Result
 #[tauri::command]
 pub async fn set_backups_kept(kept: u32) -> Result<()> {
     crate::config::Config::set_backups_kept(kept)
+}
+
+/// The trash's limits, what it holds, and what its next run sends and when, as Settings › Trash
+/// says it.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct TrashSettings {
+    pub limits: TrashLimits,
+    pub held: items::Tally,
+    pub due: Due,
+    /// When the next run is, in seconds since 1970.
+    pub at: i64,
+}
+
+#[tauri::command]
+pub async fn trash_limits(state: State<'_, AppState>) -> Result<TrashSettings> {
+    let at = state.queue.next_expiry();
+    run(&state, move |conn| {
+        let limits = crate::config::Config::load().trash_limits();
+        Ok(TrashSettings {
+            limits,
+            held: items::in_trash_tally(conn)?,
+            due: expiry::due(conn, limits.into(), at)?,
+            at,
+        })
+    })
+    .await
+}
+
+/// Sets one of the trash's limits, `None` for No Limit. Nothing goes until the next run.
+#[tauri::command]
+pub async fn set_trash_limit(limit: TrashLimit, value: Option<u32>) -> Result<()> {
+    crate::config::Config::set_trash_limit(limit, value)
 }
 
 /// Why the launch's backup was refused, once it has ended; nothing when it was taken or not due.

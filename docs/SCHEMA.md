@@ -29,9 +29,10 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 | `folder_tag` | Terms on a folder, added by its title or by hand. |
 | `item_tag` | Tags an item carries itself. |
 | `item_effective_tag` | Everything an item carries once inheritance is resolved. |
-| `setting` | Key-value pairs: `undo_floor`, the newest journal row a restore kept. |
+| `setting` | Key-value pairs: `undo_floor`, the newest journal row a restore kept; `expiry_refused`, the trashed items the Recycle Bin refused at the last expiry run. |
 | `journal` | Every change the app made on disk, and every set tagged at once, with what reverses it, grouped into batches. |
 | `job` | Background work: waiting, running, or failed with its error. |
+| `expired` | Each item expiry sent to the Recycle Bin: its name, the folder it left, and the limit that sent it — days or bytes, never both. |
 | `destination_key` | A digit, `0` to `9`, bound to a folder that a press moves files into. |
 | `item_fts` | Each item's name and every tag it carries, tokenised for a bare word. |
 | `folder_fts` | Each folder's own tags, its title's among them, tokenised the same way. |
@@ -104,6 +105,8 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 - `source.indexed_at` is stamped when a walk finishes reading the whole source. A source it
   could not read keeps the stamp it had, which is what "last indexed" reports while it is away.
 - Removing a source deletes its rows outright. Its directory is never touched.
+- An item that expires is deleted outright once the Recycle Bin has its file, and an `expired`
+  row is written in the same transaction. That row is read only while no `item` row holds its id.
 - A file moved or restored to a name that only a retired row holds takes it: that row is deleted
   outright. A trashed row never holds a name.
 - A folder moved into another source takes its items with it: their `source_id` follows the
@@ -129,7 +132,10 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 - An act on the tags screen is one row, `retag`: the terms it reworded, made or forgot, and
   every `folder_tag` and `item_tag` row it moved onto another term or took away, each with its
   `rowid`, so an undo puts it back in its place.
-- Nothing prunes the journal yet.
+- Expiry prunes it of the file that expired. A row about that file alone keeps a `"expired"` mark
+  in `forward` and `inverse`, naming it, its folder and the limit that sent it; an undo reports
+  the mark and deletes the row. `items_tag`, `items_untag` and `retag` rows lose that file, and
+  go once they name nothing.
 - Undo never reaches a row at or below `setting.undo_floor`, which a restore sets to the newest
   row the restored journal holds.
 
