@@ -12,7 +12,7 @@ import {
 
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import { BadgeButton } from "../../ui/BadgeButton";
-import { useContextMenu } from "../../ui/Menu";
+import { autoPopoverOpen, useContextMenu } from "../../ui/Menu";
 import { dragging } from "../grid/drag";
 import { getSelection } from "../grid/selection";
 import { itemMenu } from "../menus/item-menu";
@@ -350,7 +350,8 @@ function useEscapeShowsFirst(first: number | null) {
       if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
       const pane = document.activeElement?.closest<HTMLElement>('[aria-label="Pane"]');
       if (!pane || pane.dataset.overGrid !== undefined) return;
-      if (getFullScreen() || dragging() || getSelection().ids.length > 0) return;
+      if (autoPopoverOpen() || getFullScreen() || dragging()) return;
+      if (getSelection().ids.length > 0) return;
       event.preventDefault();
       focusNextPicture();
       showInPane(first, paneFileOrigin(first));

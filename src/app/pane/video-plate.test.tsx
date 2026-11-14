@@ -455,6 +455,23 @@ test("Escape closes a volume the pointer raised, with the focus elsewhere and on
   await expect.element(level).toBeVisible();
 });
 
+test("with the speed list open, Escape closes it before a volume the pointer raised", async () => {
+  const screen = await renderInApp();
+  const level = screen.getByRole("slider", { name: "Volume" });
+  await screen.getByRole("button", { name: "Speed: 1×" }).click();
+  const list = screen.getByRole("listbox", { name: "Speed" });
+  await expect.element(list).toBeVisible();
+  await userEvent.hover(screen.getByRole("button", { name: "Mute" }));
+  await expect.element(level).toBeVisible();
+
+  await userEvent.keyboard("{Escape}");
+  await expect.element(list).not.toBeInTheDocument();
+  await expect.element(level).toBeVisible();
+
+  await userEvent.keyboard("{Escape}");
+  await expect.element(level).not.toBeInTheDocument();
+});
+
 /** A short clip the browser can play, drawn here rather than kept as a file. */
 async function recordClip() {
   // Under load the recorder can stop before the encoder has written a frame, leaving a header alone.
