@@ -42,3 +42,39 @@ Consider the old drawing's scrubber: a 16px channel at the grid's edge with a sq
 to jump anywhere; the position is the information. Investigate whether it replaces the
 scrollbar or sits beside it. The pass that drew it recommends building the other ten first, and
 only building this if the largest folders still feel unnavigable afterwards.
+
+## The Trash's limits, expiry and emptying · DRAWN
+
+#70. The Trash keeps to a time to live, a total size and a size per file, set in Settings, and
+can be emptied. Expiry goes to the Windows Recycle Bin, as DECISIONS.md "Expiry goes to the
+Recycle Bin" has it, through `fs::recycle::send`.
+
+Drawn in Artboards › The Trash's limits:
+
+- **Settings › Library › Trash**, after Backups: the head with what the Trash holds against its
+  total and Empty Trash… in `danger`, three dropdown rows (Keep For, Total Size, Size per File,
+  each ending in No Limit; 30 Days, 25 GB and 5 GB the first), and one line on where an item
+  goes. A lowered limit sends nothing at once: the line says what the next hourly run will send
+  and when. Also drawn: a dropdown open, no limits, nothing in the Trash (no Empty Trash…),
+  emptying, and the window's least with the keyboard on a dropdown.
+- **Empty Trash…'s question**, in the row question's shape under the head: how many files, how
+  much space, and that they do not go to the Recycle Bin. Cancel has the focus.
+- **A file too large for the Trash**: Delete refuses it before it moves and asks above the grid,
+  in the question's shape, with Send to Recycle Bin in `danger` and × keeping it. In a set, the
+  rest go to the Trash as one batch and the banner lists the refused ones with their sizes. A file
+  larger than Total Size is refused the same way. The bin refusing the send keeps the file where
+  it was and says so.
+- **The foot**: expiry by age, by size, and both, each with no Undo. Its line keeps the slot's
+  rule, one at a time and the newest replacing the other: it replaces an act's line, and a Band
+  or the next act's line replaces it; Ctrl+Z still reaches the act. The Recycle Bin refusing an
+  expired file keeps it in the Trash, still counting toward Total Size, and says so once, again
+  only when the count of refused files grows, with Show in Trash. After Empty Trash, and Empty
+  Trash with files that would not go.
+- **A restore that loses the race to expiry**: the Trash's restore banner, with the expired rows
+  under their own heading, In the Recycle Bin, and no row button; Retry only while a row still in
+  the Trash could succeed. A Ctrl+Z on a delete some or all of whose files expired is the same.
+- **Size per File** is asked only at Delete; lowering it sends nothing from the Trash.
+
+When built: the `recycle` glyph is new to the app's bundle. DECISIONS.md "The pane" still says
+nothing purges and emptying the Trash is under Later, and "Undo" says the journal's pruning
+is settled with the trash's limits; both change with the build.
