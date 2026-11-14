@@ -74,8 +74,8 @@ Three ways, cheapest first.
 - **Rust** is tested beside the code, in `#[cfg(test)]` modules. A test that needs real files
   writes them under `src-tauri/target/`, never outside the repository. **Tests build rusqlite
   with `extra_check`**, which the release leaves off: `pragma_update` then reads the file to
-  check the pragma's name, and `execute` refuses a query that returns rows. A pragma that must
-  not fail is set with `execute_batch`.
+  check the pragma's name, and `execute` refuses a read-only query that has result columns, even
+  one that returns no row. A pragma that must not fail is set with `execute_batch`.
 - **A test that bounds how long the code takes runs alone.** Beside the rest of the suite it
   times the machine, not the code, so it sits in a `timing` module inside its file's tests and
   is `#[ignore]`d. After the plain run,

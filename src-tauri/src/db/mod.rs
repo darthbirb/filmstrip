@@ -245,23 +245,7 @@ mod tests {
 
     #[test]
     fn a_failed_migration_returns_its_own_error_with_foreign_keys_back_on() {
-        use std::cell::RefCell;
-        use std::io::Write;
-        use std::path::PathBuf;
-
-        thread_local! {
-            static GARBLE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
-        }
-        fn garble_and_give_up(_: i32) -> bool {
-            if let Some(path) = GARBLE.with_borrow_mut(|path| path.take()) {
-                std::fs::OpenOptions::new()
-                    .write(true)
-                    .open(path)
-                    .and_then(|mut file| file.write_all(&[0xAB; 100]))
-                    .unwrap();
-            }
-            false
-        }
+        use std::io::{Read, Write};
 
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("target/test-db/garbled");
         let _ = std::fs::remove_dir_all(&dir);
@@ -272,10 +256,25 @@ mod tests {
             .execute_batch("CREATE TABLE t (x INTEGER); BEGIN IMMEDIATE;")
             .unwrap();
         let mut conn = Connection::open(&path).unwrap();
-        GARBLE.set(Some(path));
-        conn.busy_handler(Some(garble_and_give_up)).unwrap();
+        let mut garble = Some(path.clone());
+        conn.busy_handler(Some(move |_| {
+            if let Some(path) = garble.take() {
+                let _ = std::fs::OpenOptions::new()
+                    .write(true)
+                    .open(path)
+                    .and_then(|mut file| file.write_all(&[0xAB; 100]));
+            }
+            false
+        }))
+        .unwrap();
 
         let err = migrate(&mut conn).unwrap_err();
+
+        let mut header = [0u8; 100];
+        std::fs::File::open(&path)
+            .and_then(|mut file| file.read_exact(&mut header))
+            .unwrap();
+        assert_eq!(header, [0xAB; 100], "the busy handler garbled the header");
 
         assert!(
             matches!(
