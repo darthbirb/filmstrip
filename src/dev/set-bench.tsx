@@ -17,10 +17,42 @@ const VIDEO = { width: 1920, height: 1080 };
 
 /**
  * Of the frames the playing clips were due to show over a span of the count, how many they
- * dropped, and how far their clocks moved against the window's, on average, a loop counted as the
- * clip's length: 1 keeps time.
+ * dropped, and how far their clocks moved against the window's, each loop's restart left out:
+ * 1 keeps time.
  */
 export type Span = { dropped: number; due: number; pace: number };
+
+/**
+ * A clip's clock read at every frame the window draws: how far it moved, and over how many of the
+ * window's seconds, since it was first read. `restarting` from a loop until the clock moves again.
+ */
+export type Clock = {
+  time: number;
+  at: number;
+  moved: number;
+  seconds: number;
+  restarting: boolean;
+};
+
+export function clock(time: number, at: number): Clock {
+  return { time, at, moved: 0, seconds: 0, restarting: false };
+}
+
+/**
+ * The clock read again at `at`, in ms. A loop's restart, from the frame the clock went back until
+ * the frame it moves again, counts neither the clip's time nor the window's; any other stall does.
+ * DECISIONS.md "Several files in the pane".
+ */
+export function tick(was: Clock, time: number, at: number): Clock {
+  const next = { ...was, time, at };
+  if (time < was.time) return { ...next, restarting: true };
+  if (was.restarting) return { ...next, restarting: time === was.time };
+  return {
+    ...next,
+    moved: was.moved + time - was.time,
+    seconds: was.seconds + (at - was.at) / 1000,
+  };
+}
 
 /** Frames a second, the median gap between them, how many came late, and the clips' own frames. */
 export type Bench = {
@@ -261,88 +293,48 @@ async function countFrames(
 ): Promise<Bench | null> {
   const held = playingNow(videos);
   const going = videos.flatMap((one, index) => (one.paused ? [] : [index]));
-  type Mark = { at: number; quality: VideoPlaybackQuality[]; clocks: number[] };
+  type Mark = { quality: VideoPlaybackQuality[]; clocks: Clock[] };
+  let clocks = videos.map((one) => clock(one.currentTime, performance.now()));
   const mark = (): Mark => ({
-    at: performance.now(),
     quality: videos.map((one) => one.getVideoPlaybackQuality()),
-    clocks: videos.map((one) => one.currentTime),
+    clocks,
   });
   const begun = mark();
   const marks = [begun];
-  const times = [...begun.clocks];
-  const loops = [videos.map(() => 0)];
   let changed = false;
   let start: number | undefined;
-  const probe = videos.map((one) => ({ clock: one.currentTime, movedAt: 0 }));
-  const notes: string[] = [];
   const drawn = await frames(spans * ms, (now) => {
     start ??= now;
-    videos.forEach((one, index) => {
-      const p = probe[index];
-      if (!p || one.paused) return;
-      if (p.movedAt === 0) p.movedAt = now;
-      const c = one.currentTime;
-      if (c !== p.clock) {
-        const still = now - p.movedAt;
-        const wrap = c < p.clock;
-        if (still > 100 || wrap)
-          notes.push(
-            `#${index} span${marks.length} t${Math.round(now - (start ?? now))} ${wrap ? "WRAP " : ""}still${Math.round(still)}ms ${p.clock.toFixed(3)}->${c.toFixed(3)}`,
-          );
-        p.clock = c;
-        p.movedAt = now;
-      }
-    });
     if (motion === "resize") {
       // Down to half the width and back each second: a new scale every frame.
       const swing = (1 + Math.cos((now / 1000) * 2 * Math.PI)) / 2;
       host.style.width = `${Math.round(width * (0.5 + 0.5 * swing))}px`;
     }
     if (playingNow(videos) !== held) changed = true;
-    videos.forEach((one, index) => {
-      const counting = loops.at(-1);
-      if (counting && one.currentTime < (times[index] ?? 0))
-        counting[index] = (counting[index] ?? 0) + 1;
-      times[index] = one.currentTime;
-    });
-    if (now - start >= marks.length * ms && marks.length < spans) {
-      marks.push(mark());
-      loops.push(videos.map(() => 0));
-    }
+    clocks = clocks.map((was, index) => tick(was, videos[index]?.currentTime ?? was.time, now));
+    if (now - start >= marks.length * ms && marks.length < spans) marks.push(mark());
   });
   marks.push(mark());
-  console.info(
-    `PROBE ${going.length} playing, durations ${videos.map((v) => v.duration.toFixed(2)).join(" ")}\n${notes.join("\n")}`,
-  );
   if (changed) return null;
-  const span = (from: Mark, to: Mark, looped: readonly number[]): Span => {
-    const length = (index: number) => videos[index]?.duration ?? Number.NaN;
-    const counted = going.filter((index) => !looped[index] || Number.isFinite(length(index)));
-    const total = (pick: (one: VideoPlaybackQuality) => number) =>
-      counted.reduce((sum, index) => {
-        const end = to.quality[index];
-        const was = from.quality[index];
-        return end && was ? sum + pick(end) - pick(was) : sum;
+  const span = (from: Mark, to: Mark): Span => {
+    const gained = <T,>(of: (one: Mark) => readonly T[], pick: (one: T) => number) =>
+      going.reduce((sum, index) => {
+        const end = of(to)[index];
+        const was = of(from)[index];
+        return end !== undefined && was !== undefined ? sum + pick(end) - pick(was) : sum;
       }, 0);
-    const moved = counted.reduce(
-      (sum, index) =>
-        sum +
-        (to.clocks[index] ?? 0) -
-        (from.clocks[index] ?? 0) +
-        (looped[index] ? (looped[index] ?? 0) * length(index) : 0),
-      0,
-    );
+    const shown = (pick: (one: VideoPlaybackQuality) => number) =>
+      gained((one) => one.quality, pick);
+    const clocked = (pick: (one: Clock) => number) => gained((one) => one.clocks, pick);
+    const seconds = clocked((one) => one.seconds);
     return {
-      dropped: total((one) => one.droppedVideoFrames),
-      due: total((one) => one.totalVideoFrames),
-      pace: counted.length > 0 ? moved / counted.length / ((to.at - from.at) / 1000) : 1,
+      dropped: shown((one) => one.droppedVideoFrames),
+      due: shown((one) => one.totalVideoFrames),
+      pace: seconds > 0 ? clocked((one) => one.moved) / seconds : 1,
     };
   };
-  const each = marks
-    .slice(1)
-    .map((to, index) => span(marks[index] ?? begun, to, loops[index] ?? []));
-  const all = videos.map((_, index) => loops.reduce((sum, one) => sum + (one[index] ?? 0), 0));
-  const whole = span(begun, marks.at(-1) ?? begun, all);
+  const each = marks.slice(1).map((to, index) => span(marks[index] ?? begun, to));
+  const whole = span(begun, marks.at(-1) ?? begun);
   const intervals = drawn.slice(1).map((at, index) => at - (drawn[index] ?? at));
   const sorted = [...intervals].sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)] ?? 0;

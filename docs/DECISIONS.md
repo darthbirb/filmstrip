@@ -747,9 +747,8 @@ and one height in justified rows is equal cells by another measure.
   - **What each settled on**, twelve clips of each kind in the 1500 × 900 pane, on 14 November
     2026. The timing test waits until the count playing has not changed for fourteen seconds,
     which happens only once every clip plays or the pane waits on a count that fell. It then
-    counts three five-second spans, and a change inside them starts the wait over. A loop counts
-    as the clip's length there, since clips started together loop together. Each machine's column
-    is how many clips it settled on playing, then what they dropped and their pace:
+    counts three five-second spans, and a change inside them starts the wait over. Each machine's
+    column is how many clips it settled on playing, then what they dropped and their pace:
 
     | Clips         | Here | Dropped     | Pace        | CI   | Dropped    | Pace        |
     | ------------- | ---- | ----------- | ----------- | ---- | ---------- | ----------- |
@@ -770,6 +769,15 @@ and one height in justified rows is equal cells by another measure.
     test that needs them reads `KEEP`. The timing test holds all twelve 1080p30 clips playing
     where `mediaCapabilities` reports them decoded in hardware, so a pane that pauses more than
     it must fails there too.
+  - **The timing test leaves out each loop's restart, as the pane's measure leaves out loops.**
+    It reads every playing clip's clock at every frame, and from the frame a clock goes back to
+    the frame it moves again counts neither the clip's time nor the window's; a stall anywhere
+    else counts against the pace. The table above counted a loop as the clip's length instead,
+    so its lowest paces are partly loops. On CI on 15 November 2026, run 43669834508, every
+    MP4 clip decoded in software held its clock at the start for 150 to 383 ms after each loop,
+    and stood still nowhere else; the recorded WebM loops without a pause. Charged to the span,
+    that put two 4K clips that looped in different spans at 0.931 and 0.925 in run 43667718288,
+    a fail, while the pane, which never judges a span a clip looped in, kept both playing.
 
 - **The bounds were set from the test clip's edge.** Counted on 2 November 2026, before the pane
   measured itself, with the 37ms clip among twelve originals in a 1500 × 900 pane. These were runs
