@@ -10,16 +10,22 @@ import { ContextMenu } from "./Menu";
 /** One answer. `short` names it in the folded menu, where the question already says the verb. */
 export type Answer = { id: string; label: string; short: string; onChoose: () => void };
 
-type Props = {
+/** Answers that can fold come with what their fold says and shows, or there are none. */
+type Choices =
+  | {
+      /** Answers that stand on the line together, or all fold into one button whose menu names them. */
+      choices: readonly Answer[];
+      /** The folded menu's glyph for each answer. */
+      choiceGlyph: GlyphName;
+      /** What the one button says once the answers have folded into it. */
+      fold: string;
+    }
+  | { choices?: undefined; choiceGlyph?: undefined; fold?: undefined };
+
+type Props = Choices & {
   sentence: string;
   /** Why it is asked, and what an answer costs, under the question. */
   detail?: string;
-  /** Answers that stand on the line together, or all fold into one button whose menu names them. */
-  choices?: readonly Answer[];
-  /** The folded menu's glyph for each answer. */
-  choiceGlyph?: GlyphName;
-  /** What the one button says once the answers have folded into it. */
-  fold?: string;
   /** The answer that destroys: last on the line, and never folded. */
   last?: { label: string; onChoose: () => void };
   box?: { label: string; checked: boolean; onChange: (checked: boolean) => void };
@@ -139,14 +145,28 @@ export function Question({
           {(choices.length > 0 || last) && (
             <div ref={line} className="relative col-span-2 col-start-2 min-w-0">
               {/* Both lines as they would be drawn, out of sight, so the fold is measured, not guessed. */}
-              <div ref={named} inert aria-hidden className="invisible absolute flex w-max gap-1.5">
-                {everyChoice}
-                {lastButton}
-              </div>
-              <div ref={folded} inert aria-hidden className="invisible absolute flex w-max gap-1.5">
-                {foldedButton(false)}
-                {lastButton}
-              </div>
+              {choices.length > 0 && (
+                <>
+                  <div
+                    ref={named}
+                    inert
+                    aria-hidden
+                    className="invisible absolute flex w-max gap-1.5"
+                  >
+                    {everyChoice}
+                    {lastButton}
+                  </div>
+                  <div
+                    ref={folded}
+                    inert
+                    aria-hidden
+                    className="invisible absolute flex w-max gap-1.5"
+                  >
+                    {foldedButton(false)}
+                    {lastButton}
+                  </div>
+                </>
+              )}
               <div
                 className={`flex gap-1.5 ${shape === "stacked" ? "flex-col items-start" : "items-center"}`}
               >

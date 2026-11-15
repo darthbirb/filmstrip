@@ -1555,8 +1555,10 @@ export function expireNow(refuse: readonly number[] = []) {
   return said;
 }
 
-/** Puts the Trash's limits back as they start, and what expired or Delete sent to the Recycle Bin
- * back where it was, at its own size. */
+/**
+ * Puts the Trash's limits back as they start, and what expired or Delete sent to the Recycle Bin
+ * back where it was, at its own size.
+ */
 export function resetTrashLimits() {
   trashSet = { keepDays: 30, totalGb: 25, fileGb: 5 };
   for (const { item } of expired.values())

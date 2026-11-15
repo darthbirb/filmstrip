@@ -183,10 +183,10 @@ fn send_live(conn: &Connection, bin: &dyn Bin, item_id: i64) -> Result<()> {
     let file = items::file_of(conn, item_id)?
         .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
     let path = paths::item_path(conn, file.folder_id, &file.disk_name)?;
-    expired::set_recycling(conn, Some(&path))?;
-    let sent = recycle::send(bin, &path);
-    expired::set_recycling(conn, None)?;
-    match sent? {
+    expired::add_recycling(conn, &path)?;
+    let sent = recycle::send(bin, &path)?;
+    expired::settled_recycling(conn, &path)?;
+    match sent {
         Sent::Recycled => in_transaction(conn, |tx| items::retire(tx, item_id)),
         Sent::Gone => Err(AppError::refused(Reason::NotOnDisk {
             name: file.disk_name,
@@ -195,19 +195,19 @@ fn send_live(conn: &Connection, bin: &dyn Bin, item_id: i64) -> Result<()> {
     }
 }
 
-/// Settles what a send from a library folder left beside its file when the app stopped during it,
-/// once that folder can be reached. DECISIONS.md "Sending to the Recycle Bin".
+/// Settles what each send from a library folder left beside its file when the app stopped during
+/// it, once that folder can be reached. DECISIONS.md "Sending to the Recycle Bin".
 pub fn settle_unfinished_send(conn: &Connection) -> Result<()> {
-    let Some(file) = expired::recycling(conn)? else {
-        return Ok(());
-    };
-    if !file.parent().is_some_and(Path::is_dir) {
-        return Ok(());
+    for file in expired::recycling(conn)? {
+        if !file.parent().is_some_and(Path::is_dir) {
+            continue;
+        }
+        match recycle::settle_beside(&file) {
+            Ok(()) => expired::settled_recycling(conn, &file)?,
+            Err(err) => eprintln!("recycle: {} was not settled: {err}", file.display()),
+        }
     }
-    if let Err(err) = recycle::settle_beside(&file) {
-        eprintln!("recycle: {} was not settled: {err}", file.display());
-    }
-    expired::set_recycling(conn, None)
+    Ok(())
 }
 
 /// Moves one item's file into the trash and records it there. A file already gone from where the
@@ -992,7 +992,7 @@ mod tests {
         assert!(!items::is_live(&conn, sphinx).unwrap());
         assert!(!items::is_trashed(&conn, sphinx).unwrap());
         assert_eq!(journal::latest_batch(&conn).unwrap(), before);
-        assert_eq!(expired::recycling(&conn).unwrap(), None);
+        assert!(marked(&conn).is_empty());
         crate::fs::settles_to(&root.join("Trips/Cairo"), &["pyramid.jpg"]);
     }
 
@@ -1011,7 +1011,7 @@ mod tests {
             assert!(still_in_cairo(&report.refused[0].at));
             assert_eq!(std::fs::read_to_string(&place).unwrap(), "ssss");
             assert!(items::is_live(&conn, sphinx).unwrap());
-            assert_eq!(expired::recycling(&conn).unwrap(), None);
+            assert!(marked(&conn).is_empty());
             crate::fs::settles_to(&root.join("Trips/Cairo"), &["pyramid.jpg", "sphinx.jpg"]);
         }
     }
@@ -1052,25 +1052,73 @@ mod tests {
     fn a_send_the_app_stopped_during_is_settled_at_launch_and_the_file_is_back() {
         let (conn, root, _, _) = with_one_too_large("send-cut-short");
         let place = root.join("Trips/Cairo/sphinx.jpg");
-        expired::set_recycling(&conn, Some(&place)).unwrap();
+        mark(&conn, &place);
         std::fs::rename(&place, hold_of(&place)).unwrap();
 
         settle_unfinished_send(&conn).unwrap();
 
         assert_eq!(std::fs::read_to_string(&place).unwrap(), "ssss");
         assert!(!hold_of(&place).exists());
-        assert_eq!(expired::recycling(&conn).unwrap(), None);
+        assert!(marked(&conn).is_empty());
     }
 
     #[test]
     fn a_send_cut_short_in_a_folder_that_is_away_waits_for_it() {
         let (conn, root, _, _) = with_one_too_large("send-away");
         let away = root.join("Away/sphinx.jpg");
-        expired::set_recycling(&conn, Some(&away)).unwrap();
+        mark(&conn, &away);
 
         settle_unfinished_send(&conn).unwrap();
 
-        assert_eq!(expired::recycling(&conn).unwrap(), Some(away));
+        assert_eq!(marked(&conn), [away]);
+    }
+
+    fn mark(conn: &Connection, file: &Path) {
+        expired::add_recycling(conn, file).unwrap();
+    }
+
+    fn marked(conn: &Connection) -> Vec<PathBuf> {
+        expired::recycling(conn).unwrap()
+    }
+
+    #[test]
+    fn a_send_cut_short_in_a_folder_away_outlives_a_later_send_and_is_settled_once_it_is_back() {
+        let (conn, root, cairo, _) = with_one_too_large("send-away-then-another");
+        std::fs::write(root.join("Trips/boat.jpg"), "bbbb").unwrap();
+        walk::reconcile(&conn).unwrap();
+        let trips = folders::parent(&conn, cairo).unwrap().unwrap();
+        let boat = id_of(&conn, trips, "boat.jpg");
+        let place = root.join("Trips/Cairo/sphinx.jpg");
+        mark(&conn, &place);
+        std::fs::rename(&place, hold_of(&place)).unwrap();
+        let (here, away) = (root.join("Trips/Cairo"), root.join("Trips/Cairo-away"));
+        std::fs::rename(&here, &away).unwrap();
+
+        settle_unfinished_send(&conn).unwrap();
+        let bin = Fake::new(Stand::Recycles(root.parent().unwrap().join("bin")));
+        assert_eq!(send_to_bin(&conn, &bin, &[boat]).unwrap().sent, 1);
+        std::fs::rename(&away, &here).unwrap();
+        settle_unfinished_send(&conn).unwrap();
+
+        assert_eq!(std::fs::read_to_string(&place).unwrap(), "ssss");
+        assert!(!hold_of(&place).exists());
+        assert!(marked(&conn).is_empty());
+    }
+
+    #[test]
+    fn a_send_that_fails_partway_keeps_its_marker_for_the_next_launch() {
+        let (conn, root, cairo, _) = with_one_too_large("send-fails");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        let place = root.join("Trips/Cairo/sphinx.jpg");
+        std::fs::write(hold_of(&place), "another").unwrap();
+        let bin = Fake::new(Stand::Recycles(root.parent().unwrap().join("bin")));
+
+        let report = send_to_bin(&conn, &bin, &[sphinx]).unwrap();
+
+        assert_eq!(report.sent, 0);
+        assert_eq!(std::fs::read_to_string(&place).unwrap(), "ssss");
+        assert_eq!(marked(&conn), std::slice::from_ref(&place));
+        std::fs::remove_file(hold_of(&place)).unwrap();
     }
 
     #[test]

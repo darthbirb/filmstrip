@@ -114,7 +114,7 @@ impl fmt::Display for Reason {
                 limit: Limit::Size { bytes },
             } => write!(f, "it expired to keep the trash under {bytes} bytes"),
             Reason::TooLarge { bytes, limit, .. } => {
-                write!(f, "it is {bytes} bytes, and the trash takes {limit}")
+                write!(f, "it is {bytes} bytes, and the trash takes {limit} bytes")
             }
             Reason::BinRefused => f.write_str("the Recycle Bin would not take it"),
             Reason::Other { message } => f.write_str(message),

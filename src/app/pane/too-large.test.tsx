@@ -132,6 +132,11 @@ test("in a set the rest go to the Trash with Undo and the refused are listed wit
     .toBeVisible();
   expect(screen.getByText("went to the Trash", { exact: false }).elements()).toHaveLength(0);
 
+  const list = question.getByText("Still in Cairo").element().parentElement?.parentElement;
+  expect(list?.scrollHeight, "rows that fit leave the list no scrollbar").toBeLessThanOrEqual(
+    list?.clientHeight ?? 0,
+  );
+
   await question.getByRole("button", { name: "Hide Files" }).click();
   await expect.element(question.getByText("Still in Cairo")).not.toBeInTheDocument();
 
@@ -204,6 +209,6 @@ test("a folder's Delete Files Too asks the same, and the folder goes once they h
 
   await question.getByRole("button", { name: "Send to Recycle Bin" }).click();
 
-  await expect.poll(footLine).toBe("Deleted Cairo.");
+  await expect.poll(footLine).toBe("Sent felucca.mp4 to the Recycle Bin. Deleted Cairo.");
   expect(await folderChildren(4)).toEqual([]);
 });

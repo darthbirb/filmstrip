@@ -8,7 +8,7 @@ import { libraryChanged } from "../library";
 import { dropPaneFolder, getPaneFolder } from "../pane/pane-store";
 import { askTooLarge, tooLargeOf } from "../pane/too-large";
 import { getPreferences, updatePreferences } from "../preferences";
-import { folderStayedBanner, folderStayedLine, holdsLine } from "../undo/lines";
+import { actLine, folderStayedBanner, folderStayedLine, holdsLine } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
 import { useIndex } from "./index-store";
@@ -49,13 +49,15 @@ export async function deleteFolderAsking(folder: Doomed, sources: readonly Sourc
 
 /**
  * Sends the folder where its files were told to go, and says what happened: the line at the foot
- * for what went, the banner over the grid for a folder that stayed. DECISIONS.md "Undo".
+ * for what went, after what was `sent` to the Recycle Bin first, and the banner over the grid for
+ * a folder that stayed. DECISIONS.md "Undo".
  */
 async function settle(
   folder: Doomed,
   contents: Contents | null,
   held: number,
   sources: readonly SourceSummary[],
+  sent?: string,
 ) {
   const inPane = await showsInPane(folder.id);
   const done = await deleteFolder(folder.id, contents).catch(() => null);
@@ -66,21 +68,22 @@ async function settle(
     contents?.kind === "moveTo"
       ? (sources.find((source) => source.id === contents.sourceId)?.title ?? null)
       : null;
+  const after = (line: string) => (sent ? `${sent} ${line}` : line);
   if (report.deleted) {
-    if (batch) afterAct(batch);
+    if (batch) afterAct(batch, 0, after(actLine(batch)));
     showReport(null);
   } else {
     const carried = batch?.files ?? 0;
-    if (batch) afterAct(batch, 0, folderStayedLine(folder.name, carried, held, into));
+    if (batch) afterAct(batch, 0, after(folderStayedLine(folder.name, carried, held, into)));
     const tooLarge = tooLargeOf(report.refused);
     const rest = report.refused.filter((one) => !tooLarge.includes(one));
-    const again = () => void settle(folder, contents, held - carried, sources);
+    const again = (said?: string) => void settle(folder, contents, held - carried, sources, said);
     showReport(
       rest.length > 0
         ? {
             sentence: folderStayedBanner(folder.name, carried, held, into),
             rows: rest,
-            retry: again,
+            retry: () => again(),
           }
         : null,
     );

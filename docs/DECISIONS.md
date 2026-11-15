@@ -1471,10 +1471,12 @@ dialog, which the app never shows on its behalf.
   gets the same promise from one flat call. The reason a file was refused is not told apart: all
   three are the Recycle Bin refusing, and a send that fails on the disk is said in the log.
 - **A library file goes the same way.** Delete's Send to Recycle Bin hands `send` a file in its
-  own folder, so its second name is made there, hidden by its dot from the walk. Its path is
-  kept in `setting.recycling` until the send returns, and at launch a send the app stopped
-  during is settled as the next send would settle it, once that folder can be reached: a lone
-  second name is the file again. The rest of the library is never swept for second names.
+  own folder, so its second name is made there, hidden by its dot from the walk, and nothing
+  else would ever find it. Its path joins the list in `setting.recycling` before the send and
+  leaves only once the send has settled. A send that fails partway keeps it, and a later send
+  never displaces it. At launch each one whose folder can be reached is settled as the next
+  send would settle it: a lone second name is the file again. One on a drive that is away waits
+  for a launch that finds it. The rest of the library is never swept for second names.
 - **Tests never reach the real bin.** The shell is behind the `Bin` trait, which also says
   whether a name is inside it; the tests' stand-in recycles into a folder of its own, deletes
   outright or refuses, while the second name and the file's names are real. Its files start with

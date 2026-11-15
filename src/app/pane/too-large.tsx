@@ -30,8 +30,8 @@ type Asking = {
   sizes: ReadonlyMap<number, number>;
   /** The Recycle Bin would not take these, so there is nothing left to ask. */
   refused: boolean;
-  /** What follows once every one has gone, as a folder's delete goes on. */
-  afterwards?: () => void;
+  /** What follows once every one has gone, as a folder's delete goes on, saying what was sent. */
+  afterwards?: (sent: string) => void;
   back: HTMLElement | null;
   id: number;
 };
@@ -49,7 +49,11 @@ function ask(next: Omit<Asking, "id"> | null) {
  * Asks whether files the Trash refused for their size go to the Recycle Bin instead; `afterwards`
  * follows once every one has gone. Nothing is sent without an answer.
  */
-export function askTooLarge(rows: readonly Stayed[], whole: number, afterwards?: () => void) {
+export function askTooLarge(
+  rows: readonly Stayed[],
+  whole: number,
+  afterwards?: (sent: string) => void,
+) {
   const sizes = new Map<number, number>();
   for (const row of rows) if (row.reason.kind === "tooLarge") sizes.set(row.id, row.reason.bytes);
   const focused = document.activeElement;
@@ -87,13 +91,9 @@ async function send(asked: Asking) {
   if (!done) return;
   const stayed = new Set(done.refused.map((row) => row.id));
   const went = asked.rows.filter((row) => !stayed.has(row.id));
-  if (went.length > 0) {
-    const [one] = went;
-    setNews({
-      kind: "recycled",
-      line: sentToBinLine(went.length, went.length === 1 ? one?.name : undefined),
-    });
-  }
+  const sent = sentToBinLine(went.length, went.length === 1 ? went[0]?.name : undefined);
+  const after = done.refused.length === 0 ? asked.afterwards : undefined;
+  if (went.length > 0 && !after) setNews({ kind: "recycled", line: sent });
   if (done.refused.length > 0) {
     ask({ ...asked, rows: done.refused, refused: true, afterwards: undefined });
   }
@@ -101,7 +101,7 @@ async function send(asked: Asking) {
     showInPane(next, origin);
   }
   await libraryChanged();
-  if (done.refused.length === 0) asked.afterwards?.();
+  after?.(sent);
 }
 
 function subscribe(listener: () => void) {

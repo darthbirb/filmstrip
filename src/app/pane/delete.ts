@@ -11,8 +11,8 @@ import { askTooLarge, tooLargeOf } from "./too-large";
 
 /**
  * Sends files to the trash and says what happened: the line at the foot for what went, the banner
- * over the grid for what did not, and the question for what was too large for it. When the pane was showing one of them, it moves on to the file
- * that takes its tile's place. DECISIONS.md "Undo".
+ * over the grid for what did not, and the question for what was too large for it. When the pane
+ * was showing one of them, it moves on to the file that takes its tile's place. DECISIONS.md "Undo".
  */
 export async function deleteFiles(itemIds: number[]) {
   const shown = getPaneItem();
