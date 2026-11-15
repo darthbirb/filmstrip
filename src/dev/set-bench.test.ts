@@ -65,6 +65,14 @@ test("a loop's restart, the clock held at the start, does not count against the 
   expect(pace(5000, looped)).toBeCloseTo(1, 3);
 });
 
+test("a hold after a loop longer than one of the pane's spans counts against the pace", () => {
+  const held = (at: number) => {
+    if (at < 1000) return 21 + at / 1000;
+    return Math.max(0, (at - 4000) / 1000);
+  };
+  expect(pace(5000, held)).toBeCloseTo(2 / 3, 1);
+});
+
 test("a stall away from a loop counts against the pace", () => {
   const stalled = (at: number) => 10 + (at < 2000 ? at : at < 2383 ? 2000 : at - 383) / 1000;
   expect(pace(5000, stalled)).toBeCloseTo(0.923, 2);

@@ -24,31 +24,34 @@ export type Span = { dropped: number; due: number; pace: number };
 
 /**
  * A clip's clock read at every frame the window draws: how far it moved, and over how many of the
- * window's seconds, since it was first read. `restarting` from a loop until the clock moves again.
+ * window's seconds, since it was first read. `wrapped`, in ms, from a loop until it moves again.
  */
 export type Clock = {
   time: number;
   at: number;
   moved: number;
   seconds: number;
-  restarting: boolean;
+  wrapped: number | null;
 };
 
 export function clock(time: number, at: number): Clock {
-  return { time, at, moved: 0, seconds: 0, restarting: false };
+  return { time, at, moved: 0, seconds: 0, wrapped: null };
 }
 
 /**
  * The clock read again at `at`, in ms. A loop's restart, from the frame the clock went back until
- * the frame it moves again, counts neither the clip's time nor the window's; any other stall does.
+ * it moves again or one of the pane's spans has passed, is not counted; any other stall is.
  * DECISIONS.md "Several files in the pane".
  */
 export function tick(was: Clock, time: number, at: number): Clock {
   const next = { ...was, time, at };
-  if (time < was.time) return { ...next, restarting: true };
-  if (was.restarting) return { ...next, restarting: time === was.time };
+  if (time < was.time) return { ...next, wrapped: at };
+  if (was.wrapped !== null && at - was.wrapped < KEEP.span) {
+    return { ...next, wrapped: time === was.time ? was.wrapped : null };
+  }
   return {
     ...next,
+    wrapped: null,
     moved: was.moved + time - was.time,
     seconds: was.seconds + (at - was.at) / 1000,
   };
