@@ -8,6 +8,8 @@ export type Refused = { why: Refusal; clash: string | null; path: string };
 /** What just happened at the person's request, as the foot of navigation says it. */
 export type FootNews =
   | { kind: "refused"; refused: Refused }
+  /** Files Delete sent straight to the Recycle Bin, too large for the Trash; nothing to undo. */
+  | { kind: "recycled"; line: string }
   /** A destination key that moved nothing, and why. */
   | { kind: "keyRefused"; line: string; detail?: string; path?: string }
   /** An act that changed the disk, and the batch its Undo takes back. */

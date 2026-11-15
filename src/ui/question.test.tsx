@@ -74,3 +74,29 @@ test("a fold that still does not fit side by side takes a line for each answer",
   expect(trash?.top).toBeGreaterThan(fold?.bottom ?? 0);
   expect(trash?.left).toBe(fold?.left);
 });
+
+test("one answer stands alone under why it is asked, over the files it is about", async () => {
+  let open = true;
+  const screen = await render(
+    <div style={{ width: "40rem" }}>
+      <Question
+        sentence="2 of 5 files are too large for the Trash"
+        detail="The Trash takes files up to 5 GB."
+        last={{ label: "Send to Recycle Bin", onChoose: () => undefined }}
+        files={{ open, onToggle: () => (open = !open), list: <span>MVI_0412.mov</span> }}
+        dismiss="Keep It"
+        onDismiss={() => undefined}
+      />
+    </div>,
+  );
+  await expect.element(screen.getByText("The Trash takes files up to 5 GB.")).toBeVisible();
+  await expect.element(screen.getByText("MVI_0412.mov")).toBeVisible();
+  expect(shown(screen)).toEqual(["Hide Files", "Keep It", "Send to Recycle Bin"]);
+
+  await screen.rerender(
+    <div style={{ width: "40rem" }}>
+      <Question sentence="Nothing was deleted" dismiss="Dismiss" onDismiss={() => undefined} />
+    </div>,
+  );
+  expect(shown(screen)).toEqual(["Dismiss"]);
+});

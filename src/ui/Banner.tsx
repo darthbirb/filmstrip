@@ -29,14 +29,7 @@ export function Banner({ sentence, retry, open, onToggle, onDismiss, children }:
           <Glyph name="warning" className="shrink-0 text-danger text-icon" />
           <span className="min-w-0 flex-1 text-fg text-ui tabular-nums">{sentence}</span>
           {retry && <Button onClick={retry}>Retry</Button>}
-          <Button
-            tone="quiet"
-            expanded={open}
-            detail={open && <Glyph name="chevronDown" className="rotate-180 text-glyph-small" />}
-            onClick={onToggle}
-          >
-            {open ? "Hide Files" : "Show Files"}
-          </Button>
+          <FilesToggle open={open} onToggle={onToggle} />
           <button
             type="button"
             aria-label="Dismiss"
@@ -53,6 +46,20 @@ export function Banner({ sentence, retry, open, onToggle, onDismiss, children }:
   );
 }
 
+/** Show Files or Hide Files: opens and closes the list under a notice. */
+export function FilesToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  return (
+    <Button
+      tone="quiet"
+      expanded={open}
+      detail={open && <Glyph name="chevronDown" className="rotate-180 text-glyph-small" />}
+      onClick={onToggle}
+    >
+      {open ? "Hide Files" : "Show Files"}
+    </Button>
+  );
+}
+
 /** A list row's columns: the name, why, and a narrow end column. `end` is that column's width. */
 export const listRow = (end: "badge" | "control") =>
   `grid ${end === "badge" ? "grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_3.5rem]" : "grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_var(--spacing-control)]"} items-center gap-3.5 px-3`;
@@ -61,4 +68,4 @@ export const listRow = (end: "badge" | "control") =>
 export const LIST_HEADING = "h-7 text-eyebrow text-fg-dim uppercase";
 
 /** One row of a list. */
-export const LIST_ROW = "h-control border-line border-t text-ui hover:bg-inset";
+export const LIST_ROW = "min-h-control border-line border-t text-ui hover:bg-inset";

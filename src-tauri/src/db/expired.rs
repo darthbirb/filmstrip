@@ -1,5 +1,7 @@
-//! What expiry sent to the Recycle Bin, kept after each file's row is forgotten, and the files the
-//! bin last refused. DECISIONS.md "Expiry goes to the Recycle Bin".
+//! What expiry sent to the Recycle Bin, kept after each file's row is forgotten, the files the bin
+//! last refused, and a library file on its way there. DECISIONS.md "Expiry goes to the Recycle Bin".
+
+use std::path::{Path, PathBuf};
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
@@ -79,5 +81,32 @@ pub fn set_refused(conn: &Connection, ids: &[i64]) -> Result<()> {
          ON CONFLICT (key) DO UPDATE SET value = excluded.value",
         params![REFUSED, serde_json::to_string(ids)?],
     )?;
+    Ok(())
+}
+
+const RECYCLING: &str = "recycling";
+
+/// The library file being sent to the Recycle Bin, kept until the send returns, so one the app
+/// stopped during is settled at the next launch.
+pub fn recycling(conn: &Connection) -> Result<Option<PathBuf>> {
+    let text: Option<String> = conn
+        .query_row(
+            "SELECT value FROM setting WHERE key = ?1",
+            params![RECYCLING],
+            |r| r.get(0),
+        )
+        .optional()?;
+    Ok(text.map(PathBuf::from))
+}
+
+pub fn set_recycling(conn: &Connection, file: Option<&Path>) -> Result<()> {
+    match file {
+        Some(file) => conn.execute(
+            "INSERT INTO setting (key, value) VALUES (?1, ?2)
+             ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+            params![RECYCLING, file.to_string_lossy()],
+        )?,
+        None => conn.execute("DELETE FROM setting WHERE key = ?1", params![RECYCLING])?,
+    };
     Ok(())
 }

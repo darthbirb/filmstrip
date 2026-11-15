@@ -72,6 +72,15 @@ pub enum Reason {
     Expired {
         limit: Limit,
     },
+    /// Larger than the trash takes: `limit` is its size per file, or its total while that is No
+    /// Limit, when `total`.
+    TooLarge {
+        bytes: i64,
+        limit: i64,
+        total: bool,
+    },
+    /// The Recycle Bin would not take it, so it is where it was.
+    BinRefused,
     /// Anything else, in the words it came with.
     Other {
         message: String,
@@ -104,6 +113,10 @@ impl fmt::Display for Reason {
             Reason::Expired {
                 limit: Limit::Size { bytes },
             } => write!(f, "it expired to keep the trash under {bytes} bytes"),
+            Reason::TooLarge { bytes, limit, .. } => {
+                write!(f, "it is {bytes} bytes, and the trash takes {limit}")
+            }
+            Reason::BinRefused => f.write_str("the Recycle Bin would not take it"),
             Reason::Other { message } => f.write_str(message),
         }
     }

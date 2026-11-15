@@ -80,21 +80,28 @@ function Row({ row, inTrash }: { row: Stayed; inTrash: "show" | "restoreTo" }) {
       </span>
       <span className="truncate text-fg-dim">{reasonText(row.reason)}</span>
       {showable ? (
-        <button
-          type="button"
-          aria-label={`Show ${row.name} in Explorer`}
-          title="Show in Explorer"
-          onClick={() => void reveal(row).catch(() => undefined)}
-          className={GO}
-        >
-          <Glyph name="folderOpen" />
-        </button>
+        <ShowInExplorer name={row.name} onClick={() => void reveal(row).catch(() => undefined)} />
       ) : row.at.kind === "trash" ? (
         <InTrash row={row} offers={inTrash} />
       ) : (
         <span />
       )}
     </div>
+  );
+}
+
+/** A row's quiet way to go and look at it in Explorer. */
+export function ShowInExplorer({ name, onClick }: { name: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label={`Show ${name} in Explorer`}
+      title="Show in Explorer"
+      onClick={onClick}
+      className={GO}
+    >
+      <Glyph name="folderOpen" />
+    </button>
   );
 }
 

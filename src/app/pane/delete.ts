@@ -7,10 +7,11 @@ import { deletedBannerLine } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
 import { getPaneItem, getPaneOrigin, paneMovesOn, showInPane } from "./pane-store";
+import { askTooLarge, tooLargeOf } from "./too-large";
 
 /**
  * Sends files to the trash and says what happened: the line at the foot for what went, the banner
- * over the grid for what did not. When the pane was showing one of them, it moves on to the file
+ * over the grid for what did not, and the question for what was too large for it. When the pane was showing one of them, it moves on to the file
  * that takes its tile's place. DECISIONS.md "Undo".
  */
 export async function deleteFiles(itemIds: number[]) {
@@ -23,16 +24,19 @@ export async function deleteFiles(itemIds: number[]) {
   const { batch, report } = done;
   if (batch) afterAct(batch, report.refused.length);
   const whole = report.trashed + report.refused.length;
-  const [first] = report.refused;
+  const tooLarge = tooLargeOf(report.refused);
+  const rest = report.refused.filter((one) => !tooLarge.includes(one));
+  const [first] = rest;
   showReport(
     first
       ? {
           sentence: deletedBannerLine(report.trashed, whole, whole === 1 ? first.name : undefined),
-          rows: report.refused,
-          retry: () => void deleteFiles(report.refused.map((one) => one.id)),
+          rows: rest,
+          retry: () => void deleteFiles(rest.map((one) => one.id)),
         }
       : null,
   );
+  if (tooLarge.length > 0) askTooLarge(tooLarge, whole);
   const stayed = report.refused.some((one) => one.id === shown);
   if (shown !== null && !stayed && next !== shown) showInPane(next, origin);
   await libraryChanged();

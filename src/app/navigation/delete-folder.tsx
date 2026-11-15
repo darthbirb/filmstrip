@@ -6,6 +6,7 @@ import { deleteFolder, folderDetail, folderFileCount } from "../../ipc/commands"
 import { Question } from "../../ui/Question";
 import { libraryChanged } from "../library";
 import { dropPaneFolder, getPaneFolder } from "../pane/pane-store";
+import { askTooLarge, tooLargeOf } from "../pane/too-large";
 import { getPreferences, updatePreferences } from "../preferences";
 import { folderStayedBanner, folderStayedLine, holdsLine } from "../undo/lines";
 import { showReport } from "../undo/report-store";
@@ -71,11 +72,19 @@ async function settle(
   } else {
     const carried = batch?.files ?? 0;
     if (batch) afterAct(batch, 0, folderStayedLine(folder.name, carried, held, into));
-    showReport({
-      sentence: folderStayedBanner(folder.name, carried, held, into),
-      rows: report.refused,
-      retry: () => void settle(folder, contents, held - carried, sources),
-    });
+    const tooLarge = tooLargeOf(report.refused);
+    const rest = report.refused.filter((one) => !tooLarge.includes(one));
+    const again = () => void settle(folder, contents, held - carried, sources);
+    showReport(
+      rest.length > 0
+        ? {
+            sentence: folderStayedBanner(folder.name, carried, held, into),
+            rows: rest,
+            retry: again,
+          }
+        : null,
+    );
+    if (tooLarge.length > 0) askTooLarge(tooLarge, held, rest.length === 0 ? again : undefined);
   }
   await libraryChanged();
 }

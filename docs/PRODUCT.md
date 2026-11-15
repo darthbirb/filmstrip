@@ -62,6 +62,13 @@ says what the next run will send, and when; the foot says what a run sent, with 
 the Recycle Bin cannot take stays in the Trash, said once. A Restore or Ctrl+Z that reaches a
 file after it expired says it is in the Recycle Bin, and why.
 
+**A file larger than the Trash takes is refused at Delete**: over Size per File, or over Total
+Size where that is smaller or Size per File is No Limit. The question above the grid says so and
+offers Send to Recycle Bin; × keeps it where it is. In a set the rest go to the Trash as ever,
+with Undo, and the refused are listed with their sizes; a folder's Delete Files Too asks the same,
+and the folder goes once they have. Sent, a file leaves the library with no Undo. One the Recycle
+Bin cannot take stays where it was, and the notice says so; nothing is deleted outright.
+
 ## Tags and labels
 
 **Tags** are lowercase, may be several words such as `new york`, and belong to items and

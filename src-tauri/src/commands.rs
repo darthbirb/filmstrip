@@ -35,7 +35,7 @@ use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
 use crate::fs::items::{self as fs_items, MoveReport};
 use crate::fs::paste::{self, Carried, CopyRefusal};
 use crate::fs::recycle::RecycleBin;
-use crate::fs::trash::{self, Origin, Removal, RestoreReport, TrashReport, Trashed};
+use crate::fs::trash::{self, BinReport, Origin, Removal, RestoreReport, TrashReport, Trashed};
 use crate::fs::undo::{self, UndoReport};
 use crate::fs::{paths, sanitize};
 use crate::jobs::{self, JobQueue, Progress};
@@ -307,12 +307,13 @@ pub struct ItemsTrashed {
     pub report: TrashReport,
 }
 
-/// Files sent to the app's trash, out of their folders, to wait there until taken back.
+/// Files sent to the app's trash, out of their folders, to wait there until taken back; one larger
+/// than the trash takes is refused, for the question that offers the Recycle Bin.
 #[tauri::command]
 pub async fn trash_items(state: State<'_, AppState>, item_ids: Vec<i64>) -> Result<ItemsTrashed> {
     run(&state, move |conn| {
         let batch_id = journal::new_batch();
-        let report = trash::trash_items(conn, &item_ids, &batch_id)?;
+        let report = trash::trash_within(conn, &item_ids, &batch_id, largest_trashed())?;
         Ok(ItemsTrashed {
             batch: described(conn, report.trashed > 0, &batch_id)?,
             report,
@@ -375,12 +376,31 @@ pub async fn delete_folder(
 ) -> Result<FolderDeleted> {
     run(&state, move |conn| {
         let batch_id = journal::new_batch();
-        let report = fs_folders::delete(conn, folder_id, contents, &batch_id)?;
+        let report =
+            fs_folders::delete_within(conn, folder_id, contents, &batch_id, largest_trashed())?;
         let journalled = !journal::batch(conn, &batch_id)?.is_empty();
         Ok(FolderDeleted {
             batch: described(conn, journalled, &batch_id)?,
             report,
         })
+    })
+    .await
+}
+
+/// The largest file Delete sends to the trash, as Settings › Trash has it now.
+fn largest_trashed() -> Option<trash::Largest> {
+    trash::Largest::of(crate::config::Config::load().trash_limits())
+}
+
+/// Files sent from their folders straight to the Recycle Bin, as Delete offers for one larger than
+/// the trash takes. Nothing to undo. DECISIONS.md "Sending to the Recycle Bin".
+#[tauri::command]
+pub async fn send_to_recycle_bin(
+    state: State<'_, AppState>,
+    item_ids: Vec<i64>,
+) -> Result<BinReport> {
+    run(&state, move |conn| {
+        trash::send_to_bin(conn, &RecycleBin, &item_ids)
     })
     .await
 }

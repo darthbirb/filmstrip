@@ -672,7 +672,11 @@ toward the rest surface.
   on one line; under the question its answers as buttons, the one that destroys last in `danger`;
   under them, where an answer can be kept, a checkbox. The answers hold the line or all fold into
   one raised button with a caret, whose menu names them a `tile-gap` under it; folded answers that
-  still do not fit take a line each, left-aligned. Only the answers ever change shape.
+  still do not fit take a line each, left-aligned. Only the answers ever change shape. Why it is
+  asked can stand under the question in `small` `fg-dim`, as Delete's of a file too large for the
+  Trash does, where × is Keep It. A question about several files has Hide Files before × and their
+  list under its answers, as the notice's, each file's size where a reason would be. What the
+  Recycle Bin then refused keeps the shape with no answer, × as Dismiss.
 - **Selection bar.** The grid's own foot row while anything is checked: `toolbar` tall on `panel`
   with a `line` hairline above, arriving and leaving as a box pushing down does, the grid giving up
   its height. From the left: the count in `ui` semibold `fg` with its size after it in `small`

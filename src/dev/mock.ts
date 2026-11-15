@@ -3,6 +3,7 @@ import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import type { Act } from "../ipc/bindings/Act";
 import type { Backup } from "../ipc/bindings/Backup";
 import type { Batch } from "../ipc/bindings/Batch";
+import type { BinReport } from "../ipc/bindings/BinReport";
 import type { BranchFile } from "../ipc/bindings/BranchFile";
 import type { Carried } from "../ipc/bindings/Carried";
 import type { Change } from "../ipc/bindings/Change";
@@ -1554,15 +1555,73 @@ export function expireNow(refuse: readonly number[] = []) {
   return said;
 }
 
-/** Puts the Trash's limits back as they start, and what expired back where it was deleted from. */
+/** Puts the Trash's limits back as they start, and what expired or Delete sent to the Recycle Bin
+ * back where it was, at its own size. */
 export function resetTrashLimits() {
   trashSet = { keepDays: 30, totalGb: 25, fileGb: 5 };
   for (const { item } of expired.values())
     ITEMS[item.folderId] = [...(ITEMS[item.folderId] ?? []), item];
   expired.clear();
+  for (const item of sentToBin) ITEMS[item.folderId] = [...(ITEMS[item.folderId] ?? []), item];
+  sentToBin = [];
+  for (const [item, bytes] of resized) item.sizeBytes = bytes;
+  resized.clear();
+  binRefuses = new Set();
   recount();
   binRefused = [];
 }
+
+/** What Delete sent straight to the Recycle Bin, and the files the bin refuses when sent. */
+let sentToBin: ItemRow[] = [];
+let binRefuses = new Set<number>();
+/** Files grown past what the Trash takes, and the size each had. */
+const resized = new Map<ItemRow, number>();
+
+/** Gives a file a size of its own, for tests and for looking. */
+export function resizeItem(itemId: number, bytes: number) {
+  const item = allItems().find((one) => one.id === itemId);
+  if (!item) return;
+  if (!resized.has(item)) resized.set(item, item.sizeBytes);
+  item.sizeBytes = bytes;
+  recount();
+}
+
+/** Has the Recycle Bin refuse these files when Delete sends them there. */
+export function refuseRecycling(itemIds: readonly number[]) {
+  binRefuses = new Set(itemIds);
+}
+
+/** The largest file the Trash takes, as the Rust side reckons it from the limits. */
+function largestTrashed() {
+  const { fileGb, totalGb } = trashSet;
+  if (fileGb !== null && (totalGb === null || fileGb <= totalGb))
+    return { bytes: fileGb * GB, total: false };
+  return totalGb === null ? null : { bytes: totalGb * GB, total: true };
+}
+
+/** A file Delete refuses for its size, or nothing. */
+function tooLarge(item: ItemRow): Stayed | null {
+  const largest = largestTrashed();
+  if (!largest || item.sizeBytes <= largest.bytes) return null;
+  return stayedIn(item, {
+    kind: "tooLarge",
+    bytes: item.sizeBytes,
+    limit: largest.bytes,
+    total: largest.total,
+  });
+}
+
+// `?too-large` grows felucca.mp4 and pyramid.jpg past the Trash's 5 GB; `?bin-refuses` has the
+// Recycle Bin refuse whatever Delete sends it.
+if (backupsWanted().has("too-large")) {
+  const grow = (name: string, bytes: number) => {
+    const item = allItems().find((one) => one.diskName === name);
+    if (item) resizeItem(item.id, bytes);
+  };
+  grow("felucca.mp4", 6_657_199_309);
+  grow("pyramid.jpg", 12_670_154_342);
+}
+if (backupsWanted().has("bin-refuses")) refuseRecycling(allItems().map((item) => item.id));
 
 const TRASH_DIR = "D:\\Filmstrip\\data\\trash";
 // `?recycle-refused` has the Recycle Bin refuse a removed source's newest file in the Trash, and
@@ -1749,11 +1808,32 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   // The trash is a folder of its own that no place lists yet.
   trash_items: ({ itemIds }): ItemsTrashed => {
     const steps: Step[] = [];
+    const refused: Stayed[] = [];
     for (const item of everyItem().filter((one) => (itemIds as number[]).includes(one.id))) {
+      const over = tooLarge(item);
+      if (over) {
+        refused.push(over);
+        continue;
+      }
       steps.push({ op: "trash", item, from: item.folderId });
       toTrash(item);
     }
-    return { batch: record(steps), report: { trashed: steps.length, refused: [] } };
+    return { batch: record(steps), report: { trashed: steps.length, refused } };
+  },
+  send_to_recycle_bin: ({ itemIds }): BinReport => {
+    const refused: Stayed[] = [];
+    let sent = 0;
+    for (const item of everyItem().filter((one) => (itemIds as number[]).includes(one.id))) {
+      if (binRefuses.has(item.id)) {
+        refused.push(stayedIn(item, { kind: "binRefused" }));
+        continue;
+      }
+      ITEMS[item.folderId] = (ITEMS[item.folderId] ?? []).filter((other) => other !== item);
+      sentToBin.push(item);
+      sent += 1;
+    }
+    recount();
+    return { sent, refused };
   },
   restore_items: ({ itemIds, folderId }) => {
     const steps: Step[] = [];
@@ -1797,6 +1877,11 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     const refused: Stayed[] = [];
     if (held.length > 0 && how?.kind === "trash") {
       for (const item of held) {
+        const over = tooLarge(item);
+        if (over) {
+          refused.push(over);
+          continue;
+        }
         steps.push({ op: "trash", item, from: item.folderId });
         toTrash(item);
       }

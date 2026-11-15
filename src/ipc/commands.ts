@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { AddOutcome } from "./bindings/AddOutcome";
 import type { Backup } from "./bindings/Backup";
 import type { Batch } from "./bindings/Batch";
+import type { BinReport } from "./bindings/BinReport";
 import type { BranchFile } from "./bindings/BranchFile";
 import type { Carried } from "./bindings/Carried";
 import type { Contents } from "./bindings/Contents";
@@ -102,6 +103,10 @@ export const renameItem = (itemId: number, name: string) =>
   invoke<Batch | null>("rename_item", { itemId, name });
 
 export const trashItems = (itemIds: number[]) => invoke<ItemsTrashed>("trash_items", { itemIds });
+
+/** Files sent from their folders straight to the Recycle Bin, as Delete offers for one too large for the Trash. */
+export const sendToRecycleBin = (itemIds: number[]) =>
+  invoke<BinReport>("send_to_recycle_bin", { itemIds });
 
 export const restoreItems = (itemIds: number[], folderId: number | null) =>
   invoke<ItemsRestored>("restore_items", { itemIds, folderId });

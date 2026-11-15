@@ -1411,6 +1411,20 @@ promise the person has to keep in mind.
 - **The size per file is set here and kept by Delete** (#186), not by the run: a file already in
   the Trash was let in under the limit it had then.
 
+**Delete's refusal** was built on 15 November 2026 for #186, from Artboards › The Trash's limits.
+
+- **The file's size on disk, against the smaller of the two sizes.** Delete measures the file
+  itself, not the index's last reading, and refuses it before anything moves. A file over the
+  total would only expire at the next run, so it is refused too, even under the size per file;
+  with both at No Limit nothing is refused for its size. Undo of a restore and every other way
+  back into the Trash is not a Delete, and is never refused.
+- **Refused files are asked about, never sent unasked.** The rest of a set, or of a folder, go
+  to the Trash under one batch as ever. A folder stays while its refused files do, and its delete
+  runs again, as a batch of its own, once every one has gone.
+- **Sent, the row retires**, as a walk retires a file it finds gone, so a file the person puts
+  back from the Recycle Bin comes back as the same item, its tags with it. Nothing is
+  journalled: from the bin the file is Windows' to give back.
+
 ## Sending to the Recycle Bin
 
 **`fs::recycle::send` hands a file to the shell's Recycle Bin and never lets it be destroyed**,
@@ -1456,6 +1470,11 @@ dialog, which the app never shows on its behalf.
   before it happens, but only through a COM sink the app would have to implement; the second name
   gets the same promise from one flat call. The reason a file was refused is not told apart: all
   three are the Recycle Bin refusing, and a send that fails on the disk is said in the log.
+- **A library file goes the same way.** Delete's Send to Recycle Bin hands `send` a file in its
+  own folder, so its second name is made there, hidden by its dot from the walk. Its path is
+  kept in `setting.recycling` until the send returns, and at launch a send the app stopped
+  during is settled as the next send would settle it, once that folder can be reached: a lone
+  second name is the file again. The rest of the library is never swept for second names.
 - **Tests never reach the real bin.** The shell is behind the `Bin` trait, which also says
   whether a name is inside it; the tests' stand-in recycles into a folder of its own, deletes
   outright or refuses, while the second name and the file's names are real. Its files start with

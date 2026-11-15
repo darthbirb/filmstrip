@@ -32,6 +32,7 @@ pub fn run() {
             db::jobs::requeue_running(&conn)?;
             jobs::enqueue_index(&conn)?;
             jobs::enqueue_expiry(&conn)?;
+            fs::trash::settle_unfinished_send(&conn)?;
             let put = fs::recycle::sweep(&fs::paths::trash_dir()?);
             if put > 0 {
                 eprintln!("trash: {put} held files put back");
@@ -119,6 +120,7 @@ pub fn run() {
             commands::move_items,
             commands::rename_item,
             commands::trash_items,
+            commands::send_to_recycle_bin,
             commands::folder_file_count,
             commands::delete_folder,
             commands::undo_last,
