@@ -3,6 +3,8 @@ use std::fmt;
 use serde::Serialize;
 use ts_rs::TS;
 
+use crate::fs::expiry::Limit;
+
 pub type Result<T> = std::result::Result<T, AppError>;
 
 /// Serialises as `{ kind, message }`, so the frontend branches on `kind`; a refusal adds its
@@ -66,6 +68,10 @@ pub enum Reason {
         source: String,
     },
     DiskFull,
+    /// It left the trash for the Recycle Bin, past one of the trash's limits, before it was asked for.
+    Expired {
+        limit: Limit,
+    },
     /// Anything else, in the words it came with.
     Other {
         message: String,
@@ -92,6 +98,12 @@ impl fmt::Display for Reason {
             Reason::AlreadyIn { place } => write!(f, "it is already in {place}"),
             Reason::Offline { source } => write!(f, "{source} is offline"),
             Reason::DiskFull => f.write_str("the disk is full"),
+            Reason::Expired {
+                limit: Limit::Age { days },
+            } => write!(f, "it expired after {days} days"),
+            Reason::Expired {
+                limit: Limit::Size { bytes },
+            } => write!(f, "it expired to keep the trash under {bytes} bytes"),
             Reason::Other { message } => f.write_str(message),
         }
     }

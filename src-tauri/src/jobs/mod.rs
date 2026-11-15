@@ -7,8 +7,8 @@ pub mod worker;
 use std::collections::{BTreeMap, HashSet};
 use std::panic::AssertUnwindSafe;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock, RwLockWriteGuard};
+use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError, RwLock, RwLockWriteGuard};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -19,6 +19,7 @@ use ts_rs::TS;
 use crate::db::{self, jobs as table};
 use crate::error::{Reason, Result};
 use crate::fs::acts::Batch;
+use crate::fs::expiry::Expired;
 use crate::fs::export::{self, End, Naming, Scope};
 use crate::fs::stayed::Stayed;
 use crate::media::ffmpeg::Ffmpeg;
@@ -26,6 +27,7 @@ use crate::media::ffmpeg::Ffmpeg;
 pub const PROGRESS_EVENT: &str = "job-progress";
 pub const COPIED_EVENT: &str = "copy-done";
 pub const EXPORTED_EVENT: &str = "export-done";
+pub const EXPIRED_EVENT: &str = "trash-expired";
 
 const TICK: Duration = Duration::from_millis(500);
 const IDLE: Duration = Duration::from_millis(150);
@@ -34,6 +36,8 @@ const IDLE: Duration = Duration::from_millis(150);
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(3);
 const MIN_WORKERS: usize = 2;
 const MAX_WORKERS: usize = 8;
+/// How often the trash keeps its limits, in seconds, after the run at launch.
+const EXPIRY_EVERY: i64 = 60 * 60;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "lowercase")]
@@ -124,6 +128,38 @@ pub struct Exported {
 pub type Report = Box<dyn Fn(&Progress) + Send + Sync>;
 pub type Announce = Box<dyn Fn(&Copied) + Send + Sync>;
 pub type AnnounceExport = Box<dyn Fn(&Exported) + Send + Sync>;
+pub type AnnounceExpiry = Box<dyn Fn(&Expired) + Send + Sync>;
+
+/// A run on a clock: due once `every` seconds have passed since the last, then not again until
+/// as many more have. Given the time rather than reading it, so it is tested without waiting.
+pub struct Every {
+    every: i64,
+    next: AtomicI64,
+}
+
+impl Every {
+    pub fn from(start: i64, every: i64) -> Every {
+        Every {
+            every,
+            next: AtomicI64::new(start + every),
+        }
+    }
+
+    /// When it is next due, in seconds since 1970.
+    pub fn next(&self) -> i64 {
+        self.next.load(Ordering::Relaxed)
+    }
+
+    /// Whether it is due at `now`; once it is, the next is `every` from now.
+    pub fn due(&self, now: i64) -> bool {
+        let next = self.next();
+        now >= next
+            && self
+                .next
+                .compare_exchange(next, now + self.every, Ordering::Relaxed, Ordering::Relaxed)
+                .is_ok()
+    }
+}
 
 pub struct QueueInner {
     db_path: PathBuf,
@@ -141,6 +177,9 @@ pub struct QueueInner {
     report: Report,
     announce: Announce,
     exported: AnnounceExport,
+    expired: OnceLock<AnnounceExpiry>,
+    /// When the trash next keeps its limits.
+    expiry: Every,
     copies: Mutex<BTreeMap<i64, Copying>>,
     exports: Mutex<BTreeMap<i64, Exporting>>,
     cancelled: Mutex<HashSet<i64>>,
@@ -167,6 +206,8 @@ impl QueueInner {
             report,
             announce,
             exported,
+            expired: OnceLock::new(),
+            expiry: Every::from(db::now(), EXPIRY_EVERY),
             copies: Mutex::new(BTreeMap::new()),
             exports: Mutex::new(BTreeMap::new()),
             cancelled: Mutex::new(HashSet::new()),
@@ -351,6 +392,16 @@ impl JobQueue {
         self.inner.progress(&db::open(&self.inner.db_path)?)
     }
 
+    /// Says what each run of expiry sent, once it has something to say.
+    pub fn on_expired(&self, expired: AnnounceExpiry) {
+        let _ = self.inner.expired.set(expired);
+    }
+
+    /// When the trash next keeps its limits, in seconds since 1970.
+    pub fn next_expiry(&self) -> i64 {
+        self.inner.expiry.next()
+    }
+
     /// Stops a copy: one still waiting is taken off the queue, one running stops after the file
     /// in hand. `false` when there was nothing to stop.
     pub fn cancel_copy(&self, conn: &Connection, job_id: i64) -> Result<bool> {
@@ -469,6 +520,9 @@ fn tick(inner: &QueueInner) {
     let mut previous: Option<Progress> = None;
     while !inner.stop.load(Ordering::Relaxed) {
         std::thread::sleep(TICK);
+        if let Err(err) = keep_time(inner, &conn, db::now()) {
+            eprintln!("the trash's hourly run was not queued: {err}");
+        }
         let Ok(progress) = inner.progress(&conn) else {
             continue;
         };
@@ -477,6 +531,23 @@ fn tick(inner: &QueueInner) {
             previous = Some(progress);
         }
     }
+}
+
+/// Queues the trash's run once its hour has come.
+fn keep_time(inner: &QueueInner, conn: &Connection, now: i64) -> Result<()> {
+    if inner.expiry.due(now) {
+        enqueue_expiry(conn)?;
+    }
+    Ok(())
+}
+
+/// Queues the trash keeping its limits, unless a run is already waiting or running: two at once
+/// would each say what the bin refused.
+pub fn enqueue_expiry(conn: &Connection) -> Result<()> {
+    if !table::is_queued(conn, kinds::EXPIRE, "{}")? {
+        table::enqueue(conn, kinds::EXPIRE, "{}", kinds::PRIORITY_EXPIRE)?;
+    }
+    Ok(())
 }
 
 /// Queues a walk of every source, unless one is already waiting or running.
@@ -1023,6 +1094,58 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM item", [], |r| r.get(0))
             .unwrap();
         assert_eq!(walked, 1, "and it starts again once the hold goes");
+    }
+
+    #[test]
+    fn an_hourly_run_is_due_once_its_hour_has_passed_and_then_an_hour_after_that() {
+        let hourly = Every::from(1_000, 3_600);
+        assert_eq!(hourly.next(), 4_600);
+        assert!(!hourly.due(4_599));
+        assert!(hourly.due(4_600));
+        assert!(!hourly.due(4_600), "once");
+        assert_eq!(hourly.next(), 8_200);
+        assert!(
+            hourly.due(20_000),
+            "a machine that slept runs once on waking"
+        );
+        assert_eq!(hourly.next(), 23_600);
+    }
+
+    #[test]
+    fn the_trash_is_queued_to_keep_its_limits_once_an_hour_and_never_twice_over() {
+        let dir = scratch("hourly");
+        let mut conn = db::open(&dir.join("library.db")).unwrap();
+        db::migrate(&mut conn).unwrap();
+        let inner = QueueInner::new(
+            dir.join("library.db"),
+            dir.join("thumbs"),
+            None,
+            Box::new(|_| {}),
+            Box::new(|_| {}),
+            Box::new(|_| {}),
+        );
+        let waiting = |conn: &Connection| -> i64 {
+            conn.query_row(
+                "SELECT COUNT(*) FROM job WHERE kind = ?1 AND status = 'pending'",
+                [kinds::EXPIRE],
+                |r| r.get(0),
+            )
+            .unwrap()
+        };
+        let hour = inner.expiry.next();
+
+        keep_time(&inner, &conn, hour - 1).unwrap();
+        assert_eq!(waiting(&conn), 0);
+        keep_time(&inner, &conn, hour).unwrap();
+        assert_eq!(waiting(&conn), 1);
+        assert_eq!(inner.expiry.next(), hour + EXPIRY_EVERY);
+        keep_time(&inner, &conn, hour + EXPIRY_EVERY).unwrap();
+        assert_eq!(waiting(&conn), 1, "one still waiting is enough");
+
+        let running = table::claim(&mut conn).unwrap().unwrap();
+        assert_eq!(running.kind, kinds::EXPIRE);
+        keep_time(&inner, &conn, hour + 2 * EXPIRY_EVERY).unwrap();
+        assert_eq!(waiting(&conn), 0, "nor is a second queued while one runs");
     }
 
     #[test]

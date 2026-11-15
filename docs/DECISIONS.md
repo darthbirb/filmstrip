@@ -1191,8 +1191,12 @@ it.
 - **The tags screen's renames, merges and deletes are journalled too**, one row per act
   (`retag`), for the same reason: a merge of `dawn` into `golden hour` forgets which files held
   which, and only the journal can split them again. DECISIONS.md "The tags screen".
-- **The journal keeps everything for now.** Its rows are small, and what to prune is settled with
-  the trash's limits.
+- **Expiry prunes the journal, and only of the file that expired.** A row about that one file
+  (a move, a rename, a delete, a restore, a copy) is kept with a mark saying where it went, so
+  Ctrl+Z still finds its batch and says the file is in the Recycle Bin rather than acting on an id
+  that may be reused; the mark goes as the undo says so. A row naming a set (a tag added, one taken
+  off, a tags-screen act) loses that file alone, and goes once it names nothing. DECISIONS.md
+  "Expiry goes to the Recycle Bin".
 
 ## Bringing files in
 
@@ -1381,6 +1385,32 @@ promise the person has to keep in mind.
   happens if nothing refuses, and the band says what did when something does. Artboards ›
   Sources, "What removing does with its trashed files".
 
+**The run** was built on 14 November 2026 for #184, from Artboards › The Trash's limits.
+
+- **At launch and every hour**, as a job of its own kind behind the walk, so it never holds the
+  window. The hour is kept by the queue's own tick, which is handed the time, so a test moves the
+  clock rather than waiting on it. No run is queued while another waits or runs, so a run that
+  outlasts its hour is never joined by a second saying the same refusals.
+- **Age first, then size, oldest first.** Every file past the time to live goes; then, while the
+  Trash still weighs more than its total, the oldest that are left. Each file goes on its own turn
+  at the disk, its row going in the same transaction once the Recycle Bin has it, so an act
+  queued behind the run waits for one file, not the run. Inside each turn the Trash is weighed
+  again and the file's deletion time checked again: a restore or a delete between two turns
+  changes what is over, and a file deleted again is now the newest. A partial index on the
+  trashed items keeps that weighing to the Trash alone.
+- **A file the Recycle Bin refuses stays in the Trash under its row**, still counted against the
+  total, and is tried again at every run. The foot says so once, when more are refused than at the
+  last run, with Show in Trash; a run that only sent files says what went, with no Undo.
+- **What expired is remembered by id**: its name, the folder it left and the limit that sent it.
+  A Restore or Ctrl+Z that reaches it after the run lists it under In the Recycle Bin with why,
+  rather than as a file the app has lost, and Retry tries again only what is still in the Trash.
+- **The limits live in `filmstrip.config.json`**, beside the backups kept: they are the app's
+  own housekeeping, not the library, and a restore of the index leaves them as they are. No Limit
+  is a choice for each. The line under them says what the next run will send, as of when it runs,
+  leaving out what the Recycle Bin refused at the last one.
+- **The size per file is set here and kept by Delete** (#186), not by the run: a file already in
+  the Trash was let in under the limit it had then.
+
 ## Sending to the Recycle Bin
 
 **`fs::recycle::send` hands a file to the shell's Recycle Bin and never lets it be destroyed**,
@@ -1453,6 +1483,10 @@ is read at a glance. A bound row is its key, its folder as a button that opens t
 picker to choose another, its count and a ×; a free row offers Choose Folder…; one whose folder
 has gone is in the red and says where it was, and keeps its key until it is freed or given to
 another folder. The picker opens inside the dialog, since the window behind it is inert.
+
+**Trash sits in the Library group, after Backups**: its three limits as dropdowns of a few fixed
+answers and No Limit each, what the Trash holds against its total in the section's head, and one
+line under them on what the next run sends, and when. DECISIONS.md "Expiry goes to the Recycle Bin".
 
 **A rail of sections, grouped and filtered**, because it will grow: tabs hold six or seven names
 and then scroll, and a rail takes twenty. A section with nothing in it yet is not in the rail.

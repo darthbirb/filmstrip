@@ -31,6 +31,7 @@ pub fn run() {
             jobs::abandon_exports(&conn)?;
             db::jobs::requeue_running(&conn)?;
             jobs::enqueue_index(&conn)?;
+            jobs::enqueue_expiry(&conn)?;
             let put = fs::recycle::sweep(&fs::paths::trash_dir()?);
             if put > 0 {
                 eprintln!("trash: {put} held files put back");
@@ -69,6 +70,10 @@ pub fn run() {
                     let _ = exporter.emit(jobs::EXPORTED_EVENT, exported);
                 }),
             );
+            let expirer = app.handle().clone();
+            queue.on_expired(Box::new(move |expired| {
+                let _ = expirer.emit(jobs::EXPIRED_EVENT, expired);
+            }));
             let backups = fs::backups::Shelf::new(fs::paths::backups_dir()?);
             back_up_at_launch(app.handle().clone(), &backups, db_path.clone());
             app.manage(commands::AppState {
@@ -191,6 +196,8 @@ pub fn run() {
             commands::restore_backup,
             commands::restore_forgets,
             commands::set_backups_kept,
+            commands::trash_limits,
+            commands::set_trash_limit,
             commands::launch_backup_refusal,
             commands::ui_preferences,
             commands::set_ui_preferences,

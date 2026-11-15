@@ -2,7 +2,7 @@
 
 /**
  * Where something that stayed is now: a folder, named from its source's own folder down, the
- * app's trash, or a directory outside the library that a copy was bringing it in from, with the
- * folder it was bringing it into.
+ * app's trash, the Recycle Bin a file expired to, or a directory outside the library that a copy
+ * was bringing it in from, with the folder it was bringing it into.
  */
-export type Whereabouts = { "kind": "folder", folderId: number, path: Array<string>, } | { "kind": "trash" } | { "kind": "outside", dir: string, into: number, };
+export type Whereabouts = { "kind": "folder", folderId: number, path: Array<string>, } | { "kind": "trash" } | { "kind": "recycleBin" } | { "kind": "outside", dir: string, into: number, };

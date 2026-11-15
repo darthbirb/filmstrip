@@ -56,6 +56,12 @@ and the oldest first while the trash is over its total size. That is one more ch
 back, outside the app; the app's Restore and undo can no longer reach it. Nothing is destroyed
 by expiry. Purging the trash is the one way the app deletes a file outright.
 
+The limits are kept at launch and every hour, and set in Settings › Trash: Keep For 30 days,
+Total Size 25 GB and Size per File 5 GB until changed, each with No Limit. The line under them
+says what the next run will send, and when; the foot says what a run sent, with no Undo. A file
+the Recycle Bin cannot take stays in the Trash, said once. A Restore or Ctrl+Z that reaches a
+file after it expired says it is in the Recycle Bin, and why.
+
 ## Tags and labels
 
 **Tags** are lowercase, may be several words such as `new york`, and belong to items and

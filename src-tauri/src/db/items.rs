@@ -563,6 +563,47 @@ pub fn in_trash(conn: &Connection) -> Result<Vec<(ItemRow, i64)>> {
     Ok(rows)
 }
 
+/// One file in the trash as expiry weighs it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Waiting {
+    pub id: i64,
+    pub bytes: i64,
+    pub trashed_at: i64,
+}
+
+/// Every item in the trash, the one that went first first.
+pub fn trash_oldest_first(conn: &Connection) -> Result<Vec<Waiting>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, size_bytes, trashed_at FROM item
+          WHERE trashed_at IS NOT NULL
+          ORDER BY trashed_at, id",
+    )?;
+    let rows = stmt
+        .query_map([], |r| {
+            Ok(Waiting {
+                id: r.get(0)?,
+                bytes: r.get(1)?,
+                trashed_at: r.get(2)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(rows)
+}
+
+/// What the trash holds and weighs.
+pub fn in_trash_tally(conn: &Connection) -> Result<Tally> {
+    Ok(conn.query_row(
+        "SELECT COUNT(*), COALESCE(SUM(size_bytes), 0) FROM item WHERE trashed_at IS NOT NULL",
+        [],
+        |r| {
+            Ok(Tally {
+                count: r.get(0)?,
+                bytes: r.get(1)?,
+            })
+        },
+    )?)
+}
+
 /// How many files, and their bytes together.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, TS)]
 #[ts(export)]

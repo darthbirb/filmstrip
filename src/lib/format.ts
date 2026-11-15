@@ -70,12 +70,16 @@ export function formatShortDate(seconds: number) {
   );
 }
 
-/** A moment as its day and its time: Today, 14:02. */
-export function formatWhen(seconds: number, now = new Date()) {
-  const time = new Intl.DateTimeFormat(undefined, { timeStyle: "short" }).format(
+/** A moment's time of day alone: 14:02. */
+export function formatTime(seconds: number) {
+  return new Intl.DateTimeFormat(undefined, { timeStyle: "short" }).format(
     new Date(seconds * 1000),
   );
-  return `${formatDay(seconds, now)}, ${time}`;
+}
+
+/** A moment as its day and its time: Today, 14:02. */
+export function formatWhen(seconds: number, now = new Date()) {
+  return `${formatDay(seconds, now)}, ${formatTime(seconds)}`;
 }
 
 /** A moment, in seconds since 1970. A floating one is a camera's clock, shown as it was written. DECISIONS.md "Capture dates". */

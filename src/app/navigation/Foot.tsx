@@ -17,6 +17,8 @@ import { Line } from "../../ui/Line";
 import { keepEscape, SURFACE } from "../../ui/Menu";
 import { PushDown } from "../../ui/PushDown";
 import { Tallies, type TallyNote, type TallyRow } from "../../ui/Tallies";
+import { showInPane } from "../pane/pane-store";
+import { setPlace } from "../place";
 import { undo } from "../undo/undo";
 import { refusalSentence } from "./add-source";
 import { type FootNews, setNews, useNews } from "./foot-slot";
@@ -33,7 +35,10 @@ export function Foot({ rail = false }: { rail?: boolean }) {
     news !== null &&
     !(
       rail &&
-      (news.kind === "undone" || news.kind === "said" || (news.kind === "exported" && !news.path))
+      (news.kind === "undone" ||
+        news.kind === "said" ||
+        news.kind === "expired" ||
+        (news.kind === "exported" && !news.path))
     );
 
   // Newest highest, above the walk, as the foot is ordered by permanence from the bottom.
@@ -218,6 +223,23 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
   if (news.kind === "keyRefused") {
     return <Band sentence={news.line} detail={news.detail} path={news.path} onDismiss={dismiss} />;
   }
+  if (news.kind === "expiryRefused") {
+    const { first } = news;
+    return (
+      <Band
+        sentence={news.sentence}
+        detail={news.detail}
+        action={
+          first !== null && (
+            <Button glyph="trash" onClick={() => showInTrash(first)}>
+              Show in Trash
+            </Button>
+          )
+        }
+        onDismiss={dismiss}
+      />
+    );
+  }
   const exported = news.kind === "exported" ? news : null;
   const reveal = exported?.path;
 
@@ -281,6 +303,9 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
   if (news.kind === "said") {
     return <Line glyph="done" sentence={news.line} onDismiss={dismiss} />;
   }
+  if (news.kind === "expired") {
+    return <Line glyph="recycle" sentence={news.line} onDismiss={dismiss} />;
+  }
   return (
     <Line
       glyph="undo"
@@ -291,6 +316,13 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
 }
 
 const NO_FILES = "The clipboard holds no files.";
+
+/** Goes to the Trash with a file there in the pane. */
+function showInTrash(itemId: number) {
+  const trash = { kind: "trash" } as const;
+  setPlace(trash);
+  showInPane(itemId, trash);
+}
 
 /** Folded, the rail has no room for the sentence, so it comes out beside the slot. */
 function Nothing({ noFiles = false }: { noFiles?: boolean }) {

@@ -15,6 +15,7 @@ import type { Crumb } from "../ipc/bindings/Crumb";
 import type { DestinationKey } from "../ipc/bindings/DestinationKey";
 import type { EffectiveTag } from "../ipc/bindings/EffectiveTag";
 import type { End } from "../ipc/bindings/End";
+import type { Expired } from "../ipc/bindings/Expired";
 import type { Exported } from "../ipc/bindings/Exported";
 import type { Exporting } from "../ipc/bindings/Exporting";
 import type { ExportStart } from "../ipc/bindings/ExportStart";
@@ -36,6 +37,7 @@ import type { KeyClash } from "../ipc/bindings/KeyClash";
 import type { KeyClashFor } from "../ipc/bindings/KeyClashFor";
 import type { KeyRow } from "../ipc/bindings/KeyRow";
 import type { LibraryTotals } from "../ipc/bindings/LibraryTotals";
+import type { Limit } from "../ipc/bindings/Limit";
 import type { Plan } from "../ipc/bindings/Plan";
 import type { Progress } from "../ipc/bindings/Progress";
 import type { QueryTerm } from "../ipc/bindings/QueryTerm";
@@ -57,6 +59,9 @@ import type { TagRow } from "../ipc/bindings/TagRow";
 import type { Taken } from "../ipc/bindings/Taken";
 import type { Tally } from "../ipc/bindings/Tally";
 import type { Trashed } from "../ipc/bindings/Trashed";
+import type { TrashLimit } from "../ipc/bindings/TrashLimit";
+import type { TrashLimits } from "../ipc/bindings/TrashLimits";
+import type { TrashSettings } from "../ipc/bindings/TrashSettings";
 import type { UndoReport } from "../ipc/bindings/UndoReport";
 import type { Vocabulary } from "../ipc/bindings/Vocabulary";
 import type { ZipPick } from "../ipc/bindings/ZipPick";
@@ -542,14 +547,18 @@ function takeBack(at: number): UndoReport {
   const [{ batchId, steps }] = journal.splice(at, 1) as [{ batchId: string; steps: Step[] }];
   // Described before anything comes back, as the Rust journal is.
   const batch = describeBatch(batchId, steps);
+  const stayed: Stayed[] = [];
   for (const step of [...steps].reverse()) {
     switch (step.op) {
       case "move":
         relocate(step.item, step.from);
         break;
-      case "trash":
-        fromTrash(step.item, step.from);
+      case "trash": {
+        const gone = wentToBin(step.item);
+        if (gone) stayed.push(gone);
+        else fromTrash(step.item, step.from);
         break;
+      }
       case "rename":
         step.item.diskName = step.from;
         break;
@@ -598,7 +607,7 @@ function takeBack(at: number): UndoReport {
         break;
     }
   }
-  return { batch, filesBack: batch.files, foldersBack: batch.folders, stayed: [] };
+  return { batch, filesBack: batch.files - stayed.length, foldersBack: batch.folders, stayed };
 }
 
 /** The live folder with this id, and the folder it is in. */
@@ -1459,6 +1468,102 @@ function backUpNow(): Promise<Backup | null> {
   );
 }
 
+// The Trash's limits, and the runs the hourly job would make, for tests and for looking.
+let trashSet: TrashLimits = { keepDays: 30, totalGb: 25, fileGb: 5 };
+const nextRun = Math.floor(Date.now() / 1000) + 60 * 60;
+/** What expiry sent to the Recycle Bin, and which limit sent it. */
+const expired = new Map<number, { item: ItemRow; limit: Limit }>();
+/** What the Recycle Bin refused at the last run. */
+let binRefused: number[] = [];
+const DAY = 24 * 60 * 60;
+const GB = 2 ** 30;
+
+function wentToBin(item: ItemRow): Stayed | null {
+  const gone = expired.get(item.id);
+  if (!gone) return null;
+  const at = { kind: "recycleBin" as const };
+  const reason = { kind: "expired" as const, limit: gone.limit };
+  return { kind: "file", id: item.id, name: item.diskName, at, reason };
+}
+
+/** The Trash oldest first, with when each went. */
+const waiting = () =>
+  (ITEMS[TRASH] ?? [])
+    .map((item) => ({ item, at: trashed.get(item.id)?.at ?? 0 }))
+    .sort((a, b) => a.at - b.at || a.item.id - b.item.id);
+
+/** What a run at `at` sends by age and then by size, as the Rust side picks them. */
+function pick(at: number, refused: readonly number[]) {
+  const all = waiting();
+  let total = all.reduce((sum, one) => sum + one.item.sizeBytes, 0);
+  const byAge: ItemRow[] = [];
+  const bySize: ItemRow[] = [];
+  const { keepDays, totalGb } = trashSet;
+  for (const { item, at: went } of all) {
+    if (keepDays !== null && went <= at - keepDays * DAY && !refused.includes(item.id)) {
+      byAge.push(item);
+      total -= item.sizeBytes;
+    }
+  }
+  for (const { item } of all) {
+    if (totalGb === null || total <= totalGb * GB) break;
+    if (refused.includes(item.id) || byAge.includes(item)) continue;
+    bySize.push(item);
+    total -= item.sizeBytes;
+  }
+  return { byAge, bySize };
+}
+
+const tallied = (rows: readonly ItemRow[]): Tally => ({
+  count: rows.length,
+  bytes: rows.reduce((sum, row) => sum + row.sizeBytes, 0),
+});
+
+/** Ages a file in the Trash as if it went `days` ago. */
+export function ageTrashed(itemId: number, days: number) {
+  const went = trashed.get(itemId);
+  if (went) went.at = Math.floor(Date.now() / 1000) - days * DAY;
+}
+
+/** Runs the Trash's limits now, the bin refusing the files named, and says what it did. */
+export function expireNow(refuse: readonly number[] = []) {
+  const { byAge, bySize } = pick(Math.floor(Date.now() / 1000), []);
+  const refused = [...byAge, ...bySize].filter((item) => refuse.includes(item.id));
+  const send = (items: ItemRow[], limit: Limit) => {
+    const sent = items.filter((item) => !refuse.includes(item.id));
+    for (const item of sent) {
+      ITEMS[TRASH] = (ITEMS[TRASH] ?? []).filter((other) => other !== item);
+      trashed.delete(item.id);
+      expired.set(item.id, { item, limit });
+    }
+    return sent.length;
+  };
+  const before = binRefused.length;
+  binRefused = refused.map((item) => item.id);
+  const said: Expired = {
+    byAge: send(byAge, { kind: "age", days: trashSet.keepDays ?? 0 }),
+    bySize: send(bySize, { kind: "size", bytes: (trashSet.totalGb ?? 0) * GB }),
+    keepDays: trashSet.keepDays,
+    totalBytes: trashSet.totalGb === null ? null : trashSet.totalGb * GB,
+    refused: binRefused.length,
+    firstRefused: binRefused[0] ?? null,
+    refusedGrew: binRefused.length > before,
+  };
+  recount();
+  if (said.byAge + said.bySize > 0 || said.refusedGrew) void emit("trash-expired", said);
+  return said;
+}
+
+/** Puts the Trash's limits back as they start, and what expired back where it was deleted from. */
+export function resetTrashLimits() {
+  trashSet = { keepDays: 30, totalGb: 25, fileGb: 5 };
+  for (const { item } of expired.values())
+    ITEMS[item.folderId] = [...(ITEMS[item.folderId] ?? []), item];
+  expired.clear();
+  recount();
+  binRefused = [];
+}
+
 const TRASH_DIR = "D:\\Filmstrip\\data\\trash";
 // `?recycle-refused` has the Recycle Bin refuse a removed source's newest file in the Trash, and
 // two of the three a restore forgets; `?restore-forgets` has every restore forget Archive's three.
@@ -1654,8 +1759,14 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     const steps: Step[] = [];
     const refused: Stayed[] = [];
     const wanted = itemIds as number[];
-    for (const item of (ITEMS[TRASH] ?? []).filter((one) => wanted.includes(one.id))) {
+    const asked = [...(ITEMS[TRASH] ?? []), ...[...expired.values()].map((gone) => gone.item)];
+    for (const item of asked.filter((one) => wanted.includes(one.id))) {
       const went = trashed.get(item.id);
+      const gone = wentToBin(item);
+      if (gone) {
+        refused.push(gone);
+        continue;
+      }
       const to = (folderId as number | null) ?? item.folderId;
       const at = { kind: "trash" as const };
       const stayed = (reason: Reason) =>
@@ -2148,6 +2259,20 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     return null;
   },
   launch_backup_refusal: (): Reason | null => launchRefusal,
+  trash_limits: (): TrashSettings => {
+    const { byAge, bySize } = pick(nextRun, binRefused);
+    return {
+      limits: trashSet,
+      held: tallied(ITEMS[TRASH] ?? []),
+      due: { byAge: tallied(byAge), bySize: tallied(bySize) },
+      at: nextRun,
+    };
+  },
+  set_trash_limit: ({ limit, value }) => {
+    const key = { keepFor: "keepDays", totalSize: "totalGb", sizePerFile: "fileGb" } as const;
+    trashSet = { ...trashSet, [key[limit as TrashLimit]]: value as number | null };
+    return null;
+  },
 };
 
 mockWindows("main");

@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./app/App";
 import { suppressBrowserMenu } from "./app/browser-menu";
 import { watchExports } from "./app/export/export";
+import { watchExpiry } from "./app/navigation/expiry";
 import { startIndex } from "./app/navigation/index-store";
 import { watchWork } from "./app/navigation/work-store";
 import { watchClipboard } from "./app/paste/clipboard";
@@ -21,6 +22,7 @@ void startIndex();
 void watchWork();
 void watchCopies();
 void watchExports();
+void watchExpiry();
 watchClipboard();
 
 const root = document.getElementById("root");

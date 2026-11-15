@@ -666,7 +666,8 @@ toward the rest surface.
   glyph, never a fill; what is only worth knowing takes the ordinary `line-control` ring. Its list
   opens in place beneath it rather than in a dialog: `eyebrow` headings over rows `control` tall,
   each row the name, why, and at its end a quiet way to go and look. What an act or an undo could
-  not finish is grouped under a heading per place it is still in, "Reason" said over the first.
+  not finish is grouped under a heading per place it is still in, "Reason" said over the first;
+  a file that expired first is under In the Recycle Bin, last, with no way to look and no Retry.
 - **Question.** The notice's shape, asking: the `danger` glyph, the question and × to answer none
   on one line; under the question its answers as buttons, the one that destroys last in `danger`;
   under them, where an answer can be kept, a checkbox. The answers hold the line or all fold into
@@ -978,7 +979,11 @@ toward the rest surface.
   own over such rows. One that heads itself, as Tags does, fills the section: its name in semibold
   `row` with what it holds after it in `small` `fg-dim`, and a list that scrolls inside it, so the
   dialog never grows; its Line stands at the section's foot. Backups heads itself the same way,
-  with Back Up Now at the head's end, and its Band stands where the Line does.
+  with Back Up Now at the head's end, and its Band stands where the Line does. Trash heads itself
+  too, what it holds against its total after its name, over its three limits as dropdown rows and
+  one line under them at the rows' inset: the recycle glyph in `glyph` and what the next run sends
+  in `small` `fg-dim`, its count and time in `fg`, or the usual line when nothing; with neither
+  Keep For nor Total Size, the infinity glyph and that nothing leaves the Trash.
 - **Filter field.** Narrows the list under it as you type: `bar-field` tall on `ground` at the
   `nested` corner in a `line-control` ring, `line-strong` while it has the focus, the search glyph
   before it in `fg-dim` and "3 of 228" at its end in `small` tabular figures once something is
@@ -1018,12 +1023,14 @@ toward the rest surface.
   indent, the one that acts first and Cancel, which has the focus. Escape puts the row back.
 - **Band.** What could not be done, at the foot of the panel it was asked from: a sentence, the
   folder's path under it in `--font-mono` or why in `small` `fg-dim`, and a dismiss, on a
-  `danger-wash` ground. There is only ever one, and a second refusal replaces it rather than
-  stacking.
+  `danger-wash` ground. A way to go and look, as Show in Trash after files the Recycle Bin refused,
+  stands under why as a Button. There is only ever one, and a second refusal replaces it rather
+  than stacking.
 - **Line.** What an act did, in the Band's slot and shape without its alarm: a `glyph` in `fg-dim`
   (a check after an act, the undo arrow after an undo), the sentence in `ui`, the way back under it
   as a raised Undo button, and a dismiss. An act that changed nothing in the library, as a drop on
-  the pane past its limit, has no Undo, and leaves the folded rail. It shares the one slot with the Band, and the newest of
+  the pane past its limit, has no Undo, and leaves the folded rail; so does what the Trash's limits
+  sent to the Recycle Bin, under the recycle glyph. It shares the one slot with the Band, and the newest of
   the two replaces the other. Folded, the rail keeps the Undo glyph button alone, its sentence in
   the tooltip; "Nothing to undo." comes out beside the rail on `panel` with the overlay shadow, as
   does "The clipboard holds no files.", with the clipboard glyph.
