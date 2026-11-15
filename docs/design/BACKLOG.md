@@ -64,9 +64,21 @@ Drawn in Artboards › The Trash in the Recycle Bin:
 - **Reconciling** at launch and when the Trash opens: gone from the bin and not back, the row
   retires; back at its path, it is restored in the index.
 
-Left for the build: Artboards › Sources ("What removing does with its trashed files") and
-Backups ("Not restored · the Recycle Bin cannot take a file") still speak of `data\trash`, and
-source comments cite Artboards › The Trash's limits, now The Trash in the Recycle Bin.
+Redrawn with it, by the owner's decision of 2026-11-15:
+
+- **Removing a source**, in Artboards › Sources ("What removing does with its trashed files"):
+  files the library already sent to the bin stay there. The question says how many of the
+  source's files are in the Recycle Bin and that they stay there, out of the app; removing
+  forgets their rows, sends nothing and so cannot be refused. An offline source's trashed files
+  are in its own drive's bin and are counted from the index the same way. The sending bar and
+  the refusal band go.
+- **A backup restore that forgets rows**, in Artboards › Backups ("Restore… · a source added
+  since"): the question names the source and counts its files in the Recycle Bin, which stay
+  there; nothing is sent while restoring. "Not restored · the Recycle Bin cannot take a file"
+  goes.
+
+Left for the build: source comments cite Artboards › The Trash's limits, now The Trash in the
+Recycle Bin.
 
 ## Ask before deleting on a drive with no Recycle Bin · DRAWN
 
@@ -78,7 +90,8 @@ Drawn in Artboards › The Trash in the Recycle Bin, "A drive with no Recycle Bi
   by its label and letter, how many files and how much space, that they go for good and Undo
   cannot bring them back. Delete Permanently in `danger`, Cancel with the focus.
 - **A mixed set**: the rest go to the bin at once with Undo; the banner lists the asked ones under
-  their drive with their sizes.
+  their drive with their sizes. A selection wholly on two such drives names both in the head,
+  and three or more are counted.
 - **A folder's question** says it once rather than asking twice: Delete Files Too becomes Delete
   Files Permanently, with the drive's line under the answers, and × has the focus.
 - **The foot**: deleted for good with no Undo, and a file that would not go staying where it was.
@@ -96,4 +109,4 @@ Drawn in Artboards › The Trash in the Recycle Bin:
 - **Emptying**: the head counts as it goes with the walk's bar where the button was; nothing to
   cancel; a file deleted meanwhile joins the Trash after it and stays.
 - **The foot**: after Empty Trash, with no Undo, Ctrl+Z skipping to the act before; and files
-  skipped, one gone from the bin and one that would not go, with Show in Trash.
+  skipped, two gone from the bin and one that would not go, with Show in Trash.
