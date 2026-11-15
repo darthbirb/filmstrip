@@ -13,3 +13,6 @@ CREATE TABLE expired (
   expired_at INTEGER NOT NULL,
   CHECK ((days IS NULL) <> (bytes IS NULL))
 );
+
+-- The trash, oldest first, and what it weighs, which a run asks again before each file it sends.
+CREATE INDEX idx_item_trashed ON item(trashed_at, size_bytes) WHERE trashed_at IS NOT NULL;

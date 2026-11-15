@@ -94,23 +94,21 @@ pub fn run(conn: &Connection, bin: &dyn Bin, limits: Limits, now: i64) -> Result
         }
     }
     if let Some(bytes) = limits.total_bytes {
-        let waiting = items::trash_oldest_first(conn)?;
-        let mut total: i64 = waiting.iter().map(|one| one.bytes).sum();
-        for one in waiting {
-            if total <= bytes {
-                break;
-            }
+        for one in items::trash_oldest_first(conn)? {
             if refused.contains(&one.id) {
                 continue;
             }
             let _turn = super::turn();
+            if items::in_trash_tally(conn)?.bytes <= bytes {
+                break;
+            }
+            if items::trashed_at(conn, one.id)? != Some(one.trashed_at) {
+                continue;
+            }
             match expire(conn, bin, one.id, Limit::Size { bytes })? {
-                Some(true) => {
-                    said.by_size += 1;
-                    total -= one.bytes;
-                }
+                Some(true) => said.by_size += 1,
                 Some(false) => refused.push(one.id),
-                None => total -= one.bytes,
+                None => {}
             }
         }
     }
@@ -301,6 +299,26 @@ mod tests {
         }
     }
 
+    /// A bin that, as it takes the first file, lets something happen before the run's next turn.
+    struct Meanwhile<'a> {
+        bin: Fake,
+        then: std::cell::Cell<Option<Box<dyn FnOnce() + 'a>>>,
+    }
+
+    impl Bin for Meanwhile<'_> {
+        fn take(&self, file: &Path) -> std::io::Result<()> {
+            let taken = self.bin.take(file);
+            if let Some(then) = self.then.take() {
+                then();
+            }
+            taken
+        }
+
+        fn holds(&self, name: &Path) -> bool {
+            self.bin.holds(name)
+        }
+    }
+
     fn limits(keep_days: Option<u32>, total_bytes: Option<i64>) -> Limits {
         Limits {
             keep_days,
@@ -362,6 +380,66 @@ mod tests {
             Limit::Size { bytes: 2 * GB }
         );
         lib.clear(&[ids[0].0, ids[2].0]);
+    }
+
+    #[test]
+    fn a_restore_between_two_files_is_weighed_and_the_run_stops_once_under_its_total() {
+        let lib = library("weighed", &["a.jpg", "b.jpg", "c.jpg", "d.jpg", "e.jpg"]);
+        let ids = lib.trashed(&[
+            ("a.jpg", 9, GB),
+            ("b.jpg", 8, GB),
+            ("c.jpg", 7, GB),
+            ("d.jpg", 6, GB),
+            ("e.jpg", 1, 3 * GB),
+        ]);
+        let restored = ids[4].0;
+        let bin = Meanwhile {
+            bin: lib.bin(),
+            then: std::cell::Cell::new(Some(Box::new(|| {
+                lib.conn
+                    .execute(
+                        "UPDATE item SET trashed_at = NULL WHERE id = ?1",
+                        [restored],
+                    )
+                    .unwrap();
+            }))),
+        };
+
+        let said = run(&lib.conn, &bin, limits(None, Some(3 * GB)), NOW).unwrap();
+
+        assert_eq!(said.by_size, 1, "a went, and then the trash weighed 3 GB");
+        for &(id, _) in &ids[1..4] {
+            assert!(items::is_trashed(&lib.conn, id).unwrap());
+        }
+        lib.clear(&[ids[1].0, ids[2].0, ids[3].0, restored]);
+    }
+
+    #[test]
+    fn a_file_deleted_again_while_the_run_goes_is_the_newest_and_waits_its_turn() {
+        let lib = library("again", &["a.jpg", "b.jpg", "c.jpg", "d.jpg"]);
+        let ids = lib.trashed(&[
+            ("a.jpg", 9, GB),
+            ("b.jpg", 8, GB),
+            ("c.jpg", 7, GB),
+            ("d.jpg", 6, GB),
+        ]);
+        let again = ids[1].0;
+        let bin = Meanwhile {
+            bin: lib.bin(),
+            then: std::cell::Cell::new(Some(Box::new(|| {
+                items::set_trashed_at(&lib.conn, again, NOW).unwrap();
+            }))),
+        };
+
+        let said = run(&lib.conn, &bin, limits(None, Some(2 * GB)), NOW).unwrap();
+
+        assert_eq!(said.by_size, 2);
+        assert!(items::is_trashed(&lib.conn, again).unwrap());
+        assert!(
+            !items::is_trashed(&lib.conn, ids[2].0).unwrap(),
+            "c went in its stead"
+        );
+        lib.clear(&[again, ids[3].0]);
     }
 
     #[test]
