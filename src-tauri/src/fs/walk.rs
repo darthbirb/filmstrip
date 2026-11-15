@@ -61,8 +61,16 @@ fn is_hidden(entry: &walkdir::DirEntry) -> bool {
     entry.file_name().to_string_lossy().starts_with('.')
 }
 
+/// The Recycle Bin a drive keeps at its root, where Delete sends the library's own files: a source
+/// at a drive's root would otherwise take them in again. DECISIONS.md "The Trash is the Recycle Bin".
+fn is_recycle_bin(path: &Path) -> bool {
+    path.file_name()
+        .is_some_and(|name| name.eq_ignore_ascii_case("$Recycle.Bin"))
+        && path.parent().is_some_and(|drive| drive.parent().is_none())
+}
+
 /// Mirrors a source's directories into folders and collects its files. Skips
-/// hidden entries, and the app's own directory should a root contain it.
+/// hidden entries, a drive's Recycle Bin, and the app's own directory should a root contain it.
 pub fn mirror(
     conn: &Connection,
     source_root: &Path,
@@ -76,7 +84,11 @@ pub fn mirror(
     let walker = WalkDir::new(source_root)
         .follow_links(false)
         .into_iter()
-        .filter_entry(|e| (e.depth() == 0 || !is_hidden(e)) && !is_app_owned(e.path()));
+        .filter_entry(|e| {
+            (e.depth() == 0 || !is_hidden(e))
+                && !is_recycle_bin(e.path())
+                && !is_app_owned(e.path())
+        });
 
     for entry in walker.flatten() {
         if entry.depth() == 0 {
@@ -573,6 +585,14 @@ mod tests {
 
         reconcile(&conn).unwrap();
         assert_eq!(live_items(&conn), [("real.jpg".to_string(), 1)]);
+    }
+
+    #[test]
+    fn a_drives_recycle_bin_is_not_library_content_and_a_folder_named_so_elsewhere_is() {
+        assert!(is_recycle_bin(Path::new(r"D:\$Recycle.Bin")));
+        assert!(is_recycle_bin(Path::new(r"\\?\D:\$RECYCLE.BIN")));
+        assert!(!is_recycle_bin(Path::new(r"D:\Photos\$Recycle.Bin")));
+        assert!(!is_recycle_bin(Path::new(r"D:\Photos")));
     }
 
     /// An unplugged drive is not a mass deletion.

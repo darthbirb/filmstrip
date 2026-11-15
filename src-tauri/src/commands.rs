@@ -12,7 +12,6 @@ use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 use ts_rs::TS;
 
-use crate::config::{TrashLimit, TrashLimits};
 use crate::db::details::{self, FolderDetail};
 use crate::db::folders::{self, FolderEntry, FolderNode};
 use crate::db::in_transaction;
@@ -29,13 +28,11 @@ use crate::error::{AppError, Reason, Result};
 use crate::fs::acts::{self, Batch};
 use crate::fs::backups::{self, Backup, Forgets, Restored, Shelf, Shelved, Taken};
 use crate::fs::clipboard;
-use crate::fs::expiry::{self, Due};
 use crate::fs::export::{self, Naming, Plan, Scope};
 use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
 use crate::fs::items::{self as fs_items, MoveReport};
 use crate::fs::paste::{self, Carried, CopyRefusal};
-use crate::fs::recycle::RecycleBin;
-use crate::fs::trash::{self, BinReport, Origin, Removal, RestoreReport, TrashReport, Trashed};
+use crate::fs::trash::{self, Looked, Origin, RestoreReport, TrashReport, Trashed};
 use crate::fs::undo::{self, UndoReport};
 use crate::fs::{paths, sanitize};
 use crate::jobs::{self, JobQueue, Progress};
@@ -51,8 +48,6 @@ pub struct AppState {
 
 /// How far a restore has got, from 0 to 100, as its row's bar shows it.
 pub const RESTORE_PROGRESS_EVENT: &str = "restore-progress";
-/// How far removing a source has got in sending its files in the Trash, from 0 to 100.
-pub const REMOVE_PROGRESS_EVENT: &str = "remove-progress";
 /// The launch's backup has ended, taken, refused or not due, so a list showing it writing is stale.
 pub const BACKUPS_CHANGED_EVENT: &str = "backups-changed";
 
@@ -307,13 +302,13 @@ pub struct ItemsTrashed {
     pub report: TrashReport,
 }
 
-/// Files sent to the app's trash, out of their folders, to wait there until taken back; one larger
-/// than the trash takes is refused, for the question that offers the Recycle Bin.
+/// Files sent to the Recycle Bin, out of their folders, until taken back; one the bin will not take
+/// stays where it was.
 #[tauri::command]
 pub async fn trash_items(state: State<'_, AppState>, item_ids: Vec<i64>) -> Result<ItemsTrashed> {
     run(&state, move |conn| {
         let batch_id = journal::new_batch();
-        let report = trash::trash_within(conn, &item_ids, &batch_id, largest_trashed())?;
+        let report = trash::trash_items(conn, &item_ids, &batch_id)?;
         Ok(ItemsTrashed {
             batch: described(conn, report.trashed > 0, &batch_id)?,
             report,
@@ -376,31 +371,12 @@ pub async fn delete_folder(
 ) -> Result<FolderDeleted> {
     run(&state, move |conn| {
         let batch_id = journal::new_batch();
-        let report =
-            fs_folders::delete_within(conn, folder_id, contents, &batch_id, largest_trashed())?;
+        let report = fs_folders::delete(conn, folder_id, contents, &batch_id)?;
         let journalled = !journal::batch(conn, &batch_id)?.is_empty();
         Ok(FolderDeleted {
             batch: described(conn, journalled, &batch_id)?,
             report,
         })
-    })
-    .await
-}
-
-/// The largest file Delete sends to the trash, as Settings › Trash has it now.
-fn largest_trashed() -> Option<trash::Largest> {
-    trash::Largest::of(crate::config::Config::load().trash_limits())
-}
-
-/// Files sent from their folders straight to the Recycle Bin, as Delete offers for one larger than
-/// the trash takes. Nothing to undo. DECISIONS.md "Sending to the Recycle Bin".
-#[tauri::command]
-pub async fn send_to_recycle_bin(
-    state: State<'_, AppState>,
-    item_ids: Vec<i64>,
-) -> Result<BinReport> {
-    run(&state, move |conn| {
-        trash::send_to_bin(conn, &RecycleBin, &item_ids)
     })
     .await
 }
@@ -643,15 +619,13 @@ pub async fn read_folder_again(state: State<'_, AppState>, folder_id: i64) -> Re
     .await
 }
 
-/// Removes a source once its files in the Trash have gone to the Recycle Bin; one the bin cannot
-/// take keeps it. DECISIONS.md "Expiry goes to the Recycle Bin".
+/// Forgets a source and its rows; its folder on disk is never touched, and its files in the Trash
+/// stay in the Recycle Bin. DECISIONS.md "The Trash is the Recycle Bin".
 #[tauri::command]
-pub async fn remove_source(app: AppHandle, state: State<'_, AppState>, id: i64) -> Result<Removal> {
+pub async fn remove_source(state: State<'_, AppState>, id: i64) -> Result<()> {
     run(&state, move |conn| {
-        let progress = |done: f64| {
-            let _ = app.emit(REMOVE_PROGRESS_EVENT, (done * 100.0).round() as u32);
-        };
-        trash::remove_source(conn, &RecycleBin, id, &progress)
+        let _turn = crate::fs::turn();
+        in_transaction(conn, |tx| sources::remove(tx, id))
     })
     .await
 }
@@ -986,6 +960,13 @@ pub fn destination_key_list(conn: &Connection) -> Result<Vec<DestinationKey>> {
             })
         })
         .collect()
+}
+
+/// Looks for each trashed file in the Recycle Bin, as the Trash opens: what was emptied from it
+/// outside the app leaves the Trash, and what was put back from Explorer is restored.
+#[tauri::command]
+pub async fn look_in_bin(state: State<'_, AppState>) -> Result<Looked> {
+    run(&state, trash::look_in_bin).await
 }
 
 /// What the trash holds, the most recent first, each with the folder it left.
@@ -1335,19 +1316,39 @@ pub async fn delete_label_value(state: State<'_, AppState>, tag_id: i64) -> Resu
 
 /// One item in full for the pane, or nothing once it is gone.
 #[tauri::command]
-pub async fn item_detail(state: State<'_, AppState>, item_id: i64) -> Result<Option<ItemDetail>> {
+pub async fn item_detail(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    item_id: i64,
+) -> Result<Option<ItemDetail>> {
     let thumbs = state.thumbs.clone();
-    run(&state, move |conn| detail_of(conn, item_id, &thumbs)).await
+    let detail = run(&state, move |conn| detail_of(conn, item_id, &thumbs)).await?;
+    let_load_trashed(&app, detail.iter());
+    Ok(detail)
 }
 
 /// Several items in full, for a pane showing a set, in the order asked; nothing for each one gone.
 #[tauri::command]
 pub async fn items_detail(
+    app: AppHandle,
     state: State<'_, AppState>,
     item_ids: Vec<i64>,
 ) -> Result<Vec<Option<ItemDetail>>> {
     let thumbs = state.thumbs.clone();
-    run(&state, move |conn| details_of(conn, &item_ids, &thumbs)).await
+    let details = run(&state, move |conn| details_of(conn, &item_ids, &thumbs)).await?;
+    let_load_trashed(&app, details.iter().flatten());
+    Ok(details)
+}
+
+/// Lets the window load each trashed file shown here from the Recycle Bin, that file and nothing
+/// else of the bin's.
+fn let_load_trashed<'a>(app: &AppHandle, details: impl Iterator<Item = &'a ItemDetail>) {
+    let scope = app.asset_protocol_scope();
+    for detail in details.filter(|detail| detail.trashed_at.is_some()) {
+        if let Err(err) = scope.allow_file(&detail.path) {
+            eprintln!("the window may not load {}: {err}", detail.path);
+        }
+    }
 }
 
 /// Where an item's file was, for a pane showing one that has gone: a retired row still knows.
@@ -1498,17 +1499,15 @@ pub async fn restore_backup(
         let mut live = crate::db::open(&path)?;
         let keep = crate::config::Config::load().backups_kept();
         let kept = |one: &crate::db::backup::InTrash| {
-            paths::trash_path(&one.uuid, &one.disk_name).is_ok_and(|file| file.is_file())
+            one.binned.as_ref().is_some_and(|(path, file)| {
+                crate::fs::recycle::file_at(Path::new(path)).as_deref() == Some(file.as_str())
+            })
         };
         let progress = |done: f64| {
             let _ = app.emit(RESTORE_PROGRESS_EVENT, (done * 100.0).round() as u32);
         };
         let hold = || Ok((queue.hold()?, crate::fs::turn()));
-        let trash = backups::Trash {
-            kept: &kept,
-            bin: &RecycleBin,
-        };
-        let restored = backups::restore(&mut live, &dir, &name, keep, &trash, &progress, hold)?;
+        let restored = backups::restore(&mut live, &dir, &name, keep, &kept, &progress, hold)?;
         if matches!(restored, Restored::Restored { .. }) {
             let scope = app.asset_protocol_scope();
             backups::after_swap(&live, &mut |root| Ok(scope.allow_directory(root, true)?));
@@ -1533,40 +1532,6 @@ pub async fn restore_forgets(state: State<'_, AppState>, name: String) -> Result
 #[tauri::command]
 pub async fn set_backups_kept(kept: u32) -> Result<()> {
     crate::config::Config::set_backups_kept(kept)
-}
-
-/// The trash's limits, what it holds, and what its next run sends and when, as Settings › Trash
-/// says it.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export)]
-pub struct TrashSettings {
-    pub limits: TrashLimits,
-    pub held: items::Tally,
-    pub due: Due,
-    /// When the next run is, in seconds since 1970.
-    pub at: i64,
-}
-
-#[tauri::command]
-pub async fn trash_limits(state: State<'_, AppState>) -> Result<TrashSettings> {
-    let at = state.queue.next_expiry();
-    run(&state, move |conn| {
-        let limits = crate::config::Config::load().trash_limits();
-        Ok(TrashSettings {
-            limits,
-            held: items::in_trash_tally(conn)?,
-            due: expiry::due(conn, limits.into(), at)?,
-            at,
-        })
-    })
-    .await
-}
-
-/// Sets one of the trash's limits, `None` for No Limit. Nothing goes until the next run.
-#[tauri::command]
-pub async fn set_trash_limit(limit: TrashLimit, value: Option<u32>) -> Result<()> {
-    crate::config::Config::set_trash_limit(limit, value)
 }
 
 /// Why the launch's backup was refused, once it has ended; nothing when it was taken or not due.
@@ -1627,10 +1592,10 @@ pub fn last_path(conn: &Connection, item_id: i64) -> Result<Option<String>> {
     Ok(Some(path.to_string_lossy().into_owned()))
 }
 
-/// Where a file is: in its folder, or where the trash keeps it under its uuid.
+/// Where a file is: in its folder, or where the Recycle Bin keeps it under a name of its own.
 fn file_path(conn: &Connection, item_id: i64, file: &items::ItemFile) -> Result<PathBuf> {
-    if items::is_trashed(conn, item_id)? {
-        return paths::trash_path(&file.uuid, &file.disk_name);
+    if let Some((binned, _)) = items::binned(conn, item_id)? {
+        return Ok(PathBuf::from(binned));
     }
     paths::item_path(conn, file.folder_id, &file.disk_name)
 }
@@ -1652,10 +1617,9 @@ pub fn detail_of(conn: &Connection, item_id: i64, thumbs: &Path) -> Result<Optio
     let Some(mut detail) = items::detail(conn, item_id)? else {
         return Ok(None);
     };
-    let file = if detail.trashed_at.is_some() {
-        paths::trash_path(&detail.row.uuid, &detail.row.disk_name)?
-    } else {
-        paths::item_path(conn, detail.row.folder_id, &detail.row.disk_name)?
+    let file = match items::binned(conn, item_id)? {
+        Some((binned, _)) => PathBuf::from(binned),
+        None => paths::item_path(conn, detail.row.folder_id, &detail.row.disk_name)?,
     };
     detail.path = file.to_string_lossy().into_owned();
     with_cached(&mut detail.row, thumbs);

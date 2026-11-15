@@ -1,19 +1,18 @@
-//! The trash: a folder beside the executable where a file waits, out of its folder, until it is
-//! taken back. Sending one there is a move like any other, journalled, so it can be undone.
-//! DECISIONS.md "Undo".
+//! The Trash: what the library sent to the Windows Recycle Bin, on its own drive, until it is taken
+//! back. Sending one there is journalled, so it can be undone.
+//! DECISIONS.md "The Trash is the Recycle Bin".
 
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::config::TrashLimits;
 use crate::db::items::{ItemFile, ItemRow};
 use crate::db::journal::ItemRestored;
-use crate::db::{expired, folders, in_transaction, items, journal, sources, tags};
+use crate::db::{folders, in_transaction, items, journal, now, recycling, sources, tags};
 use crate::error::{AppError, Reason, Result};
-use crate::fs::recycle::{self, Bin, Sent};
+use crate::fs::recycle::{self, Bin, Sent, Shell};
 use crate::fs::stayed::{self, Stayed};
 use crate::fs::{paths, relocate};
 
@@ -74,49 +73,12 @@ pub fn origin(conn: &Connection, folder_id: i64) -> Result<Origin> {
     })
 }
 
-/// The largest file the trash takes: its size per file, or its total where that is smaller or the
-/// size per file is No Limit. DECISIONS.md "Expiry goes to the Recycle Bin".
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Largest {
-    pub bytes: i64,
-    /// Whether it is the trash's total rather than its size per file.
-    pub total: bool,
-}
-
-impl Largest {
-    /// Nothing with both limits at No Limit.
-    pub fn of(limits: TrashLimits) -> Option<Largest> {
-        let largest = |gb: u32, total| Largest {
-            bytes: i64::from(gb) << 30,
-            total,
-        };
-        let file = limits.file_gb.map(|gb| largest(gb, false));
-        let total = limits.total_gb.map(|gb| largest(gb, true));
-        match (file, total) {
-            (Some(file), Some(total)) if total.bytes < file.bytes => Some(total),
-            (file, total) => file.or(total),
-        }
-    }
-}
-
 /// Sends each item to the trash under one batch, so one undo brings the whole selection back.
 pub fn trash_items(conn: &Connection, item_ids: &[i64], batch_id: &str) -> Result<TrashReport> {
-    trash_within(conn, item_ids, batch_id, None)
-}
-
-/// [`trash_items`], refusing before it moves each file larger than `largest`, as Delete does.
-pub fn trash_within(
-    conn: &Connection,
-    item_ids: &[i64],
-    batch_id: &str,
-    largest: Option<Largest>,
-) -> Result<TrashReport> {
     let _turn = super::turn();
     let mut report = TrashReport::default();
     for &item_id in item_ids {
-        let trashed = fits(conn, item_id, largest)
-            .and_then(|()| trash_unjournalled(conn, item_id, Some(batch_id)));
-        match trashed {
+        match trash_unjournalled(conn, item_id, Some(batch_id)) {
             Ok(()) => report.trashed += 1,
             Err(err) => report.refused.push(stayed::file(conn, item_id, &err)?),
         }
@@ -124,94 +86,9 @@ pub fn trash_within(
     Ok(report)
 }
 
-/// Refuses a live file larger than `largest`, by its size on disk. One not live or not on disk is
-/// left for the trash to refuse in its own words.
-pub(super) fn fits(conn: &Connection, item_id: i64, largest: Option<Largest>) -> Result<()> {
-    let Some(largest) = largest else {
-        return Ok(());
-    };
-    if !items::is_live(conn, item_id)? {
-        return Ok(());
-    }
-    let Some(file) = items::file_of(conn, item_id)? else {
-        return Ok(());
-    };
-    let path = paths::item_path(conn, file.folder_id, &file.disk_name)?;
-    let bytes = match std::fs::metadata(&path) {
-        Ok(meta) if meta.is_file() => i64::try_from(meta.len()).unwrap_or(i64::MAX),
-        _ => return Ok(()),
-    };
-    if bytes <= largest.bytes {
-        return Ok(());
-    }
-    Err(AppError::refused(Reason::TooLarge {
-        bytes,
-        limit: largest.bytes,
-        total: largest.total,
-    }))
-}
-
-/// What sending files from their folders to the Recycle Bin did: how many went, and each one that
-/// stayed where it was, with why.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export)]
-pub struct BinReport {
-    pub sent: u32,
-    pub refused: Vec<Stayed>,
-}
-
-/// Sends each live file from its folder straight to the Recycle Bin, unjournalled, and retires its
-/// row once the bin has it; one the bin refuses stays where it was.
-/// DECISIONS.md "Expiry goes to the Recycle Bin".
-pub fn send_to_bin(conn: &Connection, bin: &dyn Bin, item_ids: &[i64]) -> Result<BinReport> {
-    let _turn = super::turn();
-    let mut report = BinReport::default();
-    for &item_id in item_ids {
-        match send_live(conn, bin, item_id) {
-            Ok(()) => report.sent += 1,
-            Err(err) => report.refused.push(stayed::file(conn, item_id, &err)?),
-        }
-    }
-    Ok(report)
-}
-
-fn send_live(conn: &Connection, bin: &dyn Bin, item_id: i64) -> Result<()> {
-    if !items::is_live(conn, item_id)? {
-        return Err(AppError::invalid("that file is no longer in the index"));
-    }
-    let file = items::file_of(conn, item_id)?
-        .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
-    let path = paths::item_path(conn, file.folder_id, &file.disk_name)?;
-    expired::add_recycling(conn, &path)?;
-    let sent = recycle::send(bin, &path)?;
-    expired::settled_recycling(conn, &path)?;
-    match sent {
-        Sent::Recycled => in_transaction(conn, |tx| items::retire(tx, item_id)),
-        Sent::Gone => Err(AppError::refused(Reason::NotOnDisk {
-            name: file.disk_name,
-        })),
-        Sent::Refused => Err(AppError::refused(Reason::BinRefused)),
-    }
-}
-
-/// Settles what each send from a library folder left beside its file when the app stopped during
-/// it, once that folder can be reached. DECISIONS.md "Sending to the Recycle Bin".
-pub fn settle_unfinished_send(conn: &Connection) -> Result<()> {
-    for file in expired::recycling(conn)? {
-        if !file.parent().is_some_and(Path::is_dir) {
-            continue;
-        }
-        match recycle::settle_beside(&file) {
-            Ok(()) => expired::settled_recycling(conn, &file)?,
-            Err(err) => eprintln!("recycle: {} was not settled: {err}", file.display()),
-        }
-    }
-    Ok(())
-}
-
-/// Moves one item's file into the trash and records it there. A file already gone from where the
-/// index has it is refused: the next walk retires it.
+/// Sends one item's file from its folder to the Recycle Bin and records where the bin keeps it. A
+/// file already gone from where the index has it is refused, and the next walk retires it; one the
+/// bin will not take stays where it was. DECISIONS.md "Sending to the Recycle Bin".
 pub(super) fn trash_unjournalled(
     conn: &Connection,
     item_id: i64,
@@ -228,25 +105,137 @@ pub(super) fn trash_unjournalled(
             name: file.disk_name,
         }));
     }
-    let to = paths::trash_path(&file.uuid, &file.disk_name)?;
-    if let Some(shard) = to.parent() {
-        std::fs::create_dir_all(shard)?;
-    }
-    relocate::relocate(&from, &to).map_err(relocate::taken_as(|| {
-        AppError::invalid(format!("{} is already there", to.display()))
-    }))?;
+    recycling::add(conn, &from)?;
+    let sent = recycle::send(&Shell, &from)?;
+    recycling::settled(conn, &from)?;
+    let binned = match sent {
+        Sent::Recycled(binned) => binned,
+        Sent::Gone => {
+            return Err(AppError::refused(Reason::NotOnDisk {
+                name: file.disk_name,
+            }));
+        }
+        Sent::Refused => return Err(AppError::refused(Reason::BinRefused)),
+    };
 
     let recorded = in_transaction(conn, |tx| {
         items::send_to_trash(tx, item_id)?;
+        items::set_binned(tx, item_id, &binned.path.to_string_lossy(), &binned.file)?;
         if let Some(batch_id) = batch_id {
             journal::record_item_trash(tx, batch_id, item_id)?;
         }
         Ok(())
     });
-    if recorded.is_err() {
-        let _ = relocate::relocate(&to, &from);
+    if recorded.is_err() && relocate::relocate(&binned.path, &from).is_ok() {
+        let_go(&binned.path);
     }
     recorded
+}
+
+/// Settles what each send from a library folder left beside its file when the app stopped during
+/// it, once that folder can be reached. DECISIONS.md "Sending to the Recycle Bin".
+pub fn settle_unfinished_send(conn: &Connection) -> Result<()> {
+    for file in recycling::unsettled(conn)? {
+        if !file.parent().is_some_and(Path::is_dir) {
+            continue;
+        }
+        match recycle::settle_beside(&file) {
+            Ok(()) => recycling::settled(conn, &file)?,
+            Err(err) => eprintln!("recycle: {} was not settled: {err}", file.display()),
+        }
+    }
+    Ok(())
+}
+
+/// Where a trashed item's file is now.
+enum Found {
+    /// Still in the Recycle Bin, under this name.
+    Bin(PathBuf),
+    /// Back at its own path, put back from Explorer.
+    Back,
+    /// Emptied from the bin outside the app.
+    Gone,
+    /// On a drive that is away, so neither can be told.
+    Away,
+}
+
+/// Looks for a trashed item's file by the file itself: in the bin where it went, or back where it
+/// came from. One the bin has no record of is gone, as a file the app's own trash folder held is.
+fn find(conn: &Connection, item_id: i64, file: &ItemFile) -> Result<Found> {
+    let Some((binned, itself)) = items::binned(conn, item_id)? else {
+        return Ok(Found::Gone);
+    };
+    let binned = PathBuf::from(binned);
+    if recycle::file_at(&binned).as_deref() == Some(itself.as_str()) {
+        return Ok(Found::Bin(binned));
+    }
+    let home = paths::item_path(conn, file.folder_id, &file.disk_name)?;
+    if recycle::file_at(&home).as_deref() == Some(itself.as_str()) {
+        return Ok(Found::Back);
+    }
+    if drive_of(&binned).is_dir() {
+        Ok(Found::Gone)
+    } else {
+        Ok(Found::Away)
+    }
+}
+
+/// The root of the drive a path is on, `D:\` for `D:\$Recycle.Bin\…`; empty for a relative one.
+fn drive_of(path: &Path) -> PathBuf {
+    path.components()
+        .take_while(|part| matches!(part, Component::Prefix(_) | Component::RootDir))
+        .collect()
+}
+
+/// Brings a file back from Explorer into the index, tags and all: live in its folder, or retired
+/// there, for the walk to find, while the folder is gone. A row the walk made for it meanwhile, or
+/// one retired at its name, describes the same file, and is forgotten. Whether it went live.
+fn put_back(conn: &Connection, item_id: i64, file: &ItemFile) -> Result<bool> {
+    if let Some(held) = items::existing_by_disk_name(conn, file.folder_id, &file.disk_name)? {
+        items::forget(conn, held.id)?;
+    }
+    if !folders::is_live(conn, file.folder_id)? {
+        items::retire_trashed(conn, item_id, now())?;
+        return Ok(false);
+    }
+    items::take_from_trash(conn, item_id)?;
+    tags::rebuild_item(conn, item_id)?;
+    Ok(true)
+}
+
+/// What looking in the Recycle Bin found: rows retired for files emptied from it outside the app,
+/// and rows restored for files put back from Explorer.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Looked {
+    pub retired: u32,
+    pub restored: u32,
+}
+
+/// Looks for each trashed item's file in the Recycle Bin, at launch and as the Trash opens: gone
+/// from the bin and not back at its path, its row retires; back at its path, it is restored in the
+/// index. One on a drive that is away waits. Artboards › The Trash in the Recycle Bin.
+pub fn look_in_bin(conn: &Connection) -> Result<Looked> {
+    let _turn = super::turn();
+    let mut looked = Looked::default();
+    for (row, _) in items::in_trash(conn)? {
+        let Some(file) = items::file_of(conn, row.id)? else {
+            continue;
+        };
+        match find(conn, row.id, &file)? {
+            Found::Bin(_) | Found::Away => {}
+            Found::Gone => {
+                in_transaction(conn, |tx| items::retire_trashed(tx, row.id, now()))?;
+                looked.retired += 1;
+            }
+            Found::Back => {
+                in_transaction(conn, |tx| put_back(tx, row.id, &file))?;
+                looked.restored += 1;
+            }
+        }
+    }
+    Ok(looked)
 }
 
 /// What restoring several items did: how many came back, and each one that did not, with why.
@@ -276,9 +265,10 @@ pub fn restore_items(
     Ok(report)
 }
 
-/// Takes an item back out of the trash under its own name: into `to`, or into the folder it left,
-/// or a live one at that folder's place once it has gone. A name taken there is never changed.
-pub(super) fn restore_unjournalled(
+/// Takes an item back out of the Recycle Bin under its own name, into `to` or the folder it left or
+/// a live one at its place; a name taken there is never changed. One already back at its path is
+/// restored where it is; one emptied from the bin has its row retired, and says so.
+fn restore_unjournalled(
     conn: &Connection,
     item_id: i64,
     to: Option<i64>,
@@ -289,6 +279,39 @@ pub(super) fn restore_unjournalled(
     }
     let file = items::file_of(conn, item_id)?
         .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
+    let trashed_at = items::trashed_at(conn, item_id)?.unwrap_or_default();
+    let binned = match find(conn, item_id, &file)? {
+        Found::Bin(binned) => binned,
+        Found::Back => {
+            return in_transaction(conn, |tx| {
+                if put_back(tx, item_id, &file)?
+                    && let Some(batch_id) = batch_id
+                {
+                    let restored = ItemRestored {
+                        item_id,
+                        left_folder_id: file.folder_id,
+                        to_folder_id: file.folder_id,
+                        trashed_at,
+                    };
+                    journal::record_item_restore(tx, batch_id, &restored)?;
+                }
+                Ok(())
+            });
+        }
+        Found::Gone => {
+            let place = folders::title(conn, to.unwrap_or(file.folder_id))?.unwrap_or_default();
+            in_transaction(conn, |tx| items::retire_trashed(tx, item_id, now()))?;
+            return Err(AppError::refused(Reason::GoneFromBin {
+                name: file.disk_name,
+                place,
+            }));
+        }
+        Found::Away => {
+            return Err(AppError::refused(Reason::Offline {
+                source: source_title(conn, file.folder_id),
+            }));
+        }
+    };
     let home = match to {
         Some(folder) if folders::is_live(conn, folder)? => folder,
         Some(_) => return Err(AppError::invalid("that folder is no longer in the index")),
@@ -312,10 +335,8 @@ pub(super) fn restore_unjournalled(
     if held.as_ref().is_some_and(|row| !row.deleted) {
         return Err(taken());
     }
-    let from = paths::trash_path(&file.uuid, &file.disk_name)?;
     let dest = paths::item_path(conn, home, &file.disk_name)?;
-    let trashed_at = items::trashed_at(conn, item_id)?.unwrap_or_default();
-    relocate::relocate(&from, &dest).map_err(relocate::taken_as(taken))?;
+    relocate::relocate(&binned, &dest).map_err(relocate::taken_as(taken))?;
 
     let recorded = in_transaction(conn, |tx| {
         // A retired row holding the name describes a file that is gone; the returning one takes it.
@@ -338,13 +359,44 @@ pub(super) fn restore_unjournalled(
         }
         Ok(())
     });
-    if recorded.is_err() {
-        let _ = relocate::relocate(&dest, &from);
+    match recorded {
+        Ok(()) => let_go(&binned),
+        Err(_) => {
+            let _ = relocate::relocate(&dest, &binned);
+        }
     }
     recorded
 }
 
-/// Undoes a restore: the file goes back to the trash, from the folder it had left and at the
+/// Undoes a send to the Recycle Bin: takes the file back out, unless looking in the bin already
+/// found it put back from Explorer, which leaves nothing to do, or emptied from it outside the app.
+pub(super) fn untrash(conn: &Connection, item_id: i64) -> Result<()> {
+    if !items::is_trashed(conn, item_id)?
+        && let Some(file) = items::file_of(conn, item_id)?
+    {
+        if items::is_live(conn, item_id)? {
+            return Ok(());
+        }
+        return Err(AppError::refused(Reason::GoneFromBin {
+            name: file.disk_name,
+            place: folders::title(conn, file.folder_id)?.unwrap_or_default(),
+        }));
+    }
+    restore_unjournalled(conn, item_id, None, None)
+}
+
+/// Has the bin forget what it kept beside a file taken back out of it. The file is already where
+/// it belongs, so a record left behind is only said in the log.
+fn let_go(binned: &Path) {
+    if let Err(err) = Shell.let_go(binned) {
+        eprintln!(
+            "recycle: the bin's record of {} stays: {err}",
+            binned.display()
+        );
+    }
+}
+
+/// Undoes a restore: the file goes back to the Recycle Bin, from the folder it had left and at the
 /// moment it first went, so the Trash shows it as it was.
 pub(super) fn unrestore(conn: &Connection, restored: &ItemRestored) -> Result<()> {
     trash_unjournalled(conn, restored.item_id, None)?;
@@ -363,88 +415,6 @@ pub(super) fn unrestore(conn: &Connection, restored: &ItemRestored) -> Result<()
     })
 }
 
-/// What sending trashed files on to the Recycle Bin did: how many went, each row with it, and how
-/// many the bin could not take, which stay under their rows.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct Recycled {
-    pub sent: u32,
-    pub refused: u32,
-}
-
-/// Sends each trashed item's file to the Recycle Bin and forgets its row once it has gone; one
-/// already gone from the trash counts as sent. The caller holds the disk's turn.
-/// DECISIONS.md "Expiry goes to the Recycle Bin".
-pub fn recycle_items(
-    conn: &Connection,
-    bin: &dyn Bin,
-    item_ids: &[i64],
-    progress: &dyn Fn(f64),
-) -> Result<Recycled> {
-    let mut recycled = Recycled::default();
-    for (at, &item_id) in item_ids.iter().enumerate() {
-        let went = match items::file_of(conn, item_id)? {
-            None => true,
-            Some(_) if !items::is_trashed(conn, item_id)? => false,
-            Some(file) => send_trashed(bin, &file)?,
-        };
-        if went {
-            in_transaction(conn, |tx| items::forget_trashed(tx, item_id))?;
-            recycled.sent += 1;
-        } else {
-            recycled.refused += 1;
-        }
-        progress((at + 1) as f64 / item_ids.len() as f64);
-    }
-    Ok(recycled)
-}
-
-/// Sends a trashed file to the Recycle Bin: whether it went, or was already gone from the trash.
-/// One the bin refused, or the disk would not let go, stays where it is.
-pub fn send_trashed(bin: &dyn Bin, file: &ItemFile) -> Result<bool> {
-    let path = paths::trash_path(&file.uuid, &file.disk_name)?;
-    Ok(match recycle::send(bin, &path) {
-        Ok(sent) => matches!(sent, Sent::Recycled | Sent::Gone),
-        Err(err) => {
-            eprintln!("recycle: {} was kept: {err}", path.display());
-            false
-        }
-    })
-}
-
-/// What came of removing a source.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
-#[serde(tag = "kind", rename_all = "camelCase")]
-#[ts(export)]
-pub enum Removal {
-    Removed,
-    /// Kept, since the Recycle Bin could not take `refused` of its files, which stay in `trash`.
-    Kept {
-        refused: u32,
-        trash: String,
-    },
-}
-
-/// Removes a source once its files in the Trash have gone to the Recycle Bin; with any the bin
-/// cannot take, the source stays, and so do they. Its folder on disk is never touched.
-pub fn remove_source(
-    conn: &Connection,
-    bin: &dyn Bin,
-    source_id: i64,
-    progress: &dyn Fn(f64),
-) -> Result<Removal> {
-    let _turn = super::turn();
-    let trashed = sources::trashed(conn, source_id)?;
-    let recycled = recycle_items(conn, bin, &trashed, progress)?;
-    if recycled.refused > 0 {
-        return Ok(Removal::Kept {
-            refused: recycled.refused,
-            trash: paths::trash_dir()?.to_string_lossy().into_owned(),
-        });
-    }
-    in_transaction(conn, |tx| sources::remove(tx, source_id))?;
-    Ok(Removal::Removed)
-}
-
 /// A folder as navigation names it: a source's own folder goes by the source's title.
 fn place_name(conn: &Connection, folder_id: i64) -> String {
     folders::ancestry(conn, folder_id)
@@ -454,14 +424,22 @@ fn place_name(conn: &Connection, folder_id: i64) -> String {
         .unwrap_or_default()
 }
 
+/// The title of the source a folder is in.
+fn source_title(conn: &Connection, folder_id: i64) -> String {
+    folders::location(conn, folder_id)
+        .ok()
+        .and_then(|location| sources::get(conn, location.source_id).ok().flatten())
+        .map(|source| source.title)
+        .unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::db::sources::{self, SourceKind};
     use crate::db::{self, journal};
-    use crate::fs::recycle::tests::{Fake, Stand};
+    use crate::fs::recycle::tests::{Fake, Stand, stand_in, stand_in_as};
     use crate::fs::{undo, walk};
-    use std::path::{Path, PathBuf};
 
     /// Trips/Cairo holding pyramid.jpg and sphinx.jpg, walked into a real file.
     fn library(name: &str) -> (Connection, PathBuf, i64) {
@@ -490,28 +468,50 @@ mod tests {
             .id
     }
 
-    fn trash_file(conn: &Connection, id: i64) -> PathBuf {
-        let file = items::file_of(conn, id).unwrap().unwrap();
-        paths::trash_path(&file.uuid, &file.disk_name).unwrap()
+    /// Where the bin keeps a trashed item's file.
+    fn bin_file(conn: &Connection, id: i64) -> PathBuf {
+        PathBuf::from(items::binned(conn, id).unwrap().unwrap().0)
+    }
+
+    fn cairo_holds(root: &Path, names: &[&str]) {
+        crate::fs::settles_to(&root.join("Trips/Cairo"), names);
+    }
+
+    /// A stand-in that recycles into `bin` beside the library, but refuses each file named here.
+    fn refusing(root: &Path, names: &[&str]) {
+        let mut bin = Fake::new(Stand::Recycles(root.parent().unwrap().join("bin")));
+        bin.deletes = names.iter().map(|name| (*name).to_owned()).collect();
+        stand_in_as(bin);
     }
 
     #[test]
-    fn a_file_goes_to_the_trash_and_one_undo_brings_it_back_with_its_tags() {
+    fn a_file_goes_to_the_recycle_bin_and_one_undo_brings_it_back_with_its_tags() {
         let (conn, root, cairo) = library("round-trip");
+        let bin = stand_in();
         let pyramid = id_of(&conn, cairo, "pyramid.jpg");
         let batch = journal::new_batch();
 
         let report = trash_items(&conn, &[pyramid], &batch).unwrap();
         assert_eq!(report.trashed, 1);
-        assert!(!root.join("Trips/Cairo/pyramid.jpg").exists());
-        assert!(trash_file(&conn, pyramid).is_file());
+        cairo_holds(&root, &["sphinx.jpg"]);
+        let binned = bin_file(&conn, pyramid);
+        assert!(binned.starts_with(bin.dir().unwrap()));
+        assert_eq!(std::fs::read_to_string(&binned).unwrap(), "p");
         assert!(items::is_trashed(&conn, pyramid).unwrap());
         assert_eq!(items::in_folder(&conn, cairo).unwrap().len(), 1);
 
         undo::undo_batch(&conn, &batch).unwrap();
-        assert!(root.join("Trips/Cairo/pyramid.jpg").is_file());
-        assert!(!trash_file(&conn, pyramid).exists());
+        assert_eq!(
+            std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap(),
+            "p"
+        );
+        assert!(!binned.exists());
+        assert_eq!(
+            bin.let_go.borrow().as_slice(),
+            std::slice::from_ref(&binned)
+        );
         assert!(items::is_live(&conn, pyramid).unwrap());
+        assert_eq!(items::binned(&conn, pyramid).unwrap(), None);
         let carried = tags::item_effective_tags(&conn, pyramid).unwrap();
         assert!(carried.iter().any(|tag| tag.value == "cairo"));
     }
@@ -526,12 +526,13 @@ mod tests {
         walk::reconcile(&conn).unwrap();
         let newcomer = id_of(&conn, cairo, "pyramid.jpg");
         assert_ne!(newcomer, pyramid);
+        assert_eq!(look_in_bin(&conn).unwrap(), Looked::default());
         assert!(items::is_trashed(&conn, pyramid).unwrap());
-        assert!(trash_file(&conn, pyramid).is_file());
+        assert!(bin_file(&conn, pyramid).is_file());
     }
 
     #[test]
-    fn a_file_whose_name_has_been_taken_since_stays_in_the_trash_and_says_so() {
+    fn a_file_whose_name_has_been_taken_since_stays_in_the_bin_and_says_so() {
         let (conn, root, cairo) = library("blocked");
         let pyramid = id_of(&conn, cairo, "pyramid.jpg");
         let batch = journal::new_batch();
@@ -549,7 +550,14 @@ mod tests {
             }
         );
         assert_eq!(report.stayed[0].at, stayed::Whereabouts::Trash);
-        assert!(trash_file(&conn, pyramid).is_file());
+        assert_eq!(
+            std::fs::read_to_string(bin_file(&conn, pyramid)).unwrap(),
+            "p"
+        );
+        assert_eq!(
+            std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap(),
+            "another"
+        );
         assert_eq!(journal::latest_batch(&conn).unwrap(), Some(batch));
     }
 
@@ -581,7 +589,7 @@ mod tests {
     }
 
     #[test]
-    fn a_trashed_file_is_shown_in_full_from_where_the_trash_keeps_it() {
+    fn a_trashed_file_is_shown_in_full_from_where_the_bin_keeps_it() {
         let (conn, _, cairo) = library("detail");
         let pyramid = id_of(&conn, cairo, "pyramid.jpg");
         trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
@@ -595,22 +603,29 @@ mod tests {
             detail.folders.last().map(|crumb| crumb.title.as_str()),
             Some("Cairo")
         );
-        assert_eq!(Path::new(&detail.path), trash_file(&conn, pyramid));
+        assert_eq!(Path::new(&detail.path), bin_file(&conn, pyramid));
         let path = crate::commands::last_path(&conn, pyramid).unwrap().unwrap();
-        assert_eq!(Path::new(&path), trash_file(&conn, pyramid));
+        assert_eq!(Path::new(&path), bin_file(&conn, pyramid));
     }
 
     #[test]
-    fn restore_puts_a_file_back_where_it_was_and_its_undo_returns_it_to_the_trash_as_it_was() {
+    fn restore_takes_a_file_out_of_the_bin_and_its_undo_sends_it_back_as_it_was() {
         let (conn, root, cairo) = library("restore");
+        let bin = stand_in();
         let pyramid = id_of(&conn, cairo, "pyramid.jpg");
         trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
         let went = items::trashed_at(&conn, pyramid).unwrap();
+        let binned = bin_file(&conn, pyramid);
 
         let batch = journal::new_batch();
         let report = restore_items(&conn, &[pyramid], None, &batch).unwrap();
         assert_eq!(report.restored, 1);
-        assert!(root.join("Trips/Cairo/pyramid.jpg").is_file());
+        cairo_holds(&root, &["pyramid.jpg", "sphinx.jpg"]);
+        assert!(!binned.exists());
+        assert_eq!(
+            bin.let_go.borrow().as_slice(),
+            std::slice::from_ref(&binned)
+        );
         assert!(items::is_live(&conn, pyramid).unwrap());
         assert_eq!(
             crate::fs::acts::describe(&conn, &batch).unwrap().act,
@@ -622,7 +637,11 @@ mod tests {
 
         let back = undo::undo_batch(&conn, &batch).unwrap();
         assert!(back.stayed.is_empty(), "{:?}", back.stayed);
-        assert!(trash_file(&conn, pyramid).is_file());
+        cairo_holds(&root, &["sphinx.jpg"]);
+        assert_eq!(
+            std::fs::read_to_string(bin_file(&conn, pyramid)).unwrap(),
+            "p"
+        );
         assert_eq!(items::trashed_at(&conn, pyramid).unwrap(), went);
     }
 
@@ -635,14 +654,20 @@ mod tests {
         let people = folders::child_id(&conn, top, "People").unwrap().unwrap();
         let pyramid = id_of(&conn, cairo, "pyramid.jpg");
         trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+        let binned = bin_file(&conn, pyramid);
 
         let batch = journal::new_batch();
         restore_items(&conn, &[pyramid], Some(people), &batch).unwrap();
-        assert!(root.join("People/pyramid.jpg").is_file());
+        assert_eq!(
+            std::fs::read_to_string(root.join("People/pyramid.jpg")).unwrap(),
+            "p"
+        );
+        assert!(!binned.exists());
         assert_eq!(items::folder_of(&conn, pyramid).unwrap(), Some(people));
 
         undo::undo_batch(&conn, &batch).unwrap();
         assert!(!root.join("People/pyramid.jpg").exists());
+        assert!(bin_file(&conn, pyramid).is_file());
         assert_eq!(
             listing(&conn).unwrap()[0].from.path,
             ["Library", "Trips", "Cairo"]
@@ -651,28 +676,6 @@ mod tests {
 
     fn theirs_appears_just_before_the_move() {
         crate::fs::noclobber::just_before_the_next(|to| std::fs::write(to, "theirs").unwrap());
-    }
-
-    #[test]
-    fn a_file_sent_to_the_trash_onto_a_name_that_appeared_just_before_it_stays() {
-        let (conn, root, cairo) = library("late-trash");
-        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
-        let kept = trash_file(&conn, pyramid);
-
-        theirs_appears_just_before_the_move();
-        let report = trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
-        assert_eq!((report.trashed, report.refused.len()), (0, 1));
-        assert_eq!(
-            report.refused[0].reason,
-            Reason::Other {
-                message: format!("{} is already there", kept.display())
-            }
-        );
-        assert_eq!(std::fs::read_to_string(&kept).unwrap(), "theirs");
-        let ours = std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap();
-        assert_eq!(ours, "p");
-        assert!(items::is_live(&conn, pyramid).unwrap());
-        std::fs::remove_file(kept).unwrap();
     }
 
     #[test]
@@ -692,17 +695,19 @@ mod tests {
                 folder: false
             }
         );
+        assert_eq!(report.refused[0].at, stayed::Whereabouts::Trash);
         let theirs = std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap();
         assert_eq!(theirs, "theirs");
         assert_eq!(
-            std::fs::read_to_string(trash_file(&conn, pyramid)).unwrap(),
+            std::fs::read_to_string(bin_file(&conn, pyramid)).unwrap(),
             "p"
         );
         assert!(items::is_trashed(&conn, pyramid).unwrap());
+        assert!(stand_in().let_go.borrow().is_empty());
     }
 
     #[test]
-    fn undoing_a_trash_onto_a_name_that_appeared_just_before_it_stays_and_theirs_is_kept() {
+    fn undoing_a_delete_onto_a_name_that_appeared_just_before_it_stays_and_theirs_is_kept() {
         let (conn, root, cairo) = library("late-untrash");
         let pyramid = id_of(&conn, cairo, "pyramid.jpg");
         let batch = journal::new_batch();
@@ -714,7 +719,7 @@ mod tests {
         let theirs = std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap();
         assert_eq!(theirs, "theirs");
         assert_eq!(
-            std::fs::read_to_string(trash_file(&conn, pyramid)).unwrap(),
+            std::fs::read_to_string(bin_file(&conn, pyramid)).unwrap(),
             "p"
         );
     }
@@ -745,76 +750,308 @@ mod tests {
         assert!(root.join("Trips/Cairo/pyramid.jpg").is_file());
     }
 
-    fn rows(conn: &Connection) -> i64 {
-        conn.query_row("SELECT COUNT(*) FROM item", [], |r| r.get(0))
-            .unwrap()
+    fn still_in_cairo(at: &stayed::Whereabouts) -> bool {
+        matches!(at, stayed::Whereabouts::Folder { path, .. } if path.last().is_some_and(|name| name == "Cairo"))
     }
 
     #[test]
-    fn removing_a_source_sends_its_trashed_files_to_the_recycle_bin_and_leaves_its_folder() {
-        let (conn, root, cairo) = library("remove-recycles");
-        let dir = root.parent().unwrap().to_path_buf();
-        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
-        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
-        trash_items(&conn, &[pyramid, sphinx], &journal::new_batch()).unwrap();
-        let (one, two) = (trash_file(&conn, pyramid), trash_file(&conn, sphinx));
-        std::fs::remove_file(&two).unwrap();
-        let bin = Fake::new(Stand::Recycles(dir.join("bin")));
-        let shares = std::cell::RefCell::new(Vec::new());
+    fn a_file_the_bin_refuses_stays_where_it_was_and_nothing_is_deleted() {
+        for (at, stand) in [("deletes", Stand::Deletes), ("fails", Stand::Fails)] {
+            let (conn, root, cairo) = library(&format!("bin-refuses-{at}"));
+            let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+            stand_in_as(Fake::new(stand));
 
-        let removal =
-            remove_source(&conn, &bin, 1, &|done| shares.borrow_mut().push(done)).unwrap();
+            let report = trash_items(&conn, &[sphinx], &journal::new_batch()).unwrap();
 
-        assert_eq!(removal, Removal::Removed);
-        assert_eq!(*shares.borrow(), [0.5, 1.0]);
-        assert_eq!(
-            bin.asked.borrow().as_slice(),
-            std::slice::from_ref(&one),
-            "one already gone from the trash counts as sent"
-        );
-        assert!(!one.exists());
-        let recycled = dir.join("bin").join(one.file_name().unwrap());
-        assert_eq!(std::fs::read_to_string(recycled).unwrap(), "p");
-        assert!(sources::list(&conn).unwrap().is_empty());
-        assert_eq!(rows(&conn), 0);
-        assert!(
-            root.join("Trips/Cairo").is_dir(),
-            "its folder stays on disk"
-        );
+            assert_eq!(report.trashed, 0, "{at}");
+            assert_eq!(report.refused.len(), 1);
+            assert_eq!(report.refused[0].reason, Reason::BinRefused);
+            assert!(still_in_cairo(&report.refused[0].at));
+            assert_eq!(
+                std::fs::read_to_string(root.join("Trips/Cairo/sphinx.jpg")).unwrap(),
+                "s"
+            );
+            assert!(items::is_live(&conn, sphinx).unwrap());
+            assert_eq!(journal::latest_batch(&conn).unwrap(), None);
+            assert!(recycling::unsettled(&conn).unwrap().is_empty());
+            cairo_holds(&root, &["pyramid.jpg", "sphinx.jpg"]);
+        }
     }
 
     #[test]
-    fn a_file_the_recycle_bin_cannot_take_keeps_the_source_and_stays_in_the_trash() {
-        let (conn, root, cairo) = library("remove-refused");
+    fn in_a_set_the_bin_refuses_one_and_the_rest_go_under_one_undo() {
+        let (conn, root, cairo) = library("bin-refuses-one");
         let pyramid = id_of(&conn, cairo, "pyramid.jpg");
         let sphinx = id_of(&conn, cairo, "sphinx.jpg");
-        trash_items(&conn, &[pyramid, sphinx], &journal::new_batch()).unwrap();
-        let (one, two) = (trash_file(&conn, pyramid), trash_file(&conn, sphinx));
-        let elsewhere = root.parent().unwrap().join("sphinx-elsewhere.jpg");
-        std::fs::hard_link(&two, &elsewhere).unwrap();
-        let mut bin = Fake::new(Stand::Recycles(root.parent().unwrap().join("bin")));
-        bin.deletes = vec![two.file_name().unwrap().to_string_lossy().into_owned()];
+        refusing(&root, &["sphinx"]);
+        let batch = journal::new_batch();
 
-        let removal = remove_source(&conn, &bin, 1, &|_| {}).unwrap();
+        let report = trash_items(&conn, &[pyramid, sphinx], &batch).unwrap();
+
+        assert_eq!(report.trashed, 1);
+        assert_eq!(
+            (report.refused[0].id, &report.refused[0].reason),
+            (sphinx, &Reason::BinRefused)
+        );
+        cairo_holds(&root, &["sphinx.jpg"]);
+        assert!(items::is_trashed(&conn, pyramid).unwrap());
+
+        undo::undo_batch(&conn, &batch).unwrap();
+        cairo_holds(&root, &["pyramid.jpg", "sphinx.jpg"]);
+        assert!(items::is_live(&conn, pyramid).unwrap());
+    }
+
+    #[test]
+    fn a_folders_files_the_bin_refuses_keep_it_until_they_go() {
+        let (conn, root, cairo) = library("folder-refused");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        let contents = Some(crate::fs::folders::Contents::Trash);
+        refusing(&root, &["sphinx"]);
+
+        let report =
+            crate::fs::folders::delete(&conn, cairo, contents, &journal::new_batch()).unwrap();
+        assert!(!report.deleted);
+        assert_eq!(report.refused.len(), 1);
+        assert_eq!(
+            (report.refused[0].id, &report.refused[0].reason),
+            (sphinx, &Reason::BinRefused)
+        );
+        assert!(items::is_trashed(&conn, pyramid).unwrap());
+        cairo_holds(&root, &["sphinx.jpg"]);
+
+        refusing(&root, &[]);
+        let report =
+            crate::fs::folders::delete(&conn, cairo, contents, &journal::new_batch()).unwrap();
+        assert!(report.deleted, "{:?}", report.refused);
+        assert!(!root.join("Trips/Cairo").exists());
+    }
+
+    #[test]
+    fn a_file_emptied_from_the_bin_outside_the_app_is_refused_and_its_row_retires() {
+        let (conn, root, cairo) = library("emptied");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        tags::add_item_tag(&conn, pyramid, "dusk").unwrap();
+        trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+        std::fs::remove_file(bin_file(&conn, pyramid)).unwrap();
+
+        let report = restore_items(&conn, &[pyramid], None, &journal::new_batch()).unwrap();
+
+        assert_eq!(report.restored, 0);
+        assert_eq!(
+            report.refused,
+            [Stayed {
+                kind: stayed::Thing::File,
+                id: pyramid,
+                name: "pyramid.jpg".into(),
+                at: stayed::Whereabouts::RecycleBin,
+                reason: Reason::GoneFromBin {
+                    name: "pyramid.jpg".into(),
+                    place: "Cairo".into(),
+                },
+            }]
+        );
+        assert!(!items::is_trashed(&conn, pyramid).unwrap());
+        assert!(!items::is_live(&conn, pyramid).unwrap());
+        assert!(listing(&conn).unwrap().is_empty());
+        cairo_holds(&root, &["sphinx.jpg"]);
+
+        // Retired where it was, it keeps its name and tags: the same file back is the same item.
+        std::fs::write(root.join("Trips/Cairo/pyramid.jpg"), "p").unwrap();
+        walk::reconcile(&conn).unwrap();
+        assert!(items::is_live(&conn, pyramid).unwrap());
+        let tags = tags::item_effective_tags(&conn, pyramid).unwrap();
+        assert!(tags.iter().any(|tag| tag.value == "dusk"));
+    }
+
+    #[test]
+    fn looking_in_the_bin_retires_what_was_emptied_and_restores_what_was_put_back() {
+        let (conn, root, cairo) = library("look");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        tags::add_item_tag(&conn, sphinx, "dusk").unwrap();
+        trash_items(&conn, &[pyramid, sphinx], &journal::new_batch()).unwrap();
+        std::fs::remove_file(bin_file(&conn, pyramid)).unwrap();
+        std::fs::rename(bin_file(&conn, sphinx), root.join("Trips/Cairo/sphinx.jpg")).unwrap();
 
         assert_eq!(
-            removal,
-            Removal::Kept {
-                refused: 1,
-                trash: paths::trash_dir().unwrap().to_string_lossy().into_owned()
+            look_in_bin(&conn).unwrap(),
+            Looked {
+                retired: 1,
+                restored: 1
             }
         );
-        assert!(!one.exists(), "a refusal stops nothing");
+
         assert!(!items::is_trashed(&conn, pyramid).unwrap());
-        assert_eq!(std::fs::read_to_string(&two).unwrap(), "s");
+        assert!(!items::is_live(&conn, pyramid).unwrap());
+        assert!(items::is_live(&conn, sphinx).unwrap());
+        assert_eq!(items::folder_of(&conn, sphinx).unwrap(), Some(cairo));
+        let tags = tags::item_effective_tags(&conn, sphinx).unwrap();
+        assert!(tags.iter().any(|tag| tag.value == "dusk"));
+        assert!(listing(&conn).unwrap().is_empty());
+        assert_eq!(look_in_bin(&conn).unwrap(), Looked::default());
+    }
+
+    #[test]
+    fn a_file_put_back_from_explorer_after_a_walk_took_it_in_is_the_item_it_was() {
+        let (conn, root, cairo) = library("look-after-walk");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        tags::add_item_tag(&conn, sphinx, "dusk").unwrap();
+        trash_items(&conn, &[sphinx], &journal::new_batch()).unwrap();
+        std::fs::rename(bin_file(&conn, sphinx), root.join("Trips/Cairo/sphinx.jpg")).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let newcomer = id_of(&conn, cairo, "sphinx.jpg");
+        assert_ne!(newcomer, sphinx);
+
+        look_in_bin(&conn).unwrap();
+
+        assert_eq!(id_of(&conn, cairo, "sphinx.jpg"), sphinx);
+        assert!(items::file_of(&conn, newcomer).unwrap().is_none());
+        let tags = tags::item_effective_tags(&conn, sphinx).unwrap();
+        assert!(tags.iter().any(|tag| tag.value == "dusk"));
+    }
+
+    #[test]
+    fn a_file_put_back_from_explorer_counts_as_restored() {
+        let (conn, root, cairo) = library("restore-put-back");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+        std::fs::rename(
+            bin_file(&conn, pyramid),
+            root.join("Trips/Cairo/pyramid.jpg"),
+        )
+        .unwrap();
+
+        let report = restore_items(&conn, &[pyramid], None, &journal::new_batch()).unwrap();
+
+        assert_eq!((report.restored, report.refused.len()), (1, 0));
+        assert!(items::is_live(&conn, pyramid).unwrap());
+        assert!(stand_in().let_go.borrow().is_empty());
+    }
+
+    #[test]
+    fn a_file_another_took_the_bins_name_of_is_gone_and_theirs_is_left() {
+        let (conn, root, cairo) = library("bin-name-reused");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+        let binned = bin_file(&conn, pyramid);
+        std::fs::remove_file(&binned).unwrap();
+        std::fs::write(&binned, "another").unwrap();
+
+        let report = restore_items(&conn, &[pyramid], None, &journal::new_batch()).unwrap();
+
+        assert_eq!(report.restored, 0);
+        assert_eq!(report.refused[0].at, stayed::Whereabouts::RecycleBin);
+        assert_eq!(std::fs::read_to_string(&binned).unwrap(), "another");
+        cairo_holds(&root, &["sphinx.jpg"]);
+    }
+
+    #[test]
+    fn an_undo_across_a_send_brings_back_what_is_still_in_the_bin_and_names_what_is_not() {
+        let (conn, root, cairo) = library("undo-emptied");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        let batch = journal::new_batch();
+        trash_items(&conn, &[pyramid, sphinx], &batch).unwrap();
+        std::fs::remove_file(bin_file(&conn, pyramid)).unwrap();
+
+        let report = undo::undo_batch(&conn, &batch).unwrap();
+
+        assert_eq!(report.files_back, 1);
+        assert_eq!(report.stayed.len(), 1);
+        assert_eq!(report.stayed[0].id, pyramid);
+        assert_eq!(report.stayed[0].at, stayed::Whereabouts::RecycleBin);
+        cairo_holds(&root, &["sphinx.jpg"]);
+        assert!(items::is_live(&conn, sphinx).unwrap());
         assert_eq!(
-            listing(&conn).unwrap()[0].row.id,
-            sphinx,
-            "it stays in the Trash under its row"
+            journal::latest_batch(&conn).unwrap(),
+            None,
+            "nothing is left to try again"
         );
-        assert_eq!(sources::list(&conn).unwrap().len(), 1);
-        assert_eq!(sources::item_stats(&conn, 1).unwrap().0, 0);
-        std::fs::remove_file(two).unwrap();
+    }
+
+    #[test]
+    fn an_undo_after_the_trash_found_a_file_emptied_or_put_back_says_so_or_counts_it_back() {
+        let (conn, root, cairo) = library("undo-after-look");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        let batch = journal::new_batch();
+        trash_items(&conn, &[pyramid, sphinx], &batch).unwrap();
+        std::fs::remove_file(bin_file(&conn, pyramid)).unwrap();
+        std::fs::rename(bin_file(&conn, sphinx), root.join("Trips/Cairo/sphinx.jpg")).unwrap();
+        look_in_bin(&conn).unwrap();
+
+        let report = undo::undo_batch(&conn, &batch).unwrap();
+
+        assert_eq!(report.files_back, 1);
+        assert_eq!(report.stayed.len(), 1);
+        assert_eq!(report.stayed[0].id, pyramid);
+        assert_eq!(
+            report.stayed[0].reason,
+            Reason::GoneFromBin {
+                name: "pyramid.jpg".into(),
+                place: "Cairo".into(),
+            }
+        );
+        assert!(items::is_live(&conn, sphinx).unwrap());
+        assert_eq!(journal::latest_batch(&conn).unwrap(), None);
+    }
+
+    #[test]
+    fn a_trashed_row_the_bin_has_no_record_of_retires_and_nothing_else_is_touched() {
+        let (conn, root, cairo) = library("no-record");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let elsewhere = root.parent().unwrap().join("pyramid.jpg");
+        std::fs::rename(root.join("Trips/Cairo/pyramid.jpg"), &elsewhere).unwrap();
+        items::send_to_trash(&conn, pyramid).unwrap();
+
+        assert_eq!(look_in_bin(&conn).unwrap().retired, 1);
+
+        assert!(!items::is_trashed(&conn, pyramid).unwrap());
+        assert_eq!(std::fs::read_to_string(&elsewhere).unwrap(), "p");
+    }
+
+    #[test]
+    fn a_send_the_app_stopped_during_is_settled_at_launch_and_the_file_is_back() {
+        let (conn, root, _) = library("send-cut-short");
+        let place = root.join("Trips/Cairo/sphinx.jpg");
+        recycling::add(&conn, &place).unwrap();
+        std::fs::rename(&place, hold_of(&place)).unwrap();
+
+        settle_unfinished_send(&conn).unwrap();
+
+        assert_eq!(std::fs::read_to_string(&place).unwrap(), "s");
+        assert!(!hold_of(&place).exists());
+        assert!(recycling::unsettled(&conn).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_send_cut_short_in_a_folder_that_is_away_waits_for_it() {
+        let (conn, root, _) = library("send-away");
+        let away = root.join("Away/sphinx.jpg");
+        recycling::add(&conn, &away).unwrap();
+
+        settle_unfinished_send(&conn).unwrap();
+
+        assert_eq!(recycling::unsettled(&conn).unwrap(), [away]);
+    }
+
+    #[test]
+    fn a_send_that_fails_partway_keeps_its_marker_for_the_next_launch() {
+        let (conn, root, cairo) = library("send-fails");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        let place = root.join("Trips/Cairo/sphinx.jpg");
+        std::fs::write(hold_of(&place), "another").unwrap();
+
+        let report = trash_items(&conn, &[sphinx], &journal::new_batch()).unwrap();
+
+        assert_eq!(report.trashed, 0);
+        assert_eq!(std::fs::read_to_string(&place).unwrap(), "s");
+        assert_eq!(
+            recycling::unsettled(&conn).unwrap(),
+            std::slice::from_ref(&place)
+        );
+        std::fs::remove_file(hold_of(&place)).unwrap();
     }
 
     fn hold_of(file: &Path) -> PathBuf {
@@ -825,304 +1062,7 @@ mod tests {
     }
 
     #[test]
-    fn at_launch_every_lone_second_name_is_put_back_whether_or_not_a_row_has_it() {
-        let (conn, _, cairo) = library("sweep-holds");
-        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
-        trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
-        let needed = trash_file(&conn, pyramid);
-        let shard = needed.parent().unwrap().to_path_buf();
-        std::fs::rename(&needed, hold_of(&needed)).unwrap();
-        let orphan = shard.join("orphan.jpg");
-        std::fs::write(hold_of(&orphan), "orphan").unwrap();
-        std::fs::write(shard.join(".unrelated.recycling"), "unrelated").unwrap();
-
-        assert_eq!(recycle::sweep(&shard), 3);
-
-        assert_eq!(std::fs::read_to_string(&needed).unwrap(), "p");
-        assert_eq!(std::fs::read_to_string(&orphan).unwrap(), "orphan");
-        assert_eq!(
-            std::fs::read_to_string(shard.join("unrelated")).unwrap(),
-            "unrelated"
-        );
-        for file in [needed, orphan, shard.join("unrelated")] {
-            std::fs::remove_file(file).unwrap();
-        }
-    }
-
-    #[test]
-    fn a_trashed_file_a_crash_left_under_its_second_name_is_back_at_launch_to_restore() {
-        let (conn, root, cairo) = library("sweep-crashed-removal");
-        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
-        trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
-        let file = trash_file(&conn, pyramid);
-        let hold = hold_of(&file);
-        std::fs::rename(&file, &hold).unwrap();
-
-        assert_eq!(recycle::sweep(file.parent().unwrap()), 1);
-
-        assert!(!hold.exists());
-        assert_eq!(std::fs::read_to_string(&file).unwrap(), "p");
-        let report = restore_items(&conn, &[pyramid], None, &journal::new_batch()).unwrap();
-        assert_eq!(report.restored, 1, "{:?}", report.refused);
-        assert!(root.join("Trips/Cairo/pyramid.jpg").is_file());
-    }
-
-    #[test]
-    fn a_source_with_nothing_in_the_trash_goes_without_asking_the_bin() {
-        let (conn, _, _) = library("remove-none");
-        let bin = Fake::new(Stand::Deletes);
-        assert_eq!(
-            remove_source(&conn, &bin, 1, &|_| panic!("nothing to send")).unwrap(),
-            Removal::Removed
-        );
-        assert!(bin.asked.borrow().is_empty());
-        assert!(sources::list(&conn).unwrap().is_empty());
-    }
-
-    #[test]
-    fn the_largest_file_the_trash_takes_is_its_size_per_file_or_its_total_when_smaller_or_alone() {
-        let gb = |gb: i64| gb << 30;
-        let limits = |file_gb, total_gb| TrashLimits {
-            keep_days: Some(30),
-            total_gb,
-            file_gb,
-        };
-        let largest = |bytes, total| Some(Largest { bytes, total });
-        assert_eq!(
-            Largest::of(limits(Some(5), Some(25))),
-            largest(gb(5), false)
-        );
-        assert_eq!(Largest::of(limits(None, Some(25))), largest(gb(25), true));
-        assert_eq!(
-            Largest::of(limits(Some(25), Some(10))),
-            largest(gb(10), true)
-        );
-        assert_eq!(Largest::of(limits(Some(5), None)), largest(gb(5), false));
-        assert_eq!(Largest::of(limits(None, None)), None);
-    }
-
-    /// Cairo with sphinx.jpg grown to four bytes, and a trash that takes two.
-    fn with_one_too_large(name: &str) -> (Connection, PathBuf, i64, Option<Largest>) {
-        let (conn, root, cairo) = library(name);
-        std::fs::write(root.join("Trips/Cairo/sphinx.jpg"), "ssss").unwrap();
-        let largest = Some(Largest {
-            bytes: 2,
-            total: false,
-        });
-        (conn, root, cairo, largest)
-    }
-
-    fn still_in_cairo(at: &stayed::Whereabouts) -> bool {
-        matches!(at, stayed::Whereabouts::Folder { path, .. } if path.last().is_some_and(|name| name == "Cairo"))
-    }
-
-    #[test]
-    fn a_file_larger_than_the_trash_takes_stays_and_the_rest_of_the_set_goes_under_one_undo() {
-        let (conn, root, cairo, largest) = with_one_too_large("too-large");
-        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
-        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
-        let batch = journal::new_batch();
-
-        let report = trash_within(&conn, &[pyramid, sphinx], &batch, largest).unwrap();
-
-        assert_eq!(report.trashed, 1);
-        assert_eq!(report.refused.len(), 1);
-        let refused = &report.refused[0];
-        assert_eq!((refused.id, refused.name.as_str()), (sphinx, "sphinx.jpg"));
-        assert_eq!(
-            refused.reason,
-            Reason::TooLarge {
-                bytes: 4,
-                limit: 2,
-                total: false
-            }
-        );
-        assert!(still_in_cairo(&refused.at));
-        assert!(items::is_live(&conn, sphinx).unwrap());
-        assert_eq!(
-            std::fs::read_to_string(root.join("Trips/Cairo/sphinx.jpg")).unwrap(),
-            "ssss"
-        );
-        assert!(items::is_trashed(&conn, pyramid).unwrap());
-
-        undo::undo_batch(&conn, &batch).unwrap();
-        assert!(items::is_live(&conn, pyramid).unwrap());
-        assert!(root.join("Trips/Cairo/pyramid.jpg").is_file());
-    }
-
-    #[test]
-    fn a_file_at_the_limit_goes_and_with_no_limit_nothing_is_refused_for_its_size() {
-        let (conn, _, cairo, _) = with_one_too_large("at-limit");
-        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
-        let at = Some(Largest {
-            bytes: 4,
-            total: true,
-        });
-        let report = trash_within(&conn, &[sphinx], &journal::new_batch(), at).unwrap();
-        assert_eq!(report.trashed, 1);
-        restore_items(&conn, &[sphinx], None, &journal::new_batch()).unwrap();
-        let unlimited = trash_within(&conn, &[sphinx], &journal::new_batch(), None).unwrap();
-        assert_eq!(unlimited.trashed, 1);
-    }
-
-    #[test]
-    fn sent_to_the_recycle_bin_a_file_leaves_its_folder_and_its_row_retires_with_no_undo() {
-        let (conn, root, cairo, _) = with_one_too_large("to-bin");
-        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
-        let place = root.join("Trips/Cairo/sphinx.jpg");
-        let bin_dir = root.parent().unwrap().join("bin");
-        let bin = Fake::new(Stand::Recycles(bin_dir.clone()));
-        let before = journal::latest_batch(&conn).unwrap();
-
-        let report = send_to_bin(&conn, &bin, &[sphinx]).unwrap();
-
-        assert_eq!(
-            report,
-            BinReport {
-                sent: 1,
-                refused: Vec::new()
-            }
-        );
-        assert_eq!(bin.asked.borrow().as_slice(), std::slice::from_ref(&place));
-        assert!(!place.exists());
-        assert_eq!(
-            std::fs::read_to_string(bin_dir.join("sphinx.jpg")).unwrap(),
-            "ssss"
-        );
-        assert!(!items::is_live(&conn, sphinx).unwrap());
-        assert!(!items::is_trashed(&conn, sphinx).unwrap());
-        assert_eq!(journal::latest_batch(&conn).unwrap(), before);
-        assert!(marked(&conn).is_empty());
-        crate::fs::settles_to(&root.join("Trips/Cairo"), &["pyramid.jpg"]);
-    }
-
-    #[test]
-    fn a_file_the_recycle_bin_refuses_stays_where_it_was_and_nothing_is_deleted() {
-        for (at, stand) in [("deletes", Stand::Deletes), ("fails", Stand::Fails)] {
-            let (conn, root, cairo, _) = with_one_too_large(&format!("bin-refuses-{at}"));
-            let sphinx = id_of(&conn, cairo, "sphinx.jpg");
-            let place = root.join("Trips/Cairo/sphinx.jpg");
-
-            let report = send_to_bin(&conn, &Fake::new(stand), &[sphinx]).unwrap();
-
-            assert_eq!(report.sent, 0, "{at}");
-            assert_eq!(report.refused.len(), 1);
-            assert_eq!(report.refused[0].reason, Reason::BinRefused);
-            assert!(still_in_cairo(&report.refused[0].at));
-            assert_eq!(std::fs::read_to_string(&place).unwrap(), "ssss");
-            assert!(items::is_live(&conn, sphinx).unwrap());
-            assert!(marked(&conn).is_empty());
-            crate::fs::settles_to(&root.join("Trips/Cairo"), &["pyramid.jpg", "sphinx.jpg"]);
-        }
-    }
-
-    #[test]
-    fn a_folders_files_too_large_for_the_trash_keep_it_until_they_go_to_the_recycle_bin() {
-        let (conn, root, cairo, largest) = with_one_too_large("folder-too-large");
-        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
-        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
-        let contents = Some(crate::fs::folders::Contents::Trash);
-        let delete = || {
-            crate::fs::folders::delete_within(
-                &conn,
-                cairo,
-                contents,
-                &journal::new_batch(),
-                largest,
-            )
-            .unwrap()
-        };
-
-        let report = delete();
-        assert!(!report.deleted);
-        assert_eq!(report.refused.len(), 1);
-        assert_eq!(report.refused[0].id, sphinx);
-        assert!(matches!(report.refused[0].reason, Reason::TooLarge { .. }));
-        assert!(items::is_trashed(&conn, pyramid).unwrap());
-        assert!(root.join("Trips/Cairo/sphinx.jpg").is_file());
-
-        let bin = Fake::new(Stand::Recycles(root.parent().unwrap().join("bin")));
-        assert_eq!(send_to_bin(&conn, &bin, &[sphinx]).unwrap().sent, 1);
-        let report = delete();
-        assert!(report.deleted, "{:?}", report.refused);
-        assert!(!root.join("Trips/Cairo").exists());
-    }
-
-    #[test]
-    fn a_send_the_app_stopped_during_is_settled_at_launch_and_the_file_is_back() {
-        let (conn, root, _, _) = with_one_too_large("send-cut-short");
-        let place = root.join("Trips/Cairo/sphinx.jpg");
-        mark(&conn, &place);
-        std::fs::rename(&place, hold_of(&place)).unwrap();
-
-        settle_unfinished_send(&conn).unwrap();
-
-        assert_eq!(std::fs::read_to_string(&place).unwrap(), "ssss");
-        assert!(!hold_of(&place).exists());
-        assert!(marked(&conn).is_empty());
-    }
-
-    #[test]
-    fn a_send_cut_short_in_a_folder_that_is_away_waits_for_it() {
-        let (conn, root, _, _) = with_one_too_large("send-away");
-        let away = root.join("Away/sphinx.jpg");
-        mark(&conn, &away);
-
-        settle_unfinished_send(&conn).unwrap();
-
-        assert_eq!(marked(&conn), [away]);
-    }
-
-    fn mark(conn: &Connection, file: &Path) {
-        expired::add_recycling(conn, file).unwrap();
-    }
-
-    fn marked(conn: &Connection) -> Vec<PathBuf> {
-        expired::recycling(conn).unwrap()
-    }
-
-    #[test]
-    fn a_send_cut_short_in_a_folder_away_outlives_a_later_send_and_is_settled_once_it_is_back() {
-        let (conn, root, cairo, _) = with_one_too_large("send-away-then-another");
-        std::fs::write(root.join("Trips/boat.jpg"), "bbbb").unwrap();
-        walk::reconcile(&conn).unwrap();
-        let trips = folders::parent(&conn, cairo).unwrap().unwrap();
-        let boat = id_of(&conn, trips, "boat.jpg");
-        let place = root.join("Trips/Cairo/sphinx.jpg");
-        mark(&conn, &place);
-        std::fs::rename(&place, hold_of(&place)).unwrap();
-        let (here, away) = (root.join("Trips/Cairo"), root.join("Trips/Cairo-away"));
-        std::fs::rename(&here, &away).unwrap();
-
-        settle_unfinished_send(&conn).unwrap();
-        let bin = Fake::new(Stand::Recycles(root.parent().unwrap().join("bin")));
-        assert_eq!(send_to_bin(&conn, &bin, &[boat]).unwrap().sent, 1);
-        std::fs::rename(&away, &here).unwrap();
-        settle_unfinished_send(&conn).unwrap();
-
-        assert_eq!(std::fs::read_to_string(&place).unwrap(), "ssss");
-        assert!(!hold_of(&place).exists());
-        assert!(marked(&conn).is_empty());
-    }
-
-    #[test]
-    fn a_send_that_fails_partway_keeps_its_marker_for_the_next_launch() {
-        let (conn, root, cairo, _) = with_one_too_large("send-fails");
-        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
-        let place = root.join("Trips/Cairo/sphinx.jpg");
-        std::fs::write(hold_of(&place), "another").unwrap();
-        let bin = Fake::new(Stand::Recycles(root.parent().unwrap().join("bin")));
-
-        let report = send_to_bin(&conn, &bin, &[sphinx]).unwrap();
-
-        assert_eq!(report.sent, 0);
-        assert_eq!(std::fs::read_to_string(&place).unwrap(), "ssss");
-        assert_eq!(marked(&conn), std::slice::from_ref(&place));
-        std::fs::remove_file(hold_of(&place)).unwrap();
-    }
-
-    #[test]
-    fn a_file_no_longer_on_disk_is_not_sent_to_the_trash() {
+    fn a_file_no_longer_on_disk_is_not_sent_to_the_bin() {
         let (conn, root, cairo) = library("gone");
         let sphinx = id_of(&conn, cairo, "sphinx.jpg");
         std::fs::remove_file(root.join("Trips/Cairo/sphinx.jpg")).unwrap();
@@ -1136,5 +1076,15 @@ mod tests {
             }
         );
         assert!(!items::is_trashed(&conn, sphinx).unwrap());
+        assert!(stand_in().asked.borrow().is_empty());
+    }
+
+    #[test]
+    fn a_drive_is_its_root_and_nothing_else() {
+        assert_eq!(
+            drive_of(Path::new(r"D:\$Recycle.Bin\S-1-5-21\$RAB12CD.jpg")),
+            Path::new(r"D:\")
+        );
+        assert_eq!(drive_of(Path::new("relative/one.jpg")), PathBuf::new());
     }
 }

@@ -2,17 +2,18 @@ import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { trashItems } from "../../ipc/commands";
 import { placeItems } from "../grid/place-items";
 import { libraryChanged } from "../library";
+import { setNews } from "../navigation/foot-slot";
 import type { Place } from "../place";
-import { deletedBannerLine } from "../undo/lines";
+import { binRefusedDetail, binRefusedLine, deletedBannerLine } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
 import { getPaneItem, getPaneOrigin, paneMovesOn, showInPane } from "./pane-store";
-import { askTooLarge, tooLargeOf } from "./too-large";
 
 /**
- * Sends files to the trash and says what happened: the line at the foot for what went, the banner
- * over the grid for what did not, and the question for what was too large for it. When the pane
- * was showing one of them, it moves on to the file that takes its tile's place. DECISIONS.md "Undo".
+ * Sends files to the Recycle Bin and says what happened: the line at the foot for what went and
+ * for what the bin alone would not take, the banner over the grid for what else did not go. When
+ * the pane was showing one of them, it moves on to the file that takes its tile's place.
+ * DECISIONS.md "Undo".
  */
 export async function deleteFiles(itemIds: number[]) {
   const shown = getPaneItem();
@@ -22,21 +23,24 @@ export async function deleteFiles(itemIds: number[]) {
   const done = await trashItems(itemIds).catch(() => null);
   if (!done) return;
   const { batch, report } = done;
-  if (batch) afterAct(batch, report.refused.length);
+  const binOnly =
+    report.refused.length > 0 && report.refused.every((one) => one.reason.kind === "binRefused");
+  if (binOnly) {
+    const line = binRefusedLine(report.refused, report.trashed);
+    if (batch) afterAct(batch, 0, line);
+    else setNews({ kind: "binRefused", line, detail: binRefusedDetail(report.refused.length) });
+  } else if (batch) afterAct(batch, report.refused.length);
   const whole = report.trashed + report.refused.length;
-  const tooLarge = tooLargeOf(report.refused);
-  const rest = report.refused.filter((one) => !tooLarge.includes(one));
-  const [first] = rest;
+  const [first] = report.refused;
   showReport(
-    first
+    first && !binOnly
       ? {
           sentence: deletedBannerLine(report.trashed, whole, whole === 1 ? first.name : undefined),
-          rows: rest,
-          retry: () => void deleteFiles(rest.map((one) => one.id)),
+          rows: report.refused,
+          retry: () => void deleteFiles(report.refused.map((one) => one.id)),
         }
       : null,
   );
-  if (tooLarge.length > 0) askTooLarge(tooLarge, whole);
   const stayed = report.refused.some((one) => one.id === shown);
   if (shown !== null && !stayed && next !== shown) showInPane(next, origin);
   await libraryChanged();

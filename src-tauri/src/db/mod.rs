@@ -3,12 +3,12 @@
 
 pub mod backup;
 pub mod details;
-pub mod expired;
 pub mod folders;
 pub mod items;
 pub mod jobs;
 pub mod journal;
 pub mod keys;
+pub mod recycling;
 pub mod search;
 pub mod sources;
 pub mod suggest;
@@ -35,6 +35,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (9, include_str!("migrations/009_folder_tag_rev.sql")),
     (10, include_str!("migrations/010_frame.sql")),
     (11, include_str!("migrations/011_expired.sql")),
+    (12, include_str!("migrations/012_recycle_bin.sql")),
 ];
 
 type Rewrite = fn(&Connection) -> Result<()>;

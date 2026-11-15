@@ -16,8 +16,7 @@ folder renames the directory.
 
 A **source** is a folder the user adds to the app. There can be several, and one source may
 not sit inside another. Removing a source forgets the index and never the files in its folder;
-its files in the trash go to the Windows Recycle Bin, as an expired item does, and one the Recycle
-Bin cannot take keeps the source.
+its files in the trash stay in the Windows Recycle Bin, out of the app.
 
 Deleting a folder asks: move what is inside to the Sorting Box, or send it to the trash as
 well. An empty folder goes without asking. Each sorting source is its own answer, and one can be kept
@@ -48,26 +47,20 @@ it on disk, out of its sorting source and into the library.
 
 ## Trash
 
-A place: a folder in the app's own directory, with a maximum total size, a maximum size per
-item, and a time to live, all adjustable by the user.
+**The Windows Recycle Bin, on each file's own drive.** Delete sends a file there, and the Trash
+lists what the library sent: Restore, Restore to… and Ctrl+Z take a file back out, its tags with
+it. The Trash keeps no limits of its own, since the Recycle Bin keeps Windows'; Settings › Trash
+says how many files the library has there and the space they take. Nothing else in the bin is the
+Trash's.
 
-**An item that expires goes to the Windows Recycle Bin**: one that outlives the time to live,
-and the oldest first while the trash is over its total size. That is one more chance to get it
-back, outside the app; the app's Restore and undo can no longer reach it. Nothing is destroyed
-by expiry. Purging the trash is the one way the app deletes a file outright.
+A file the Recycle Bin will not take, too large for it or on a drive whose bin is off, stays where
+it was, and the foot says so; nothing is deleted outright. In a set the rest go, with Undo.
 
-The limits are kept at launch and every hour, and set in Settings › Trash: Keep For 30 days,
-Total Size 25 GB and Size per File 5 GB until changed, each with No Limit. The line under them
-says what the next run will send, and when; the foot says what a run sent, with no Undo. A file
-the Recycle Bin cannot take stays in the Trash, said once. A Restore or Ctrl+Z that reaches a
-file after it expired says it is in the Recycle Bin, and why.
-
-**A file larger than the Trash takes is refused at Delete**: over Size per File, or over Total
-Size where that is smaller or Size per File is No Limit. The question above the grid says so and
-offers Send to Recycle Bin; × keeps it where it is. In a set the rest go to the Trash as ever,
-with Undo, and the refused are listed with their sizes; a folder's Delete Files Too asks the same,
-and the folder goes once they have. Sent, a file leaves the library with no Undo. One the Recycle
-Bin cannot take stays where it was, and the notice says so; nothing is deleted outright.
+The Trash looks in the bin at launch and whenever it opens. A file emptied from the bin outside
+the app leaves the Trash, its row retired; one put back from Explorer is restored in the index,
+tags and all. A Restore or Ctrl+Z that reaches a file emptied from the bin says so, under Gone from
+the Recycle Bin. Emptying the library's files from the bin is the one way the app deletes a file
+outright, and it asks first.
 
 ## Tags and labels
 
@@ -117,5 +110,5 @@ selection somewhere. Destination hotkeys exist for the folders used most.
 ## Later
 
 Built on the finished interface, not alongside it: compression with review before anything is
-replaced, duplicate detection, a storage screen, trash limits and purging, a
+replaced, duplicate detection, a storage screen, a
 blur toggle, and bundling HandBrake as ffmpeg already is, so a release needs nothing downloaded.

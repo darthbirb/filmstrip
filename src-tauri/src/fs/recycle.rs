@@ -1,5 +1,5 @@
-//! The Windows Recycle Bin as one more place a file can go, and never a way to destroy one: a file
-//! the bin cannot take is put back where it was and reported refused.
+//! The Windows Recycle Bin, where Delete sends a file and Restore takes it back from, and never a
+//! way to destroy one: a file the bin cannot take is put back where it was and reported refused.
 //! DECISIONS.md "Sending to the Recycle Bin".
 
 use std::io;
@@ -16,13 +16,25 @@ pub trait Bin {
 
     /// Whether `name`, one of a file's full names, is inside this bin.
     fn holds(&self, name: &Path) -> bool;
+
+    /// Forgets what the bin kept beside a file once the file has been taken back out of `binned`,
+    /// so the bin no longer lists it.
+    fn let_go(&self, binned: &Path) -> io::Result<()>;
+}
+
+/// Where the bin keeps a file it took: the name it gave it, and the file itself on its volume, by
+/// which it is found again in the bin or back where it was.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Binned {
+    pub path: PathBuf,
+    pub file: String,
 }
 
 /// What came of sending one file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Sent {
     /// It is in the Recycle Bin.
-    Recycled,
+    Recycled(Binned),
     /// Nothing was there to send.
     Gone,
     /// The bin could not take it, so it is where it was, or under its second name beside it.
@@ -44,7 +56,7 @@ pub fn send(bin: &dyn Bin, file: &Path) -> io::Result<Sent> {
     if std::fs::hard_link(file, &hold).is_err() {
         return Ok(Sent::Refused);
     }
-    let Ok(before) = names_of(&hold) else {
+    let (Ok(before), Ok(itself)) = (names_of(&hold), identity(&hold)) else {
         drop_hold(file, &hold)?;
         return Ok(Sent::Refused);
     };
@@ -54,25 +66,44 @@ pub fn send(bin: &dyn Bin, file: &Path) -> io::Result<Sent> {
         return Ok(Sent::Refused);
     }
     let gained = |name: &PathBuf| !before.contains(name) && bin.holds(name);
-    if names_of(&hold).is_ok_and(|names| names.iter().any(gained)) {
+    if let Some(binned) = names_of(&hold)
+        .ok()
+        .and_then(|names| names.into_iter().find(gained))
+    {
         std::fs::remove_file(&hold)?;
-        return Ok(Sent::Recycled);
+        return Ok(Sent::Recycled(Binned {
+            path: plain(&binned),
+            file: itself.key(),
+        }));
     }
     noclobber::rename(&hold, file)?;
     Ok(Sent::Refused)
+}
+
+/// The file at `path`, as [`Binned::file`] names it; nothing when no file is there.
+pub fn file_at(path: &Path) -> Option<String> {
+    let is_file = std::fs::symlink_metadata(path).is_ok_and(|meta| meta.is_file());
+    is_file
+        .then(|| identity(path).ok().map(|found| found.key()))
+        .flatten()
+}
+
+/// A verbatim name as the rest of the app writes one: `D:\…`, or `\\server\share\…`.
+fn plain(path: &Path) -> PathBuf {
+    let text = path.to_string_lossy();
+    if let Some(unc) = text.strip_prefix(r"\\?\UNC\") {
+        return PathBuf::from(format!(r"\\{unc}"));
+    }
+    match text.strip_prefix(r"\\?\") {
+        Some(rest) => PathBuf::from(rest),
+        None => path.to_path_buf(),
+    }
 }
 
 /// The second name a file is held under while it is sent: beside it, hidden by its dot.
 fn hold_of(file: &Path) -> PathBuf {
     let name = file.file_name().unwrap_or_default().to_string_lossy();
     file.with_file_name(format!(".{name}.recycling"))
-}
-
-/// The file a hold is the second name of, when `path` is one.
-fn held_by(path: &Path) -> Option<PathBuf> {
-    let name = path.file_name()?.to_str()?;
-    let file = name.strip_prefix('.')?.strip_suffix(".recycling")?;
-    (!file.is_empty()).then(|| path.with_file_name(file))
 }
 
 /// Settles a hold a send cut short left behind. It is never taken for sent: a hold left alone is
@@ -90,36 +121,6 @@ fn settle(file: &Path, hold: &Path) -> io::Result<()> {
 /// Settles what a send of `file` cut short left beside it, as the next send of it would.
 pub fn settle_beside(file: &Path) -> io::Result<()> {
     settle(file, &hold_of(file))
-}
-
-/// Puts back each lone hold under `dir` as the file it holds, where that name is free, and says
-/// how many; nothing is ever removed. DECISIONS.md "Sending to the Recycle Bin".
-pub fn sweep(dir: &Path) -> u32 {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return 0;
-    };
-    let mut put = 0;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let Ok(kind) = entry.file_type() else {
-            continue;
-        };
-        if kind.is_dir() {
-            put += sweep(&path);
-            continue;
-        }
-        let Some(file) = held_by(&path) else {
-            continue;
-        };
-        if !kind.is_file() || std::fs::symlink_metadata(&file).is_ok() {
-            continue;
-        }
-        match noclobber::rename(&path, &file) {
-            Ok(()) => put += 1,
-            Err(err) => eprintln!("recycle: {} was not put back: {err}", path.display()),
-        }
-    }
-    put
 }
 
 /// Removes the hold only while it is a second name of the file itself, never the last of one.
@@ -145,6 +146,10 @@ struct Identity {
 impl Identity {
     fn same_as(&self, other: &Identity) -> bool {
         self.volume == other.volume && self.index == other.index
+    }
+
+    fn key(&self) -> String {
+        format!("{:x}-{:x}", self.volume, self.index)
     }
 }
 
@@ -282,7 +287,41 @@ fn names_of(_path: &Path) -> io::Result<Vec<PathBuf>> {
     Err(io::ErrorKind::Unsupported.into())
 }
 
-/// The shell's own Recycle Bin, which every send goes through in the app.
+/// The bin the app's verbs send to and take back from: the shell's [`RecycleBin`], and under test
+/// each test thread's own stand-in, so no test can reach the real one.
+pub struct Shell;
+
+#[cfg(not(test))]
+impl Bin for Shell {
+    fn take(&self, file: &Path) -> io::Result<()> {
+        RecycleBin.take(file)
+    }
+
+    fn holds(&self, name: &Path) -> bool {
+        RecycleBin.holds(name)
+    }
+
+    fn let_go(&self, binned: &Path) -> io::Result<()> {
+        RecycleBin.let_go(binned)
+    }
+}
+
+#[cfg(test)]
+impl Bin for Shell {
+    fn take(&self, file: &Path) -> io::Result<()> {
+        tests::stand_in().take(file)
+    }
+
+    fn holds(&self, name: &Path) -> bool {
+        tests::stand_in().holds(name)
+    }
+
+    fn let_go(&self, binned: &Path) -> io::Result<()> {
+        tests::stand_in().let_go(binned)
+    }
+}
+
+/// The shell's own Recycle Bin.
 pub struct RecycleBin;
 
 #[cfg(windows)]
@@ -298,6 +337,10 @@ impl Bin for RecycleBin {
             assert!(flags >> 16 == 0, "the shell's flags fit its 16 bits");
             flags as u16
         };
+
+        if cfg!(test) {
+            panic!("{} was handed to the real Recycle Bin", file.display());
+        }
 
         let full = std::path::absolute(file)?;
         let mut from: Vec<u16> = full.as_os_str().encode_wide().collect();
@@ -332,6 +375,26 @@ impl Bin for RecycleBin {
             .and_then(|rest| rest.components().next())
             .is_some_and(|first| first.as_os_str().eq_ignore_ascii_case("$Recycle.Bin"))
     }
+
+    /// The shell keeps a file as `$R…` beside a record of where it came from, `$I…`, which it
+    /// lists the file by; the record goes once the file has, as the shell's own restore does.
+    fn let_go(&self, binned: &Path) -> io::Result<()> {
+        let Some(rest) = binned
+            .file_name()
+            .and_then(|name| name.to_str())
+            .and_then(|name| name.strip_prefix("$R").or_else(|| name.strip_prefix("$r")))
+        else {
+            return Ok(());
+        };
+        let record = binned.with_file_name(format!("$I{rest}"));
+        if !self.holds(&record) || std::fs::symlink_metadata(binned).is_ok() {
+            return Ok(());
+        }
+        match std::fs::remove_file(&record) {
+            Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(()),
+            done => done,
+        }
+    }
 }
 
 #[cfg(not(windows))]
@@ -343,6 +406,10 @@ impl Bin for RecycleBin {
     fn holds(&self, _name: &Path) -> bool {
         false
     }
+
+    fn let_go(&self, _binned: &Path) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -350,6 +417,37 @@ pub(crate) mod tests {
     use super::*;
     use crate::fs::{settled_names, settles_to};
     use std::cell::RefCell;
+    use std::rc::Rc;
+
+    thread_local! {
+        static STAND_IN: RefCell<Option<Rc<Fake>>> = const { RefCell::new(None) };
+    }
+
+    /// This thread's stand-in for the shell, which [`Shell`] hands every file to: one that
+    /// recycles into a folder of the test's own, unless the test has set another.
+    pub(crate) fn stand_in() -> Rc<Fake> {
+        STAND_IN.with(|cell| {
+            Rc::clone(cell.borrow_mut().get_or_insert_with(|| {
+                let test = std::thread::current()
+                    .name()
+                    .unwrap_or("unnamed")
+                    .replace("::", "-");
+                let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("target/test-bin")
+                    .join(test);
+                let _ = std::fs::remove_dir_all(&dir);
+                Rc::new(Fake::new(Stand::Recycles(dir)))
+            }))
+        })
+    }
+
+    /// Sets this thread's stand-in, for a test that has the shell do something else, or that
+    /// reads what it was asked.
+    pub(crate) fn stand_in_as(fake: Fake) -> Rc<Fake> {
+        let fake = Rc::new(fake);
+        STAND_IN.with(|cell| *cell.borrow_mut() = Some(Rc::clone(&fake)));
+        fake
+    }
 
     /// A stand-in for the shell, doing to each file what the real one might.
     pub(crate) enum Stand {
@@ -370,6 +468,8 @@ pub(crate) mod tests {
         /// Names the shell refuses, deleting them outright, whatever it does with the rest.
         pub(crate) deletes: Vec<String>,
         pub(crate) asked: RefCell<Vec<PathBuf>>,
+        /// Each name a file was taken back out of.
+        pub(crate) let_go: RefCell<Vec<PathBuf>>,
     }
 
     impl Fake {
@@ -378,8 +478,30 @@ pub(crate) mod tests {
                 stand,
                 deletes: Vec::new(),
                 asked: RefCell::default(),
+                let_go: RefCell::default(),
             }
         }
+
+        /// The folder it recycles into, as a bin of its own.
+        pub(crate) fn dir(&self) -> Option<&Path> {
+            match &self.stand {
+                Stand::Recycles(bin) | Stand::Relinks(bin) => Some(bin),
+                _ => None,
+            }
+        }
+    }
+
+    /// A name in `bin` for `file`: its own, or, once that is taken, one the bin makes up, as the
+    /// shell's own does for every file.
+    fn binned_name(bin: &Path, file: &Path) -> PathBuf {
+        let name = file.file_name().unwrap_or_default().to_string_lossy();
+        let mut at = bin.join(&*name);
+        let mut made = 0;
+        while std::fs::symlink_metadata(&at).is_ok() {
+            made += 1;
+            at = bin.join(format!("$R{made}-{name}"));
+        }
+        at
     }
 
     impl Bin for Fake {
@@ -392,7 +514,7 @@ pub(crate) mod tests {
             match &self.stand {
                 Stand::Recycles(bin) => {
                     std::fs::create_dir_all(bin)?;
-                    std::fs::rename(file, bin.join(file.file_name().unwrap_or_default()))
+                    std::fs::rename(file, binned_name(bin, file))
                 }
                 Stand::Deletes => std::fs::remove_file(file),
                 Stand::Fails => Err(io::Error::other("refused")),
@@ -419,6 +541,15 @@ pub(crate) mod tests {
             };
             lower(name).starts_with(lower(bin))
         }
+
+        fn let_go(&self, binned: &Path) -> io::Result<()> {
+            self.let_go.borrow_mut().push(binned.to_path_buf());
+            Ok(())
+        }
+    }
+
+    fn recycled(sent: Sent) -> bool {
+        matches!(sent, Sent::Recycled(_))
     }
 
     fn scratch(name: &str) -> PathBuf {
@@ -449,8 +580,16 @@ pub(crate) mod tests {
             let file = one_with_names(&dir, others);
             let bin = Fake::new(Stand::Recycles(dir.join("bin")));
 
-            assert_eq!(send(&bin, &file).unwrap(), Sent::Recycled, "{others}");
             let recycled = dir.join("bin/one.jpg");
+            let sent = send(&bin, &file).unwrap();
+            assert_eq!(
+                sent,
+                Sent::Recycled(Binned {
+                    path: recycled.clone(),
+                    file: file_at(&recycled).unwrap(),
+                }),
+                "{others}"
+            );
             assert_eq!(std::fs::read_to_string(&recycled).unwrap(), "one");
             assert_eq!(identity(&recycled).unwrap().links, others + 1);
             settles_to(&dir.join("trash"), &[]);
@@ -509,7 +648,7 @@ pub(crate) mod tests {
         let file = one_with_names(&dir, 1);
 
         let bin = Fake::new(Stand::Relinks(dir.join("bin")));
-        assert_eq!(send(&bin, &file).unwrap(), Sent::Recycled);
+        assert!(recycled(send(&bin, &file).unwrap()));
         settles_to(&dir.join("trash"), &[]);
         assert_eq!(
             std::fs::read_to_string(dir.join("bin/one.jpg")).unwrap(),
@@ -587,7 +726,7 @@ pub(crate) mod tests {
         std::fs::write(&file, "one").unwrap();
         let bin = Fake::new(Stand::Recycles(dir.join("bin")));
 
-        assert_eq!(send(&bin, &file).unwrap(), Sent::Recycled);
+        assert!(recycled(send(&bin, &file).unwrap()));
         settles_to(&trash, &[]);
         assert_eq!(
             settled_names(&dir.join("bin"), |seen| seen.len() == 1).len(),
@@ -629,7 +768,7 @@ pub(crate) mod tests {
                 assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
                 settles_to(&dir.join("bin"), &["$Rold.jpg"]);
             } else {
-                assert_eq!(sent, Sent::Recycled);
+                assert!(recycled(sent));
                 settles_to(&dir.join("trash"), &[]);
                 settles_to(&dir.join("bin"), &["$Rold.jpg", "one.jpg"]);
             }
@@ -654,7 +793,7 @@ pub(crate) mod tests {
         // Cut short before the shell was asked: both names, one file.
         std::fs::write(&file, "one").unwrap();
         std::fs::hard_link(&file, &hold).unwrap();
-        assert_eq!(send(&bin, &file).unwrap(), Sent::Recycled);
+        assert!(recycled(send(&bin, &file).unwrap()));
         settles_to(&dir.join("trash"), &[]);
 
         // Cut short after the shell deleted it outright: the hold is the file.
@@ -670,12 +809,18 @@ pub(crate) mod tests {
         std::fs::hard_link(&file, &hold).unwrap();
         std::fs::rename(&file, dir.join("bin/two.jpg")).unwrap();
         let again = Fake::new(Stand::Recycles(dir.join("bin")));
-        assert_eq!(send(&again, &file).unwrap(), Sent::Recycled);
+        let Sent::Recycled(binned) = send(&again, &file).unwrap() else {
+            panic!("not recycled");
+        };
         assert_eq!(again.asked.borrow().as_slice(), std::slice::from_ref(&file));
         settles_to(&dir.join("trash"), &[]);
-        for twin in ["bin/two.jpg", "bin/one.jpg"] {
-            assert_eq!(std::fs::read_to_string(dir.join(twin)).unwrap(), "two");
+        for twin in [dir.join("bin/two.jpg"), binned.path] {
+            assert_eq!(std::fs::read_to_string(twin).unwrap(), "two");
         }
+        assert_eq!(
+            std::fs::read_to_string(dir.join("bin/one.jpg")).unwrap(),
+            "one"
+        );
     }
 
     #[test]
@@ -709,36 +854,12 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn the_sweep_puts_back_every_lone_hold_and_removes_nothing() {
-        let dir = scratch("sweep");
-        let shard = dir.join("trash/ab/cd");
-        std::fs::create_dir_all(&shard).unwrap();
-        let orphan = shard.join("orphan.jpg");
-        std::fs::write(hold_of(&orphan), "orphan").unwrap();
-        let linked = shard.join("linked.jpg");
-        std::fs::write(hold_of(&linked), "linked").unwrap();
-        std::fs::create_dir_all(dir.join("elsewhere")).unwrap();
-        std::fs::hard_link(hold_of(&linked), dir.join("elsewhere/linked.jpg")).unwrap();
-        let beside = shard.join("beside.jpg");
-        std::fs::write(&beside, "beside").unwrap();
-        std::fs::hard_link(&beside, hold_of(&beside)).unwrap();
-        std::fs::write(shard.join(".recycling"), "not a hold").unwrap();
+    fn letting_go_of_a_file_outside_the_bin_never_removes_its_neighbour() {
+        let dir = scratch("let-go");
+        let record = dir.join("trash/$IABC123.jpg");
+        std::fs::write(&record, "a record").unwrap();
 
-        let put = sweep(&dir.join("trash"));
-
-        assert_eq!(put, 2);
-        assert_eq!(std::fs::read_to_string(&orphan).unwrap(), "orphan");
-        assert_eq!(std::fs::read_to_string(&linked).unwrap(), "linked");
-        assert_eq!(identity(&linked).unwrap().links, 2);
-        settles_to(
-            &shard,
-            &[
-                ".beside.jpg.recycling",
-                ".recycling",
-                "beside.jpg",
-                "linked.jpg",
-                "orphan.jpg",
-            ],
-        );
+        RecycleBin.let_go(&dir.join("trash/$RABC123.jpg")).unwrap();
+        assert_eq!(std::fs::read_to_string(&record).unwrap(), "a record");
     }
 }

@@ -13,7 +13,6 @@ use crate::db::sources::{self, SourceKind};
 use crate::db::{folders, in_transaction, items, journal, now, tags};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::stayed::{self, Stayed};
-use crate::fs::trash::Largest;
 use crate::fs::{
     PASSING, items as fs_items, noclobber, paths, relocate, sanitize, take_away, trash, walk,
 };
@@ -179,17 +178,6 @@ pub fn delete(
     contents: Option<Contents>,
     batch_id: &str,
 ) -> Result<DeleteReport> {
-    delete_within(conn, folder_id, contents, batch_id, None)
-}
-
-/// [`delete`], its files trashed only up to `largest`: one larger stays, and keeps the folder.
-pub fn delete_within(
-    conn: &Connection,
-    folder_id: i64,
-    contents: Option<Contents>,
-    batch_id: &str,
-    largest: Option<Largest>,
-) -> Result<DeleteReport> {
     let _turn = super::turn();
     if !folders::is_live(conn, folder_id)? {
         return Err(AppError::invalid("that folder is no longer in the index"));
@@ -212,9 +200,7 @@ pub fn delete_within(
         }
         (Some(Contents::Trash), false) => {
             for item_id in held {
-                let trashed = trash::fits(conn, item_id, largest)
-                    .and_then(|()| trash::trash_unjournalled(conn, item_id, Some(batch_id)));
-                if let Err(err) = trashed {
+                if let Err(err) = trash::trash_unjournalled(conn, item_id, Some(batch_id)) {
                     report.refused.push(stayed::file(conn, item_id, &err)?);
                 }
             }

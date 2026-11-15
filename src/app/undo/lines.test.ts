@@ -17,10 +17,7 @@ import {
   reasonText,
   refusedName,
   restoredBannerLine,
-  sentToBinLine,
   stayedGroups,
-  tooLargeDetail,
-  tooLargeLine,
   undoBannerLine,
   undoneLine,
 } from "./lines";
@@ -112,58 +109,44 @@ test("each reason is said in the banner's own words", () => {
   expect(reasonText({ kind: "permissionDenied" })).toBe("Permission denied");
   expect(reasonText({ kind: "notOnDisk", name: "a.jpg" })).toBe("No longer on disk");
   expect(reasonText({ kind: "holds", name: "notes.txt", more: 0 })).toBe("Holds notes.txt");
-  expect(reasonText({ kind: "expired", limit: { kind: "age", days: 14 } })).toBe(
-    "Expired after 14 days",
+  expect(reasonText({ kind: "goneFromBin", name: "a.jpg", place: "Cairo" })).toBe(
+    "Emptied outside the app",
   );
-  expect(
-    reasonText({ kind: "tooLarge", bytes: 6.2 * 2 ** 30, limit: 5 * 2 ** 30, total: false }),
-  ).toBe("6.2 GB, over 5 GB");
   expect(reasonText({ kind: "binRefused" })).toBe("The Recycle Bin would not take it");
 });
 
-test("what Delete asks of files too large for the Trash, and what the Recycle Bin then refused", () => {
-  const GB = 2 ** 30;
+test("what the foot says when the Recycle Bin would not take what Delete sent it", () => {
   const at = (place: string) => ({
     kind: "folder" as const,
     folderId: 1,
     path: ["Pictures", place],
   });
-  const big = (name: string, place = "Cairo", total = false): Stayed => ({
+  const refused = (name: string, place = "Cairo"): Stayed => ({
     kind: "file",
     id: name.length,
     name,
     at: at(place),
-    reason: { kind: "tooLarge", bytes: 6.2 * GB, limit: (total ? 25 : 5) * GB, total },
+    reason: { kind: "binRefused" },
   });
-  const one = [big("MVI_0412.mov")];
-  const two = [big("MVI_0412.mov"), big("MVI_0415.mov")];
+  const one = [refused("MVI_0412.mov")];
+  const two = [refused("MVI_0412.mov"), refused("MVI_0415.mov")];
 
-  expect(tooLargeLine(one, 5)).toBe("MVI_0412.mov is too large for the Trash");
-  expect(tooLargeLine(two, 5)).toBe("2 of 5 files are too large for the Trash");
-  expect(tooLargeLine(two, 2)).toBe("The 2 files are too large for the Trash");
-  expect(tooLargeDetail(one)).toBe(
-    "It is 6.2 GB, and the Trash takes files up to 5 GB. From the Recycle Bin, Undo cannot bring it back.",
-  );
-  expect(tooLargeDetail([big("MVI_0412.mov", "Cairo", true)])).toBe(
-    "It is 6.2 GB, and the Trash holds 25 GB in all. From the Recycle Bin, Undo cannot bring it back.",
-  );
-  expect(tooLargeDetail(two)).toBe(
-    "The Trash takes files up to 5 GB. From the Recycle Bin, Undo cannot bring them back.",
-  );
-
-  expect(sentToBinLine(1, "MVI_0412.mov")).toBe("Sent MVI_0412.mov to the Recycle Bin.");
-  expect(sentToBinLine(2)).toBe("Sent 2 files to the Recycle Bin.");
   expect(binRefusedLine(one)).toBe(
-    "The Recycle Bin could not take MVI_0412.mov, so it stays in Cairo",
+    "The Recycle Bin would not take MVI_0412.mov, so it stays in Cairo.",
   );
-  expect(binRefusedLine(two)).toBe("The Recycle Bin could not take 2 files, so they stay in Cairo");
-  expect(binRefusedLine([big("a.mov"), big("b.mov", "Lisbon")])).toBe(
-    "The Recycle Bin could not take 2 files, so they stay where they were",
+  expect(binRefusedLine(one, 4)).toBe(
+    "Deleted 4 of 5 files. The Recycle Bin would not take MVI_0412.mov, so it stays in Cairo.",
+  );
+  expect(binRefusedLine(two)).toBe(
+    "The Recycle Bin would not take 2 files, so they stay in Cairo.",
+  );
+  expect(binRefusedLine([refused("a.mov"), refused("b.mov", "Lisbon")], 1)).toBe(
+    "Deleted 1 of 3 files. The Recycle Bin would not take 2 files, so they stay where they were.",
   );
   expect(binRefusedDetail(1)).toBe(
-    "Its drive may have no Recycle Bin, or it is off or too small. Nothing was deleted.",
+    "It may be too large for the bin, or the bin is turned off. Nothing was deleted.",
   );
-  expect(binRefusedDetail(2)).toMatch(/^Their drive/);
+  expect(binRefusedDetail(2)).toMatch(/^They may be/);
 });
 
 test("rows are grouped under the place each is still in, named from the folder they share", () => {
@@ -194,13 +177,13 @@ test("rows are grouped under the place each is still in, named from the folder t
   ]);
   expect(gone[0]?.heading).toBe("Gone from Cairo");
 
-  const expired = { kind: "expired", limit: { kind: "age", days: 30 } } as const;
-  const binned: Stayed = { ...row("b.jpg", null, expired), at: { kind: "recycleBin" } };
+  const emptied = { kind: "goneFromBin", name: "b.jpg", place: "Cairo" } as const;
+  const binned: Stayed = { ...row("b.jpg", null, emptied), at: { kind: "recycleBin" } };
   const ordered = stayedGroups([binned, row("c.jpg", null, inUse), row("d.jpg", ["Inbox"], inUse)]);
   expect(ordered.map((group) => group.heading)).toEqual([
     "Still in the Trash",
     "Still in Inbox",
-    "In the Recycle Bin",
+    "Gone from the Recycle Bin",
   ]);
 });
 

@@ -3,7 +3,6 @@ import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import type { Act } from "../ipc/bindings/Act";
 import type { Backup } from "../ipc/bindings/Backup";
 import type { Batch } from "../ipc/bindings/Batch";
-import type { BinReport } from "../ipc/bindings/BinReport";
 import type { BranchFile } from "../ipc/bindings/BranchFile";
 import type { Carried } from "../ipc/bindings/Carried";
 import type { Change } from "../ipc/bindings/Change";
@@ -16,7 +15,6 @@ import type { Crumb } from "../ipc/bindings/Crumb";
 import type { DestinationKey } from "../ipc/bindings/DestinationKey";
 import type { EffectiveTag } from "../ipc/bindings/EffectiveTag";
 import type { End } from "../ipc/bindings/End";
-import type { Expired } from "../ipc/bindings/Expired";
 import type { Exported } from "../ipc/bindings/Exported";
 import type { Exporting } from "../ipc/bindings/Exporting";
 import type { ExportStart } from "../ipc/bindings/ExportStart";
@@ -38,13 +36,12 @@ import type { KeyClash } from "../ipc/bindings/KeyClash";
 import type { KeyClashFor } from "../ipc/bindings/KeyClashFor";
 import type { KeyRow } from "../ipc/bindings/KeyRow";
 import type { LibraryTotals } from "../ipc/bindings/LibraryTotals";
-import type { Limit } from "../ipc/bindings/Limit";
+import type { Looked } from "../ipc/bindings/Looked";
 import type { Plan } from "../ipc/bindings/Plan";
 import type { Progress } from "../ipc/bindings/Progress";
 import type { QueryTerm } from "../ipc/bindings/QueryTerm";
 import type { Reading } from "../ipc/bindings/Reading";
 import type { Reason } from "../ipc/bindings/Reason";
-import type { Removal } from "../ipc/bindings/Removal";
 import type { Restored } from "../ipc/bindings/Restored";
 import type { Scope } from "../ipc/bindings/Scope";
 import type { SearchOutcome } from "../ipc/bindings/SearchOutcome";
@@ -60,9 +57,6 @@ import type { TagRow } from "../ipc/bindings/TagRow";
 import type { Taken } from "../ipc/bindings/Taken";
 import type { Tally } from "../ipc/bindings/Tally";
 import type { Trashed } from "../ipc/bindings/Trashed";
-import type { TrashLimit } from "../ipc/bindings/TrashLimit";
-import type { TrashLimits } from "../ipc/bindings/TrashLimits";
-import type { TrashSettings } from "../ipc/bindings/TrashSettings";
 import type { UndoReport } from "../ipc/bindings/UndoReport";
 import type { Vocabulary } from "../ipc/bindings/Vocabulary";
 import type { ZipPick } from "../ipc/bindings/ZipPick";
@@ -555,7 +549,7 @@ function takeBack(at: number): UndoReport {
         relocate(step.item, step.from);
         break;
       case "trash": {
-        const gone = wentToBin(step.item);
+        const gone = goneFromBin(step.item);
         if (gone) stayed.push(gone);
         else fromTrash(step.item, step.from);
         break;
@@ -1469,181 +1463,62 @@ function backUpNow(): Promise<Backup | null> {
   );
 }
 
-// The Trash's limits, and the runs the hourly job would make, for tests and for looking.
-let trashSet: TrashLimits = { keepDays: 30, totalGb: 25, fileGb: 5 };
-const nextRun = Math.floor(Date.now() / 1000) + 60 * 60;
-/** What expiry sent to the Recycle Bin, and which limit sent it. */
-const expired = new Map<number, { item: ItemRow; limit: Limit }>();
-/** What the Recycle Bin refused at the last run. */
-let binRefused: number[] = [];
-const DAY = 24 * 60 * 60;
-const GB = 2 ** 30;
+// `?restore-forgets` has every restore forget Archive's three files in the Recycle Bin.
+/** What every restore forgets of the Trash, as Archive added since with three files there;
+ * `unknown` has asking what it forgets fail. */
+type Forgetting = { forgets: Forgets; unknown?: boolean };
+let forgetting: Forgetting | null = backupsWanted().has("restore-forgets")
+  ? { forgets: { sources: ["Archive"], files: 3 } }
+  : null;
 
-function wentToBin(item: ItemRow): Stayed | null {
-  const gone = expired.get(item.id);
-  if (!gone) return null;
-  const at = { kind: "recycleBin" as const };
-  const reason = { kind: "expired" as const, limit: gone.limit };
-  return { kind: "file", id: item.id, name: item.diskName, at, reason };
+/** Has every restore forget files in the Trash, for tests. */
+export function forgetOnRestore(next: Forgetting | null) {
+  forgetting = next;
 }
 
-/** The Trash oldest first, with when each went. */
-const waiting = () =>
-  (ITEMS[TRASH] ?? [])
-    .map((item) => ({ item, at: trashed.get(item.id)?.at ?? 0 }))
-    .sort((a, b) => a.at - b.at || a.item.id - b.item.id);
-
-/** What a run at `at` sends by age and then by size, as the Rust side picks them. */
-function pick(at: number, refused: readonly number[]) {
-  const all = waiting();
-  let total = all.reduce((sum, one) => sum + one.item.sizeBytes, 0);
-  const byAge: ItemRow[] = [];
-  const bySize: ItemRow[] = [];
-  const { keepDays, totalGb } = trashSet;
-  for (const { item, at: went } of all) {
-    if (keepDays !== null && went <= at - keepDays * DAY && !refused.includes(item.id)) {
-      byAge.push(item);
-      total -= item.sizeBytes;
-    }
-  }
-  for (const { item } of all) {
-    if (totalGb === null || total <= totalGb * GB) break;
-    if (refused.includes(item.id) || byAge.includes(item)) continue;
-    bySize.push(item);
-    total -= item.sizeBytes;
-  }
-  return { byAge, bySize };
-}
-
-const tallied = (rows: readonly ItemRow[]): Tally => ({
-  count: rows.length,
-  bytes: rows.reduce((sum, row) => sum + row.sizeBytes, 0),
-});
-
-/** Ages a file in the Trash as if it went `days` ago. */
-export function ageTrashed(itemId: number, days: number) {
-  const went = trashed.get(itemId);
-  if (went) went.at = Math.floor(Date.now() / 1000) - days * DAY;
-}
-
-/** Runs the Trash's limits now, the bin refusing the files named, and says what it did. */
-export function expireNow(refuse: readonly number[] = []) {
-  const { byAge, bySize } = pick(Math.floor(Date.now() / 1000), []);
-  const refused = [...byAge, ...bySize].filter((item) => refuse.includes(item.id));
-  const send = (items: ItemRow[], limit: Limit) => {
-    const sent = items.filter((item) => !refuse.includes(item.id));
-    for (const item of sent) {
-      ITEMS[TRASH] = (ITEMS[TRASH] ?? []).filter((other) => other !== item);
-      trashed.delete(item.id);
-      expired.set(item.id, { item, limit });
-    }
-    return sent.length;
-  };
-  const before = binRefused.length;
-  binRefused = refused.map((item) => item.id);
-  const said: Expired = {
-    byAge: send(byAge, { kind: "age", days: trashSet.keepDays ?? 0 }),
-    bySize: send(bySize, { kind: "size", bytes: (trashSet.totalGb ?? 0) * GB }),
-    keepDays: trashSet.keepDays,
-    totalBytes: trashSet.totalGb === null ? null : trashSet.totalGb * GB,
-    refused: binRefused.length,
-    firstRefused: binRefused[0] ?? null,
-    refusedGrew: binRefused.length > before,
-  };
-  recount();
-  if (said.byAge + said.bySize > 0 || said.refusedGrew) void emit("trash-expired", said);
-  return said;
-}
-
-/**
- * Puts the Trash's limits back as they start, and what expired or Delete sent to the Recycle Bin
- * back where it was, at its own size.
- */
-export function resetTrashLimits() {
-  trashSet = { keepDays: 30, totalGb: 25, fileGb: 5 };
-  for (const { item } of expired.values())
-    ITEMS[item.folderId] = [...(ITEMS[item.folderId] ?? []), item];
-  expired.clear();
-  for (const item of sentToBin) ITEMS[item.folderId] = [...(ITEMS[item.folderId] ?? []), item];
-  sentToBin = [];
-  for (const [item, bytes] of resized) item.sizeBytes = bytes;
-  resized.clear();
-  binRefuses = new Set();
-  recount();
-  binRefused = [];
-}
-
-/** What Delete sent straight to the Recycle Bin, and the files the bin refuses when sent. */
-let sentToBin: ItemRow[] = [];
+// The Recycle Bin as far as the Trash sees it, for tests and for looking. `?bin-refuses` has it
+// refuse whatever Delete sends it.
 let binRefuses = new Set<number>();
-/** Files grown past what the Trash takes, and the size each had. */
-const resized = new Map<ItemRow, number>();
-
-/** Gives a file a size of its own, for tests and for looking. */
-export function resizeItem(itemId: number, bytes: number) {
-  const item = allItems().find((one) => one.id === itemId);
-  if (!item) return;
-  if (!resized.has(item)) resized.set(item, item.sizeBytes);
-  item.sizeBytes = bytes;
-  recount();
-}
+/** Trashed files emptied from the bin outside the app, which an undo still finds gone. */
+const emptiedOutside = new Set<number>();
 
 /** Has the Recycle Bin refuse these files when Delete sends them there. */
 export function refuseRecycling(itemIds: readonly number[]) {
   binRefuses = new Set(itemIds);
 }
 
-/** The largest file the Trash takes, as the Rust side reckons it from the limits. */
-function largestTrashed() {
-  const { fileGb, totalGb } = trashSet;
-  if (fileGb !== null && (totalGb === null || fileGb <= totalGb))
-    return { bytes: fileGb * GB, total: false };
-  return totalGb === null ? null : { bytes: totalGb * GB, total: true };
+/** Empties these trashed files from the Recycle Bin behind the app's back, as Explorer would. */
+export function emptyOutside(itemIds: readonly number[]) {
+  for (const id of itemIds) if (trashed.has(id)) emptiedOutside.add(id);
 }
 
-/** A file Delete refuses for its size, or nothing. */
-function tooLarge(item: ItemRow): Stayed | null {
-  const largest = largestTrashed();
-  if (!largest || item.sizeBytes <= largest.bytes) return null;
-  return stayedIn(item, {
-    kind: "tooLarge",
-    bytes: item.sizeBytes,
-    limit: largest.bytes,
-    total: largest.total,
-  });
+/** The Recycle Bin as it starts: it takes everything, and nothing was emptied from it. */
+export function resetBin() {
+  binRefuses = new Set();
+  emptiedOutside.clear();
 }
 
-// `?too-large` grows felucca.mp4 and pyramid.jpg past the Trash's 5 GB; `?bin-refuses` has the
-// Recycle Bin refuse whatever Delete sends it.
-if (backupsWanted().has("too-large")) {
-  const grow = (name: string, bytes: number) => {
-    const item = allItems().find((one) => one.diskName === name);
-    if (item) resizeItem(item.id, bytes);
-  };
-  grow("felucca.mp4", 6_657_199_309);
-  grow("pyramid.jpg", 12_670_154_342);
-}
 if (backupsWanted().has("bin-refuses")) refuseRecycling(allItems().map((item) => item.id));
 
-const TRASH_DIR = "D:\\Filmstrip\\data\\trash";
-// `?recycle-refused` has the Recycle Bin refuse a removed source's newest file in the Trash, and
-// two of the three a restore forgets; `?restore-forgets` has every restore forget Archive's three.
-const recycleRefused = () => backupsWanted().has("recycle-refused");
+/** A trashed row whose file is gone from the bin leaves the Trash, its tags with it. */
+function retireGone(item: ItemRow) {
+  ITEMS[TRASH] = (ITEMS[TRASH] ?? []).filter((other) => other !== item);
+  trashed.delete(item.id);
+  recount();
+}
 
-/** What every restore forgets of the Trash, as Archive added since with three files there;
- * `unknown` has asking what it forgets fail. */
-type Forgetting = { forgets: Forgets; refused: number; failed: boolean; unknown?: boolean };
-let forgetting: Forgetting | null = backupsWanted().has("restore-forgets")
-  ? {
-      forgets: { sources: ["Archive"], files: 3 },
-      refused: recycleRefused() ? 2 : 0,
-      failed: false,
-    }
-  : null;
+/** What Restore or Undo says of a file emptied from the bin outside the app, its row retired. */
+function goneFromBin(item: ItemRow, to = item.folderId): Stayed | null {
+  if (!emptiedOutside.has(item.id)) return null;
+  retireGone(item);
+  const reason = { kind: "goneFromBin" as const, name: item.diskName, place: folderName(to) };
+  return { kind: "file", id: item.id, name: item.diskName, at: { kind: "recycleBin" }, reason };
+}
 
-/** Has every restore forget files in the Trash, for tests: refused by the bin, or failing after. */
-export function forgetOnRestore(next: Forgetting | null) {
-  forgetting = next;
+function lookInBin(): Looked {
+  const gone = (ITEMS[TRASH] ?? []).filter((item) => emptiedOutside.has(item.id));
+  for (const item of gone) retireGone(item);
+  return { retired: gone.length, restored: 0 };
 }
 
 function withTrashCount(one: SourceSummary): SourceSummary {
@@ -1651,34 +1526,13 @@ function withTrashCount(one: SourceSummary): SourceSummary {
   return { ...one, trashCount };
 }
 
-/** Sends a source's files in the Trash on to the Recycle Bin, then forgets it. Its folders stay. */
-function removeSource(id: number): Promise<Removal> {
-  const files = (ITEMS[TRASH] ?? []).filter((item) => trashed.get(item.id)?.home.id === id);
-  const refused = recycleRefused() && files.length > 0 ? 1 : 0;
-  return new Promise((resolve) => {
-    let sent = 0;
-    const step = () => {
-      if (sent < files.length - refused) {
-        const item = files[sent] as ItemRow;
-        ITEMS[TRASH] = (ITEMS[TRASH] ?? []).filter((other) => other !== item);
-        trashed.delete(item.id);
-      }
-      sent += 1;
-      if (files.length > 0) void emit("remove-progress", Math.round((sent / files.length) * 100));
-      if (sent < files.length) {
-        setTimeout(step, BACKUP_STEP_MS);
-        return;
-      }
-      if (refused > 0) {
-        resolve({ kind: "kept", refused, trash: TRASH_DIR });
-        return;
-      }
-      const at = SOURCES.findIndex((one) => one.id === id);
-      if (at >= 0) SOURCES.splice(at, 1);
-      resolve({ kind: "removed" });
-    };
-    setTimeout(step, files.length > 0 ? BACKUP_STEP_MS : 0);
-  });
+/** Forgets a source and its files in the Trash, which stay in the Recycle Bin. Its folders stay. */
+function removeSource(id: number) {
+  for (const item of (ITEMS[TRASH] ?? []).filter((one) => trashed.get(one.id)?.home.id === id))
+    retireGone(item);
+  const at = SOURCES.findIndex((one) => one.id === id);
+  if (at >= 0) SOURCES.splice(at, 1);
+  return null;
 }
 
 function restoreBackup(name: string): Promise<Restored> | Restored {
@@ -1687,23 +1541,6 @@ function restoreBackup(name: string): Promise<Restored> | Restored {
   if (from.name === unreadable || !from.readable) {
     from.readable = false;
     return { kind: "unreadable", from };
-  }
-  const forgot = forgetting;
-  if (forgot && (forgot.refused > 0 || forgot.failed)) {
-    return new Promise((resolve) =>
-      setTimeout(() => {
-        void emit("restore-progress", 20);
-        const { forgets, refused } = forgot;
-        if (refused > 0) {
-          forgot.forgets = { ...forgets, files: refused };
-          forgot.refused = 0;
-          resolve({ kind: "kept", from, forgets, refused, trash: TRASH_DIR });
-        } else {
-          forgetting = null;
-          resolve({ kind: "failed", from, forgets, reason: { kind: "diskFull" } });
-        }
-      }, BACKUP_STEP_MS),
-    );
   }
   forgetting = null;
   return new Promise((resolve) => {
@@ -1807,14 +1644,12 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     item.diskName = wanted;
     return record([{ op: "rename", item, from, to: wanted }]);
   },
-  // The trash is a folder of its own that no place lists yet.
   trash_items: ({ itemIds }): ItemsTrashed => {
     const steps: Step[] = [];
     const refused: Stayed[] = [];
     for (const item of everyItem().filter((one) => (itemIds as number[]).includes(one.id))) {
-      const over = tooLarge(item);
-      if (over) {
-        refused.push(over);
+      if (binRefuses.has(item.id)) {
+        refused.push(stayedIn(item, { kind: "binRefused" }));
         continue;
       }
       steps.push({ op: "trash", item, from: item.folderId });
@@ -1822,33 +1657,18 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     }
     return { batch: record(steps), report: { trashed: steps.length, refused } };
   },
-  send_to_recycle_bin: ({ itemIds }): BinReport => {
-    const refused: Stayed[] = [];
-    let sent = 0;
-    for (const item of everyItem().filter((one) => (itemIds as number[]).includes(one.id))) {
-      if (binRefuses.has(item.id)) {
-        refused.push(stayedIn(item, { kind: "binRefused" }));
-        continue;
-      }
-      ITEMS[item.folderId] = (ITEMS[item.folderId] ?? []).filter((other) => other !== item);
-      sentToBin.push(item);
-      sent += 1;
-    }
-    recount();
-    return { sent, refused };
-  },
+  look_in_bin: () => lookInBin(),
   restore_items: ({ itemIds, folderId }) => {
     const steps: Step[] = [];
     const refused: Stayed[] = [];
     const wanted = itemIds as number[];
-    const asked = [...(ITEMS[TRASH] ?? []), ...[...expired.values()].map((gone) => gone.item)];
-    for (const item of asked.filter((one) => wanted.includes(one.id))) {
-      const went = trashed.get(item.id);
-      const gone = wentToBin(item);
+    for (const item of (ITEMS[TRASH] ?? []).filter((one) => wanted.includes(one.id))) {
+      const gone = goneFromBin(item, (folderId as number | null) ?? item.folderId);
       if (gone) {
         refused.push(gone);
         continue;
       }
+      const went = trashed.get(item.id);
       const to = (folderId as number | null) ?? item.folderId;
       const at = { kind: "trash" as const };
       const stayed = (reason: Reason) =>
@@ -1879,9 +1699,8 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     const refused: Stayed[] = [];
     if (held.length > 0 && how?.kind === "trash") {
       for (const item of held) {
-        const over = tooLarge(item);
-        if (over) {
-          refused.push(over);
+        if (binRefuses.has(item.id)) {
+          refused.push(stayedIn(item, { kind: "binRefused" }));
           continue;
         }
         steps.push({ op: "trash", item, from: item.folderId });
@@ -2346,20 +2165,6 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     return null;
   },
   launch_backup_refusal: (): Reason | null => launchRefusal,
-  trash_limits: (): TrashSettings => {
-    const { byAge, bySize } = pick(nextRun, binRefused);
-    return {
-      limits: trashSet,
-      held: tallied(ITEMS[TRASH] ?? []),
-      due: { byAge: tallied(byAge), bySize: tallied(bySize) },
-      at: nextRun,
-    };
-  },
-  set_trash_limit: ({ limit, value }) => {
-    const key = { keepFor: "keepDays", totalSize: "totalGb", sizePerFile: "fileGb" } as const;
-    trashSet = { ...trashSet, [key[limit as TrashLimit]]: value as number | null };
-    return null;
-  },
 };
 
 mockWindows("main");

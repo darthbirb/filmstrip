@@ -18,12 +18,13 @@ and a keyboard, any display size and text scale.
   neighbours is instant; nothing else may slow it down.
 - **The user's files are safe.** The app never overwrites, never loses a file halfway through a
   move, and every change on disk can be undone, across a restart. The one irreversible act is
-  purging the trash, and it asks.
+  emptying the library's files from the Recycle Bin, and it asks.
 - **Folders stay real.** A folder is a directory and an item is a file under its own name;
   removing a source forgets the index and never the files (PRODUCT.md "Folders and sources").
 - **Local and private.** No account, no network service, no telemetry. The release is a
   portable `Filmstrip.exe`, with the ffmpeg it uses in a `tools` folder beside it; its index,
-  thumbnails and trash live in a `data` folder beside it too.
+  thumbnails and backups live in a `data` folder beside it too. A deleted file goes to the
+  Windows Recycle Bin on its own drive.
 - **Scale.** A library of 100,000 items and a folder of 40,000 stay smooth: the grid scrolls at
   the display's frame rate and a folder opens in well under a second once indexed.
 - **Offline sources degrade, never break.** A drive that is away keeps its folders, tags and
@@ -72,9 +73,12 @@ and the small verbs ggallery had.
 
 ### M5 · The trash, finished
 
-- Limits on the trash's total size, per-item size and time to live, set in Settings (#70)
-- What happens when an item expires — **decided: the Windows Recycle Bin** (#69)
-- Purging the trash, the one irreversible act (#70)
+- The trash is the Windows Recycle Bin — **decided 15 November 2026**: Delete sends a file to the
+  bin on its own drive, the Trash lists what the library sent there and takes it back out, and
+  the app keeps no limits of its own (#192); this replaced the trash folder's limits and expiry
+  (#69, #70)
+- A drive with no Recycle Bin asks before Delete removes anything for good (#193)
+- Emptying the library's files from the Recycle Bin, the one irreversible act (#194)
 
 ### M6 · Self-contained
 

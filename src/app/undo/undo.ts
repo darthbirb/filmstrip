@@ -19,11 +19,11 @@ export function afterAct(batch: Batch, stayed = 0, line = actLine(batch, stayed)
 let undoing = false;
 
 /**
- * Takes back one batch, or the newest when none is named, and says what came back. What expired
- * before it could is listed until the banner goes, and only what is still in the Trash is tried
- * again.
+ * Takes back one batch, or the newest when none is named, and says what came back. What was gone
+ * from the Recycle Bin is listed until the banner goes, and only what is still in the Trash is
+ * tried again.
  */
-export async function undo(batchId?: string, expired: readonly Stayed[] = []) {
+export async function undo(batchId?: string, earlier: readonly Stayed[] = []) {
   if (undoing) return;
   undoing = true;
   try {
@@ -40,7 +40,7 @@ export async function undo(batchId?: string, expired: readonly Stayed[] = []) {
     }
     await libraryChanged();
     const left = report.stayed.filter((row) => row.at.kind !== "recycleBin");
-    const gone = [...expired, ...report.stayed.filter((row) => row.at.kind === "recycleBin")];
+    const gone = [...earlier, ...report.stayed.filter((row) => row.at.kind === "recycleBin")];
     if (left.length + gone.length === 0) {
       setNews({ kind: "undone", line: undoneLine(report), batchId: report.batch.batchId });
       return;

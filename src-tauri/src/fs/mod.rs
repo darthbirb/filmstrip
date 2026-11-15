@@ -1,7 +1,6 @@
 pub mod acts;
 pub mod backups;
 pub mod clipboard;
-pub mod expiry;
 pub mod export;
 pub mod folders;
 pub mod items;

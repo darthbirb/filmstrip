@@ -31,10 +31,9 @@ import { RowQuestion } from "../../ui/TermTable";
 import { libraryChanged } from "../library";
 import { setNews } from "../navigation/foot-slot";
 import { useWork } from "../navigation/work-store";
-import { reasonText } from "../undo/lines";
 import { backupWhen, howTaken, notBackedUp, whyFailed } from "./backup-words";
 import { Rows } from "./Rows";
-import { listed, notRestored, trashGoes, wentBefore } from "./recycle-words";
+import { binStays, listed } from "./recycle-words";
 import {
   finishRestore,
   type RestoreEnd,
@@ -85,7 +84,7 @@ export function Backups() {
     takeRestoreEnd();
     setSaid(
       ended.kind === "band"
-        ? { kind: "band", sentence: ended.sentence, path: ended.path }
+        ? { kind: "band", sentence: ended.sentence }
         : { kind: "line", sentence: ended.sentence },
     );
     void listBackups()
@@ -285,21 +284,6 @@ async function restoreIndex(backup: Backup) {
         sentence: `The backup from ${when} could not be read. The index is as it was.`,
         focus: backup.name,
       };
-    } else if (restored.kind === "kept") {
-      await libraryChanged().catch(() => undefined);
-      ended = {
-        kind: "band",
-        sentence: notRestored(restored.forgets, restored.refused),
-        path: restored.trash,
-        focus: backup.name,
-      };
-    } else if (restored.kind === "failed") {
-      await libraryChanged().catch(() => undefined);
-      ended = {
-        kind: "band",
-        sentence: `The index could not be restored. ${reasonText(restored.reason)}. ${wentBefore(restored.forgets)}`,
-        focus: backup.name,
-      };
     } else {
       setNews(null);
       await libraryChanged().catch(() => undefined);
@@ -323,23 +307,21 @@ async function restoreIndex(backup: Backup) {
 
 /**
  * What a restore forgets of the Trash, said on its question: the sources added since that have
- * files there, and every file there it forgets, which go to the Recycle Bin.
+ * files there, and every file there it forgets, which stay in the Recycle Bin.
  */
 function Forgotten({ forgets }: { forgets: Forgets | "unknown" | null }) {
   if (forgets === "unknown") {
-    return (
-      <> Any source added since is forgotten, and its files in the Trash go to the Recycle Bin.</>
-    );
+    return <> Any source added since is forgotten; its files in the Recycle Bin stay there.</>;
   }
-  const goes = trashGoes(forgets?.files ?? 0);
-  if (!forgets || !goes) return null;
+  const stays = binStays(forgets?.files ?? 0);
+  if (!forgets || !stays) return null;
   const one = forgets.sources.length === 1;
   return (
     <>
       {" "}
       <Term>{listed(forgets.sources)}</Term> {one ? "was" : "were"} added since, so{" "}
-      {one ? "it is" : "they are"} forgotten, and {one ? "its" : "their"} <Term>{goes.files}</Term>{" "}
-      {goes.verb} to the Recycle Bin.
+      {one ? "it is" : "they are"} forgotten; {one ? "its" : "their"} <Term>{stays.files}</Term>{" "}
+      {stays.verb} there, out of the app.
     </>
   );
 }

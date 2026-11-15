@@ -1,17 +1,15 @@
-import { emit } from "@tauri-apps/api/event";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import { beforeEach, expect, test } from "vitest";
-import { page, userEvent } from "vitest/browser";
+import { page } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
-import type { Removal } from "../../ipc/bindings/Removal";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { Settings } from "./Settings";
 import { finishRemove, settingsHeld } from "./settings-store";
 
-// Removing a source sends its files in the Trash to the Recycle Bin first. Artboards › Sources,
-// "What removing does with its trashed files".
+// Removing a source forgets its trashed rows; their files stay in the Recycle Bin. Artboards ›
+// Sources, "What removing does with its trashed files".
 
 function source(id: number, title: string, trashCount: number, reachable = true): SourceSummary {
   return {
@@ -32,7 +30,7 @@ function source(id: number, title: string, trashCount: number, reachable = true)
 }
 
 let sources: SourceSummary[] = [];
-let answer: (removal: Removal) => void = () => undefined;
+let answer: () => void = () => undefined;
 const removed: number[] = [];
 
 beforeEach(async () => {
@@ -46,8 +44,8 @@ beforeEach(async () => {
       if (cmd === "remove_source") {
         const { id } = payload as { id: number };
         removed.push(id);
-        return new Promise<Removal>((resolve) => {
-          answer = resolve;
+        return new Promise<null>((resolve) => {
+          answer = () => resolve(null);
         });
       }
       return undefined;
@@ -65,21 +63,21 @@ async function asking(title: string) {
   return section.getByRole("group", { name: `Remove ${title}?` });
 }
 
-test("the question counts the source's files in the Trash, which go to the Recycle Bin", async () => {
+test("the question counts the source's files in the Recycle Bin, which stay there", async () => {
   const question = await asking("Pictures");
   await expect
     .poll(() => question.element().textContent)
     .toContain(
-      "The folder stays on disk. Its tags and notes are lost. Its 2 files in the Trash go to the Recycle Bin.",
+      "The folder stays on disk. Its tags and notes are lost. Its 2 files in the Recycle Bin stay there, out of the app.",
     );
-  await expect.element(question.getByText("2 files in the Trash")).toHaveClass(/text-fg/);
+  await expect.element(question.getByText("2 files in the Recycle Bin")).toHaveClass(/text-fg/);
 });
 
 test("an offline source's one file is counted in the singular", async () => {
   const question = await asking("Archive");
   await expect
     .poll(() => question.element().textContent)
-    .toContain("Its 1 file in the Trash goes to the Recycle Bin.");
+    .toContain("Its 1 file in the Recycle Bin stays there, out of the app.");
 });
 
 test("with nothing in the Trash the question is as it was", async () => {
@@ -88,48 +86,25 @@ test("with nothing in the Trash the question is as it was", async () => {
   expect(question.element().textContent).not.toContain("Recycle Bin");
 });
 
-test("Remove Source gives the answers' place to its line and bar, and Settings holds still", async () => {
+test("Remove Source forgets the source with no bar, holding Settings still until it has", async () => {
   const question = await asking("Pictures");
   await question.getByRole("button", { name: "Remove Source" }).click();
-  await expect.element(question.getByText("Removing Pictures…")).toBeVisible();
-  expect(question.getByRole("button", { name: "Remove Source" }).query()).toBeNull();
   expect(settingsHeld()).toBe(true);
   await expect.element(page.getByRole("searchbox", { name: "Find a setting" })).toBeDisabled();
-
-  await emit("remove-progress", 50);
-  await expect.element(question.getByText("50%")).toBeVisible();
-  await userEvent.keyboard("{Escape}");
-  await expect.element(question.getByText("Removing Pictures…")).toBeVisible();
+  expect(question.getByText("Removing Pictures…").query()).toBeNull();
+  expect(question.getByRole("progressbar").query()).toBeNull();
 
   sources = sources.filter((one) => one.id !== 1);
-  answer({ kind: "removed" });
+  answer();
   await expect.poll(settingsHeld).toBe(false);
   await expect
     .element(page.getByRole("button", { name: "Remove Pictures" }))
     .not.toBeInTheDocument();
   expect(removed).toEqual([1]);
-});
-
-test("a file the Recycle Bin cannot take keeps the source, and the band counts it", async () => {
-  const question = await asking("Pictures");
-  await question.getByRole("button", { name: "Remove Source" }).click();
-  await expect.element(question.getByText("Removing Pictures…")).toBeVisible();
-
-  sources = [source(1, "Pictures", 1), ...sources.slice(1)];
-  answer({ kind: "kept", refused: 1, trash: "D:\\Filmstrip\\data\\trash" });
-  const section = page.getByRole("region", { name: "Sources" });
-  await expect
-    .element(
-      section.getByText(
-        "Pictures was not removed. The Recycle Bin could not take 1 of its files, so it stays in the Trash.",
-      ),
-    )
-    .toBeVisible();
-  await expect.element(section.getByText("D:\\Filmstrip\\data\\trash")).toBeVisible();
-  expect(settingsHeld()).toBe(false);
-
-  await section.getByRole("button", { name: "Remove Pictures" }).click();
-  await expect
-    .poll(() => section.getByRole("group", { name: "Remove Pictures?" }).element().textContent)
-    .toContain("Its 1 file in the Trash goes to the Recycle Bin.");
+  expect(
+    page
+      .getByRole("region", { name: "Sources" })
+      .getByText(/Recycle Bin/)
+      .query(),
+  ).toBeNull();
 });

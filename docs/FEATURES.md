@@ -19,11 +19,11 @@ drawn. **Not started** — neither.
 | Register a folder as a source | Built | `add_source`, and both doorways |
 | Several sources at once, library and sorting | Built | `list_sources`, `set_source_kind` |
 | Rename a source | Built | `rename_source`, in Settings and on its tree row |
-| Remove a source, leaving the folder alone | Built | `remove_source`; its files in the Trash go to the Recycle Bin first, through `fs::recycle`, and one the bin cannot take keeps the source |
+| Remove a source, leaving the folder alone | Built | `remove_source`; its trashed rows are forgotten and their files stay in the Recycle Bin, so nothing is sent |
 | Reveal a source in Explorer | Built | `reveal_source` |
 | Remember the interface's own state | Built | `ui_preferences` |
 | Back up the index beside it, at launch once a day and by hand, the newest kept | Built | `list_backups`, `back_up_now`, `set_backups_kept`, `launch_backup_refusal`; DECISIONS.md "Backing up the index". Filmstrip's own change: SQLite's online backup while the app runs, not a file copy as it closes, and the number kept is a setting |
-| Restore the index from a backup | Built | `restore_backup`, on the backup's row in Settings › Backups; the Trash stays as it is now, and undo stops at the restore. A trashed file the restore forgets, from a source added since, goes to the Recycle Bin first, as a removed source's do |
+| Restore the index from a backup | Built | `restore_backup`, on the backup's row in Settings › Backups; the Trash stays as it is now, and undo stops at the restore. A trashed file the restore forgets, from a source added since, stays in the Recycle Bin, as a removed source's do |
 | First-import review, then a move | **Dropped on purpose.** A folder is read where it stands, so there is nothing to review and nothing to move. |
 
 ## Reading what is there
@@ -66,7 +66,7 @@ drawn. **Not started** — neither.
 | Reveal, open, copy the file | Built | the pane's bar |
 | Sort by key and direction, random order held steady | Built | `folder_items`, `sorting_items` and `search` take the order; the grid's header chooses it per kind of place |
 | Move items between folders | Built | `move_items`, Move to… on the pane's bar and a file's menu; a name already taken is reported, never changed |
-| Delete items to the trash | Built | `trash_items`, Delete on the pane's bar and a file's menu; undo takes an item back |
+| Delete items to the trash | Built | `trash_items`, Delete on the pane's bar and a file's menu, sending each file to the Windows Recycle Bin on its own drive through `fs::recycle`; one the bin will not take stays where it was, said at the foot; undo takes an item back out of the bin |
 | Rename a file, on disk | Built | `rename_item`, the pane's Name row; not in ggallery; a name already taken is refused |
 | Paste files in, and take an OS drop | Built | `paste_files`, `drop_files`: Paste on a folder's, a source's and the Sorting Box's menus, on the rows and on the grid's ground, Ctrl+V, and a drop from Explorer on a row or a folder's grid, the tree scrolling near its edges; a copy as a job with Cancel, a name taken refused, never changed; undo sends what came in to the Trash |
 | Copy an item's path | Built | `copy_item_paths`, Copy Path in a file's menu, a set's and the pane's ⋯; one path to a line |
@@ -112,9 +112,9 @@ drawn. **Not started** — neither.
 | Select in a grid, and act on the selection | Built | a box on each tile, Ctrl and Shift with a click, the keyboard; a bar at the grid's foot with Favourite, Tag…, Move to…, Copy and Delete, or Restore in the Trash |
 | Move a selection somewhere | Built | the bar's Move to…, or dragged onto a row in navigation; one batch undone as one |
 | Destination hotkeys | Built | `destination_keys`, `set_destination_key`, `remove_destination_key`; the digits 1 to 0, bound from a folder's menu or Settings, shown on its row, a press moving the set or the pane's file |
-| The trash as a place, with its own limits | Partly | `trash_listing`, `library_totals`: newest first under a heading per day, each tile saying where it came from, counted on its row and header. `trash_limits`, `set_trash_limit` in Settings › Trash, and an `expire` job at launch and every hour that sends what is past the time to live or over the total to the Recycle Bin, said at the foot. `trash_items` and `delete_folder` refuse a file over the size per file, or the total where that is smaller, and the question above the grid offers `send_to_recycle_bin` |
-| Restore from the trash, or restore to another folder | Built | `restore_items`, journalled; Restore and Restore to… on a trashed file's bar and menu, refused into the banner |
-| Purge the trash, the one irreversible act | Not started | |
+| The trash as a place, in the Recycle Bin | Partly | `trash_listing`, `library_totals`: newest first under a heading per day, each tile saying where it came from, counted on its row and header and in Settings › Trash. `look_in_bin` at launch and as the Trash opens retires what was emptied from the bin outside the app and restores what was put back from Explorer. A drive with no Recycle Bin asking first is #193 |
+| Restore from the trash, or restore to another folder | Built | `restore_items`, journalled, taking the file out of the Recycle Bin; Restore and Restore to… on a trashed file's bar and menu, refused into the banner, a file emptied from the bin under Gone from the Recycle Bin |
+| Empty the library's files from the Recycle Bin, the one irreversible act | Not started | #194 |
 
 ## Export and undo
 

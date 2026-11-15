@@ -389,17 +389,33 @@ pub fn forget_retired(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
-/// Forgets a trashed item outright, once its file has left the trash for the Recycle Bin. Covers
-/// point in from outside the cascade, so go first.
-pub fn forget_trashed(conn: &Connection, id: i64) -> Result<()> {
+/// Forgets an item outright. Covers point in from outside the cascade, so go first.
+pub fn forget(conn: &Connection, id: i64) -> Result<()> {
     conn.execute(
         "UPDATE folder SET cover_item_id = NULL WHERE cover_item_id = ?1",
         params![id],
     )?;
-    conn.execute(
-        "DELETE FROM item WHERE id = ?1 AND trashed_at IS NOT NULL",
-        params![id],
+    conn.execute("DELETE FROM item WHERE id = ?1", params![id])?;
+    crate::db::search::index_item(conn, id)
+}
+
+/// Takes a trashed item out of the Trash for good, its file gone from the Recycle Bin: retired
+/// where it was, keeping its tags and its name, or forgotten where another row has that name now.
+pub fn retire_trashed(conn: &Connection, id: i64, at: i64) -> Result<()> {
+    let retired = conn.execute(
+        "UPDATE item SET trashed_at = NULL, bin_path = NULL, bin_file = NULL,
+                         deleted_at = COALESCE(deleted_at, ?2)
+          WHERE id = ?1
+            AND NOT EXISTS (
+                SELECT 1 FROM item other
+                 WHERE other.folder_id = item.folder_id AND other.id <> item.id
+                   AND other.disk_name = item.disk_name COLLATE NOCASE
+                   AND other.trashed_at IS NULL)",
+        params![id, at],
     )?;
+    if retired == 0 {
+        return forget(conn, id);
+    }
     crate::db::search::index_item(conn, id)
 }
 
@@ -420,6 +436,29 @@ pub fn send_to_trash(conn: &Connection, id: i64) -> Result<()> {
         params![at, id],
     )?;
     Ok(())
+}
+
+/// Where the Recycle Bin keeps a trashed item's file: the name it gave it, and the file itself.
+pub fn set_binned(conn: &Connection, id: i64, path: &str, file: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE item SET bin_path = ?2, bin_file = ?3 WHERE id = ?1 AND trashed_at IS NOT NULL",
+        params![id, path, file],
+    )?;
+    Ok(())
+}
+
+/// Where the Recycle Bin keeps a trashed item's file, and the file itself, as [`set_binned`]
+/// recorded them; nothing for an item that is not trashed or has no such record.
+pub fn binned(conn: &Connection, id: i64) -> Result<Option<(String, String)>> {
+    Ok(conn
+        .query_row(
+            "SELECT bin_path, bin_file FROM item
+              WHERE id = ?1 AND trashed_at IS NOT NULL
+                AND bin_path IS NOT NULL AND bin_file IS NOT NULL",
+            params![id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .optional()?)
 }
 
 /// When an item went to the trash, for one that is there.
@@ -446,7 +485,8 @@ pub fn set_trashed_at(conn: &Connection, id: i64, at: i64) -> Result<()> {
 /// Records an item as back from the trash, in the folder it left.
 pub fn take_from_trash(conn: &Connection, id: i64) -> Result<()> {
     conn.execute(
-        "UPDATE item SET deleted_at = NULL, trashed_at = NULL WHERE id = ?1",
+        "UPDATE item SET deleted_at = NULL, trashed_at = NULL, bin_path = NULL, bin_file = NULL
+          WHERE id = ?1",
         params![id],
     )?;
     Ok(())
@@ -561,47 +601,6 @@ pub fn in_trash(conn: &Connection) -> Result<Vec<(ItemRow, i64)>> {
         .query_map([], |r| Ok((row(r)?, r.get(12)?)))?
         .collect::<rusqlite::Result<_>>()?;
     Ok(rows)
-}
-
-/// One file in the trash as expiry weighs it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Waiting {
-    pub id: i64,
-    pub bytes: i64,
-    pub trashed_at: i64,
-}
-
-/// Every item in the trash, the one that went first first.
-pub fn trash_oldest_first(conn: &Connection) -> Result<Vec<Waiting>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, size_bytes, trashed_at FROM item
-          WHERE trashed_at IS NOT NULL
-          ORDER BY trashed_at, id",
-    )?;
-    let rows = stmt
-        .query_map([], |r| {
-            Ok(Waiting {
-                id: r.get(0)?,
-                bytes: r.get(1)?,
-                trashed_at: r.get(2)?,
-            })
-        })?
-        .collect::<rusqlite::Result<_>>()?;
-    Ok(rows)
-}
-
-/// What the trash holds and weighs.
-pub fn in_trash_tally(conn: &Connection) -> Result<Tally> {
-    Ok(conn.query_row(
-        "SELECT COUNT(*), COALESCE(SUM(size_bytes), 0) FROM item WHERE trashed_at IS NOT NULL",
-        [],
-        |r| {
-            Ok(Tally {
-                count: r.get(0)?,
-                bytes: r.get(1)?,
-            })
-        },
-    )?)
 }
 
 /// How many files, and their bytes together.

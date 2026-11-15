@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ts_rs::TS;
 
-use crate::db::expired::Gone;
 use crate::db::now;
 use crate::error::Result;
 use crate::jobs::kinds::COPY_IN;
@@ -512,78 +511,6 @@ pub fn copying(conn: &Connection, batch_id: &str) -> Result<bool> {
         params![COPY_IN, batch_id],
         |r| r.get(0),
     )?)
-}
-
-/// The rows about one file alone, which name it by `itemId`.
-const ONE_FILE: [&str; 5] = [ITEM_MOVE, ITEM_TRASH, ITEM_RENAME, ITEM_RESTORE, ITEM_COPY];
-
-/// Prunes an expired file from the journal: each row about it alone keeps only the word that it
-/// went, and what it was, for an undo to report and drop, and its id leaves every row about several.
-/// An id the index may give another file is then never acted on. DECISIONS.md "Undo".
-pub fn expire_item(conn: &Connection, gone: &Gone) -> Result<()> {
-    let id = gone.item_id;
-    let mark = serde_json::to_string(gone)?;
-    conn.execute(
-        &format!(
-            "UPDATE journal SET forward = json_set(forward, '$.expired', json(?2)),
-                                inverse = json_set(inverse, '$.expired', json(?2))
-              WHERE op IN ({}) AND json_extract(inverse, '$.itemId') = ?1",
-            quoted(&ONE_FILE)
-        ),
-        params![id, mark],
-    )?;
-    let mut stmt = conn.prepare(
-        "SELECT id, op, inverse FROM journal
-          WHERE (op = ?2 AND EXISTS(SELECT 1 FROM json_each(inverse, '$.itemIds') WHERE value = ?1))
-             OR (op = ?3 AND EXISTS(SELECT 1 FROM json_each(inverse, '$.items')
-                                     WHERE json_extract(value, '$.itemId') = ?1))
-             OR (op = ?4 AND EXISTS(SELECT 1 FROM json_each(inverse, '$.itemUses')
-                                     WHERE json_extract(value, '$.itemId') = ?1))",
-    )?;
-    let several: Vec<(i64, String, String)> = stmt
-        .query_map(params![id, ITEMS_TAG, ITEMS_UNTAG, RETAG], |r| {
-            Ok((r.get(0)?, r.get(1)?, r.get(2)?))
-        })?
-        .collect::<rusqlite::Result<_>>()?;
-    for (row, op, inverse) in several {
-        let left = match op.as_str() {
-            ITEMS_TAG => {
-                let mut tagged: ItemsTagged = serde_json::from_str(&inverse)?;
-                tagged.item_ids.retain(|&one| one != id);
-                (!tagged.item_ids.is_empty()).then(|| serde_json::to_string(&tagged))
-            }
-            ITEMS_UNTAG => {
-                let mut untagged: ItemsUntagged = serde_json::from_str(&inverse)?;
-                untagged.items.retain(|one| one.item_id != id);
-                (!untagged.items.is_empty()).then(|| serde_json::to_string(&untagged))
-            }
-            _ => {
-                let mut retagged: Retagged = serde_json::from_str(&inverse)?;
-                retagged.item_uses.retain(|one| one.item_id != id);
-                Some(serde_json::to_string(&retagged))
-            }
-        };
-        match left.transpose()? {
-            Some(json) => conn.execute(
-                "UPDATE journal SET forward = ?2, inverse = ?2 WHERE id = ?1",
-                params![row, json],
-            )?,
-            None => conn.execute("DELETE FROM journal WHERE id = ?1", params![row])?,
-        };
-    }
-    Ok(())
-}
-
-/// The file a row is about, when it has expired since.
-pub fn expired(entry: &Entry) -> Option<Gone> {
-    serde_json::from_value(entry.inverse.get("expired")?.clone()).ok()
-}
-
-fn quoted(ops: &[&str]) -> String {
-    ops.iter()
-        .map(|op| format!("'{op}'"))
-        .collect::<Vec<_>>()
-        .join(", ")
 }
 
 #[cfg(test)]

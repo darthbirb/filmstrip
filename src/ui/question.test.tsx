@@ -80,18 +80,20 @@ test("one answer stands alone under why it is asked, over the files it is about"
   const screen = await render(
     <div style={{ width: "40rem" }}>
       <Question
-        sentence="2 of 5 files are too large for the Trash"
-        detail="The Trash takes files up to 5 GB."
-        last={{ label: "Send to Recycle Bin", onChoose: () => undefined }}
-        files={{ open, onToggle: () => (open = !open), list: <span>MVI_0412.mov</span> }}
-        dismiss="Keep It"
+        sentence="3 of 15 files are on a drive with no Recycle Bin"
+        detail="Delete them, 412 MB, for good? Undo cannot bring them back."
+        last={{ label: "Delete Permanently", onChoose: () => undefined }}
+        files={{ open, onToggle: () => (open = !open), list: <span>MVI_0007.mov</span> }}
+        dismiss="Cancel"
         onDismiss={() => undefined}
       />
     </div>,
   );
-  await expect.element(screen.getByText("The Trash takes files up to 5 GB.")).toBeVisible();
-  await expect.element(screen.getByText("MVI_0412.mov")).toBeVisible();
-  expect(shown(screen)).toEqual(["Hide Files", "Keep It", "Send to Recycle Bin"]);
+  await expect
+    .element(screen.getByText("Delete them, 412 MB, for good? Undo cannot bring them back."))
+    .toBeVisible();
+  await expect.element(screen.getByText("MVI_0007.mov")).toBeVisible();
+  expect(shown(screen)).toEqual(["Hide Files", "Cancel", "Delete Permanently"]);
 
   await screen.rerender(
     <div style={{ width: "40rem" }}>

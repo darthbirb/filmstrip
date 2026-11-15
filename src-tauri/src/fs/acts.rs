@@ -8,7 +8,6 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use ts_rs::TS;
 
-use crate::db::expired::Gone;
 use crate::db::journal::{
     self, Change, Entry, FolderCopied, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed,
     ItemCopied, ItemMoved, ItemRenamed, ItemRestored, ItemTrashed, ItemsTagged, ItemsUntagged,
@@ -151,8 +150,7 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
         let tag = forward::<ItemsUntagged>(entry)?.value;
         return Ok(Act::RemoveTag { tag });
     }
-    let copied: Vec<(ItemCopied, Option<Gone>)> =
-        of(journal::ITEM_COPY).map(marked).collect::<Result<_>>()?;
+    let copied: Vec<ItemCopied> = of(journal::ITEM_COPY).map(forward).collect::<Result<_>>()?;
     let made: Vec<FolderCopied> = of(journal::FOLDER_COPY)
         .map(forward)
         .collect::<Result<_>>()?;
@@ -197,48 +195,33 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
             to: renamed.to,
         });
     }
-    let restored: Vec<(ItemRestored, Option<Gone>)> = of(journal::ITEM_RESTORE)
-        .map(marked)
+    let restored: Vec<ItemRestored> = of(journal::ITEM_RESTORE)
+        .map(forward)
         .collect::<Result<_>>()?;
     if !restored.is_empty() {
-        let homes = restored.iter().map(|(one, _)| one.to_folder_id).collect();
-        let ones: Vec<(i64, Option<&Gone>)> = restored
-            .iter()
-            .map(|(one, gone)| (one.item_id, gone.as_ref()))
-            .collect();
+        let homes = restored.iter().map(|one| one.to_folder_id).collect();
+        let ids: Vec<i64> = restored.iter().map(|one| one.item_id).collect();
         return Ok(Act::Restore {
             to: only(conn, homes)?,
-            one: one_name(conn, &ones)?,
+            one: one_name(conn, &ids)?,
         });
     }
-    let trashed: Vec<(ItemTrashed, Option<Gone>)> =
-        of(journal::ITEM_TRASH).map(marked).collect::<Result<_>>()?;
-    let moved: Vec<(ItemMoved, Option<Gone>)> =
-        of(journal::ITEM_MOVE).map(marked).collect::<Result<_>>()?;
+    let trashed: Vec<ItemTrashed> = of(journal::ITEM_TRASH)
+        .map(forward)
+        .collect::<Result<_>>()?;
+    let moved: Vec<ItemMoved> = of(journal::ITEM_MOVE).map(forward).collect::<Result<_>>()?;
     let carried: Vec<FolderMoved> = of(journal::FOLDER_MOVE)
         .map(forward)
         .collect::<Result<_>>()?;
     if !trashed.is_empty() {
-        let files =
-            trashed
-                .iter()
-                .map(|(one, gone)| match gone {
-                    Some(gone) => Ok(Some((gone.folder_id, gone.name.clone()))),
-                    None => Ok(items::file_of(conn, one.item_id)?
-                        .map(|file| (file.folder_id, file.disk_name))),
-                })
-                .collect::<Result<Vec<_>>>()?;
-        let origins = files
+        let ids: Vec<i64> = trashed.iter().map(|one| one.item_id).collect();
+        let origins = ids
             .iter()
-            .map(|file| file.as_ref().map_or(0, |(folder, _)| *folder))
-            .collect();
-        let one = match files.as_slice() {
-            [file] => file.as_ref().map(|(_, name)| name.clone()),
-            _ => None,
-        };
+            .map(|id| items::file_of(conn, *id).map(|file| file.map_or(0, |file| file.folder_id)))
+            .collect::<Result<BTreeSet<i64>>>()?;
         return Ok(Act::Delete {
             from: only(conn, origins)?,
-            one,
+            one: one_name(conn, &ids)?,
         });
     }
     if let ([folder], []) = (carried.as_slice(), moved.as_slice()) {
@@ -250,23 +233,20 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
     }
     let to = moved
         .first()
-        .map(|(one, _)| one.to_folder_id)
+        .map(|one| one.to_folder_id)
         .or_else(|| carried.first().map(|folder| folder.to_parent_id))
         .ok_or_else(|| AppError::invalid("there is nothing left of that act"))?;
     let origins = moved
         .iter()
-        .map(|(one, _)| one.from_folder_id)
+        .map(|one| one.from_folder_id)
         .chain(carried.iter().map(|folder| folder.from_parent_id))
         .collect();
-    let ones: Vec<(i64, Option<&Gone>)> = moved
-        .iter()
-        .map(|(one, gone)| (one.item_id, gone.as_ref()))
-        .collect();
+    let ids: Vec<i64> = moved.iter().map(|one| one.item_id).collect();
     Ok(Act::Move {
         from: only(conn, origins)?,
         to: name(conn, to)?,
         one: if carried.is_empty() {
-            one_name(conn, &ones)?
+            one_name(conn, &ids)?
         } else {
             None
         },
@@ -274,21 +254,17 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
 }
 
 /// A copy, named by where it went and by what came in at its top: one file, one folder, or counts.
-fn copy_act(
-    conn: &Connection,
-    copied: &[(ItemCopied, Option<Gone>)],
-    made: &[FolderCopied],
-) -> Result<Act> {
+fn copy_act(conn: &Connection, copied: &[ItemCopied], made: &[FolderCopied]) -> Result<Act> {
     let into = copied
         .first()
-        .map(|(one, _)| one.into)
+        .map(|one| one.into)
         .or_else(|| made.first().map(|folder| folder.into))
         .unwrap_or_default();
     let tops: Vec<&FolderCopied> = made.iter().filter(|one| one.parent_id == into).collect();
-    let loose: Vec<(i64, Option<&Gone>)> = copied
+    let loose: Vec<i64> = copied
         .iter()
-        .filter(|(one, _)| one.folder_id == into)
-        .map(|(one, gone)| (one.item_id, gone.as_ref()))
+        .filter(|one| one.folder_id == into)
+        .map(|one| one.item_id)
         .collect();
     let folder = match (tops.as_slice(), loose.is_empty()) {
         ([only], true) => Some(name(conn, only.folder_id)?),
@@ -329,17 +305,11 @@ fn only(conn: &Connection, origins: BTreeSet<i64>) -> Result<Option<String>> {
     }
 }
 
-/// The lone file's name: from the mark when it has expired, since its id may name another file now.
-fn one_name(conn: &Connection, ones: &[(i64, Option<&Gone>)]) -> Result<Option<String>> {
-    match ones {
-        [(_, Some(gone))] => Ok(Some(gone.name.clone())),
-        [(id, None)] => Ok(items::file_of(conn, *id)?.map(|file| file.disk_name)),
+fn one_name(conn: &Connection, ids: &[i64]) -> Result<Option<String>> {
+    match ids {
+        [id] => Ok(items::file_of(conn, *id)?.map(|file| file.disk_name)),
         _ => Ok(None),
     }
-}
-
-fn marked<T: DeserializeOwned>(entry: &Entry) -> Result<(T, Option<Gone>)> {
-    Ok((forward(entry)?, journal::expired(entry)))
 }
 
 /// The journal is JSON that outlives the code that wrote it, so a row that no longer reads is an

@@ -8,8 +8,8 @@ export type Refused = { why: Refusal; clash: string | null; path: string };
 /** What just happened at the person's request, as the foot of navigation says it. */
 export type FootNews =
   | { kind: "refused"; refused: Refused }
-  /** Files Delete sent straight to the Recycle Bin, too large for the Trash; nothing to undo. */
-  | { kind: "recycled"; line: string }
+  /** Files the Recycle Bin would not take, which stay where they were; nothing was deleted. */
+  | { kind: "binRefused"; line: string; detail: string }
   /** A destination key that moved nothing, and why. */
   | { kind: "keyRefused"; line: string; detail?: string; path?: string }
   /** An act that changed the disk, and the batch its Undo takes back. */
@@ -20,10 +20,6 @@ export type FootNews =
   | { kind: "said"; line: string }
   /** What an undo brought back, and the batch it took back. */
   | { kind: "undone"; line: string; batchId?: string }
-  /** What the Trash's limits sent to the Recycle Bin; nothing to undo. */
-  | { kind: "expired"; line: string }
-  /** Files the Recycle Bin refused as they expired, and the first of them to show in the Trash. */
-  | { kind: "expiryRefused"; sentence: string; detail: string; first: number | null }
   | { kind: "nothing" }
   /** Ctrl+V with no files on the clipboard. */
   | { kind: "noFiles" };
