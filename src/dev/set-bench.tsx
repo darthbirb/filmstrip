@@ -273,8 +273,26 @@ async function countFrames(
   const loops = [videos.map(() => 0)];
   let changed = false;
   let start: number | undefined;
+  const probe = videos.map((one) => ({ clock: one.currentTime, movedAt: 0 }));
+  const notes: string[] = [];
   const drawn = await frames(spans * ms, (now) => {
     start ??= now;
+    videos.forEach((one, index) => {
+      const p = probe[index];
+      if (!p || one.paused) return;
+      if (p.movedAt === 0) p.movedAt = now;
+      const c = one.currentTime;
+      if (c !== p.clock) {
+        const still = now - p.movedAt;
+        const wrap = c < p.clock;
+        if (still > 100 || wrap)
+          notes.push(
+            `#${index} span${marks.length} t${Math.round(now - (start ?? now))} ${wrap ? "WRAP " : ""}still${Math.round(still)}ms ${p.clock.toFixed(3)}->${c.toFixed(3)}`,
+          );
+        p.clock = c;
+        p.movedAt = now;
+      }
+    });
     if (motion === "resize") {
       // Down to half the width and back each second: a new scale every frame.
       const swing = (1 + Math.cos((now / 1000) * 2 * Math.PI)) / 2;
@@ -293,6 +311,9 @@ async function countFrames(
     }
   });
   marks.push(mark());
+  console.info(
+    `PROBE ${going.length} playing, durations ${videos.map((v) => v.duration.toFixed(2)).join(" ")}\n${notes.join("\n")}`,
+  );
   if (changed) return null;
   const span = (from: Mark, to: Mark, looped: readonly number[]): Span => {
     const length = (index: number) => videos[index]?.duration ?? Number.NaN;
