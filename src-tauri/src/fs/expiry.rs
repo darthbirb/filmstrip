@@ -70,6 +70,7 @@ impl Expired {
 /// or an undo between two finds each either in the trash or gone. A file the bin refuses keeps its
 /// row and its file, and still counts toward the total, so the next oldest goes in its stead.
 pub fn run(conn: &Connection, bin: &dyn Bin, limits: Limits, now: i64) -> Result<Expired> {
+    let _run = super::trash_run();
     let mut said = Expired {
         keep_days: limits.keep_days,
         total_bytes: limits.total_bytes,

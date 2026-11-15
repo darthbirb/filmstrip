@@ -1,7 +1,18 @@
 import { expect, test } from "vitest";
 
 import { formatTime } from "../../lib/format";
-import { dueLine, expiredLine, expiredReason, heldLine, refusedLine, USUAL } from "./expiry-words";
+import {
+  dueLine,
+  emptiedLine,
+  emptyingLine,
+  emptyQuestion,
+  expiredLine,
+  expiredReason,
+  heldLine,
+  keptLine,
+  refusedLine,
+  USUAL,
+} from "./expiry-words";
 
 const GB = 2 ** 30;
 const tally = (count: number, gb: number) => ({ count, bytes: gb * GB });
@@ -68,5 +79,25 @@ test("what the Recycle Bin refused is said once, and why a file expired is said 
   expect(expiredReason({ kind: "age", days: 30 })).toBe("Expired after 30 days");
   expect(expiredReason({ kind: "size", bytes: 25 * GB })).toBe(
     "Expired to keep the Trash under 25 GB",
+  );
+});
+
+test("Empty Trash… asks with how many files and how much, and says they do not come back", () => {
+  expect(text(emptyQuestion({ count: 312, bytes: 8.4 * GB }))).toBe(
+    "Delete the 312 files in the Trash, 8.4 GB, for good? They do not go to the Recycle Bin, and Undo cannot bring them back.",
+  );
+  expect(emptyQuestion(tally(1, 2))[1]).toEqual({ term: "1 file" });
+});
+
+test("emptying counts as it goes, and the foot says what went or what stayed", () => {
+  expect(emptyingLine(120, 312)).toBe("Emptying · 120 of 312 files");
+  const all = { deleted: 312, bytes: 8.4 * GB, kept: 0, firstKept: null, inUse: false };
+  expect(emptiedLine(all)).toBe("Emptied the Trash: 312 files, 8.4 GB, deleted for good.");
+  const two = { ...all, deleted: 310, kept: 2, firstKept: 7, inUse: true };
+  expect(keptLine(two)).toBe(
+    "Deleted 310 of 312 files. 2 are open in another app and stay in the Trash.",
+  );
+  expect(keptLine({ ...two, kept: 1, inUse: false })).toBe(
+    "Deleted 310 of 311 files. 1 could not be deleted and stays in the Trash.",
   );
 });

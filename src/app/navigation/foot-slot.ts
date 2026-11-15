@@ -20,8 +20,11 @@ export type FootNews =
   | { kind: "undone"; line: string; batchId?: string }
   /** What the Trash's limits sent to the Recycle Bin; nothing to undo. */
   | { kind: "expired"; line: string }
-  /** Files the Recycle Bin refused as they expired, and the first of them to show in the Trash. */
-  | { kind: "expiryRefused"; sentence: string; detail: string; first: number | null }
+  /**
+   * Files that stayed in the Trash, refused by the Recycle Bin as they expired or kept from
+   * emptying, and the first of them to show there.
+   */
+  | { kind: "stayInTrash"; sentence: string; detail?: string; first: number | null }
   | { kind: "nothing" }
   /** Ctrl+V with no files on the clipboard. */
   | { kind: "noFiles" };

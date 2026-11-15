@@ -1,6 +1,7 @@
 pub mod acts;
 pub mod backups;
 pub mod clipboard;
+pub mod empty;
 pub mod expiry;
 pub mod export;
 pub mod folders;
@@ -26,6 +27,14 @@ static DISK: Mutex<()> = Mutex::new(());
 /// for its whole change, so neither reads the other half-done. DECISIONS.md "Undo".
 pub fn turn() -> MutexGuard<'static, ()> {
     DISK.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+static TRASH_RUN: Mutex<()> = Mutex::new(());
+
+/// One pass over the whole trash at a time, emptying it or keeping its limits, each still taking a
+/// turn at the disk per file. Taken before any turn, never while holding one.
+pub fn trash_run() -> MutexGuard<'static, ()> {
+    TRASH_RUN.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 /// How long a directory just emptied may hold another program's file before it stays.

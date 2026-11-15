@@ -613,8 +613,8 @@ September 2026. Its bar holds Restore and Restore to…, worded and from the lef
 nothing is left to fold; its menu holds the same two under Full Screen. Favourite, Move to… and
 Rename would change a file that is not in the library, and Show in Explorer, Copy and Open with
 Default App would hand Windows the name the Trash keeps it under, never the one it was given; all
-of them are absent rather than greyed. Nothing purges: emptying the Trash is under Later. Its
-details say where it came from and when it went, in place of where it is, and the Name row is
+of them are absent rather than greyed. Nothing purges a single file: emptying the whole Trash is
+in Settings, DECISIONS.md "Emptying the trash". Its details say where it came from and when it went, in place of where it is, and the Name row is
 only its name. Restored from the Trash, the pane moves on as it does after a delete.
 
 **A video plays on a plate of the app's own**, drawn by Claude Design and built on 12 October
@@ -1411,6 +1411,37 @@ promise the person has to keep in mind.
 - **The size per file is set here and kept by Delete** (#186), not by the run: a file already in
   the Trash was let in under the limit it had then.
 
+## Emptying the trash
+
+**Empty Trash… deletes outright, the one act the app cannot take back**, built on 15 November
+2026 for #185 from Artboards › The Trash's limits. It lives in Settings › Trash, beside the
+limits, since it is about the Trash as a whole; the Trash place keeps only the way back, and
+there is no way to purge a single file.
+
+- **It asks first, and deletes only what it asked about.** The question names how many files and
+  how much space, and says the Recycle Bin will not have them and Undo cannot bring them back;
+  Cancel has the focus. The files counted are the ones its answer deletes, by id, so a file
+  deleted while the question stands goes into the Trash as ever and waits.
+- **One file per turn at the disk, checked again inside it.** A file restored between two turns
+  is out of the Trash and is never touched; one that left for the Recycle Bin is skipped. Only the
+  name the Trash gave it, `fs::paths::trash_path` from its row, is ever removed, with
+  `std::fs::remove_file`: never a directory, never what a link points to. A read-only file goes
+  too, as Explorer's emptying of the Recycle Bin takes it. One already gone counts as deleted.
+- **The file goes first, then its row and its journal together.** A file that would not go,
+  such as one another app has open, keeps its row and stays in the Trash, restorable and still
+  counted; the foot says how many, why when every one was in use, with Show in Trash. A
+  transaction that fails after the file has gone leaves a row with no file, which the next
+  emptying counts as deleted.
+- **Its journal goes with it.** A row about the file alone is deleted rather than marked, as
+  expiry's are: nothing can bring the file back, and the question said so. A batch left with no
+  rows goes, so Ctrl+Z after emptying reaches the act before it. A row about several loses the
+  file. No row is left naming an id the index may give another file.
+- **Expiry waits for it**, and it for a run already going: one pass over the whole Trash at a
+  time (`fs::trash_run`), each still taking the disk's turn per file, so a restore or a delete
+  waits for one file, not the pass. Settings does not hold still meanwhile; the head counts as it
+  goes, with the walk's bar where the button was, and nothing cancels it. It hears how far at
+  most a hundred times, however many files there are.
+
 ## Sending to the Recycle Bin
 
 **`fs::recycle::send` hands a file to the shell's Recycle Bin and never lets it be destroyed**,
@@ -1487,6 +1518,7 @@ another folder. The picker opens inside the dialog, since the window behind it i
 **Trash sits in the Library group, after Backups**: its three limits as dropdowns of a few fixed
 answers and No Limit each, what the Trash holds against its total in the section's head, and one
 line under them on what the next run sends, and when. DECISIONS.md "Expiry goes to the Recycle Bin".
+Empty Trash… is in its head, DECISIONS.md "Emptying the trash".
 
 **A rail of sections, grouped and filtered**, because it will grow: tabs hold six or seven names
 and then scroll, and a rail takes twenty. A section with nothing in it yet is not in the rail.

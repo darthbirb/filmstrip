@@ -14,6 +14,7 @@ import type { Covered } from "../ipc/bindings/Covered";
 import type { Crumb } from "../ipc/bindings/Crumb";
 import type { DestinationKey } from "../ipc/bindings/DestinationKey";
 import type { EffectiveTag } from "../ipc/bindings/EffectiveTag";
+import type { Emptied } from "../ipc/bindings/Emptied";
 import type { End } from "../ipc/bindings/End";
 import type { Expired } from "../ipc/bindings/Expired";
 import type { Exported } from "../ipc/bindings/Exported";
@@ -1560,8 +1561,73 @@ export function resetTrashLimits() {
   for (const { item } of expired.values())
     ITEMS[item.folderId] = [...(ITEMS[item.folderId] ?? []), item];
   expired.clear();
+  for (const item of emptiedOut.values())
+    ITEMS[item.folderId] = [...(ITEMS[item.folderId] ?? []), item];
+  emptiedOut.clear();
+  heldOpen = [];
   recount();
   binRefused = [];
+}
+
+/** What Empty Trash deleted, kept here only to put back for the next test. */
+const emptiedOut = new Map<number, ItemRow>();
+/** Files another program has open, which Empty Trash leaves in the Trash. */
+let heldOpen: readonly number[] = [];
+
+/** Has another program hold these files open, so Empty Trash cannot delete them; for tests. */
+export function holdOpen(itemIds: readonly number[]) {
+  heldOpen = itemIds;
+}
+
+/** Takes a file emptied from the Trash out of the journal, as the Rust side prunes its rows. */
+function forgetInJournal(item: ItemRow) {
+  for (let at = journal.length - 1; at >= 0; at -= 1) {
+    const batch = journal[at] as { batchId: string; steps: Step[] };
+    batch.steps = batch.steps.flatMap((step): Step[] => {
+      if ("item" in step) return step.item === item ? [] : [step];
+      if (step.op === "tag") {
+        const items = step.items.filter((one) => one !== item);
+        return items.length > 0 ? [{ ...step, items }] : [];
+      }
+      if (step.op === "untag") {
+        const items = step.items.filter((one) => one.item !== item);
+        return items.length > 0 ? [{ ...step, items }] : [];
+      }
+      return [step];
+    });
+    if (batch.steps.length === 0) journal.splice(at, 1);
+  }
+}
+
+/** Deletes for good each file asked about that is still in the Trash, one step at a time. */
+function emptyTrash(itemIds: readonly number[]): Promise<Emptied> {
+  const emptied: Emptied = { deleted: 0, bytes: 0, kept: 0, firstKept: null, inUse: false };
+  return new Promise((resolve) => {
+    let at = 0;
+    const step = () => {
+      const id = itemIds[at];
+      const item = (ITEMS[TRASH] ?? []).find((one) => one.id === id);
+      if (item && heldOpen.includes(item.id)) {
+        emptied.kept += 1;
+        emptied.firstKept ??= item.id;
+        emptied.inUse = true;
+      } else if (item) {
+        ITEMS[TRASH] = (ITEMS[TRASH] ?? []).filter((other) => other !== item);
+        trashed.delete(item.id);
+        emptiedOut.set(item.id, item);
+        forgetInJournal(item);
+        emptied.deleted += 1;
+        emptied.bytes += item.sizeBytes;
+      }
+      at += 1;
+      recount();
+      void emit("empty-progress", at);
+      if (at < itemIds.length) setTimeout(step, BACKUP_STEP_MS);
+      else resolve(emptied);
+    };
+    if (itemIds.length === 0) resolve(emptied);
+    else setTimeout(step, BACKUP_STEP_MS);
+  });
 }
 
 const TRASH_DIR = "D:\\Filmstrip\\data\\trash";
@@ -2268,6 +2334,11 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       at: nextRun,
     };
   },
+  trash_to_empty: () => {
+    const all = waiting().map((one) => one.item);
+    return { itemIds: all.map((item) => item.id), held: tallied(all) };
+  },
+  empty_trash: ({ itemIds }) => emptyTrash(itemIds as number[]),
   set_trash_limit: ({ limit, value }) => {
     const key = { keepFor: "keepDays", totalSize: "totalGb", sizePerFile: "fileGb" } as const;
     trashSet = { ...trashSet, [key[limit as TrashLimit]]: value as number | null };

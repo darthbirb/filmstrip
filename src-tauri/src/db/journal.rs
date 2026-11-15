@@ -532,6 +532,27 @@ pub fn expire_item(conn: &Connection, gone: &Gone) -> Result<()> {
         ),
         params![id, mark],
     )?;
+    leave_sets(conn, id)
+}
+
+/// Prunes a file emptied from the trash from the journal: each row about it alone goes, but one
+/// marked expired, which is about a file the id named before; its id leaves every row about
+/// several. DECISIONS.md "Emptying the trash".
+pub fn forget_item(conn: &Connection, item_id: i64) -> Result<()> {
+    conn.execute(
+        &format!(
+            "DELETE FROM journal
+              WHERE op IN ({}) AND json_extract(inverse, '$.itemId') = ?1
+                AND json_extract(inverse, '$.expired') IS NULL",
+            quoted(&ONE_FILE)
+        ),
+        params![item_id],
+    )?;
+    leave_sets(conn, item_id)
+}
+
+/// Takes a file's id out of every row about several, and drops a row left naming none.
+fn leave_sets(conn: &Connection, id: i64) -> Result<()> {
     let mut stmt = conn.prepare(
         "SELECT id, op, inverse FROM journal
           WHERE (op = ?2 AND EXISTS(SELECT 1 FROM json_each(inverse, '$.itemIds') WHERE value = ?1))

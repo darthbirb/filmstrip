@@ -460,6 +460,17 @@ pub fn is_trashed(conn: &Connection, id: i64) -> Result<bool> {
     )?)
 }
 
+/// What a file in the trash weighs; `None` when the id is not in the trash.
+pub fn trashed_bytes(conn: &Connection, id: i64) -> Result<Option<i64>> {
+    Ok(conn
+        .query_row(
+            "SELECT size_bytes FROM item WHERE id = ?1 AND trashed_at IS NOT NULL",
+            params![id],
+            |r| r.get(0),
+        )
+        .optional()?)
+}
+
 /// Every live item at or below a folder, deepest folders last.
 pub fn live_under(conn: &Connection, folder_id: i64) -> Result<Vec<i64>> {
     let mut stmt = conn.prepare(

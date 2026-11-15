@@ -198,6 +198,8 @@ pub fn run() {
             commands::set_backups_kept,
             commands::trash_limits,
             commands::set_trash_limit,
+            commands::trash_to_empty,
+            commands::empty_trash,
             commands::launch_backup_refusal,
             commands::ui_preferences,
             commands::set_ui_preferences,

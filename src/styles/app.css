@@ -202,6 +202,8 @@
   --spacing-count: 3.25rem;
   /* The column a row's one worded button stands in, so the rows without one still line up. */
   --spacing-row-action: 4.25rem;
+  /* The walk's bar where a section's head had its button, as the Trash shows emptying. */
+  --spacing-head-progress: 6rem;
   /* A dragged ghost's picture. */
   --spacing-ghost-thumb: 1.5rem;
   /* A folder a search found: the card, and the picture that stands for it. */

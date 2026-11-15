@@ -10,6 +10,7 @@ import type { Coverage } from "./bindings/Coverage";
 import type { CoverChoice } from "./bindings/CoverChoice";
 import type { DestinationKey } from "./bindings/DestinationKey";
 import type { EffectiveTag } from "./bindings/EffectiveTag";
+import type { Emptied } from "./bindings/Emptied";
 import type { ExportStart } from "./bindings/ExportStart";
 import type { Failure } from "./bindings/Failure";
 import type { FavouritePlace } from "./bindings/FavouritePlace";
@@ -43,6 +44,7 @@ import type { SourceKind } from "./bindings/SourceKind";
 import type { SourceSummary } from "./bindings/SourceSummary";
 import type { Suggestions } from "./bindings/Suggestions";
 import type { TagOffer } from "./bindings/TagOffer";
+import type { ToEmpty } from "./bindings/ToEmpty";
 import type { Trashed } from "./bindings/Trashed";
 import type { TrashLimit } from "./bindings/TrashLimit";
 import type { TrashSettings } from "./bindings/TrashSettings";
@@ -306,5 +308,11 @@ export const trashLimits = () => invoke<TrashSettings>("trash_limits");
 /** One of the trash's limits; `null` is No Limit. */
 export const setTrashLimit = (limit: TrashLimit, value: number | null) =>
   invoke<void>("set_trash_limit", { limit, value });
+
+/** The files in the Trash as Empty Trash… asks, and what they weigh. */
+export const trashToEmpty = () => invoke<ToEmpty>("trash_to_empty");
+
+/** Deletes for good the files asked about that are still in the Trash; `empty-progress` counts them. */
+export const emptyTrash = (itemIds: number[]) => invoke<Emptied>("empty_trash", { itemIds });
 
 export const launchBackupRefusal = () => invoke<Reason | null>("launch_backup_refusal");

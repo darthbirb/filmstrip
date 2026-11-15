@@ -13,7 +13,7 @@ export async function afterExpired(expired: Expired) {
   await libraryChanged();
   if (expired.refusedGrew) {
     setNews({
-      kind: "expiryRefused",
+      kind: "stayInTrash",
       ...refusedLine(expired.refused),
       first: expired.firstRefused,
     });

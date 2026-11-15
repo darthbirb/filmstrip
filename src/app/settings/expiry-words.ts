@@ -1,10 +1,12 @@
 import type { Due } from "../../ipc/bindings/Due";
+import type { Emptied } from "../../ipc/bindings/Emptied";
 import type { Expired } from "../../ipc/bindings/Expired";
 import type { Limit } from "../../ipc/bindings/Limit";
 import type { Tally } from "../../ipc/bindings/Tally";
 import { formatBytes, formatCount, formatTime } from "../../lib/format";
 
-// How the Trash keeping its limits is worded: in Settings, at the foot, and in a restore's banner.
+// How the Trash keeping its limits, and emptying it, is worded: in Settings, at the foot, and in a
+// restore's banner.
 // Artboards › The Trash's limits.
 
 const GB = 2 ** 30;
@@ -82,4 +84,34 @@ export function refusedLine(refused: number) {
     sentence: `The Recycle Bin could not take ${files(refused)} that expired, so ${one ? "it stays" : "they stay"} in the Trash.`,
     detail: `${one ? "Its" : "Their"} drive may have no Recycle Bin, or it is off or too small.`,
   };
+}
+
+/** Empty Trash…'s question: how many files, how much space, and that nothing brings them back. */
+export function emptyQuestion(held: Tally): Said {
+  return [
+    "Delete the ",
+    { term: files(held.count) },
+    " in the Trash, ",
+    { term: formatBytes(held.bytes) },
+    ", for good? They do not go to the Recycle Bin, and Undo cannot bring them back.",
+  ];
+}
+
+/** The head while the Trash empties: "Emptying · 120 of 312 files". */
+export function emptyingLine(done: number, whole: number) {
+  return `Emptying · ${formatCount(done)} of ${files(whole)}`;
+}
+
+/** The line at the foot once the Trash has emptied, every file gone. */
+export function emptiedLine({ deleted, bytes }: Emptied) {
+  return `Emptied the Trash: ${files(deleted)}, ${formatBytes(bytes)}, deleted for good.`;
+}
+
+/** The band at the foot when some files would not go, which stay in the Trash. */
+export function keptLine({ deleted, kept, inUse }: Emptied) {
+  const one = kept === 1;
+  const why = inUse
+    ? `${one ? "is" : "are"} open in another app and ${one ? "stays" : "stay"}`
+    : `could not be deleted and ${one ? "stays" : "stay"}`;
+  return `Deleted ${formatCount(deleted)} of ${files(deleted + kept)}. ${formatCount(kept)} ${why} in the Trash.`;
 }

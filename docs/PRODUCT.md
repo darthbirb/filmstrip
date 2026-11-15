@@ -54,7 +54,10 @@ item, and a time to live, all adjustable by the user.
 **An item that expires goes to the Windows Recycle Bin**: one that outlives the time to live,
 and the oldest first while the trash is over its total size. That is one more chance to get it
 back, outside the app; the app's Restore and undo can no longer reach it. Nothing is destroyed
-by expiry. Purging the trash is the one way the app deletes a file outright.
+by expiry. Emptying the trash is the one way the app deletes a file outright: Empty Trash… in
+Settings › Trash asks first, says how many files and how much, and that neither the Recycle Bin
+nor Undo will have them. A file that would not go, as one another app has open, stays in the
+Trash, and the foot says so.
 
 The limits are kept at launch and every hour, and set in Settings › Trash: Keep For 30 days,
 Total Size 25 GB and Size per File 5 GB until changed, each with No Limit. The line under them
@@ -110,5 +113,5 @@ selection somewhere. Destination hotkeys exist for the folders used most.
 ## Later
 
 Built on the finished interface, not alongside it: compression with review before anything is
-replaced, duplicate detection, a storage screen, trash limits and purging, a
+replaced, duplicate detection, a storage screen, a
 blur toggle, and bundling HandBrake as ffmpeg already is, so a release needs nothing downloaded.

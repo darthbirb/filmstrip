@@ -75,7 +75,9 @@ test("with neither limit that sends files on, the line says nothing leaves the T
   await expect.poll(note).toMatch(/^Past a limit/);
   await screen.getByRole("button", { name: "Total Size: 25 GB" }).click();
   await screen.getByRole("option", { name: "No Limit" }).click();
-  await expect.poll(note).toBe("With no limits, nothing leaves the Trash until it is restored.");
+  await expect
+    .poll(note)
+    .toBe("With no limits, nothing leaves the Trash until it is restored or emptied.");
   await expect.element(screen.getByRole("button", { name: "Keep For: No Limit" })).toBeVisible();
   expect((await trashLimits()).limits).toEqual({ keepDays: null, totalGb: null, fileGb: 5 });
 });

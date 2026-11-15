@@ -29,6 +29,7 @@ use crate::error::{AppError, Reason, Result};
 use crate::fs::acts::{self, Batch};
 use crate::fs::backups::{self, Backup, Forgets, Restored, Shelf, Shelved, Taken};
 use crate::fs::clipboard;
+use crate::fs::empty::{self, Emptied, ToEmpty};
 use crate::fs::expiry::{self, Due};
 use crate::fs::export::{self, Naming, Plan, Scope};
 use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
@@ -53,6 +54,8 @@ pub struct AppState {
 pub const RESTORE_PROGRESS_EVENT: &str = "restore-progress";
 /// How far removing a source has got in sending its files in the Trash, from 0 to 100.
 pub const REMOVE_PROGRESS_EVENT: &str = "remove-progress";
+/// How many of the files Empty Trash was asked about are settled, said at most a hundred times.
+pub const EMPTY_PROGRESS_EVENT: &str = "empty-progress";
 /// The launch's backup has ended, taken, refused or not due, so a list showing it writing is stale.
 pub const BACKUPS_CHANGED_EVENT: &str = "backups-changed";
 
@@ -1547,6 +1550,33 @@ pub async fn trash_limits(state: State<'_, AppState>) -> Result<TrashSettings> {
 #[tauri::command]
 pub async fn set_trash_limit(limit: TrashLimit, value: Option<u32>) -> Result<()> {
     crate::config::Config::set_trash_limit(limit, value)
+}
+
+/// The files in the trash as Empty Trash… asks, and what they weigh.
+#[tauri::command]
+pub async fn trash_to_empty(state: State<'_, AppState>) -> Result<ToEmpty> {
+    run(&state, empty::to_empty).await
+}
+
+/// Deletes for good the files Empty Trash… asked about that are still in the trash.
+/// DECISIONS.md "Emptying the trash".
+#[tauri::command]
+pub async fn empty_trash(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    item_ids: Vec<i64>,
+) -> Result<Emptied> {
+    run(&state, move |conn| {
+        let whole = item_ids.len() as u32;
+        let every = (whole / 100).max(1);
+        let progress = |done: u32| {
+            if done.is_multiple_of(every) || done == whole {
+                let _ = app.emit(EMPTY_PROGRESS_EVENT, done);
+            }
+        };
+        empty::empty(conn, &item_ids, &progress)
+    })
+    .await
 }
 
 /// Why the launch's backup was refused, once it has ended; nothing when it was taken or not due.

@@ -107,6 +107,7 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 - Removing a source deletes its rows outright. Its directory is never touched.
 - An item that expires is deleted outright once the Recycle Bin has its file, and an `expired`
   row is written in the same transaction. That row is read only while no `item` row holds its id.
+- An item emptied from the trash is deleted outright once its file is, and nothing records it.
 - A file moved or restored to a name that only a retired row holds takes it: that row is deleted
   outright. A trashed row never holds a name.
 - A folder moved into another source takes its items with it: their `source_id` follows the
@@ -136,6 +137,8 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   in `forward` and `inverse`, naming it, its folder and the limit that sent it; an undo reports
   the mark and deletes the row. `items_tag`, `items_untag` and `retag` rows lose that file, and
   go once they name nothing.
+- Emptying the trash prunes it of each file it deleted: a row about that file alone is deleted,
+  one with an `"expired"` mark excepted, and the rows about several lose it as expiry's do.
 - Undo never reaches a row at or below `setting.undo_floor`, which a restore sets to the newest
   row the restored journal holds.
 

@@ -114,7 +114,7 @@ drawn. **Not started** — neither.
 | Destination hotkeys | Built | `destination_keys`, `set_destination_key`, `remove_destination_key`; the digits 1 to 0, bound from a folder's menu or Settings, shown on its row, a press moving the set or the pane's file |
 | The trash as a place, with its own limits | Partly | `trash_listing`, `library_totals`: newest first under a heading per day, each tile saying where it came from, counted on its row and header. `trash_limits`, `set_trash_limit` in Settings › Trash, and an `expire` job at launch and every hour that sends what is past the time to live or over the total to the Recycle Bin, said at the foot; Delete does not yet keep the size per file (#186) |
 | Restore from the trash, or restore to another folder | Built | `restore_items`, journalled; Restore and Restore to… on a trashed file's bar and menu, refused into the banner |
-| Purge the trash, the one irreversible act | Not started | |
+| Purge the trash, the one irreversible act | Built | `trash_to_empty`, `empty_trash`: Empty Trash… in Settings › Trash, after a question, deletes outright what the Trash held when it asked; a file another app has open stays, said at the foot with Show in Trash |
 
 ## Export and undo
 

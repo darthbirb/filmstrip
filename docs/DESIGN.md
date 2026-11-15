@@ -135,6 +135,7 @@ spacing:
   tile-caption: 1.3125rem
   count: 3.25rem
   row-action: 4.25rem
+  head-progress: 6rem
   ghost-thumb: 1.5rem
   card: 17rem
   card-cover: 5rem
@@ -983,7 +984,10 @@ toward the rest surface.
   too, what it holds against its total after its name, over its three limits as dropdown rows and
   one line under them at the rows' inset: the recycle glyph in `glyph` and what the next run sends
   in `small` `fg-dim`, its count and time in `fg`, or the usual line when nothing; with neither
-  Keep For nor Total Size, the infinity glyph and that nothing leaves the Trash.
+  Keep For nor Total Size, the infinity glyph and that nothing leaves the Trash. Empty Trash…
+  in `danger` ends its head while it holds anything, and asks under the head in the row
+  question's shape, its own `line-danger` ring round it. Emptying, the head counts as it goes
+  and the `progress` bar, `head-progress` wide, stands where the button was.
 - **Filter field.** Narrows the list under it as you type: `bar-field` tall on `ground` at the
   `nested` corner in a `line-control` ring, `line-strong` while it has the focus, the search glyph
   before it in `fg-dim` and "3 of 228" at its end in `small` tabular figures once something is

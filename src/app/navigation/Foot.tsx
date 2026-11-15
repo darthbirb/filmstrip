@@ -223,7 +223,7 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
   if (news.kind === "keyRefused") {
     return <Band sentence={news.line} detail={news.detail} path={news.path} onDismiss={dismiss} />;
   }
-  if (news.kind === "expiryRefused") {
+  if (news.kind === "stayInTrash") {
     const { first } = news;
     return (
       <Band
