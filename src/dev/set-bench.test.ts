@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 
-import { benchSet, recordings } from "./set-bench";
+import { benchSet, clock, recordings, tick } from "./set-bench";
 
 test("one recording serves a warm-up and the longer count after it", async () => {
   const asked: number[] = [];
@@ -45,4 +45,39 @@ test("a clip given that would loop in more than one span is refused before the p
     "a 14000ms clip would loop in more than one span of the count",
   );
   expect(document.querySelector("[data-file]")).toBeNull();
+});
+
+const FRAME = 1000 / 30;
+
+/** The pace of a clip read every frame for `ms`, showing `shows(at)` at `at` ms in. */
+function pace(ms: number, shows: (at: number) => number) {
+  let held = clock(shows(0), 0);
+  for (let at = FRAME; at <= ms; at += FRAME) held = tick(held, shows(at), at);
+  return held.moved / held.seconds;
+}
+
+test("a loop's restart, the clock held at the start, does not count against the pace", () => {
+  const looped = (at: number) => {
+    const time = 20 + at / 1000;
+    if (time < 22) return time;
+    return Math.max(0, (at - 2000 - 383) / 1000);
+  };
+  expect(pace(5000, looped)).toBeCloseTo(1, 3);
+});
+
+test("a hold after a loop longer than one of the pane's spans counts against the pace", () => {
+  const held = (at: number) => {
+    if (at < 1000) return 21 + at / 1000;
+    return Math.max(0, (at - 4000) / 1000);
+  };
+  expect(pace(5000, held)).toBeCloseTo(2 / 3, 1);
+});
+
+test("a stall away from a loop counts against the pace", () => {
+  const stalled = (at: number) => 10 + (at < 2000 ? at : at < 2383 ? 2000 : at - 383) / 1000;
+  expect(pace(5000, stalled)).toBeCloseTo(0.923, 2);
+});
+
+test("a clip slow throughout reads slow across its loop", () => {
+  expect(pace(5000, (at) => (20 + (0.9 * at) / 1000) % 22)).toBeCloseTo(0.9, 3);
 });
