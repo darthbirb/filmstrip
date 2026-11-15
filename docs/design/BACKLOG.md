@@ -43,38 +43,57 @@ to jump anywhere; the position is the information. Investigate whether it replac
 scrollbar or sits beside it. The pass that drew it recommends building the other ten first, and
 only building this if the largest folders still feel unnavigable afterwards.
 
-## The Trash's limits, expiry and emptying · DRAWN
+## Delete to the Recycle Bin, and restore from it · DRAWN
 
-#70. The Trash keeps to a time to live, a total size and a size per file, set in Settings, and
-can be emptied. Expiry goes to the Windows Recycle Bin, as DECISIONS.md "Expiry goes to the
-Recycle Bin" has it, through `fs::recycle::send`.
+#192. Delete sends a file to the Windows Recycle Bin on its own drive, not into `data\trash`, and
+the Trash lists what the library sent there. The Trash's limits, expiry and the too-large refusal
+go. Replaces what Artboards › The Trash's limits drew for #70 and #186.
 
-Drawn in Artboards › The Trash's limits:
+Drawn in Artboards › The Trash in the Recycle Bin:
 
-- **Settings › Library › Trash**, after Backups: the head with what the Trash holds against its
-  total and Empty Trash… in `danger`, three dropdown rows (Keep For, Total Size, Size per File,
-  each ending in No Limit; 30 Days, 25 GB and 5 GB the first), and one line on where an item
-  goes. A lowered limit sends nothing at once: the line says what the next hourly run will send
-  and when. Also drawn: a dropdown open, no limits, nothing in the Trash (no Empty Trash…),
-  emptying, and the window's least with the keyboard on a dropdown.
-- **Empty Trash…'s question**, in the row question's shape under the head: how many files, how
-  much space, and that they do not go to the Recycle Bin. Cancel has the focus.
-- **A file too large for the Trash**: Delete refuses it before it moves and asks above the grid,
-  in the question's shape, with Send to Recycle Bin in `danger` and × keeping it. In a set, the
-  rest go to the Trash as one batch and the banner lists the refused ones with their sizes. A file
-  larger than Total Size is refused the same way. The bin refusing the send keeps the file where
-  it was and says so.
-- **The foot**: expiry by age, by size, and both, each with no Undo. Its line keeps the slot's
-  rule, one at a time and the newest replacing the other: it replaces an act's line, and a Band
-  or the next act's line replaces it; Ctrl+Z still reaches the act. The Recycle Bin refusing an
-  expired file keeps it in the Trash, still counting toward Total Size, and says so once, again
-  only when the count of refused files grows, with Show in Trash. After Empty Trash, and Empty
-  Trash with files that would not go.
-- **A restore that loses the race to expiry**: the Trash's restore banner, with the expired rows
-  under their own heading, In the Recycle Bin, and no row button; Retry only while a row still in
-  the Trash could succeed. A Ctrl+Z on a delete some or all of whose files expired is the same.
-- **Size per File** is asked only at Delete; lowering it sends nothing from the Trash.
+- **Settings › Library › Trash** without its limits: the head with how many files the library
+  has in the bin and their size, Empty Trash… in `danger`, and two lines under it on where a
+  deleted file goes and what a drive with no bin does. Nothing in the Trash drops Empty Trash….
+- **The foot for a file the bin refused**: alone, it stays where it was and the line says it may
+  be too large for the bin or the bin off, with nothing deleted; in a set, the rest are one batch
+  with Undo and the refused one is named.
+- **Restore from the bin**: the Trash's restore banner gains a heading, Gone from the Recycle
+  Bin, for a file emptied from the bin outside the app, with no row button; Retry only while a
+  row under Still in the Trash could succeed. A taken name and a gone folder stay as The Trash,
+  holding files draws them. One already back at its path counts as restored.
+- **Reconciling** at launch and when the Trash opens: gone from the bin and not back, the row
+  retires; back at its path, it is restored in the index.
 
-Built so far: the limits in Settings, expiry and the foot's lines, and the restore race (#184).
-Still to build: Empty Trash… (#185), and Delete keeping Size per File (#186). DECISIONS.md "The
-pane" still says nothing purges and emptying the Trash is under Later; that changes with #185.
+Left for the build: Artboards › Sources ("What removing does with its trashed files") and
+Backups ("Not restored · the Recycle Bin cannot take a file") still speak of `data\trash`, and
+source comments cite Artboards › The Trash's limits, now The Trash in the Recycle Bin.
+
+## Ask before deleting on a drive with no Recycle Bin · DRAWN
+
+#193. A file on a USB stick, an SD card or a network share has no Recycle Bin to go to.
+
+Drawn in Artboards › The Trash in the Recycle Bin, "A drive with no Recycle Bin":
+
+- **The question above the grid**, once for the selection, in the question's shape: the drive
+  by its label and letter, how many files and how much space, that they go for good and Undo
+  cannot bring them back. Delete Permanently in `danger`, Cancel with the focus.
+- **A mixed set**: the rest go to the bin at once with Undo; the banner lists the asked ones under
+  their drive with their sizes.
+- **A folder's question** says it once rather than asking twice: Delete Files Too becomes Delete
+  Files Permanently, with the drive's line under the answers, and × has the focus.
+- **The foot**: deleted for good with no Undo, and a file that would not go staying where it was.
+  Also drawn: the window's least, a long name wrapping, the keyboard on Delete Permanently.
+
+## Empty the library's files from the Recycle Bin · DRAWN
+
+#194. Empty Trash… deletes for good only what the library sent to the bin.
+
+Drawn in Artboards › The Trash in the Recycle Bin:
+
+- **The question**, in the row question's shape under the section's head: how many files, how
+  much space, that only these go and the rest of the bin is left as it is, and that Undo cannot
+  bring them back. Empty Trash in `danger`, Cancel with the focus. Also at the window's least.
+- **Emptying**: the head counts as it goes with the walk's bar where the button was; nothing to
+  cancel; a file deleted meanwhile joins the Trash after it and stays.
+- **The foot**: after Empty Trash, with no Undo, Ctrl+Z skipping to the act before; and files
+  skipped, one gone from the bin and one that would not go, with Show in Trash.
