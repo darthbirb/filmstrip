@@ -87,6 +87,11 @@ fn settle(file: &Path, hold: &Path) -> io::Result<()> {
     noclobber::rename(hold, file)
 }
 
+/// Settles what a send of `file` cut short left beside it, as the next send of it would.
+pub fn settle_beside(file: &Path) -> io::Result<()> {
+    settle(file, &hold_of(file))
+}
+
 /// Puts back each lone hold under `dir` as the file it holds, where that name is free, and says
 /// how many; nothing is ever removed. DECISIONS.md "Sending to the Recycle Bin".
 pub fn sweep(dir: &Path) -> u32 {

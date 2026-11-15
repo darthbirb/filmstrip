@@ -38,6 +38,7 @@ export function Foot({ rail = false }: { rail?: boolean }) {
       (news.kind === "undone" ||
         news.kind === "said" ||
         news.kind === "expired" ||
+        news.kind === "recycled" ||
         (news.kind === "exported" && !news.path))
     );
 
@@ -303,7 +304,7 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
   if (news.kind === "said") {
     return <Line glyph="done" sentence={news.line} onDismiss={dismiss} />;
   }
-  if (news.kind === "expired") {
+  if (news.kind === "expired" || news.kind === "recycled") {
     return <Line glyph="recycle" sentence={news.line} onDismiss={dismiss} />;
   }
   return (

@@ -1,5 +1,6 @@
-import { useId, useLayoutEffect, useRef, useState } from "react";
+import { type ReactNode, useId, useLayoutEffect, useRef, useState } from "react";
 
+import { FilesToggle } from "./Banner";
 import { Button } from "./Button";
 import { Checkbox } from "./Checkbox";
 import { Glyph } from "./Glyph";
@@ -9,17 +10,29 @@ import { ContextMenu } from "./Menu";
 /** One answer. `short` names it in the folded menu, where the question already says the verb. */
 export type Answer = { id: string; label: string; short: string; onChoose: () => void };
 
-type Props = {
+/** Answers that can fold come with what their fold says and shows, or there are none. */
+type Choices =
+  | {
+      /** Answers that stand on the line together, or all fold into one button whose menu names them. */
+      choices: readonly Answer[];
+      /** The folded menu's glyph for each answer. */
+      choiceGlyph: GlyphName;
+      /** What the one button says once the answers have folded into it. */
+      fold: string;
+    }
+  | { choices?: undefined; choiceGlyph?: undefined; fold?: undefined };
+
+type Props = Choices & {
   sentence: string;
-  /** Answers that stand on the line together, or all fold into one button whose menu names them. */
-  choices: readonly Answer[];
-  /** The folded menu's glyph for each answer. */
-  choiceGlyph: GlyphName;
-  /** What the one button says once the answers have folded into it. */
-  fold: string;
+  /** Why it is asked, and what an answer costs, under the question. */
+  detail?: string;
   /** The answer that destroys: last on the line, and never folded. */
-  last: { label: string; onChoose: () => void };
+  last?: { label: string; onChoose: () => void };
   box?: { label: string; checked: boolean; onChange: (checked: boolean) => void };
+  /** The files it is about, in a list that opens under the answers. */
+  files?: { open: boolean; onToggle: () => void; list: ReactNode };
+  /** What × is called: Cancel, unless answering none keeps something. */
+  dismiss?: string;
   onDismiss: () => void;
 };
 
@@ -28,7 +41,18 @@ type Props = {
  * under it, and × to answer none. The answers hold one line or all fold into one button, and a
  * fold that still does not fit stacks. Measured against its own line. DESIGN.md "Components".
  */
-export function Question({ sentence, choices, choiceGlyph, fold, last, box, onDismiss }: Props) {
+export function Question({
+  sentence,
+  detail,
+  choices = [],
+  choiceGlyph = "moveTo",
+  fold = "",
+  last,
+  box,
+  files,
+  dismiss = "Cancel",
+  onDismiss,
+}: Props) {
   const said = useId();
   const root = useRef<HTMLElement>(null);
   const line = useRef<HTMLDivElement>(null);
@@ -59,7 +83,7 @@ export function Question({ sentence, choices, choiceGlyph, fold, last, box, onDi
     return () => observer.disconnect();
   }, [labels]);
 
-  const lastButton = (
+  const lastButton = last && (
     <Button tone="danger" onClick={last.onChoose}>
       {last.label}
     </Button>
@@ -92,43 +116,72 @@ export function Question({ sentence, choices, choiceGlyph, fold, last, box, onDi
           event.stopPropagation();
           onDismiss();
         }}
-        className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-1.5 rounded-control bg-panel py-2 pr-2 pl-3 outline-none inset-ring inset-ring-line-danger"
+        className="flex flex-col rounded-control bg-panel outline-none inset-ring inset-ring-line-danger"
       >
-        <Glyph name="warning" className="text-danger text-icon" />
-        <span id={said} className="min-w-0 text-fg text-ui tabular-nums">
-          {sentence}
-        </span>
-        <button
-          type="button"
-          aria-label="Cancel"
-          title="Cancel"
-          onClick={onDismiss}
-          className="focus-ring grid size-control shrink-0 place-items-center rounded-control text-fg-dim text-glyph transition-colors duration-(--motion-quick) hover:bg-wash hover:text-fg motion-reduce:transition-none"
+        <div
+          className={`grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2.5 gap-y-1.5 py-2 pr-2 pl-3 ${files?.open ? "border-line border-b" : ""}`}
         >
-          <Glyph name="close" />
-        </button>
-        <div ref={line} className="relative col-span-2 col-start-2 min-w-0">
-          {/* Both lines as they would be drawn, out of sight, so the fold is measured, not guessed. */}
-          <div ref={named} inert aria-hidden className="invisible absolute flex w-max gap-1.5">
-            {everyChoice}
-            {lastButton}
-          </div>
-          <div ref={folded} inert aria-hidden className="invisible absolute flex w-max gap-1.5">
-            {foldedButton(false)}
-            {lastButton}
-          </div>
-          <div
-            className={`flex gap-1.5 ${shape === "stacked" ? "flex-col items-start" : "items-center"}`}
+          <Glyph name="warning" className="text-danger text-icon" />
+          <span className="flex min-w-0 items-center gap-2.5">
+            <span id={said} className="min-w-0 flex-1 text-fg text-ui tabular-nums">
+              {sentence}
+            </span>
+            {files && <FilesToggle open={files.open} onToggle={files.onToggle} />}
+          </span>
+          <button
+            type="button"
+            aria-label={dismiss}
+            title={dismiss}
+            onClick={onDismiss}
+            className="focus-ring grid size-control shrink-0 place-items-center rounded-control text-fg-dim text-glyph transition-colors duration-(--motion-quick) hover:bg-wash hover:text-fg motion-reduce:transition-none"
           >
-            {shape === "named" ? everyChoice : foldedButton(true)}
-            {lastButton}
-          </div>
+            <Glyph name="close" />
+          </button>
+          {detail && (
+            <span className="col-span-2 col-start-2 text-pretty text-fg-dim text-small tabular-nums">
+              {detail}
+            </span>
+          )}
+          {(choices.length > 0 || last) && (
+            <div ref={line} className="relative col-span-2 col-start-2 min-w-0">
+              {/* Both lines as they would be drawn, out of sight, so the fold is measured, not guessed. */}
+              {choices.length > 0 && (
+                <>
+                  <div
+                    ref={named}
+                    inert
+                    aria-hidden
+                    className="invisible absolute flex w-max gap-1.5"
+                  >
+                    {everyChoice}
+                    {lastButton}
+                  </div>
+                  <div
+                    ref={folded}
+                    inert
+                    aria-hidden
+                    className="invisible absolute flex w-max gap-1.5"
+                  >
+                    {foldedButton(false)}
+                    {lastButton}
+                  </div>
+                </>
+              )}
+              <div
+                className={`flex gap-1.5 ${shape === "stacked" ? "flex-col items-start" : "items-center"}`}
+              >
+                {shape === "named" ? everyChoice : foldedButton(true)}
+                {lastButton}
+              </div>
+            </div>
+          )}
+          {box && (
+            <div className="col-span-2 col-start-2">
+              <Checkbox label={box.label} checked={box.checked} onChange={box.onChange} />
+            </div>
+          )}
         </div>
-        {box && (
-          <div className="col-span-2 col-start-2">
-            <Checkbox label={box.label} checked={box.checked} onChange={box.onChange} />
-          </div>
-        )}
+        {files?.open && <div className="max-h-45 overflow-auto">{files.list}</div>}
       </section>
       {menu && (
         <ContextMenu

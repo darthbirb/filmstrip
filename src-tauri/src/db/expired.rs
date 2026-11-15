@@ -1,5 +1,7 @@
-//! What expiry sent to the Recycle Bin, kept after each file's row is forgotten, and the files the
-//! bin last refused. DECISIONS.md "Expiry goes to the Recycle Bin".
+//! What expiry sent to the Recycle Bin, kept after each file's row is forgotten, the files the bin
+//! last refused, and library files on their way there. DECISIONS.md "Expiry goes to the Recycle Bin".
+
+use std::path::{Path, PathBuf};
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
@@ -79,5 +81,49 @@ pub fn set_refused(conn: &Connection, ids: &[i64]) -> Result<()> {
          ON CONFLICT (key) DO UPDATE SET value = excluded.value",
         params![REFUSED, serde_json::to_string(ids)?],
     )?;
+    Ok(())
+}
+
+const RECYCLING: &str = "recycling";
+
+/// Every library file whose send to the Recycle Bin has not settled: each is kept until its send
+/// returns, or until a launch settles what one cut short left beside it.
+pub fn recycling(conn: &Connection) -> Result<Vec<PathBuf>> {
+    let text: Option<String> = conn
+        .query_row(
+            "SELECT value FROM setting WHERE key = ?1",
+            params![RECYCLING],
+            |r| r.get(0),
+        )
+        .optional()?;
+    Ok(text
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default())
+}
+
+pub fn add_recycling(conn: &Connection, file: &Path) -> Result<()> {
+    let mut files = recycling(conn)?;
+    if !files.iter().any(|one| one == file) {
+        files.push(file.to_path_buf());
+    }
+    keep_recycling(conn, &files)
+}
+
+pub fn settled_recycling(conn: &Connection, file: &Path) -> Result<()> {
+    let mut files = recycling(conn)?;
+    files.retain(|one| one != file);
+    keep_recycling(conn, &files)
+}
+
+fn keep_recycling(conn: &Connection, files: &[PathBuf]) -> Result<()> {
+    if files.is_empty() {
+        conn.execute("DELETE FROM setting WHERE key = ?1", params![RECYCLING])?;
+    } else {
+        conn.execute(
+            "INSERT INTO setting (key, value) VALUES (?1, ?2)
+             ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+            params![RECYCLING, serde_json::to_string(files)?],
+        )?;
+    }
     Ok(())
 }
