@@ -87,15 +87,14 @@ async function settle(
   const binned = batch?.files ?? 0;
   const { outright } = report;
   if (report.deleted) {
-    const line = forGood ? folderForGoodLine(folder.name, binned, outright) : undefined;
+    const line = outright > 0 ? folderForGoodLine(folder.name, binned, outright) : undefined;
     if (batch) afterAct(batch, 0, line);
     else if (line) setNews({ kind: "said", line });
     showReport(null);
   } else if (forGood) {
     const line = folderKeptLine(folder.name, binned, outright, held);
-    if (!line) setNews(null);
-    else if (batch) afterAct(batch, 0, line);
-    else setNews({ kind: "said", line });
+    if (line && batch) afterAct(batch, 0, line);
+    else if (line) setNews({ kind: "said", line });
     showReport({
       sentence: folderKeptBanner(folder.name, binned, outright, held),
       rows: report.refused,

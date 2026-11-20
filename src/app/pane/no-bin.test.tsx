@@ -3,7 +3,7 @@ import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { onDriveWithoutBin, refuseDeleting, resetBin } from "../../dev/mock";
-import { folderItems, undoLast } from "../../ipc/commands";
+import { folderItems, moveItems, undoLast } from "../../ipc/commands";
 import { formatBytes } from "../../lib/format";
 import { Frame } from "../frame/Frame";
 import { checkAll, clearChecked, getSelection, useSelectionKeys } from "../grid/selection";
@@ -209,20 +209,42 @@ test("a folder with files on two drives counts those gone for good apart, and Un
   await expect.element(screen.getByRole("button", { name: "Undo" })).toBeVisible();
 });
 
-test("a folder none of whose files would go keeps them, and the foot says nothing of it", async () => {
-  const cairo = (await folderItems(6)).map((row) => row.id);
-  onDriveWithoutBin(cairo, "USB Drive (E:)");
-  refuseDeleting(cairo);
+test("a folder none of whose files would go keeps them, and the foot keeps the act before", async () => {
+  const [felucca, pyramid, sphinx] = await Promise.all(
+    ["felucca.mp4", "pyramid.jpg", "sphinx.jpg"].map(id),
+  );
   const screen = await render(<Harness />);
+  await deleteFiles([felucca as number]);
+  await expect.element(screen.getByText("Deleted felucca.mp4.")).toBeVisible();
+  const before = getNews();
+  onDriveWithoutBin([pyramid as number, sphinx as number], "USB Drive (E:)");
+  refuseDeleting([pyramid as number, sphinx as number]);
   await deleteFolderAsking({ id: 6, name: "Cairo" }, getIndex().sources ?? []);
   await screen.getByRole("button", { name: "Delete Files Permanently" }).click();
 
   await expect
     .poll(() => getReport()?.sentence)
-    .toBe("Cairo’s 3 files could not be deleted · Cairo stayed");
-  expect(getNews()).toBeNull();
+    .toBe("Cairo’s 2 files could not be deleted · Cairo stayed");
+  expect(getNews()).toEqual(before);
+  await expect.element(screen.getByText("Deleted felucca.mp4.")).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "Undo" })).toBeVisible();
   expect(screen.getByText(/^Deleted 0 of/).query()).toBeNull();
-  expect(await names()).toEqual(["felucca.mp4", "pyramid.jpg", "sphinx.jpg"]);
+  expect(await names()).toEqual(["pyramid.jpg", "sphinx.jpg"]);
+});
+
+test("a folder emptied before Delete Files Permanently is answered goes with Undo", async () => {
+  const cairo = (await folderItems(6)).map((row) => row.id);
+  onDriveWithoutBin(cairo, "USB Drive (E:)");
+  const screen = await render(<Harness />);
+  await deleteFolderAsking({ id: 6, name: "Cairo" }, getIndex().sources ?? []);
+  await expect.element(screen.getByText("Cairo holds 3 files")).toBeVisible();
+  await moveItems(cairo, 4);
+  await screen.getByRole("button", { name: "Delete Files Permanently" }).click();
+
+  await expect.element(screen.getByText("Deleted Cairo.", { exact: true })).toBeVisible();
+  await screen.getByRole("button", { name: "Undo" }).click();
+  await expect.element(screen.getByText("Cairo is back in Trips.")).toBeVisible();
+  expect(await names()).toEqual([]);
 });
 
 /** The frame as the app fills it: the question above the grid, the pane beside it. */

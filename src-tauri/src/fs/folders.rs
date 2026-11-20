@@ -271,8 +271,7 @@ pub fn delete(
         .into_iter()
         .map(|id| paths::folder_dir(conn, id))
         .collect::<Result<_>>()?;
-    let undoable =
-        contents != Some(Contents::Permanently) || !journal::batch(conn, batch_id)?.is_empty();
+    let undoable = report.outright == 0 || !journal::batch(conn, batch_id)?.is_empty();
     let recorded = in_transaction(conn, |tx| {
         folders::retire_subtree_at(tx, folder_id, retired_at)?;
         if undoable {
