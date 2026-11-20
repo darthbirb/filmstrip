@@ -1,7 +1,7 @@
 //! What a batch did, read back from its journal rows in the terms the line at the foot of
 //! navigation is written in, both after the act and after undoing it. DECISIONS.md "Undo".
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
 use rusqlite::Connection;
 use serde::Serialize;
@@ -10,8 +10,8 @@ use ts_rs::TS;
 
 use crate::db::journal::{
     self, Change, Entry, FolderCopied, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed,
-    ItemCopied, ItemMoved, ItemRenamed, ItemRestored, ItemTrashed, ItemsTagged, ItemsUntagged,
-    Retagged,
+    Gone, ItemCopied, ItemMoved, ItemRenamed, ItemRestored, ItemTrashed, ItemsTagged,
+    ItemsUntagged, Retagged,
 };
 use crate::db::{folders, items};
 use crate::error::{AppError, Result};
@@ -138,6 +138,11 @@ pub fn count(conn: &Connection, entries: &[Entry]) -> Result<(u32, u32)> {
 
 fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
     let of = |op: &'static str| entries.iter().filter(move |entry| entry.op == op);
+    let gone: HashMap<i64, Gone> = entries
+        .iter()
+        .filter_map(journal::gone)
+        .map(|one| (one.item_id, one))
+        .collect();
     if let Some(entry) = of(journal::ITEMS_TAG).next() {
         let tag = forward::<ItemsTagged>(entry)?.value;
         return Ok(Act::AddTag { tag });
@@ -155,7 +160,7 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
         .map(forward)
         .collect::<Result<_>>()?;
     if !copied.is_empty() || !made.is_empty() {
-        return copy_act(conn, &copied, &made);
+        return copy_act(conn, &copied, &made, &gone);
     }
     if let Some(entry) = of(journal::FOLDER_DELETE).next() {
         let deleted: FolderDeleted = forward(entry)?;
@@ -203,7 +208,7 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
         let ids: Vec<i64> = restored.iter().map(|one| one.item_id).collect();
         return Ok(Act::Restore {
             to: only(conn, homes)?,
-            one: one_name(conn, &ids)?,
+            one: one_name(conn, &ids, &gone)?,
         });
     }
     let trashed: Vec<ItemTrashed> = of(journal::ITEM_TRASH)
@@ -217,11 +222,11 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
         let ids: Vec<i64> = trashed.iter().map(|one| one.item_id).collect();
         let origins = ids
             .iter()
-            .map(|id| items::file_of(conn, *id).map(|file| file.map_or(0, |file| file.folder_id)))
+            .map(|id| file_of(conn, *id, &gone).map(|file| file.map_or(0, |file| file.0)))
             .collect::<Result<BTreeSet<i64>>>()?;
         return Ok(Act::Delete {
             from: only(conn, origins)?,
-            one: one_name(conn, &ids)?,
+            one: one_name(conn, &ids, &gone)?,
         });
     }
     if let ([folder], []) = (carried.as_slice(), moved.as_slice()) {
@@ -246,7 +251,7 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
         from: only(conn, origins)?,
         to: name(conn, to)?,
         one: if carried.is_empty() {
-            one_name(conn, &ids)?
+            one_name(conn, &ids, &gone)?
         } else {
             None
         },
@@ -254,7 +259,12 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
 }
 
 /// A copy, named by where it went and by what came in at its top: one file, one folder, or counts.
-fn copy_act(conn: &Connection, copied: &[ItemCopied], made: &[FolderCopied]) -> Result<Act> {
+fn copy_act(
+    conn: &Connection,
+    copied: &[ItemCopied],
+    made: &[FolderCopied],
+    gone: &HashMap<i64, Gone>,
+) -> Result<Act> {
     let into = copied
         .first()
         .map(|one| one.into)
@@ -273,7 +283,7 @@ fn copy_act(conn: &Connection, copied: &[ItemCopied], made: &[FolderCopied]) -> 
     Ok(Act::Copy {
         to: name(conn, into)?,
         one: if tops.is_empty() {
-            one_name(conn, &loose)?
+            one_name(conn, &loose, gone)?
         } else {
             None
         },
@@ -305,11 +315,20 @@ fn only(conn: &Connection, origins: BTreeSet<i64>) -> Result<Option<String>> {
     }
 }
 
-fn one_name(conn: &Connection, ids: &[i64]) -> Result<Option<String>> {
+fn one_name(conn: &Connection, ids: &[i64], gone: &HashMap<i64, Gone>) -> Result<Option<String>> {
     match ids {
-        [id] => Ok(items::file_of(conn, *id)?.map(|file| file.disk_name)),
+        [id] => Ok(file_of(conn, *id, gone)?.map(|file| file.1)),
         _ => Ok(None),
     }
+}
+
+/// A file's folder and name: as the journal kept them when the index has forgotten it, since its
+/// id may name another file now.
+fn file_of(conn: &Connection, id: i64, gone: &HashMap<i64, Gone>) -> Result<Option<(i64, String)>> {
+    if let Some(one) = gone.get(&id) {
+        return Ok(Some((one.folder_id, one.name.clone())));
+    }
+    Ok(items::file_of(conn, id)?.map(|file| (file.folder_id, file.disk_name)))
 }
 
 /// The journal is JSON that outlives the code that wrote it, so a row that no longer reads is an

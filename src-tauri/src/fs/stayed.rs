@@ -5,6 +5,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
 
+use crate::db::journal::Gone;
 use crate::db::{folders, items};
 use crate::error::{AppError, Reason, Result};
 
@@ -74,6 +75,20 @@ pub fn file(conn: &Connection, item_id: i64, err: &AppError) -> Result<Stayed> {
         name: file.disk_name,
         at,
         reason,
+    })
+}
+
+/// A file the index forgot once it was emptied from the Recycle Bin, as the journal kept it.
+pub fn forgotten(conn: &Connection, gone: &Gone) -> Result<Stayed> {
+    Ok(Stayed {
+        kind: Thing::File,
+        id: gone.item_id,
+        name: gone.name.clone(),
+        at: Whereabouts::RecycleBin,
+        reason: Reason::GoneFromBin {
+            name: gone.name.clone(),
+            place: folders::title(conn, gone.folder_id)?.unwrap_or_default(),
+        },
     })
 }
 

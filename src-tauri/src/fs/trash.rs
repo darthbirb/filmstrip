@@ -155,7 +155,7 @@ enum Found {
     Back,
     /// Emptied from the bin outside the app.
     Gone,
-    /// On a drive that is away, so neither can be told.
+    /// On a drive that is away, or another volume stands at its letter, so neither can be told.
     Away,
 }
 
@@ -173,10 +173,9 @@ fn find(conn: &Connection, item_id: i64, file: &ItemFile) -> Result<Found> {
     if recycle::file_at(&home).as_deref() == Some(itself.as_str()) {
         return Ok(Found::Back);
     }
-    if drive_of(&binned).is_dir() {
-        Ok(Found::Gone)
-    } else {
-        Ok(Found::Away)
+    match recycle::serial_at(&drive_of(&binned)) {
+        Some(volume) if volume == recycle::serial_of(&itself) => Ok(Found::Gone),
+        _ => Ok(Found::Away),
     }
 }
 
@@ -230,8 +229,11 @@ pub fn look_in_bin(conn: &Connection) -> Result<Looked> {
                 looked.retired += 1;
             }
             Found::Back => {
-                in_transaction(conn, |tx| put_back(tx, row.id, &file))?;
-                looked.restored += 1;
+                if in_transaction(conn, |tx| put_back(tx, row.id, &file))? {
+                    looked.restored += 1;
+                } else {
+                    looked.retired += 1;
+                }
             }
         }
     }
@@ -439,7 +441,7 @@ mod tests {
     use crate::db::sources::{self, SourceKind};
     use crate::db::{self, journal};
     use crate::fs::recycle::tests::{Fake, Stand, stand_in, stand_in_as};
-    use crate::fs::{undo, walk};
+    use crate::fs::{acts, undo, walk};
 
     /// Trips/Cairo holding pyramid.jpg and sphinx.jpg, walked into a real file.
     fn library(name: &str) -> (Connection, PathBuf, i64) {
@@ -912,6 +914,27 @@ mod tests {
     }
 
     #[test]
+    fn a_file_put_back_from_explorer_into_a_folder_the_index_has_retired_counts_as_retired() {
+        let (conn, root, cairo) = library("look-folder-gone");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+        let binned = bin_file(&conn, pyramid);
+        std::fs::remove_dir_all(root.join("Trips/Cairo")).unwrap();
+        walk::reconcile(&conn).unwrap();
+        std::fs::create_dir_all(root.join("Trips/Cairo")).unwrap();
+        std::fs::rename(binned, root.join("Trips/Cairo/pyramid.jpg")).unwrap();
+
+        assert_eq!(
+            look_in_bin(&conn).unwrap(),
+            Looked {
+                retired: 1,
+                restored: 0
+            }
+        );
+        assert!(!items::is_trashed(&conn, pyramid).unwrap());
+    }
+
+    #[test]
     fn a_file_put_back_from_explorer_counts_as_restored() {
         let (conn, root, cairo) = library("restore-put-back");
         let pyramid = id_of(&conn, cairo, "pyramid.jpg");
@@ -995,6 +1018,96 @@ mod tests {
         );
         assert!(items::is_live(&conn, sphinx).unwrap());
         assert_eq!(journal::latest_batch(&conn).unwrap(), None);
+    }
+
+    #[test]
+    fn an_undo_of_a_file_the_index_forgot_once_it_was_emptied_says_so_and_leaves_nothing_to_redo() {
+        let (conn, root, cairo) = library("undo-forgotten");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let batch = journal::new_batch();
+        trash_items(&conn, &[pyramid], &batch).unwrap();
+        std::fs::write(root.join("Trips/Cairo/pyramid.jpg"), "another").unwrap();
+        walk::reconcile(&conn).unwrap();
+        let newcomer = id_of(&conn, cairo, "pyramid.jpg");
+        std::fs::remove_file(bin_file(&conn, pyramid)).unwrap();
+        assert_eq!(look_in_bin(&conn).unwrap().retired, 1);
+        assert!(items::file_of(&conn, pyramid).unwrap().is_none());
+
+        let report = undo::undo_last(&conn).unwrap().unwrap();
+
+        assert_eq!(report.batch.batch_id, batch);
+        assert_eq!(
+            report.batch.act,
+            acts::Act::Delete {
+                from: Some("Cairo".into()),
+                one: Some("pyramid.jpg".into()),
+            }
+        );
+        assert_eq!(report.files_back, 0);
+        assert_eq!(
+            report.stayed,
+            [Stayed {
+                kind: stayed::Thing::File,
+                id: pyramid,
+                name: "pyramid.jpg".into(),
+                at: stayed::Whereabouts::RecycleBin,
+                reason: Reason::GoneFromBin {
+                    name: "pyramid.jpg".into(),
+                    place: "Cairo".into(),
+                },
+            }]
+        );
+        assert_eq!(journal::latest_batch(&conn).unwrap(), None);
+        assert!(items::is_live(&conn, newcomer).unwrap());
+        assert_eq!(
+            std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap(),
+            "another"
+        );
+    }
+
+    /// A drive letter with nothing at it.
+    fn free_letter() -> char {
+        ('D'..='Z')
+            .rev()
+            .find(|letter| !Path::new(&format!(r"{letter}:\")).is_dir())
+            .expect("a drive letter with nothing at it")
+    }
+
+    #[test]
+    fn a_file_on_a_drive_that_is_away_or_another_volume_at_its_letter_waits_in_the_trash() {
+        let (conn, _root, cairo) = library("away");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        trash_items(&conn, &[pyramid, sphinx], &journal::new_batch()).unwrap();
+        let (binned, itself) = items::binned(&conn, pyramid).unwrap().unwrap();
+        let away = format!(r"{}:\$Recycle.Bin\$RAWAY.jpg", free_letter());
+        items::set_binned(&conn, pyramid, &away, &itself).unwrap();
+        let ours = recycle::serial_at(&drive_of(Path::new(&binned))).unwrap();
+        let other = if ours == "1" { "2" } else { "1" };
+        let (sphinx_binned, sphinx_itself) = items::binned(&conn, sphinx).unwrap().unwrap();
+        std::fs::remove_file(&sphinx_binned).unwrap();
+        let index = sphinx_itself.split_once('-').unwrap().1;
+        let elsewhere = format!("{other}-{index}");
+        items::set_binned(&conn, sphinx, &sphinx_binned, &elsewhere).unwrap();
+
+        assert_eq!(look_in_bin(&conn).unwrap(), Looked::default());
+        assert!(items::is_trashed(&conn, pyramid).unwrap());
+        assert!(items::is_trashed(&conn, sphinx).unwrap());
+
+        let report = restore_items(&conn, &[pyramid, sphinx], None, &journal::new_batch()).unwrap();
+
+        assert_eq!(report.restored, 0);
+        let offline = Reason::Offline {
+            source: "Library".into(),
+        };
+        assert!(report.refused.iter().all(|one| one.reason == offline));
+        assert!(
+            report
+                .refused
+                .iter()
+                .all(|one| one.at == stayed::Whereabouts::Trash)
+        );
+        assert_eq!(listing(&conn).unwrap().len(), 2);
     }
 
     #[test]

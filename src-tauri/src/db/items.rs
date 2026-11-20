@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::db::folders::{self, Crumb};
+use crate::db::journal::{self, Gone};
 use crate::db::now;
 use crate::db::sources::SourceKind;
 use crate::error::Result;
@@ -389,8 +390,17 @@ pub fn forget_retired(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
-/// Forgets an item outright. Covers point in from outside the cascade, so go first.
+/// Forgets an item outright, and has the journal forget it with it. Covers point in from outside
+/// the cascade, so go first.
 pub fn forget(conn: &Connection, id: i64) -> Result<()> {
+    if let Some(file) = file_of(conn, id)? {
+        let gone = Gone {
+            item_id: id,
+            name: file.disk_name,
+            folder_id: file.folder_id,
+        };
+        journal::forget_item(conn, &gone)?;
+    }
     conn.execute(
         "UPDATE folder SET cover_item_id = NULL WHERE cover_item_id = ?1",
         params![id],

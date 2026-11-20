@@ -62,6 +62,14 @@ fn reverse_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
     let mut stayed = Vec::new();
     let mut gone = 0;
     for entry in &entries {
+        if let Some(forgotten) = journal::gone(entry) {
+            journal::drop_entry(conn, entry.id)?;
+            if entry.op != journal::ITEM_COPY {
+                stayed.push(stayed::forgotten(conn, &forgotten)?);
+                gone += 1;
+            }
+            continue;
+        }
         // What failed stays in the journal, or it could never be tried again; a file emptied from
         // the Recycle Bin never could be.
         match reverse(conn, entry) {

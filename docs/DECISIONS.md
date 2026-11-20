@@ -1396,11 +1396,17 @@ waits, where Explorer can see it too.
   Restore had done it; a row a walk made for it meanwhile, under the name it took back, is
   forgotten. In neither, it was emptied outside the app: its row retires where it was, keeping its
   name and tags, as a walk retires a file it finds gone. A drive that is away is left until it is
-  back. A row with no record of where the bin keeps it is retired too: only a build before this
+  back, and so is one where another volume answers at its letter, since its serial is not the
+  one `bin_file` names: that drive's bin is not where the file went. A row with no record of where the bin keeps it is retired too: only a build before this
   one made such rows, and no library predates it.
 - **A Restore or Ctrl+Z that reaches a file emptied from the bin says so**: listed under Gone from
   the Recycle Bin, with no row button, its row retired. Retry stays only while a row still in the
   Trash could succeed.
+- **A row forgotten rather than retired leaves the journal with it.** Retiring keeps a name
+  another file holds by then, so that row is forgotten instead, and the journal forgets it in the
+  same transaction (SCHEMA.md "The undo journal"): an undo of the act that sent it reports it gone
+  from the bin, by the name and folder kept on its rows, and never stops on it or reaches a file
+  given its id since.
 - **The bin refusing a file leaves it where it was.** The send never deletes outright, so a file
   too large for the bin, or on a drive whose bin is off, stays in its folder and the foot says so;
   the rest of a set are one batch with Undo. A drive with no Recycle Bin at all, which Windows

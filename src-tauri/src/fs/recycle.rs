@@ -88,6 +88,24 @@ pub fn file_at(path: &Path) -> Option<String> {
         .flatten()
 }
 
+/// The serial of the volume a directory is on, as [`Binned::file`] begins; nothing when it cannot
+/// be reached.
+pub fn serial_at(dir: &Path) -> Option<String> {
+    let is_dir = std::fs::metadata(dir).is_ok_and(|meta| meta.is_dir());
+    is_dir
+        .then(|| {
+            identity(dir)
+                .ok()
+                .map(|found| format!("{:x}", found.volume))
+        })
+        .flatten()
+}
+
+/// The serial of the volume a file named as [`Binned::file`] names it is on.
+pub fn serial_of(file: &str) -> &str {
+    file.split_once('-').map_or(file, |(volume, _)| volume)
+}
+
 /// A verbatim name as the rest of the app writes one: `D:\…`, or `\\server\share\…`.
 fn plain(path: &Path) -> PathBuf {
     let text = path.to_string_lossy();
@@ -158,12 +176,13 @@ fn identity(path: &Path) -> io::Result<Identity> {
     use std::os::windows::fs::OpenOptionsExt;
     use std::os::windows::io::AsRawHandle;
     use windows_sys::Win32::Storage::FileSystem::{
-        BY_HANDLE_FILE_INFORMATION, FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ,
-        FILE_SHARE_WRITE, GetFileInformationByHandle,
+        BY_HANDLE_FILE_INFORMATION, FILE_FLAG_BACKUP_SEMANTICS, FILE_READ_ATTRIBUTES,
+        FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, GetFileInformationByHandle,
     };
 
     let file = std::fs::OpenOptions::new()
         .access_mode(FILE_READ_ATTRIBUTES)
+        .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
         .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
         .open(path)?;
     // SAFETY: all-zero is a valid BY_HANDLE_FILE_INFORMATION, which the call fills in.
