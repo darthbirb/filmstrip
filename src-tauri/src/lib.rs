@@ -31,18 +31,15 @@ pub fn run() {
             jobs::abandon_exports(&conn)?;
             db::jobs::requeue_running(&conn)?;
             jobs::enqueue_index(&conn)?;
-            jobs::enqueue_expiry(&conn)?;
             fs::trash::settle_unfinished_send(&conn)?;
-            let put = fs::recycle::sweep(&fs::paths::trash_dir()?);
-            if put > 0 {
-                eprintln!("trash: {put} held files put back");
+            if let Err(err) = fs::trash::look_in_bin(&conn) {
+                eprintln!("trash: the Recycle Bin was not looked in: {err}");
             }
 
-            // The window may load files from the sources, the thumbnail cache and the trash, where
-            // a file waits to be restored; and nothing else.
+            // The window may load files from the sources and the thumbnail cache, and a trashed
+            // file only once the pane shows it; and nothing else.
             let scope = app.asset_protocol_scope();
             scope.allow_directory(&thumbs, true)?;
-            scope.allow_directory(fs::paths::trash_dir()?, true)?;
             for source in db::sources::list(&conn)? {
                 scope.allow_directory(&source.root, true)?;
             }
@@ -71,10 +68,6 @@ pub fn run() {
                     let _ = exporter.emit(jobs::EXPORTED_EVENT, exported);
                 }),
             );
-            let expirer = app.handle().clone();
-            queue.on_expired(Box::new(move |expired| {
-                let _ = expirer.emit(jobs::EXPIRED_EVENT, expired);
-            }));
             let backups = fs::backups::Shelf::new(fs::paths::backups_dir()?);
             back_up_at_launch(app.handle().clone(), &backups, db_path.clone());
             app.manage(commands::AppState {
@@ -120,7 +113,7 @@ pub fn run() {
             commands::move_items,
             commands::rename_item,
             commands::trash_items,
-            commands::send_to_recycle_bin,
+            commands::look_in_bin,
             commands::folder_file_count,
             commands::delete_folder,
             commands::undo_last,
@@ -198,8 +191,6 @@ pub fn run() {
             commands::restore_backup,
             commands::restore_forgets,
             commands::set_backups_kept,
-            commands::trash_limits,
-            commands::set_trash_limit,
             commands::launch_backup_refusal,
             commands::ui_preferences,
             commands::set_ui_preferences,

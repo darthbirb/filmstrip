@@ -667,16 +667,16 @@ toward the rest surface.
   opens in place beneath it rather than in a dialog: `eyebrow` headings over rows `control` tall,
   each row the name, why, and at its end a quiet way to go and look. What an act or an undo could
   not finish is grouped under a heading per place it is still in, "Reason" said over the first;
-  a file that expired first is under In the Recycle Bin, last, with no way to look and no Retry.
+  a file emptied from the Recycle Bin outside the app is under Gone from the Recycle Bin, last,
+  with no way to look, and Retry stays only while a row above it could succeed.
 - **Question.** The notice's shape, asking: the `danger` glyph, the question and × to answer none
   on one line; under the question its answers as buttons, the one that destroys last in `danger`;
   under them, where an answer can be kept, a checkbox. The answers hold the line or all fold into
   one raised button with a caret, whose menu names them a `tile-gap` under it; folded answers that
   still do not fit take a line each, left-aligned. Only the answers ever change shape. Why it is
-  asked can stand under the question in `small` `fg-dim`, as Delete's of a file too large for the
-  Trash does, where × is Keep It. A question about several files has Hide Files before × and their
-  list under its answers, as the notice's, each file's size where a reason would be. What the
-  Recycle Bin then refused keeps the shape with no answer, × as Dismiss.
+  asked can stand under the question in `small` `fg-dim`. A question about several files has
+  Hide Files before × and their list under its answers, as the notice's, each file's size where a
+  reason would be.
 - **Selection bar.** The grid's own foot row while anything is checked: `toolbar` tall on `panel`
   with a `line` hairline above, arriving and leaving as a box pushing down does, the grid giving up
   its height. From the left: the count in `ui` semibold `fg` with its size after it in `small`
@@ -984,10 +984,9 @@ toward the rest surface.
   `row` with what it holds after it in `small` `fg-dim`, and a list that scrolls inside it, so the
   dialog never grows; its Line stands at the section's foot. Backups heads itself the same way,
   with Back Up Now at the head's end, and its Band stands where the Line does. Trash heads itself
-  too, what it holds against its total after its name, over its three limits as dropdown rows and
-  one line under them at the rows' inset: the recycle glyph in `glyph` and what the next run sends
-  in `small` `fg-dim`, its count and time in `fg`, or the usual line when nothing; with neither
-  Keep For nor Total Size, the infinity glyph and that nothing leaves the Trash.
+  too, how many files the library has in the Recycle Bin and their size after its name, or
+  Nothing in it, over one line on where a deleted file goes: the recycle glyph in `glyph` and the
+  sentence in `small` `fg-dim`.
 - **Filter field.** Narrows the list under it as you type: `bar-field` tall on `ground` at the
   `nested` corner in a `line-control` ring, `line-strong` while it has the focus, the search glyph
   before it in `fg-dim` and "3 of 228" at its end in `small` tabular figures once something is
@@ -1016,9 +1015,9 @@ toward the rest surface.
   the next backup says so where how it was taken goes, its time in `fg-mid`; one that cannot be
   read says unreadable and has no Restore…; one being written arrives at the top as a push-down,
   "backing up…" and the `progress` bar in place of its size. Restore… asks in the row question's
-  shape, naming in `fg` each source it forgets with files in the Trash and counting the files,
-  which go to the Recycle Bin; when what it forgets cannot be read, it says any source added since
-  is forgotten and its files there go, with no names or count, and while it restores the answers give way to the walk's line and bar inside the same
+  shape, naming in `fg` each source it forgets with files in the Recycle Bin and counting the
+  files, which stay there; when what it forgets cannot be read, it says any source added since is
+  forgotten and its files stay in the bin, with no names or count, and while it restores the answers give way to the walk's line and bar inside the same
   ring, and Settings holds still: the rail's sections and its filter field are disabled, those
   not shown in `fg-faint`, and Escape and the close wait. The list scrolls inside the group, and No Backups Yet takes its place when there are none.
 - **Row question.** A question on the row it is about, in the source row's remove shape: the row
@@ -1027,14 +1026,13 @@ toward the rest surface.
   indent, the one that acts first and Cancel, which has the focus. Escape puts the row back.
 - **Band.** What could not be done, at the foot of the panel it was asked from: a sentence, the
   folder's path under it in `--font-mono` or why in `small` `fg-dim`, and a dismiss, on a
-  `danger-wash` ground. A way to go and look, as Show in Trash after files the Recycle Bin refused,
-  stands under why as a Button. There is only ever one, and a second refusal replaces it rather
+  `danger-wash` ground, as when the Recycle Bin would not take a file Delete sent it. A way to go
+  and look stands under why as a Button. There is only ever one, and a second refusal replaces it rather
   than stacking.
 - **Line.** What an act did, in the Band's slot and shape without its alarm: a `glyph` in `fg-dim`
   (a check after an act, the undo arrow after an undo), the sentence in `ui`, the way back under it
   as a raised Undo button, and a dismiss. An act that changed nothing in the library, as a drop on
-  the pane past its limit, has no Undo, and leaves the folded rail; so does what the Trash's limits
-  sent to the Recycle Bin, under the recycle glyph. It shares the one slot with the Band, and the newest of
+  the pane past its limit, has no Undo, and leaves the folded rail. It shares the one slot with the Band, and the newest of
   the two replaces the other. Folded, the rail keeps the Undo glyph button alone, its sentence in
   the tooltip; "Nothing to undo." comes out beside the rail on `panel` with the overlay shadow, as
   does "The clipboard holds no files.", with the clipboard glyph.
@@ -1062,10 +1060,8 @@ toward the rest surface.
   Remove asks on the row: a `line-danger` ring, the glyph becomes the warning, the kind and the
   buttons give up their space, and the path gives way to what removing forgets, over **Remove
   source** and **Cancel**. The name and the count stay, and Escape puts the row back. A source
-  with files in the Trash adds that they go to the Recycle Bin, their count in `fg`; Remove
-  source gives the answers' place to the walk's line and bar, "Removing Pictures…", as a restore
-  does, and Settings holds still until it ends. A file the bin refused is counted in the Band at
-  the section's foot, over the Trash's folder.
+  with files in the Trash adds that they stay in the Recycle Bin, out of the app, their count in
+  `fg`; Remove source sends nothing, so the row simply goes, with no bar, band or line.
 - **Push-down.** A box arriving under the row above it: it grows from no height, lifts the
   `--push-lift` it started above where it settles, and fades, all as one move. Closed, it is out of
   sight and out of the tab order rather than sitting at no height. The pane's details and the

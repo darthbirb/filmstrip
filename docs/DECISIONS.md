@@ -34,10 +34,12 @@ configuration fetches whatever was published minutes ago, every time it starts.
 
 ## Nothing outside the app folder
 
-Everything the app writes lives beside its own executable: the index, thumbnails, the trash,
-and WebView2's profile. `lib.rs` passes `data_directory` to the window builder. Measured on 12
-September 2026, `%LOCALAPPDATA%\com.darthbirb.filmstrip` is never created — the builder call
-is sufficient on its own.
+Everything the app writes lives beside its own executable: the index, thumbnails, backups and
+WebView2's profile. A deleted file goes to the Windows Recycle Bin on its own drive, which is
+Windows', not the app's: DECISIONS.md "The Trash is the Recycle Bin". `lib.rs` passes
+`data_directory` to the window builder. Measured on 12 September 2026,
+`%LOCALAPPDATA%\com.darthbirb.filmstrip` is never created — the builder call is sufficient on its
+own.
 
 The library is a folder the user chooses. Nothing in it is touched except when they ask.
 
@@ -612,10 +614,10 @@ a source that is away keeps the verb.
 September 2026. Its bar holds Restore and Restore to…, worded and from the left, and no ⋯, since
 nothing is left to fold; its menu holds the same two under Full Screen. Favourite, Move to… and
 Rename would change a file that is not in the library, and Show in Explorer, Copy and Open with
-Default App would hand Windows the name the Trash keeps it under, never the one it was given; all
-of them are absent rather than greyed. Nothing purges: emptying the Trash is under Later. Its
-details say where it came from and when it went, in place of where it is, and the Name row is
-only its name. Restored from the Trash, the pane moves on as it does after a delete.
+Default App would hand Windows the name the Recycle Bin keeps it under, never the one it was given;
+all of them are absent rather than greyed. Nothing purges: emptying the Trash is under Later. Its
+details say where it came from and when it went, in place of where it is, and the Name row is only
+its name. Restored from the Trash, the pane moves on as it does after a delete.
 
 **A video plays on a plate of the app's own**, drawn by Claude Design and built on 12 October
 2026, in place of the controls the window brings with it: play, the track, the time and the mute
@@ -917,7 +919,7 @@ Shift+F10 did nothing at all.
   between two groups that both hold rows, so an absent verb leaves no stray line, and a menu with
   nothing in it opens nothing.
 - **What a drive that is away cannot do is absent too.** An offline source keeps Rename, Manage
-  Sources and Remove Source, which touch only the index and the app's own Trash, never the drive;
+  Sources and Remove Source, which touch only the index, never the drive;
   it and its folders keep Favourite, Assign
   Key… and Select Everything Inside, as their band keeps what the index holds, and lose every verb
   that needs the folder on disk.
@@ -1177,10 +1179,10 @@ it.
 - **A trashed item gives up its name; a retired one keeps it.** `trashed_at` tells them apart. A
   file vanishing and coming back is the same file, so it keeps its tags. A file sent to the trash
   and then replaced under the same name is a different file: the newcomer is a new item, and the
-  trashed one waits in the trash, untouched, until it is taken back.
-- **The trash is a folder beside the executable**, as PRODUCT.md "Trash" has it, so a file on
-  another drive is copied there. A file already gone from where the index has it is refused
-  rather than trashed; the next walk retires it.
+  trashed one waits in the Recycle Bin, untouched, until it is taken back.
+- **The Trash is the Windows Recycle Bin**, on each file's own drive, as PRODUCT.md "Trash" has
+  it and DECISIONS.md "The Trash is the Recycle Bin" says why. A file already gone from where the
+  index has it is refused rather than trashed; the next walk retires it.
 - **Deleting a folder moves or trashes what it holds first**, under the batch the folder's own
   deletion joins, so one undo takes back all of it. Moved to a sorting source, its files and its
   subfolders arrive at that source's top level as they were. The folder itself goes only once
@@ -1200,12 +1202,9 @@ it.
 - **The tags screen's renames, merges and deletes are journalled too**, one row per act
   (`retag`), for the same reason: a merge of `dawn` into `golden hour` forgets which files held
   which, and only the journal can split them again. DECISIONS.md "The tags screen".
-- **Expiry prunes the journal, and only of the file that expired.** A row about that one file
-  (a move, a rename, a delete, a restore, a copy) is kept with a mark saying where it went, so
-  Ctrl+Z still finds its batch and says the file is in the Recycle Bin rather than acting on an id
-  that may be reused; the mark goes as the undo says so. A row naming a set (a tag added, one taken
-  off, a tags-screen act) loses that file alone, and goes once it names nothing. DECISIONS.md
-  "Expiry goes to the Recycle Bin".
+- **A file emptied from the Recycle Bin outside the app ends its way back.** A Ctrl+Z or Restore
+  that reaches it lists it under Gone from the Recycle Bin, retires its row and drops the journal
+  row that sent it there, so no later undo acts on it. DECISIONS.md "The Trash is the Recycle Bin".
 
 ## Bringing files in
 
@@ -1343,104 +1342,100 @@ does not: tags, labels, notes, statuses, covers, favourites, keys and the undo j
 - **A restore checks the chosen backup whole first**, every page read, and refuses one that cannot
   be read, or that a later build wrote, before anything is written. Then the queue is held: each
   copy and export is stopped as its Cancel would, a walk stops before its next directory, and
-  the restore waits for every job in flight. Then each file in the Trash the restore would forget
-  goes to the Recycle Bin, its row with it; with any the bin cannot take, the restore stops there,
-  nothing backed up and nothing swapped. Then the index as it is is backed up, "before restore";
-  then the chosen one is copied aside, brought to this build's schema, settled, and copied over the
-  live index by the backup API in one write, so one that fails part way leaves the index as it
-  was but for the files already sent, which stand and which the failure names. Only once that has
+  the restore waits for every job in flight. Then the index as it is is backed up, "before
+  restore"; then the chosen one is copied aside, brought to this build's schema, settled, and
+  copied over the live index by the backup API in one write, so one that fails part way leaves the
+  index as it was. Only once that has
   succeeded do the oldest go, and never the one restored: had it been the
   oldest, it stays past the number until the next backup. Rotating, queueing the walk and letting
   the window load from every source the restored index has follow it, and none of them can fail a
   restore that has swapped.
 - **What a restore leaves as it is now.** The index goes back; the disk does not. The Trash is kept
   as it is now: a file in it since the backup is in it again from the folder it left, found by its
-  source's root and the titles below it, with the folders on the way made retired where the
-  backup has none. One from a source added since, or from a place the backup cannot find, is
-  forgotten as that source's other rows are, so its file goes to the Recycle Bin first, as a
-  removed source's do, and the question names the sources and counts the files beforehand. A row
-  the backup has in the Trash whose file is no longer in `data\trash` is retired where it was,
-  keeping its tags and uuid for the walk to find again, or dropped where a file there now has its
-  name. The job queue starts empty but for the walk, which
-  runs at once, so a copy or an export waiting in the backup never runs again and files moved or
-  added since are found where they are. A source added since is forgotten, and its files on disk
-  are left as they are.
+  source's root and the titles below it, with the folders on the way made retired where the backup
+  has none, with where the Recycle Bin keeps its file. One from a source added since, or from a
+  place the backup cannot find, is forgotten as that source's other rows are, and its file stays in
+  the Recycle Bin, as a removed source's do; the question names the sources and counts the files
+  beforehand. Nothing is sent, so nothing can be refused. A row the backup has in the Trash whose
+  file is no longer where the bin kept it is retired where it was, keeping its tags and uuid for
+  the walk to find again, or dropped where a file there now has its name. The job queue starts
+  empty but for the walk, which runs at once, so a copy or an export waiting in the backup never
+  runs again and files moved or added since are found where they are. A source added since is
+  forgotten, and its files on disk are left as they are.
 - **Undo goes no further back than a restore.** The journal comes back as it was then, so restoring
   the "before restore" backup puts the index back whole, but what it holds describes a disk the
   walk has read again since. A restore records the newest journal row it kept in `setting`, and
   Ctrl+Z and Undo stop there.
 
-## Expiry goes to the Recycle Bin
+## The Trash is the Recycle Bin
 
-**An item that expires from the trash goes to the Windows Recycle Bin**, as the owner decided on
-13 October 2026. Expiry is the trash keeping its own limits, not an act the person made, so
-it may end what the app can take back, but it may not destroy: an item that outlives the time to
-live, or goes while the trash is over its total size, gets one more chance outside the app. The
-other answer, deleting it outright, would have made the trash the last chance and its limits a
-promise the person has to keep in mind.
+**Delete sends a file to the Windows Recycle Bin on its own drive, and the Trash lists what the
+library sent there**, as the owner decided on 15 November 2026 and built for #192 from Artboards ›
+The Trash in the Recycle Bin. It replaced `data\trash`, a folder of the app's own beside the
+executable, with the three limits it kept and the hourly run that expired files from it to the
+Recycle Bin (#184), and Delete's refusal of a file too large for it (#186). That folder copied a
+file across drives to keep it, and kept limits beside the ones Windows already keeps for each
+drive's bin; and expiry still ended in the Recycle Bin. Now there is one place a deleted file
+waits, where Explorer can see it too.
 
-- **Restore and undo end at expiry.** From the Recycle Bin a file is Windows' to give back, and
-  the app no longer holds it.
-- **Purge stays the one irreversible act**, as PRD.md "What must always hold" has it: emptying the
-  trash deletes outright, and it asks first.
-- **An item over the per-item size goes where an expiry would**: refused by the trash, the delete
-  offers to send it to the Recycle Bin instead.
-- **A removed source's trashed files go there too**, and so does each trashed file a restore of
-  the index would forget (#110). Removing a source forgets its rows, the trashed ones with them,
-  and a file left in `data\trash` with no row would never be shown, restored or expired. The
-  files go first, each row with its file, one already gone counting as sent, and the source only
-  once every one has gone; a file the Recycle Bin cannot take stays in the Trash under its row,
-  the rest still go, and the source stays with it. Nothing is predicted: the question says what
-  happens if nothing refuses, and the band says what did when something does. Artboards ›
-  Sources, "What removing does with its trashed files".
-
-**The run** was built on 14 November 2026 for #184, from Artboards › The Trash's limits.
-
-- **At launch and every hour**, as a job of its own kind behind the walk, so it never holds the
-  window. The hour is kept by the queue's own tick, which is handed the time, so a test moves the
-  clock rather than waiting on it. No run is queued while another waits or runs, so a run that
-  outlasts its hour is never joined by a second saying the same refusals.
-- **Age first, then size, oldest first.** Every file past the time to live goes; then, while the
-  Trash still weighs more than its total, the oldest that are left. Each file goes on its own turn
-  at the disk, its row going in the same transaction once the Recycle Bin has it, so an act
-  queued behind the run waits for one file, not the run. Inside each turn the Trash is weighed
-  again and the file's deletion time checked again: a restore or a delete between two turns
-  changes what is over, and a file deleted again is now the newest. A partial index on the
-  trashed items keeps that weighing to the Trash alone.
-- **A file the Recycle Bin refuses stays in the Trash under its row**, still counted against the
-  total, and is tried again at every run. The foot says so once, when more are refused than at the
-  last run, with Show in Trash; a run that only sent files says what went, with no Undo.
-- **What expired is remembered by id**: its name, the folder it left and the limit that sent it.
-  A Restore or Ctrl+Z that reaches it after the run lists it under In the Recycle Bin with why,
-  rather than as a file the app has lost, and Retry tries again only what is still in the Trash.
-- **The limits live in `filmstrip.config.json`**, beside the backups kept: they are the app's
-  own housekeeping, not the library, and a restore of the index leaves them as they are. No Limit
-  is a choice for each. The line under them says what the next run will send, as of when it runs,
-  leaving out what the Recycle Bin refused at the last one.
-- **The size per file is set here and kept by Delete** (#186), not by the run: a file already in
-  the Trash was let in under the limit it had then.
-
-**Delete's refusal** was built on 15 November 2026 for #186, from Artboards › The Trash's limits.
-
-- **The file's size on disk, against the smaller of the two sizes.** Delete measures the file
-  itself, not the index's last reading, and refuses it before anything moves. A file over the
-  total would only expire at the next run, so it is refused too, even under the size per file;
-  with both at No Limit nothing is refused for its size. Undo of a restore and every other way
-  back into the Trash is not a Delete, and is never refused.
-- **Refused files are asked about, never sent unasked.** The rest of a set, or of a folder, go
-  to the Trash under one batch as ever. A folder stays while its refused files do, and its delete
-  runs again, as a batch of its own, once every one has gone.
-- **Sent, the row retires**, as a walk retires a file it finds gone, so a file the person puts
-  back from the Recycle Bin comes back as the same item, its tags with it. Nothing is
-  journalled: from the bin the file is Windows' to give back.
+- **Each trashed row records where the bin keeps its file.** The send already reads the file's
+  names before and after the shell takes it (DECISIONS.md "Sending to the Recycle Bin"), and the
+  name it gained under `$Recycle.Bin` is the shell's own name for it there, `$R…`. That name goes
+  in `item.bin_path`, and the file's identity, its volume's serial and its index on it, in
+  `item.bin_file`, so a file is known by what it is rather than by a name another file could
+  take. No crate reads the bin: listing it through the shell's namespace means COM and every file
+  in every drive's bin, where the send has already seen the one name it needs.
+- **Restore, Restore to… and Ctrl+Z move the file back out**, from its name in the bin to its
+  folder or the one picked, by the same no-clobber move the app's other moves use, under its own
+  name; a taken name or a gone folder keeps it in the Trash as before. Once the file is out, the
+  shell's record of it, `$I…` beside it, is removed too, so Explorer's bin stops listing a file it
+  no longer holds, as the shell's own restore does. Only a record inside the bin whose file has
+  gone is ever removed.
+- **The Trash looks in the bin at launch and whenever it opens.** Each trashed file is looked for
+  by its identity, at its name in the bin and then at its own path. Still in the bin, it stays.
+  Back at its path, put back from Explorer, it is restored in the index, tags and all, as if
+  Restore had done it; a row a walk made for it meanwhile, under the name it took back, is
+  forgotten. In neither, it was emptied outside the app: its row retires where it was, keeping its
+  name and tags, as a walk retires a file it finds gone. A drive that is away is left until it is
+  back, and so is one where another volume answers at its letter or folder, since its serial is
+  not the one `bin_file` names: that volume's bin is not where the file went. A row with no
+  record of where the bin keeps it is retired too: only a build before this one made such rows,
+  and no library predates it.
+- **A Restore or Ctrl+Z that reaches a file emptied from the bin says so**: listed under Gone from
+  the Recycle Bin, with no row button, its row retired. Retry stays only while a row still in the
+  Trash could succeed.
+- **A row forgotten rather than retired leaves the journal with it.** Retiring keeps a name
+  another file holds by then, so that row is forgotten instead, and the journal forgets it in the
+  same transaction (SCHEMA.md "The undo journal"): an undo of the act that sent it reports it gone
+  from the bin, by the name and folder kept on its rows, and never stops on it or reaches a file
+  given its id since.
+- **The bin refusing a file leaves it where it was.** The send never deletes outright, so a file
+  too large for the bin, or on a drive whose bin is off, stays in its folder and the foot says so;
+  the rest of a set are one batch with Undo. A drive with no Recycle Bin at all, which Windows
+  would delete from outright, is #193's to ask about first.
+- **A removed source's trashed files stay in the bin**, and so do those a restore of the index
+  forgets. Their rows are forgotten; their files are already in the Recycle Bin, on the drive each
+  came from, for Explorer to put back or empty. Nothing is sent, so nothing can be refused, and
+  removing a source is the index forgetting rows again. Artboards › Sources, "What removing does
+  with its trashed files".
+- **A drive's own Recycle Bin is never walked.** A source at a drive's root holds `$Recycle.Bin`,
+  where Delete now sends the library's files; walked, they would come back in as new files in a
+  folder of that name.
+- **`data\trash` is never touched.** A folder of that name from an earlier build is neither read,
+  emptied nor deleted; the app no longer makes one.
+- **Emptying stays the one irreversible act**, as PRD.md "What must always hold" has it: Empty
+  Trash… (#194) deletes for good only what the library sent to the bin, and asks first.
+- **Tests never reach the real bin.** Every send goes through `fs::recycle::Shell`, which in a
+  test build hands the file to a stand-in of the test's own thread, recycling into a folder under
+  `target`; the real `RecycleBin` refuses to run in one.
 
 ## Sending to the Recycle Bin
 
 **`fs::recycle::send` hands a file to the shell's Recycle Bin and never lets it be destroyed**,
-built on 20 October 2026 for #110 and meant for expiry (#70) too. The Recycle Bin cannot take
-every file: a drive with none, such as a removable one or a network share, the bin turned off,
-or a file over its quota. There the shell deletes it outright, and asking it not to means a
-dialog, which the app never shows on its behalf.
+built on 20 October 2026 for #110, and since #192 the way every Delete goes. The Recycle Bin cannot
+take every file: a drive with none, such as a removable one or a network share, the bin turned off,
+or a file over its quota. There the shell deletes it outright, and asking it not to means a dialog,
+which the app never shows on its behalf.
 
 - **A second name first, then its names, then the shell, then its names again.** Before the
   shell is asked, the file is given a second name beside it by a hard link, and that file's names
@@ -1468,27 +1463,24 @@ dialog, which the app never shows on its behalf.
   with a name in the bin is not counted as sent either: the disk can change while the app is
   closed, so that name may be gone or emptied by the next look, and the twin costs only space. A
   second name that is not the same file is never removed.
-- **Every lone second name is put back at launch.** A lone one is never counted as sent, so
-  putting it back then is what its row's next send would do, only sooner. Waiting for that send
-  left a crash during Remove Source with an item in the Trash and no file under it: not
-  restorable, not shown, and dropped by a restore of the index, which keeps only the trashed rows
-  whose files it finds. One whose row was forgotten would wait unseen forever. At launch, every
-  second name under `data\trash` alone where its file's name is free is given that name back,
-  whatever the index holds; nothing there is removed.
+- **The send says where the bin put it**: the name the file gained under `$Recycle.Bin`, and its
+  identity, read from the second name before the shell is asked, since the file keeps it in the
+  bin. DECISIONS.md "The Trash is the Recycle Bin".
 - **`SHFileOperationW`, not `IFileOperation`.** The newer interface can refuse an outright delete
   before it happens, but only through a COM sink the app would have to implement; the second name
   gets the same promise from one flat call. The reason a file was refused is not told apart: all
   three are the Recycle Bin refusing, and a send that fails on the disk is said in the log.
-- **A library file goes the same way.** Delete's Send to Recycle Bin hands `send` a file in its
-  own folder, so its second name is made there, hidden by its dot from the walk, and nothing
-  else would ever find it. Its path joins the list in `setting.recycling` before the send and
+- **The second name is made in the file's own folder.** Delete hands `send` a file where it is,
+  so its second name is made there, hidden by its dot from the walk, and nothing else would ever
+  find it. Its path joins the list in `setting.recycling` before the send and
   leaves only once the send has settled. A send that fails partway keeps it, and a later send
   never displaces it. At launch each one whose folder can be reached is settled as the next
   send would settle it: a lone second name is the file again. One on a drive that is away waits
   for a launch that finds it. The rest of the library is never swept for second names.
 - **Tests never reach the real bin.** The shell is behind the `Bin` trait, which also says
-  whether a name is inside it; the tests' stand-in recycles into a folder of its own, deletes
-  outright or refuses, while the second name and the file's names are real. Its files start with
+  whether a name is inside it and lets go of the record it keeps; the tests' stand-in recycles
+  into a folder of its own, deletes outright or refuses, while the second name and the file's
+  names are real. Its files start with
   one name and with several, one of them already in the bin, and gain one from outside while the
   shell acts. Names that cannot be read are made so by a switch only tests have.
 
@@ -1514,9 +1506,10 @@ picker to choose another, its count and a ×; a free row offers Choose Folder…
 has gone is in the red and says where it was, and keeps its key until it is freed or given to
 another folder. The picker opens inside the dialog, since the window behind it is inert.
 
-**Trash sits in the Library group, after Backups**: its three limits as dropdowns of a few fixed
-answers and No Limit each, what the Trash holds against its total in the section's head, and one
-line under them on what the next run sends, and when. DECISIONS.md "Expiry goes to the Recycle Bin".
+**Trash sits in the Library group, after Backups**: how many files the library has in the Recycle
+Bin and their size in the section's head, and a line under it on where a deleted file goes. It
+keeps no limits, since the Recycle Bin keeps Windows' own for each drive.
+DECISIONS.md "The Trash is the Recycle Bin".
 
 **A rail of sections, grouped and filtered**, because it will grow: tabs hold six or seven names
 and then scroll, and a rail takes twenty. A section with nothing in it yet is not in the rail.

@@ -127,37 +127,33 @@ test("a backup that cannot be read is refused at the section's foot, and its row
 
 const ARCHIVE = { sources: ["Archive"], files: 3 };
 
-test("a restore that forgets a source names it, and counts its files in the Trash", async () => {
-  forgetOnRestore({ forgets: ARCHIVE, refused: 0, failed: false });
+test("a restore that forgets a source names it, and counts its files in the Recycle Bin", async () => {
+  forgetOnRestore({ forgets: ARCHIVE });
   await opened();
   await expect.poll(() => rows().length).toBe(7);
   await userEvent.click(restoreOn(2) as HTMLElement);
   await expect.element(page.getByRole("button", { name: "Restore Index" })).toBeVisible();
   expect(rowText(2)).toContain(
-    "go back to then. Archive was added since, so it is forgotten, and its 3 files in the Trash go to the Recycle Bin. The index as it is now is kept as a backup first.",
+    "go back to then. Archive was added since, so it is forgotten; its 3 files in the Recycle Bin stay there, out of the app. The index as it is now is kept as a backup first.",
   );
   await userEvent.keyboard("{Escape}");
 
-  forgetOnRestore({
-    forgets: { sources: ["Archive", "Phone"], files: 1 },
-    refused: 0,
-    failed: false,
-  });
+  forgetOnRestore({ forgets: { sources: ["Archive", "Phone"], files: 1 } });
   await userEvent.click(restoreOn(2) as HTMLElement);
   await expect.element(page.getByRole("button", { name: "Restore Index" })).toBeVisible();
   expect(rowText(2)).toContain(
-    "Archive and Phone were added since, so they are forgotten, and their 1 file in the Trash goes to the Recycle Bin.",
+    "Archive and Phone were added since, so they are forgotten; their 1 file in the Recycle Bin stays there, out of the app.",
   );
 });
 
-test("a restore whose files to forget cannot be counted still says they go to the Recycle Bin", async () => {
-  forgetOnRestore({ forgets: ARCHIVE, refused: 0, failed: false, unknown: true });
+test("a restore whose files to forget cannot be counted still says they stay in the Recycle Bin", async () => {
+  forgetOnRestore({ forgets: ARCHIVE, unknown: true });
   await opened();
   await expect.poll(() => rows().length).toBe(7);
   await userEvent.click(restoreOn(2) as HTMLElement);
   await expect.element(page.getByRole("button", { name: "Restore Index" })).toBeVisible();
   expect(rowText(2)).toContain(
-    "go back to then. Any source added since is forgotten, and its files in the Trash go to the Recycle Bin. The index as it is now is kept as a backup first.",
+    "go back to then. Any source added since is forgotten; its files in the Recycle Bin stay there. The index as it is now is kept as a backup first.",
   );
 });
 
@@ -169,42 +165,16 @@ test("a restore with nothing in the Trash to forget asks as ever", async () => {
   expect(rowText(2)).not.toContain("Recycle Bin");
 });
 
-test("files the Recycle Bin cannot take stop the restore, and the band counts them", async () => {
-  forgetOnRestore({ forgets: ARCHIVE, refused: 2, failed: false });
+test("a restore that forgets files in the Recycle Bin sends none, and restores as ever", async () => {
+  forgetOnRestore({ forgets: ARCHIVE });
   await opened();
   await expect.poll(() => rows().length).toBe(7);
+  const when = rowText(2).split("\n")[0];
   await userEvent.click(restoreOn(2) as HTMLElement);
   await userEvent.click(page.getByRole("button", { name: "Restore Index" }));
-  await expect
-    .element(
-      page.getByText(
-        "The index was not restored. The Recycle Bin could not take 2 of Archive’s 3 files in the Trash, so they stay there.",
-      ),
-    )
-    .toBeVisible();
-  await expect.element(page.getByText("D:\\Filmstrip\\data\\trash")).toBeVisible();
-  expect(settingsHeld()).toBe(false);
-  expect(rows()).toHaveLength(7);
-  expect(rowText(0)).not.toMatch(/before restore/);
-
-  await userEvent.click(restoreOn(2) as HTMLElement);
-  await expect.element(page.getByRole("button", { name: "Restore Index" })).toBeVisible();
-  expect(rowText(2)).toContain("its 2 files in the Trash go to the Recycle Bin.");
-});
-
-test("a restore that fails after sending says what went", async () => {
-  forgetOnRestore({ forgets: ARCHIVE, refused: 0, failed: true });
-  await opened();
-  await expect.poll(() => rows().length).toBe(7);
-  await userEvent.click(restoreOn(2) as HTMLElement);
-  await userEvent.click(page.getByRole("button", { name: "Restore Index" }));
-  await expect
-    .element(
-      page.getByText(
-        "The index could not be restored. The disk is full. Archive’s 3 files in the Trash went to the Recycle Bin; the index is otherwise as it was.",
-      ),
-    )
-    .toBeVisible();
+  await expect.element(page.getByText(`Restored the index from ${when}.`)).toBeVisible();
+  expect(rowText(0)).toMatch(/before restore/);
+  expect(page.getByText(/could not take/).query()).toBeNull();
 });
 
 test("lowering the number kept marks what will go at the next backup and removes nothing", async () => {

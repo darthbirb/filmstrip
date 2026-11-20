@@ -9,7 +9,7 @@ use rusqlite::backup::{Backup, StepResult};
 use rusqlite::types::Value;
 use rusqlite::{Connection, OpenFlags, OptionalExtension, params, params_from_iter};
 
-use crate::db::{folders, journal, now, search, tags};
+use crate::db::{folders, items, journal, now, tags};
 use crate::error::{AppError, Result};
 
 /// Pages copied back per step, so a restore can say how far it has got.
@@ -102,17 +102,32 @@ pub struct InTrash {
     pub titles: Vec<String>,
     pub source_id: i64,
     pub source: String,
+    /// Where the Recycle Bin keeps its file, and the file itself, as Delete recorded them.
+    pub binned: Option<(String, String)>,
 }
 
 /// Everything in the live index's Trash.
 pub fn in_trash(conn: &Connection) -> Result<Vec<InTrash>> {
     let mut stmt = conn.prepare(
-        "SELECT i.id, i.uuid, i.disk_name, i.folder_id, s.root, s.id, s.title
+        "SELECT i.id, i.uuid, i.disk_name, i.folder_id, s.root, s.id, s.title,
+                i.bin_path, i.bin_file
            FROM item i JOIN source s ON s.id = i.source_id
           WHERE i.trashed_at IS NOT NULL ORDER BY i.id",
     )?;
-    let rows: Vec<(i64, String, String, i64, String, i64, String)> = stmt
+    type Row = (
+        i64,
+        String,
+        String,
+        i64,
+        String,
+        i64,
+        String,
+        Option<(String, String)>,
+    );
+    let rows: Vec<Row> = stmt
         .query_map([], |r| {
+            let bin_path: Option<String> = r.get(7)?;
+            let bin_file: Option<String> = r.get(8)?;
             Ok((
                 r.get(0)?,
                 r.get(1)?,
@@ -121,12 +136,13 @@ pub fn in_trash(conn: &Connection) -> Result<Vec<InTrash>> {
                 r.get(4)?,
                 r.get(5)?,
                 r.get(6)?,
+                bin_path.zip(bin_file),
             ))
         })?
         .collect::<rusqlite::Result<_>>()?;
     rows.into_iter()
         .map(
-            |(id, uuid, disk_name, folder_id, root, source_id, source)| {
+            |(id, uuid, disk_name, folder_id, root, source_id, source, binned)| {
                 Ok(InTrash {
                     id,
                     uuid,
@@ -135,6 +151,7 @@ pub fn in_trash(conn: &Connection) -> Result<Vec<InTrash>> {
                     titles: folders::location(conn, folder_id)?.titles,
                     source_id,
                     source,
+                    binned,
                 })
             },
         )
@@ -181,9 +198,10 @@ pub fn settle(
                     params![one.id],
                     |r| Ok((r.get(0)?, r.get(1)?)),
                 )?;
+                let (bin_path, bin_file) = one.binned.clone().unzip();
                 tx.execute(
                     "UPDATE item SET folder_id = ?2, source_id = ?3, disk_name = ?4, ext = ?5,
-                                     deleted_at = ?6, trashed_at = ?7
+                                     deleted_at = ?6, trashed_at = ?7, bin_path = ?8, bin_file = ?9
                       WHERE id = ?1",
                     params![
                         id,
@@ -192,7 +210,9 @@ pub fn settle(
                         one.disk_name,
                         crate::fs::paths::extension_of(&one.disk_name),
                         deleted_at,
-                        trashed_at
+                        trashed_at,
+                        bin_path,
+                        bin_file
                     ],
                 )?;
                 id
@@ -209,24 +229,7 @@ pub fn settle(
         .collect::<rusqlite::Result<_>>()?;
     drop(stmt);
     for id in trashed.into_iter().filter(|id| !placed.contains(id)) {
-        let retired = tx.execute(
-            "UPDATE item SET trashed_at = NULL, deleted_at = COALESCE(deleted_at, ?2)
-              WHERE id = ?1
-                AND NOT EXISTS (
-                    SELECT 1 FROM item other
-                     WHERE other.folder_id = item.folder_id AND other.id <> item.id
-                       AND other.disk_name = item.disk_name COLLATE NOCASE
-                       AND other.trashed_at IS NULL)",
-            params![id, at],
-        )?;
-        if retired == 0 {
-            tx.execute(
-                "UPDATE folder SET cover_item_id = NULL WHERE cover_item_id = ?1",
-                params![id],
-            )?;
-            tx.execute("DELETE FROM item WHERE id = ?1", params![id])?;
-        }
-        search::index_item(&tx, id)?;
+        items::retire_trashed(&tx, id, at)?;
     }
     tx.execute("DELETE FROM job", [])?;
     journal::set_floor(&tx)?;

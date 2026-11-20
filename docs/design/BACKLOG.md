@@ -77,9 +77,6 @@ Redrawn with it, by the owner's decision of 2026-11-15:
   there; nothing is sent while restoring. "Not restored · the Recycle Bin cannot take a file"
   goes.
 
-Left for the build: source comments cite Artboards › The Trash's limits, now The Trash in the
-Recycle Bin.
-
 ## Ask before deleting on a drive with no Recycle Bin · DRAWN
 
 #193. A file on a USB stick, an SD card or a network share has no Recycle Bin to go to.

@@ -2,7 +2,6 @@ import { invoke } from "@tauri-apps/api/core";
 import type { AddOutcome } from "./bindings/AddOutcome";
 import type { Backup } from "./bindings/Backup";
 import type { Batch } from "./bindings/Batch";
-import type { BinReport } from "./bindings/BinReport";
 import type { BranchFile } from "./bindings/BranchFile";
 import type { Carried } from "./bindings/Carried";
 import type { Contents } from "./bindings/Contents";
@@ -29,12 +28,12 @@ import type { ItemsTrashed } from "./bindings/ItemsTrashed";
 import type { KeyClashFor } from "./bindings/KeyClashFor";
 import type { LabelOffer } from "./bindings/LabelOffer";
 import type { LibraryTotals } from "./bindings/LibraryTotals";
+import type { Looked } from "./bindings/Looked";
 import type { Naming } from "./bindings/Naming";
 import type { Plan } from "./bindings/Plan";
 import type { Progress } from "./bindings/Progress";
 import type { Reading } from "./bindings/Reading";
 import type { Reason } from "./bindings/Reason";
-import type { Removal } from "./bindings/Removal";
 import type { Restored } from "./bindings/Restored";
 import type { Scope } from "./bindings/Scope";
 import type { SearchOutcome } from "./bindings/SearchOutcome";
@@ -45,8 +44,6 @@ import type { SourceSummary } from "./bindings/SourceSummary";
 import type { Suggestions } from "./bindings/Suggestions";
 import type { TagOffer } from "./bindings/TagOffer";
 import type { Trashed } from "./bindings/Trashed";
-import type { TrashLimit } from "./bindings/TrashLimit";
-import type { TrashSettings } from "./bindings/TrashSettings";
 import type { UndoReport } from "./bindings/UndoReport";
 import type { Vocabulary } from "./bindings/Vocabulary";
 import type { ZipPick } from "./bindings/ZipPick";
@@ -78,7 +75,7 @@ export const setSourceKind = (id: number, kind: SourceKind) =>
 
 export const revealSource = (id: number) => invoke<void>("reveal_source", { id });
 
-export const removeSource = (id: number) => invoke<Removal>("remove_source", { id });
+export const removeSource = (id: number) => invoke<void>("remove_source", { id });
 
 export const revealFolder = (folderId: number) => invoke<void>("reveal_folder", { folderId });
 
@@ -103,10 +100,6 @@ export const renameItem = (itemId: number, name: string) =>
   invoke<Batch | null>("rename_item", { itemId, name });
 
 export const trashItems = (itemIds: number[]) => invoke<ItemsTrashed>("trash_items", { itemIds });
-
-/** Files sent from their folders straight to the Recycle Bin, as Delete offers for one too large for the Trash. */
-export const sendToRecycleBin = (itemIds: number[]) =>
-  invoke<BinReport>("send_to_recycle_bin", { itemIds });
 
 export const restoreItems = (itemIds: number[], folderId: number | null) =>
   invoke<ItemsRestored>("restore_items", { itemIds, folderId });
@@ -262,6 +255,9 @@ export const sortingItems = (sort: Sort = FIRST_SORT) =>
 
 export const trashListing = () => invoke<Trashed[]>("trash_listing");
 
+/** Settles the Trash with the Recycle Bin: what was emptied from it outside the app, or put back. */
+export const lookInBin = () => invoke<Looked>("look_in_bin");
+
 export const libraryTotals = () => invoke<LibraryTotals>("library_totals");
 
 export const readQuery = (text: string) => invoke<Reading>("read_query", { text });
@@ -305,11 +301,5 @@ export const restoreBackup = (name: string) => invoke<Restored>("restore_backup"
 export const restoreForgets = (name: string) => invoke<Forgets>("restore_forgets", { name });
 
 export const setBackupsKept = (kept: number) => invoke<void>("set_backups_kept", { kept });
-
-export const trashLimits = () => invoke<TrashSettings>("trash_limits");
-
-/** One of the trash's limits; `null` is No Limit. */
-export const setTrashLimit = (limit: TrashLimit, value: number | null) =>
-  invoke<void>("set_trash_limit", { limit, value });
 
 export const launchBackupRefusal = () => invoke<Reason | null>("launch_backup_refusal");

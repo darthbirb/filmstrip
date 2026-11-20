@@ -4,8 +4,7 @@ import type { Reason } from "../../ipc/bindings/Reason";
 import type { Stayed } from "../../ipc/bindings/Stayed";
 import type { UndoReport } from "../../ipc/bindings/UndoReport";
 import type { AppError } from "../../ipc/commands";
-import { formatBytes, formatCount } from "../../lib/format";
-import { expiredReason } from "../settings/expiry-words";
+import { formatCount } from "../../lib/format";
 
 // Every sentence an act and its undo say, as Artboards › Undo words them. DECISIONS.md "Undo".
 
@@ -297,50 +296,27 @@ export function folderStayedBanner(
 /** Where a file that stayed is, by its folder's name, when it is in one. */
 const folderOf = (one: Stayed) => (one.at.kind === "folder" ? (one.at.path.at(-1) ?? null) : null);
 
-/** The question Delete asks of files too large for the Trash. Artboards › The Trash's limits. */
-export function tooLargeLine(rows: readonly Stayed[], whole: number) {
-  const [first] = rows;
-  if (rows.length === 1 && first) return `${first.name} is too large for the Trash`;
-  if (rows.length === whole) return `The ${files(whole)} are too large for the Trash`;
-  return `${formatCount(rows.length)} of ${files(whole)} ${are(rows.length)} too large for the Trash`;
-}
-
-/** Under that question: how large, against what the Trash takes, and that Undo ends there. */
-export function tooLargeDetail(rows: readonly Stayed[]) {
-  const [first] = rows;
-  const reason = first?.reason;
-  if (!first || reason?.kind !== "tooLarge") return "";
-  const takes = reason.total
-    ? `the Trash holds ${formatBytes(reason.limit)} in all`
-    : `the Trash takes files up to ${formatBytes(reason.limit)}`;
-  if (rows.length === 1) {
-    return `It is ${formatBytes(reason.bytes)}, and ${takes}. From the Recycle Bin, Undo cannot bring it back.`;
-  }
-  const capital = takes.charAt(0).toUpperCase() + takes.slice(1);
-  return `${capital}. From the Recycle Bin, Undo cannot bring them back.`;
-}
-
-/** What the foot says once Delete has sent files on to the Recycle Bin, with no Undo. */
-export function sentToBinLine(sent: number, one?: string) {
-  return `Sent ${one ?? files(sent)} to the Recycle Bin.`;
-}
-
-/** The notice when the Recycle Bin would not take what Delete sent it: where they stay. */
-export function binRefusedLine(rows: readonly Stayed[]) {
+/**
+ * What the foot says when the Recycle Bin would not take files Delete sent it: what went, when
+ * any did, then where the refused stay. Artboards › The Trash in the Recycle Bin.
+ */
+export function binRefusedLine(rows: readonly Stayed[], trashed = 0) {
   const [first] = rows;
   const places = new Set(rows.map(folderOf));
   const [place] = places;
   const where = places.size === 1 && place ? ` in ${place}` : " where they were";
-  if (rows.length === 1 && first) {
-    return `The Recycle Bin could not take ${first.name}, so it stays${place ? ` in ${place}` : " where it was"}`;
-  }
-  return `The Recycle Bin could not take ${files(rows.length)}, so they stay${where}`;
+  const refused =
+    rows.length === 1 && first
+      ? `The Recycle Bin would not take ${first.name}, so it stays${place ? ` in ${place}` : " where it was"}.`
+      : `The Recycle Bin would not take ${files(rows.length)}, so they stay${where}.`;
+  if (trashed === 0) return refused;
+  return `Deleted ${formatCount(trashed)} of ${files(trashed + rows.length)}. ${refused}`;
 }
 
 /** Why it may have refused, said once, since the app cannot tell which it was. */
 export function binRefusedDetail(count: number) {
-  const whose = count === 1 ? "Its" : "Their";
-  return `${whose} drive may have no Recycle Bin, or it is off or too small. Nothing was deleted.`;
+  const which = count === 1 ? "It" : "They";
+  return `${which} may be too large for the bin, or the bin is turned off. Nothing was deleted.`;
 }
 
 /** What a name field says under itself when the name was refused; nothing for any other failure. */
@@ -374,10 +350,8 @@ export function reasonText(reason: Reason): string {
       return `${reason.source} is offline`;
     case "diskFull":
       return "The disk is full";
-    case "expired":
-      return expiredReason(reason.limit);
-    case "tooLarge":
-      return `${formatBytes(reason.bytes)}, over ${formatBytes(reason.limit)}`;
+    case "goneFromBin":
+      return "Emptied outside the app";
     case "binRefused":
       return "The Recycle Bin would not take it";
     case "other":
@@ -413,7 +387,7 @@ export function stayedGroups(stayed: readonly Stayed[], skipped = false): Stayed
       if (!first || first.at.kind === "trash")
         return { heading: "Still in the Trash", rows, depth: 0 };
       if (first.at.kind === "recycleBin")
-        return { heading: "In the Recycle Bin", rows, depth: Number.MAX_SAFE_INTEGER };
+        return { heading: "Gone from the Recycle Bin", rows, depth: Number.MAX_SAFE_INTEGER };
       // Outside the library a directory goes by its own name, as Explorer's title bar has it.
       if (first.at.kind === "outside")
         return { heading: `${still} ${dirName(first.at.dir)}`, rows, depth: 0 };

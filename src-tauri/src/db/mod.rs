@@ -3,12 +3,12 @@
 
 pub mod backup;
 pub mod details;
-pub mod expired;
 pub mod folders;
 pub mod items;
 pub mod jobs;
 pub mod journal;
 pub mod keys;
+pub mod recycling;
 pub mod search;
 pub mod sources;
 pub mod suggest;
@@ -35,6 +35,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (9, include_str!("migrations/009_folder_tag_rev.sql")),
     (10, include_str!("migrations/010_frame.sql")),
     (11, include_str!("migrations/011_expired.sql")),
+    (12, include_str!("migrations/012_recycle_bin.sql")),
 ];
 
 type Rewrite = fn(&Connection) -> Result<()>;
@@ -243,6 +244,68 @@ mod tests {
         );
         assert_eq!(codec, "h264");
         assert_eq!(frame, None);
+    }
+
+    #[test]
+    fn migration_12_keeps_a_populated_trash_and_its_next_look_retires_what_has_no_bin_record() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE schema_version (version INTEGER NOT NULL);")
+            .unwrap();
+        for (version, sql) in MIGRATIONS.iter().filter(|(version, _)| *version < 12) {
+            conn.execute_batch(sql).unwrap();
+            conn.execute("INSERT INTO schema_version VALUES (?1)", [version])
+                .unwrap();
+        }
+        let source = sources::add(
+            &conn,
+            Path::new("D:/library"),
+            "Library",
+            sources::SourceKind::Library,
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO item (uuid, source_id, folder_id, disk_name, ext, size_bytes, mtime, kind,
+                               added_at, trashed_at)
+             VALUES ('u', ?1, ?2, 'pyramid.jpg', 'jpg', 9, 1, 'image', 2, 3)",
+            [
+                source.id,
+                folders::source_root_folder(&conn, source.id).unwrap(),
+            ],
+        )
+        .unwrap();
+        let id = conn.last_insert_rowid();
+        tags::add_item_tag(&conn, id, "dusk").unwrap();
+        conn.execute_batch(
+            "INSERT INTO expired (item_id, disk_name, folder_id, days, bytes, expired_at)
+             VALUES (99, 'sphinx.jpg', 1, 30, NULL, 4);
+             INSERT INTO setting (key, value) VALUES ('expiry_refused', '[]');",
+        )
+        .unwrap();
+
+        migrate(&mut conn).unwrap();
+
+        let binned: (Option<i64>, Option<String>, Option<String>) = conn
+            .query_row(
+                "SELECT trashed_at, bin_path, bin_file FROM item WHERE id = ?1",
+                [id],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(binned, (Some(3), None, None));
+        let left: (i64, i64) = conn
+            .query_row(
+                "SELECT (SELECT COUNT(*) FROM sqlite_master WHERE name = 'expired'),
+                        (SELECT COUNT(*) FROM setting WHERE key = 'expiry_refused')",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(left, (0, 0));
+
+        assert_eq!(crate::fs::trash::look_in_bin(&conn).unwrap().retired, 1);
+        assert!(!items::is_trashed(&conn, id).unwrap());
+        let kept = tags::item_effective_tags(&conn, id).unwrap();
+        assert!(kept.iter().any(|tag| tag.value == "dusk"));
     }
 
     #[test]

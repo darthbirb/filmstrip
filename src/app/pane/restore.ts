@@ -17,7 +17,7 @@ import { getPaneItem, getPaneOrigin, paneMovesOn, showInPane } from "./pane-stor
 export async function restoreFiles(
   itemIds: number[],
   to: FolderEntry | null = null,
-  expired: readonly Stayed[] = [],
+  earlier: readonly Stayed[] = [],
 ) {
   const shown = getPaneItem();
   const origin = getPaneOrigin();
@@ -27,7 +27,7 @@ export async function restoreFiles(
   const { batch, report } = done;
   if (batch) afterAct(batch, report.refused.length);
   const left = report.refused.filter((row) => row.at.kind !== "recycleBin");
-  const gone = [...expired, ...report.refused.filter((row) => row.at.kind === "recycleBin")];
+  const gone = [...earlier, ...report.refused.filter((row) => row.at.kind === "recycleBin")];
   const rows = [...left, ...gone];
   const whole = report.restored + rows.length;
   const [first] = rows;
@@ -63,6 +63,6 @@ export async function restoreFiles(
 
 function placeOf(reason: Reason) {
   if (reason.kind === "folderGone") return reason.name;
-  if (reason.kind === "nameTaken") return reason.place;
+  if (reason.kind === "nameTaken" || reason.kind === "goneFromBin") return reason.place;
   return null;
 }

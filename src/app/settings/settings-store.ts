@@ -15,7 +15,7 @@ export function openSettings(next: SettingsRequest = {}) {
 /** A restore running, by the backup's name, and how far it has got. */
 export type Restoring = { name: string; percent: number };
 /** How a restore ended, kept until Backups is there to say it and put the focus back. */
-export type RestoreEnd = { kind: "line" | "band"; sentence: string; path?: string; focus: string };
+export type RestoreEnd = { kind: "line" | "band"; sentence: string; focus: string };
 type Restore = { restoring: Restoring | null; ended: RestoreEnd | null };
 
 // Outside the tree, so Backups left and opened again finds a restore still running, or how it
@@ -57,11 +57,10 @@ function subscribeRestore(listener: () => void) {
   };
 }
 
-/** A source being removed while its files in the Trash go to the Recycle Bin, and how far. */
-export type Removing = { id: number; percent: number };
-/** A remove the Recycle Bin refused part of, kept until the band is dismissed. */
-export type RemoveEnd = { sentence: string; path?: string };
-type Remove = { removing: Removing | null; ended: RemoveEnd | null };
+/** A remove that failed, kept until the band is dismissed. */
+export type RemoveEnd = { sentence: string };
+/** The source being removed, by its id. */
+type Remove = { removing: number | null; ended: RemoveEnd | null };
 
 // Outside the tree, as a restore is: while one runs Settings holds still. Artboards › Sources.
 let remove: Remove = { removing: null, ended: null };
@@ -73,12 +72,7 @@ function setRemove(next: Remove) {
 }
 
 export function startRemove(id: number) {
-  setRemove({ removing: { id, percent: 0 }, ended: null });
-}
-
-export function removeProgress(id: number, percent: number) {
-  if (remove.removing?.id !== id) return;
-  setRemove({ ...remove, removing: { id, percent } });
+  setRemove({ removing: id, ended: null });
 }
 
 export function finishRemove(ended: RemoveEnd | null) {

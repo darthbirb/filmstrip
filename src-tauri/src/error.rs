@@ -3,8 +3,6 @@ use std::fmt;
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::fs::expiry::Limit;
-
 pub type Result<T> = std::result::Result<T, AppError>;
 
 /// Serialises as `{ kind, message }`, so the frontend branches on `kind`; a refusal adds its
@@ -68,16 +66,11 @@ pub enum Reason {
         source: String,
     },
     DiskFull,
-    /// It left the trash for the Recycle Bin, past one of the trash's limits, before it was asked for.
-    Expired {
-        limit: Limit,
-    },
-    /// Larger than the trash takes: `limit` is its size per file, or its total while that is No
-    /// Limit, when `total`.
-    TooLarge {
-        bytes: i64,
-        limit: i64,
-        total: bool,
+    /// Emptied from the Recycle Bin outside the app, so there is nothing left to bring back to the
+    /// folder it was going to.
+    GoneFromBin {
+        name: String,
+        place: String,
     },
     /// The Recycle Bin would not take it, so it is where it was.
     BinRefused,
@@ -107,15 +100,7 @@ impl fmt::Display for Reason {
             Reason::AlreadyIn { place } => write!(f, "it is already in {place}"),
             Reason::Offline { source } => write!(f, "{source} is offline"),
             Reason::DiskFull => f.write_str("the disk is full"),
-            Reason::Expired {
-                limit: Limit::Age { days },
-            } => write!(f, "it expired after {days} days"),
-            Reason::Expired {
-                limit: Limit::Size { bytes },
-            } => write!(f, "it expired to keep the trash under {bytes} bytes"),
-            Reason::TooLarge { bytes, limit, .. } => {
-                write!(f, "it is {bytes} bytes, and the trash takes {limit} bytes")
-            }
+            Reason::GoneFromBin { name, .. } => write!(f, "{name} is no longer in the Recycle Bin"),
             Reason::BinRefused => f.write_str("the Recycle Bin would not take it"),
             Reason::Other { message } => f.write_str(message),
         }

@@ -12,7 +12,7 @@ use crate::db::journal::{
     ItemCopied, ItemMoved, ItemRenamed, ItemRestored, ItemTrashed, ItemsTagged,
 };
 use crate::db::{tags, vocabulary};
-use crate::error::{AppError, Result};
+use crate::error::{AppError, Reason, Result};
 use crate::fs::acts::{self, Batch};
 use crate::fs::stayed::{self, Stayed};
 use crate::fs::{folders, items, trash};
@@ -60,26 +60,34 @@ fn reverse_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
     // Described before anything comes back, while every name is still where the act left it.
     let batch = acts::describe(conn, batch_id)?;
     let mut stayed = Vec::new();
-    let mut expired = 0;
+    let mut gone = 0;
     for entry in &entries {
-        if let Some(gone) = journal::expired(entry) {
+        if let Some(forgotten) = journal::gone(entry) {
             journal::drop_entry(conn, entry.id)?;
             if entry.op != journal::ITEM_COPY {
-                stayed.push(stayed::gone(&gone));
-                expired += 1;
+                stayed.push(stayed::forgotten(conn, &forgotten)?);
+                gone += 1;
             }
             continue;
         }
-        // What failed stays in the journal, or it could never be tried again.
+        // What failed stays in the journal, or it could never be tried again; a file emptied from
+        // the Recycle Bin never could be.
         match reverse(conn, entry) {
             Ok(()) => journal::drop_entry(conn, entry.id)?,
             Err(err) if tagging(entry) => return Err(err),
-            Err(err) => stayed.push(stayed_of(conn, entry, &err)?),
+            Err(err) => {
+                let one = stayed_of(conn, entry, &err)?;
+                if matches!(one.reason, Reason::GoneFromBin { .. }) {
+                    journal::drop_entry(conn, entry.id)?;
+                    gone += 1;
+                }
+                stayed.push(one);
+            }
         }
     }
     let (files_left, folders_left) = acts::count(conn, &journal::batch(conn, batch_id)?)?;
     Ok(UndoReport {
-        files_back: batch.files.saturating_sub(files_left + expired),
+        files_back: batch.files.saturating_sub(files_left + gone),
         folders_back: batch.folders.saturating_sub(folders_left),
         batch,
         stayed,
@@ -143,7 +151,7 @@ fn reverse(conn: &Connection, entry: &Entry) -> Result<()> {
         }
         journal::ITEM_TRASH => {
             let back: ItemTrashed = inverse(entry)?;
-            trash::restore_unjournalled(conn, back.item_id, None, None)
+            trash::untrash(conn, back.item_id)
         }
         journal::ITEM_RESTORE => trash::unrestore(conn, &inverse(entry)?),
         journal::FOLDER_DELETE => {

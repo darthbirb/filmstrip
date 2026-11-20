@@ -24,15 +24,14 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 | --- | --- |
 | `source` | A registered root: its absolute path, a title, and a kind — `library` or `sorting`. |
 | `folder` | A real directory: title, parent, status, favourite, notes, cover. |
-| `item` | A real file: its folder, its name on disk, its measurements, a uuid, and when it was last read. |
+| `item` | A real file: its folder, its name on disk, its measurements, a uuid, and when it was last read; trashed, where the Recycle Bin keeps it. |
 | `tag` | One distinct term: a tag (no key) or a label (a key and a value). |
 | `folder_tag` | Terms on a folder, added by its title or by hand. |
 | `item_tag` | Tags an item carries itself. |
 | `item_effective_tag` | Everything an item carries once inheritance is resolved. |
-| `setting` | Key-value pairs: `undo_floor`, the newest journal row a restore kept; `expiry_refused`, the trashed items the Recycle Bin refused at the last expiry run; `recycling`, the library files whose sends to the Recycle Bin have not settled, each until its send does or a launch settles it. |
+| `setting` | Key-value pairs: `undo_floor`, the newest journal row a restore kept; `recycling`, the library files whose sends to the Recycle Bin have not settled, each until its send does or a launch settles it. |
 | `journal` | Every change the app made on disk, and every set tagged at once, with what reverses it, grouped into batches. |
 | `job` | Background work: waiting, running, or failed with its error. |
-| `expired` | Each item expiry sent to the Recycle Bin: its name, the folder it left, and the limit that sent it — days or bytes, never both. |
 | `destination_key` | A digit, `0` to `9`, bound to a folder that a press moves files into. |
 | `item_fts` | Each item's name and every tag it carries, tokenised for a bare word. |
 | `folder_fts` | Each folder's own tags, its title's among them, tokenised the same way. |
@@ -44,9 +43,11 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   the folder itself. The source's own root folder contributes no title. Derived on every read,
   in `fs::paths::folder_dir`.
 - An item's path is its folder's path joined with `disk_name`. A trashed item's file is in the
-  app's trash instead, at `ab/cd/<uuid>.<ext>`, sharded as thumbnails are
-  (`fs::paths::trash_path`); its row keeps the folder and name it left.
-- The index's backups are whole copies of it in `data\backups`, beside the trash, each named
+  Windows Recycle Bin on its own drive instead, at `item.bin_path`, the bin's own name for it
+  there, and `item.bin_file` is the file's identity, its volume's serial and its index on it, in
+  hex as `<volume>-<index>`; its row keeps the folder and name it left. Both are NULL on any row
+  not in the Trash. Migration 12 added them.
+- The index's backups are whole copies of it in `data\backups`, each named
   `index-<ms>-<how>.db` for when and how it was taken (`fs::backups`).
 - **Every item has a folder.** A file waiting in a sorting source sits in that source's root
   folder or somewhere beneath it.
@@ -95,7 +96,7 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 
 - An item has three states. Live: `deleted_at` is NULL. Retired, its file gone: `deleted_at` is
   set and `trashed_at` is NULL, and a file arriving under its name again is the same item.
-  Trashed, its file in the app's trash: both are set, and a file arriving under its name is a
+  Trashed, its file in the Recycle Bin: both are set, and a file arriving under its name is a
   new item.
 - A deleted folder, and every folder under it, is retired with one stamp in `deleted_at`, which
   is how an undo finds exactly those again. A retired folder frees its spot for a new folder of
@@ -105,8 +106,12 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 - `source.indexed_at` is stamped when a walk finishes reading the whole source. A source it
   could not read keeps the stamp it had, which is what "last indexed" reports while it is away.
 - Removing a source deletes its rows outright. Its directory is never touched.
-- An item that expires is deleted outright once the Recycle Bin has its file, and an `expired`
-  row is written in the same transaction. That row is read only while no `item` row holds its id.
+- A trashed item whose file is gone from the Recycle Bin, and not back at its path, is retired
+  where it was: `trashed_at` and its place in the bin are cleared and `deleted_at` kept, so it
+  keeps its name and tags. Where another row out of the Trash now holds its name, it is deleted
+  outright instead.
+  One whose file is back at its path is live again; a row a walk made meanwhile under that name
+  is deleted outright.
 - A file moved or restored to a name that only a retired row holds takes it: that row is deleted
   outright. A trashed row never holds a name.
 - A folder moved into another source takes its items with it: their `source_id` follows the
@@ -132,10 +137,15 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 - An act on the tags screen is one row, `retag`: the terms it reworded, made or forgot, and
   every `folder_tag` and `item_tag` row it moved onto another term or took away, each with its
   `rowid`, so an undo puts it back in its place.
-- Expiry prunes it of the file that expired. A row about that file alone keeps a `"expired"` mark
-  in `forward` and `inverse`, naming it, its folder and the limit that sent it; an undo reports
-  the mark and deletes the row. `items_tag`, `items_untag` and `retag` rows lose that file, and
-  go once they name nothing.
+- An undo that finds a trashed file gone from the Recycle Bin reports it and deletes the row
+  that sent it there.
+- A row `items::forget` deletes leaves the journal in the same transaction: a trashed row whose
+  name another file holds once its file is emptied from the Recycle Bin, or a row a file put back
+  from Explorer replaces. Each journal row about it alone gains `gone`, its name and folder, for
+  an undo to report and delete, and its id leaves every `items_tag`, `items_untag` and `retag`
+  row, an emptied tag row going with it. A marked row is never acted on, since SQLite may give
+  its id to another file. A row deleted by a file the app moves, renames, pastes or restores onto
+  its name (`items::forget_retired`), or by Remove Source, does not yet (#200).
 - Undo never reaches a row at or below `setting.undo_floor`, which a restore sets to the newest
   row the restored journal holds.
 

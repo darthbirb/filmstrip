@@ -2,24 +2,28 @@ import { beforeEach, expect, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
-import { folderItems, renameItem, trashItems, undoLast } from "../../ipc/commands";
+import { emptyOutside, resetBin } from "../../dev/mock";
+import { folderItems, renameItem, trashItems, trashListing, undoLast } from "../../ipc/commands";
 import { Foot } from "../navigation/Foot";
 import { setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { getPlace, type Place, setPlace } from "../place";
 import { updatePreferences } from "../preferences";
 import { ReportBanner } from "../undo/ReportBanner";
-import { showReport } from "../undo/report-store";
+import { getReport, showReport } from "../undo/report-store";
+import { undo } from "../undo/undo";
 import { MovePickerHost } from "./move-picker";
 import { Pane } from "./Pane";
 import { PaneDetailProvider } from "./pane-detail";
 import { getPaneItem, showInPane } from "./pane-store";
+import { restoreFiles } from "./restore";
 
 // Against the dev mock: Cairo (6) holds felucca.mp4, pyramid.jpg and sphinx.jpg; People is empty.
 
 const TRASH: Place = { kind: "trash" };
 
 beforeEach(async () => {
+  resetBin();
   while (await undoLast()) {}
   setNews(null);
   showReport(null);
@@ -156,4 +160,51 @@ test("a trashed file's menu is the way back, and nothing that would act on a fil
     .map((row) => row.querySelector(".truncate")?.textContent);
   expect(rows).toEqual(["Full Screen", "Restore", "Restore to…"]);
   expect(menu.element().querySelectorAll("hr")).toHaveLength(1);
+});
+
+test("a file emptied from the Recycle Bin outside the app is listed as gone, with no Retry", async () => {
+  const pyramid = await trashed("pyramid.jpg");
+  emptyOutside([pyramid]);
+  const screen = await render(<Harness />);
+  await screen.getByRole("button", { name: "Restore", exact: true }).click();
+
+  await expect.element(screen.getByText("pyramid.jpg could not go back to Cairo")).toBeVisible();
+  await expect.element(screen.getByText("Gone from the Recycle Bin")).toBeVisible();
+  await expect.element(screen.getByText("Emptied outside the app")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Retry" }).query()).toBeNull();
+  expect(screen.getByRole("button", { name: /Restore pyramid\.jpg to/ }).query()).toBeNull();
+  expect((await trashListing()).map((one) => one.id)).not.toContain(pyramid);
+});
+
+test("Retry stays for what is still in the Trash, and the gone row stays listed", async () => {
+  const pyramid = await trashed("pyramid.jpg");
+  const sphinx = await trashed("sphinx.jpg");
+  const felucca = (await folderItems(6)).find((row) => row.diskName === "felucca.mp4");
+  if (!felucca) throw new Error("the mock has no felucca.mp4");
+  await renameItem(felucca.id, "sphinx.jpg");
+  emptyOutside([pyramid]);
+  const screen = await render(<Harness />);
+  await restoreFiles([pyramid, sphinx]);
+
+  await expect.element(screen.getByText("Still in the Trash")).toBeVisible();
+  await expect.element(screen.getByText("Gone from the Recycle Bin")).toBeVisible();
+  expect(getReport()?.rows.map((row) => row.name)).toEqual(["sphinx.jpg", "pyramid.jpg"]);
+
+  await renameItem(felucca.id, "felucca.mp4");
+  await screen.getByRole("button", { name: "Retry" }).click();
+  await expect.poll(() => getReport()?.rows.map((row) => row.name)).toEqual(["pyramid.jpg"]);
+  expect(screen.getByRole("button", { name: "Retry" }).query()).toBeNull();
+  expect(await inCairo()).toContain("sphinx.jpg");
+});
+
+test("Ctrl+Z on a delete whose file has left the bin says so, every row gone", async () => {
+  const pyramid = await trashed("pyramid.jpg");
+  showInPane(null);
+  emptyOutside([pyramid]);
+  const screen = await render(<Harness />);
+  await undo();
+
+  await expect.element(screen.getByText("Gone from the Recycle Bin")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Retry" }).query()).toBeNull();
+  expect(await inCairo()).not.toContain("pyramid.jpg");
 });

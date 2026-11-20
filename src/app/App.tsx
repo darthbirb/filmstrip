@@ -23,7 +23,6 @@ import { MovePickerHost } from "./pane/move-picker";
 import { Pane, PaneHeader } from "./pane/Pane";
 import { PaneDetailProvider } from "./pane/pane-detail";
 import { whenShownInPane } from "./pane/pane-store";
-import { TooLargeQuestion } from "./pane/too-large";
 import { ExplorerGhost, PickHost, useExplorerDrops } from "./paste/drop";
 import { usePasteKey } from "./paste/keys";
 import { usePreferences, useScaleHotkeys } from "./preferences";
@@ -80,7 +79,6 @@ export function App() {
           notices={
             <>
               <DeleteQuestion />
-              <TooLargeQuestion />
               <ReportBanner />
               <Notices />
             </>

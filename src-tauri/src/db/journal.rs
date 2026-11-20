@@ -6,7 +6,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use ts_rs::TS;
 
-use crate::db::expired::Gone;
 use crate::db::now;
 use crate::error::Result;
 use crate::jobs::kinds::COPY_IN;
@@ -514,20 +513,30 @@ pub fn copying(conn: &Connection, batch_id: &str) -> Result<bool> {
     )?)
 }
 
+/// A file the index forgot while the journal still named it: its name and the folder it was in.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Gone {
+    pub item_id: i64,
+    pub name: String,
+    pub folder_id: i64,
+}
+
 /// The rows about one file alone, which name it by `itemId`.
 const ONE_FILE: [&str; 5] = [ITEM_MOVE, ITEM_TRASH, ITEM_RENAME, ITEM_RESTORE, ITEM_COPY];
 
-/// Prunes an expired file from the journal: each row about it alone keeps only the word that it
-/// went, and what it was, for an undo to report and drop, and its id leaves every row about several.
-/// An id the index may give another file is then never acted on. DECISIONS.md "Undo".
-pub fn expire_item(conn: &Connection, gone: &Gone) -> Result<()> {
+/// Prunes a forgotten file from the journal: each row about it alone is marked with what it was,
+/// for an undo to report and drop, and its id leaves every row about several, so an id the index
+/// may give another file is never acted on. SCHEMA.md "The undo journal".
+pub fn forget_item(conn: &Connection, gone: &Gone) -> Result<()> {
     let id = gone.item_id;
     let mark = serde_json::to_string(gone)?;
     conn.execute(
         &format!(
-            "UPDATE journal SET forward = json_set(forward, '$.expired', json(?2)),
-                                inverse = json_set(inverse, '$.expired', json(?2))
-              WHERE op IN ({}) AND json_extract(inverse, '$.itemId') = ?1",
+            "UPDATE journal SET forward = json_set(forward, '$.gone', json(?2)),
+                                inverse = json_set(inverse, '$.gone', json(?2))
+              WHERE op IN ({}) AND json_extract(inverse, '$.itemId') = ?1
+                AND json_type(inverse, '$.gone') IS NULL",
             quoted(&ONE_FILE)
         ),
         params![id, mark],
@@ -574,9 +583,9 @@ pub fn expire_item(conn: &Connection, gone: &Gone) -> Result<()> {
     Ok(())
 }
 
-/// The file a row is about, when it has expired since.
-pub fn expired(entry: &Entry) -> Option<Gone> {
-    serde_json::from_value(entry.inverse.get("expired")?.clone()).ok()
+/// The file a row is about, when the index has forgotten it since.
+pub fn gone(entry: &Entry) -> Option<Gone> {
+    serde_json::from_value(entry.inverse.get("gone")?.clone()).ok()
 }
 
 fn quoted(ops: &[&str]) -> String {
@@ -634,6 +643,81 @@ mod tests {
 
         set_floor(&conn).unwrap();
         assert_eq!(floor(&conn).unwrap(), 1, "a second restore moves it");
+    }
+
+    #[test]
+    fn a_forgotten_file_is_marked_on_its_own_rows_and_taken_out_of_every_set() {
+        let conn = conn();
+        let both = new_batch();
+        let tag = |item_ids| ItemsTagged {
+            tag_id: 1,
+            value: "dusk".into(),
+            item_ids,
+        };
+        record_items_tag(&conn, &both, &tag(vec![5, 6])).unwrap();
+        let alone = new_batch();
+        record_items_tag(&conn, &alone, &tag(vec![5])).unwrap();
+        let untagged = new_batch();
+        let untag = |item_id| Untagged {
+            item_id,
+            added_at: 1,
+        };
+        let items = vec![untag(5), untag(6)];
+        let untag_row = ItemsUntagged {
+            tag_id: 1,
+            value: "dusk".into(),
+            items,
+        };
+        record_items_untag(&conn, &untagged, &untag_row).unwrap();
+        let retagged = new_batch();
+        let using = |item_id| ItemUse {
+            item_id,
+            rowid: item_id,
+            added_at: 1,
+            from: 1,
+            to: None,
+        };
+        let retag_row = Retagged {
+            change: Change::DeleteTag { tag: "dusk".into() },
+            files: 2,
+            folders: 0,
+            reworded: vec![],
+            made: vec![],
+            removed: vec![],
+            folder_uses: vec![],
+            item_uses: vec![using(5), using(6)],
+        };
+        record_retag(&conn, &retagged, &retag_row).unwrap();
+        let renamed = new_batch();
+        record_item_rename(&conn, &renamed, 5, "a.jpg", "pyramid.jpg").unwrap();
+        record_item_rename(&conn, &renamed, 6, "b.jpg", "sphinx.jpg").unwrap();
+
+        let pyramid = Gone {
+            item_id: 5,
+            name: "pyramid.jpg".into(),
+            folder_id: 3,
+        };
+        forget_item(&conn, &pyramid).unwrap();
+        let reused = Gone {
+            name: "another.jpg".into(),
+            ..pyramid.clone()
+        };
+        forget_item(&conn, &reused).unwrap();
+
+        let only = |batch_id: &str| {
+            let rows = batch(&conn, batch_id).unwrap();
+            assert_eq!(rows.len(), 1);
+            rows[0].inverse.clone()
+        };
+        let tagged: ItemsTagged = serde_json::from_value(only(&both)).unwrap();
+        assert_eq!(tagged.item_ids, [6]);
+        assert!(batch(&conn, &alone).unwrap().is_empty());
+        let untagged: ItemsUntagged = serde_json::from_value(only(&untagged)).unwrap();
+        assert_eq!(untagged.items, [untag(6)]);
+        let retagged: Retagged = serde_json::from_value(only(&retagged)).unwrap();
+        assert_eq!(retagged.item_uses, [using(6)]);
+        let marks: Vec<Option<Gone>> = batch(&conn, &renamed).unwrap().iter().map(gone).collect();
+        assert_eq!(marks, [None, Some(pyramid)]);
     }
 
     #[test]

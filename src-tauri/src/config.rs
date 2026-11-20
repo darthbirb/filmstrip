@@ -1,11 +1,10 @@
-//! `filmstrip.config.json`: only what has no home in the database — window placement,
-//! interface preferences, how many backups of the database are kept, and the trash's limits.
+//! `filmstrip.config.json`: only what has no home in the database — window
+//! placement, interface preferences, and how many backups of the database are kept.
 //! DECISIONS.md "Nothing outside the app folder".
 
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
-use ts_rs::TS;
 
 use crate::error::{AppError, Result};
 
@@ -41,50 +40,6 @@ pub struct Config {
     /// How many of the index's backups are kept. Here rather than in the index, which a restore
     /// replaces.
     pub backups_kept: Option<u32>,
-    /// The trash's limits, here for the same reason.
-    pub trash: Option<TrashLimits>,
-}
-
-/// The trash's three limits, each one of the answers Settings offers, `None` for No Limit. A file
-/// that has none of them has the first answers. DECISIONS.md "Expiry goes to the Recycle Bin".
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[serde(default, rename_all = "camelCase")]
-#[ts(export)]
-pub struct TrashLimits {
-    pub keep_days: Option<u32>,
-    pub total_gb: Option<u32>,
-    pub file_gb: Option<u32>,
-}
-
-impl Default for TrashLimits {
-    fn default() -> TrashLimits {
-        TrashLimits {
-            keep_days: Some(30),
-            total_gb: Some(25),
-            file_gb: Some(5),
-        }
-    }
-}
-
-/// One of the trash's limits, as Settings names it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
-#[serde(rename_all = "camelCase")]
-#[ts(export)]
-pub enum TrashLimit {
-    KeepFor,
-    TotalSize,
-    SizePerFile,
-}
-
-impl TrashLimit {
-    /// The answers its dropdown offers before No Limit: days, or gigabytes.
-    pub fn answers(self) -> &'static [u32] {
-        match self {
-            TrashLimit::KeepFor => &[7, 14, 30, 90, 365],
-            TrashLimit::TotalSize => &[10, 25, 50, 100, 250],
-            TrashLimit::SizePerFile => &[1, 2, 5, 10, 25],
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -143,38 +98,6 @@ impl Config {
             .unwrap_or(BACKUPS_KEPT_FIRST)
     }
 
-    /// The trash's limits, any that is not one of its dropdown's answers taken as its first.
-    pub fn trash_limits(&self) -> TrashLimits {
-        let set = self.trash.unwrap_or_default();
-        let first = TrashLimits::default();
-        let kept = |limit: TrashLimit, value: Option<u32>, first: Option<u32>| match value {
-            Some(value) if !limit.answers().contains(&value) => first,
-            value => value,
-        };
-        TrashLimits {
-            keep_days: kept(TrashLimit::KeepFor, set.keep_days, first.keep_days),
-            total_gb: kept(TrashLimit::TotalSize, set.total_gb, first.total_gb),
-            file_gb: kept(TrashLimit::SizePerFile, set.file_gb, first.file_gb),
-        }
-    }
-
-    pub fn set_trash_limit(limit: TrashLimit, value: Option<u32>) -> Result<()> {
-        if value.is_some_and(|value| !limit.answers().contains(&value)) {
-            return Err(AppError::invalid(format!(
-                "{value:?} is not an answer to {limit:?}"
-            )));
-        }
-        let mut config = Config::load();
-        let mut set = config.trash_limits();
-        match limit {
-            TrashLimit::KeepFor => set.keep_days = value,
-            TrashLimit::TotalSize => set.total_gb = value,
-            TrashLimit::SizePerFile => set.file_gb = value,
-        }
-        config.trash = Some(set);
-        config.save()
-    }
-
     pub fn set_backups_kept(kept: u32) -> Result<()> {
         if !BACKUPS_KEPT.contains(&kept) {
             return Err(AppError::invalid(format!(
@@ -212,7 +135,6 @@ mod tests {
             window: None,
             ui: Some(ui.clone()),
             backups_kept: None,
-            trash: None,
         };
         config.save_to(&path).unwrap();
         assert_eq!(Config::load_from(&path).ui, Some(ui));
@@ -230,33 +152,6 @@ mod tests {
             7,
             "not an answer offered"
         );
-    }
-
-    #[test]
-    fn the_trash_keeps_30_days_and_25_gb_until_another_answer_or_no_limit_is_chosen() {
-        let path = scratch("trash").join("filmstrip.config.json");
-        let first = TrashLimits {
-            keep_days: Some(30),
-            total_gb: Some(25),
-            file_gb: Some(5),
-        };
-        assert_eq!(Config::load_from(&path).trash_limits(), first);
-        std::fs::write(
-            &path,
-            r#"{ "trash": { "keepDays": null, "totalGb": 100, "fileGb": 3 } }"#,
-        )
-        .unwrap();
-        assert_eq!(
-            Config::load_from(&path).trash_limits(),
-            TrashLimits {
-                keep_days: None,
-                total_gb: Some(100),
-                file_gb: Some(5),
-            },
-            "No Limit is kept, and an answer never offered is the first"
-        );
-        std::fs::write(&path, r#"{ "trash": { "totalGb": 10 } }"#).unwrap();
-        assert_eq!(Config::load_from(&path).trash_limits().keep_days, Some(30));
     }
 
     #[test]

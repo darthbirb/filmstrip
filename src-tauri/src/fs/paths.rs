@@ -21,10 +21,6 @@ pub fn thumbs_dir() -> Result<PathBuf> {
     Ok(cache_dir()?.join("thumbs"))
 }
 
-pub fn trash_dir() -> Result<PathBuf> {
-    Ok(config::app_data_dir()?.join("trash"))
-}
-
 pub fn backups_dir() -> Result<PathBuf> {
     Ok(config::app_data_dir()?.join("backups"))
 }
@@ -35,7 +31,6 @@ pub fn ensure_app_dirs() -> Result<()> {
         config::app_data_dir()?,
         cache_dir()?,
         thumbs_dir()?,
-        trash_dir()?,
         backups_dir()?,
     ] {
         std::fs::create_dir_all(dir)?;
@@ -79,21 +74,6 @@ pub fn frames_rel(uuid: &str) -> String {
     let thumb = thumb_rel(uuid);
     let stem = thumb.strip_suffix(".webp").unwrap_or(&thumb);
     format!("{stem}.frames.webp")
-}
-
-/// Where a trashed item's file waits: `<uuid>` → `ab/cd/<uuid>.<ext>` under the trash, sharded as
-/// the thumbnails are, and keeping its extension so Explorer still knows what it is.
-pub fn trash_path(uuid: &str, disk_name: &str) -> Result<PathBuf> {
-    let clean: String = uuid.chars().filter(char::is_ascii_alphanumeric).collect();
-    let a = clean.get(0..2).unwrap_or("00");
-    let b = clean.get(2..4).unwrap_or("00");
-    let ext = extension_of(disk_name);
-    let name = if ext.is_empty() {
-        uuid.to_string()
-    } else {
-        format!("{uuid}.{ext}")
-    };
-    Ok(trash_dir()?.join(a).join(b).join(name))
 }
 
 /// Whether two paths name one directory. Windows ignores case and takes either
