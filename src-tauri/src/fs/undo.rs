@@ -482,4 +482,79 @@ mod tests {
         assert!(dir.join("library/Trips/Cairo/sphinx.jpg").is_file());
         assert_eq!(journal::latest_batch(&conn).unwrap(), None);
     }
+
+    #[test]
+    fn an_undo_of_a_file_whose_retired_row_a_move_took_over_says_so_and_leaves_nothing_to_redo() {
+        let dir = scratch("retired-taken");
+        std::fs::create_dir_all(dir.join("library/People")).unwrap();
+        let (conn, trips) = library(&dir);
+        let top = rows::source_root_folder(&conn, 1).unwrap();
+        let people = rows::child_id(&conn, top, "People").unwrap().unwrap();
+        let cairo = rows::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        let pyramid = db::items::in_folder(&conn, cairo).unwrap()[0].id;
+        let renamed = journal::new_batch();
+        items::rename(&conn, pyramid, "giza.jpg", &renamed).unwrap();
+        std::fs::remove_file(dir.join("library/Trips/Cairo/giza.jpg")).unwrap();
+        walk::reconcile(&conn).unwrap();
+        std::fs::write(dir.join("library/People/giza.jpg"), "another").unwrap();
+        walk::reconcile(&conn).unwrap();
+        let newcomer = db::items::in_folder(&conn, people).unwrap()[0].id;
+        items::move_items(&conn, &[newcomer], cairo, &journal::new_batch()).unwrap();
+        assert!(db::items::file_of(&conn, pyramid).unwrap().is_none());
+
+        undo_last(&conn).unwrap().unwrap();
+        let report = undo_last(&conn).unwrap().unwrap();
+
+        assert_eq!(report.batch.batch_id, renamed);
+        assert_eq!(report.files_back, 0);
+        let stayed: Vec<i64> = report.stayed.iter().map(|one| one.id).collect();
+        assert_eq!(stayed, [pyramid]);
+        assert_eq!(journal::latest_batch(&conn).unwrap(), None);
+        assert!(dir.join("library/People/giza.jpg").is_file());
+        assert!(!dir.join("library/Trips/Cairo/pyramid.jpg").exists());
+        assert!(!dir.join("library/Trips/Cairo/giza.jpg").exists());
+    }
+
+    #[test]
+    fn an_undo_after_remove_source_leaves_its_files_alone_and_leaves_nothing_to_redo() {
+        let dir = scratch("source-removed");
+        std::fs::create_dir_all(dir.join("phone")).unwrap();
+        std::fs::write(dir.join("phone/beach.jpg"), "b").unwrap();
+        let (conn, trips) = library(&dir);
+        let phone = sources::add(&conn, &dir.join("phone"), "Phone", SourceKind::Library).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let cairo = rows::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        let pyramid = db::items::in_folder(&conn, cairo).unwrap()[0].id;
+        let phone_top = rows::source_root_folder(&conn, phone.id).unwrap();
+        let beach = db::items::in_folder(&conn, phone_top).unwrap()[0].id;
+        let renamed = journal::new_batch();
+        items::rename(&conn, pyramid, "giza.jpg", &renamed).unwrap();
+        let tagged = journal::new_batch();
+        db::tags::add_items_tag(&conn, &[pyramid, beach], "dusk", &tagged).unwrap();
+        sources::remove(&conn, 1).unwrap();
+        let set: journal::ItemsTagged =
+            serde_json::from_value(journal::batch(&conn, &tagged).unwrap()[0].inverse.clone())
+                .unwrap();
+        assert_eq!(set.item_ids, [beach]);
+
+        let untag = undo_last(&conn).unwrap().unwrap();
+        assert_eq!(untag.batch.batch_id, tagged);
+        let beach_tags: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM item_tag WHERE item_id = ?1",
+                [beach],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(beach_tags, 0);
+
+        let report = undo_last(&conn).unwrap().unwrap();
+        assert_eq!(report.batch.batch_id, renamed);
+        assert_eq!(report.files_back, 0);
+        let stayed: Vec<i64> = report.stayed.iter().map(|one| one.id).collect();
+        assert_eq!(stayed, [pyramid]);
+        assert_eq!(journal::latest_batch(&conn).unwrap(), None);
+        assert!(dir.join("library/Trips/Cairo/giza.jpg").is_file());
+        assert!(!dir.join("library/Trips/Cairo/pyramid.jpg").exists());
+    }
 }

@@ -139,13 +139,14 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   `rowid`, so an undo puts it back in its place.
 - An undo that finds a trashed file gone from the Recycle Bin reports it and deletes the row
   that sent it there.
-- A row `items::forget` deletes leaves the journal in the same transaction: a trashed row whose
-  name another file holds once its file is emptied from the Recycle Bin, or a row a file put back
-  from Explorer replaces. Each journal row about it alone gains `gone`, its name and folder, for
-  an undo to report and delete, and its id leaves every `items_tag`, `items_untag` and `retag`
-  row, an emptied tag row going with it. A marked row is never acted on, since SQLite may give
-  its id to another file. A row deleted by a file the app moves, renames, pastes or restores onto
-  its name (`items::forget_retired`), or by Remove Source, does not yet (#200).
+- Every row deleted outright leaves the journal in the same transaction, through
+  `items::forget`: a trashed row whose name another file holds once its file is emptied from the
+  Recycle Bin, a row a file put back from Explorer replaces, a retired row whose name a file the
+  app moves, renames, pastes or restores takes (`items::forget_retired`), and each row Remove
+  Source deletes that the journal names. Each journal row about it alone gains `gone`, its name
+  and folder, for an undo to report and delete, and its id leaves every `items_tag`,
+  `items_untag` and `retag` row, an emptied tag row going with it. A marked row is never acted
+  on, since SQLite may give its id to another file.
 - A file Empty Trash… deleted leaves the journal in the transaction that retires its row: each
   row about it alone is deleted outright, unmarked, and its id leaves every row about several as
   above, so an undo passes over it to the act before. A `folder_delete` row left alone in its

@@ -574,6 +574,29 @@ pub fn drop_item(conn: &Connection, item_id: i64) -> Result<()> {
     leave_several(conn, item_id)
 }
 
+/// The files of a source that a journal row still names and could act on.
+pub fn named_in_source(conn: &Connection, source_id: i64) -> Result<Vec<i64>> {
+    let mut stmt = conn.prepare(&format!(
+        "SELECT id FROM item
+          WHERE source_id = ?1
+            AND id IN (SELECT json_extract(inverse, '$.itemId') FROM journal
+                        WHERE op IN ({}) AND json_type(inverse, '$.gone') IS NULL
+                       UNION SELECT e.value FROM journal j, json_each(j.inverse, '$.itemIds') e
+                        WHERE j.op = ?2
+                       UNION SELECT json_extract(e.value, '$.itemId')
+                         FROM journal j, json_each(j.inverse, '$.items') e WHERE j.op = ?3
+                       UNION SELECT json_extract(e.value, '$.itemId')
+                         FROM journal j, json_each(j.inverse, '$.itemUses') e WHERE j.op = ?4)
+          ORDER BY id",
+        quoted(&ONE_FILE)
+    ))?;
+    Ok(stmt
+        .query_map(params![source_id, ITEMS_TAG, ITEMS_UNTAG, RETAG], |r| {
+            r.get(0)
+        })?
+        .collect::<rusqlite::Result<_>>()?)
+}
+
 /// Takes a file's id out of every row about several, a row left about none going with it.
 fn leave_several(conn: &Connection, id: i64) -> Result<()> {
     let mut stmt = conn.prepare(

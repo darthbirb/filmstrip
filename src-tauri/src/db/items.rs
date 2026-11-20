@@ -391,13 +391,18 @@ pub fn set_name(conn: &Connection, id: i64, disk_name: &str) -> Result<()> {
     crate::db::search::index_item(conn, id)
 }
 
-/// Removes a retired row outright: one whose file a walk found gone, holding a name another file
+/// Forgets a retired row outright: one whose file a walk found gone, holding a name another file
 /// is now arriving at.
 pub fn forget_retired(conn: &Connection, id: i64) -> Result<()> {
-    conn.execute(
-        "DELETE FROM item WHERE id = ?1 AND deleted_at IS NOT NULL AND trashed_at IS NULL",
+    let retired: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM item
+                        WHERE id = ?1 AND deleted_at IS NOT NULL AND trashed_at IS NULL)",
         params![id],
+        |r| r.get(0),
     )?;
+    if retired {
+        forget(conn, id)?;
+    }
     Ok(())
 }
 

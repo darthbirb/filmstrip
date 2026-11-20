@@ -6,7 +6,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::db::{folders, now};
+use crate::db::{folders, items, journal, now};
 use crate::error::Result;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -186,8 +186,11 @@ pub fn set_kind(conn: &Connection, id: i64, kind: SourceKind) -> Result<()> {
 }
 
 /// Forgets a source outright; **its directory is never touched**, and adding it
-/// again re-reads it. Covers point in from outside the cascade, so go first.
+/// again re-reads it. Covers and the journal point in from outside the cascade, so go first.
 pub fn remove(conn: &Connection, id: i64) -> Result<()> {
+    for item_id in journal::named_in_source(conn, id)? {
+        items::forget(conn, item_id)?;
+    }
     conn.execute(
         "UPDATE folder SET cover_item_id = NULL
           WHERE cover_item_id IN (SELECT id FROM item WHERE source_id = ?1)",
