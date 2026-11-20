@@ -3,6 +3,7 @@ import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import type { Act } from "../ipc/bindings/Act";
 import type { Backup } from "../ipc/bindings/Backup";
 import type { Batch } from "../ipc/bindings/Batch";
+import type { BinlessDrive } from "../ipc/bindings/BinlessDrive";
 import type { BranchFile } from "../ipc/bindings/BranchFile";
 import type { Carried } from "../ipc/bindings/Carried";
 import type { Change } from "../ipc/bindings/Change";
@@ -26,6 +27,7 @@ import type { FolderMatch } from "../ipc/bindings/FolderMatch";
 import type { FolderNode } from "../ipc/bindings/FolderNode";
 import type { FolderStatus } from "../ipc/bindings/FolderStatus";
 import type { Forgets } from "../ipc/bindings/Forgets";
+import type { GoneReport } from "../ipc/bindings/GoneReport";
 import type { Hit } from "../ipc/bindings/Hit";
 import type { ItemDetail } from "../ipc/bindings/ItemDetail";
 import type { ItemRow } from "../ipc/bindings/ItemRow";
@@ -1492,13 +1494,67 @@ export function emptyOutside(itemIds: readonly number[]) {
   for (const id of itemIds) if (trashed.has(id)) emptiedOutside.add(id);
 }
 
+/** Files on a drive with no Recycle Bin, by the drive's name. `?no-bin` puts Cairo's on one. */
+const binless = new Map<number, string>();
+/** Files that would not go when deleted for good, as one open in another app. */
+const undeletable = new Set<number>();
+/** Files deleted for good, which only a test's reset brings back. */
+let goneForGood: ItemRow[] = [];
+/** Folders deleted with nothing journalled, every file in them gone for good. */
+let foldersGoneForGood: { node: FolderNode; parent: number }[] = [];
+
+/** Puts these files on a drive with no Recycle Bin. */
+export function onDriveWithoutBin(itemIds: readonly number[], drive: string) {
+  for (const id of itemIds) binless.set(id, drive);
+}
+
+/** Has these files refuse to be deleted for good. */
+export function refuseDeleting(itemIds: readonly number[]) {
+  for (const id of itemIds) undeletable.add(id);
+}
+
 /** The Recycle Bin as it starts: it takes everything, and nothing was emptied from it. */
 export function resetBin() {
   binRefuses = new Set();
   emptiedOutside.clear();
+  binless.clear();
+  undeletable.clear();
+  for (const item of goneForGood) ITEMS[item.folderId] = [...(ITEMS[item.folderId] ?? []), item];
+  goneForGood = [];
+  for (const { node, parent } of foldersGoneForGood) attach(node, parent);
+  foldersGoneForGood = [];
+  recount();
 }
 
 if (backupsWanted().has("bin-refuses")) refuseRecycling(allItems().map((item) => item.id));
+if (backupsWanted().has("no-bin")) {
+  onDriveWithoutBin(
+    (ITEMS[6] ?? []).map((item) => item.id),
+    "USB Drive (E:)",
+  );
+}
+
+/** Which of these files are on drives with no Recycle Bin, under each drive. */
+function binlessAmong(rows: readonly ItemRow[]): BinlessDrive[] {
+  const drives: BinlessDrive[] = [];
+  for (const item of rows) {
+    const drive = binless.get(item.id);
+    if (!drive) continue;
+    const file = { id: item.id, name: item.diskName, bytes: item.sizeBytes };
+    const held = drives.find((one) => one.drive === drive);
+    if (held) held.files.push(file);
+    else drives.push({ drive, files: [file] });
+  }
+  return drives;
+}
+
+/** Deletes a file outright, as a walk would then find it gone: nothing keeps it. */
+function deleteOutright(item: ItemRow) {
+  ITEMS[item.folderId] = (ITEMS[item.folderId] ?? []).filter((other) => other !== item);
+  binless.delete(item.id);
+  goneForGood.push(item);
+  recount();
+}
 
 /** A trashed row whose file is gone from the bin leaves the Trash, its tags with it. */
 function retireGone(item: ItemRow) {
@@ -1648,6 +1704,11 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     const steps: Step[] = [];
     const refused: Stayed[] = [];
     for (const item of everyItem().filter((one) => (itemIds as number[]).includes(one.id))) {
+      const drive = binless.get(item.id);
+      if (drive) {
+        refused.push(stayedIn(item, { kind: "noBin", drive }));
+        continue;
+      }
       if (binRefuses.has(item.id)) {
         refused.push(stayedIn(item, { kind: "binRefused" }));
         continue;
@@ -1656,6 +1717,22 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       toTrash(item);
     }
     return { batch: record(steps), report: { trashed: steps.length, refused } };
+  },
+  binless_items: ({ itemIds }) =>
+    binlessAmong((itemIds as number[]).flatMap((id) => everyItem().filter((one) => one.id === id))),
+  binless_under: ({ folderId }) => binlessAmong(under(folderId as number)),
+  delete_for_good: ({ itemIds }): GoneReport => {
+    const refused: Stayed[] = [];
+    let deleted = 0;
+    for (const item of everyItem().filter((one) => (itemIds as number[]).includes(one.id))) {
+      if (!binless.has(item.id) || undeletable.has(item.id)) {
+        refused.push(stayedIn(item, { kind: "inUse" }));
+        continue;
+      }
+      deleteOutright(item);
+      deleted += 1;
+    }
+    return { deleted, refused };
   },
   look_in_bin: () => lookInBin(),
   restore_items: ({ itemIds, folderId }) => {
@@ -1697,8 +1774,22 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       return invalid(`${node.title} holds ${held.length} files, so where they go has to be chosen`);
     const steps: Step[] = [];
     const refused: Stayed[] = [];
-    if (held.length > 0 && how?.kind === "trash") {
+    let outright = 0;
+    if (held.length > 0 && (how?.kind === "trash" || how?.kind === "permanently")) {
       for (const item of held) {
+        const drive = binless.get(item.id);
+        if (drive && how.kind === "permanently") {
+          if (undeletable.has(item.id)) refused.push(stayedIn(item, { kind: "inUse" }));
+          else {
+            deleteOutright(item);
+            outright += 1;
+          }
+          continue;
+        }
+        if (drive) {
+          refused.push(stayedIn(item, { kind: "noBin", drive }));
+          continue;
+        }
         if (binRefuses.has(item.id)) {
           refused.push(stayedIn(item, { kind: "binRefused" }));
           continue;
@@ -1731,9 +1822,14 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     }
     if (refused.length === 0) {
       detach(node);
-      steps.push({ op: "deleteFolder", node, parent });
+      if (how?.kind !== "permanently" || steps.length > 0)
+        steps.push({ op: "deleteFolder", node, parent });
+      else foldersGoneForGood.push({ node, parent });
     }
-    return { batch: record(steps), report: { deleted: refused.length === 0, refused } };
+    return {
+      batch: record(steps),
+      report: { deleted: refused.length === 0, refused, outright },
+    };
   },
   undo_last: () => (journal.length > 0 ? takeBack(journal.length - 1) : null),
   undo_batch: ({ batchId }) => {

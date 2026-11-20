@@ -86,9 +86,9 @@ pub fn trash_items(conn: &Connection, item_ids: &[i64], batch_id: &str) -> Resul
     Ok(report)
 }
 
-/// Sends one item's file from its folder to the Recycle Bin and records where the bin keeps it. A
-/// file already gone from where the index has it is refused, and the next walk retires it; one the
-/// bin will not take stays where it was. DECISIONS.md "Sending to the Recycle Bin".
+/// Sends one item's file to the Recycle Bin and records where the bin keeps it. A file gone from
+/// where the index has it is refused, and the next walk retires it; one the bin will not take, or
+/// on a drive with no bin and never sent, stays. DECISIONS.md "Sending to the Recycle Bin".
 pub(super) fn trash_unjournalled(
     conn: &Connection,
     item_id: i64,
@@ -104,6 +104,9 @@ pub(super) fn trash_unjournalled(
         return Err(AppError::refused(Reason::NotOnDisk {
             name: file.disk_name,
         }));
+    }
+    if let Some(drive) = Shell.binless(&from) {
+        return Err(AppError::refused(Reason::NoBin { drive }));
     }
     recycling::add(conn, &from)?;
     let sent = recycle::send(&Shell, &from)?;

@@ -14,7 +14,8 @@ use crate::db::{folders, in_transaction, items, journal, now, tags};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::stayed::{self, Stayed};
 use crate::fs::{
-    PASSING, items as fs_items, noclobber, paths, relocate, sanitize, take_away, trash, walk,
+    PASSING, binless, items as fs_items, noclobber, paths, relocate, sanitize, take_away, trash,
+    walk,
 };
 
 /// Makes a folder inside `parent_id` under `title`, as a directory and then a row.
@@ -154,6 +155,9 @@ pub(super) fn move_unjournalled(
 pub enum Contents {
     /// Into the trash, with the folder.
     Trash,
+    /// Deleted for good where their drive has no Recycle Bin, once asked, and the rest into the
+    /// trash, with the folder. DECISIONS.md "A drive with no Recycle Bin".
+    Permanently,
     /// Into a sorting source's top level, subfolders and all.
     MoveTo {
         #[serde(rename = "sourceId")]
@@ -168,6 +172,8 @@ pub enum Contents {
 pub struct DeleteReport {
     pub deleted: bool,
     pub refused: Vec<Stayed>,
+    /// How many of its files went for good, from a drive with no Recycle Bin.
+    pub outright: u32,
 }
 
 /// Deletes a folder, trashing or moving what it holds first, under the same batch, as `contents`
@@ -201,6 +207,18 @@ pub fn delete(
         (Some(Contents::Trash), false) => {
             for item_id in held {
                 if let Err(err) = trash::trash_unjournalled(conn, item_id, Some(batch_id)) {
+                    report.refused.push(stayed::file(conn, item_id, &err)?);
+                }
+            }
+        }
+        (Some(Contents::Permanently), false) => {
+            for item_id in held {
+                let went = if binless::is_binless(conn, item_id)? {
+                    binless::delete_unjournalled(conn, item_id).map(|()| report.outright += 1)
+                } else {
+                    trash::trash_unjournalled(conn, item_id, Some(batch_id))
+                };
+                if let Err(err) = went {
                     report.refused.push(stayed::file(conn, item_id, &err)?);
                 }
             }
@@ -253,9 +271,14 @@ pub fn delete(
         .into_iter()
         .map(|id| paths::folder_dir(conn, id))
         .collect::<Result<_>>()?;
+    let undoable =
+        contents != Some(Contents::Permanently) || !journal::batch(conn, batch_id)?.is_empty();
     let recorded = in_transaction(conn, |tx| {
         folders::retire_subtree_at(tx, folder_id, retired_at)?;
-        journal::record_folder_delete(tx, batch_id, folder_id, retired_at)
+        if undoable {
+            journal::record_folder_delete(tx, batch_id, folder_id, retired_at)?;
+        }
+        Ok(())
     });
     if let Err(err) = recorded {
         for path in std::iter::once(&dir).chain(&subtree) {
@@ -639,7 +662,7 @@ mod tests {
             report,
             DeleteReport {
                 deleted: true,
-                refused: vec![]
+                ..DeleteReport::default()
             }
         );
         assert!(!root.join("Trips/Lisbon").exists(), "litter goes with it");

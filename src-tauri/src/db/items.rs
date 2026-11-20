@@ -360,6 +360,17 @@ pub fn folder_of(conn: &Connection, id: i64) -> Result<Option<i64>> {
         .optional()?)
 }
 
+/// How large the index has an item's file.
+pub fn size_of(conn: &Connection, id: i64) -> Result<Option<i64>> {
+    Ok(conn
+        .query_row(
+            "SELECT size_bytes FROM item WHERE id = ?1",
+            params![id],
+            |r| r.get(0),
+        )
+        .optional()?)
+}
+
 /// Records a move; the caller moves the file. `source_id` is derived, never
 /// passed, because a cross-source move is where a stale copy would hide.
 pub fn set_folder(conn: &Connection, id: i64, folder_id: i64, disk_name: &str) -> Result<()> {

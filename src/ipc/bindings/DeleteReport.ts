@@ -4,4 +4,8 @@ import type { Stayed } from "./Stayed";
 /**
  * Whether a folder went, and what kept it when it did not.
  */
-export type DeleteReport = { deleted: boolean, refused: Array<Stayed>, };
+export type DeleteReport = { deleted: boolean, refused: Array<Stayed>, 
+/**
+ * How many of its files went for good, from a drive with no Recycle Bin.
+ */
+outright: number, };

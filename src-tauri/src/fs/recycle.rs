@@ -20,6 +20,11 @@ pub trait Bin {
     /// Forgets what the bin kept beside a file once the file has been taken back out of `binned`,
     /// so the bin no longer lists it.
     fn let_go(&self, binned: &Path) -> io::Result<()>;
+
+    /// The drive `path` is on, as Explorer names it, when that drive has no Recycle Bin at all, so
+    /// the shell would delete outright whatever is sent from it. Nothing when it has one, or when
+    /// that cannot be told: a send from there still never deletes outright.
+    fn binless(&self, path: &Path) -> Option<String>;
 }
 
 /// Where the bin keeps a file it took: the name it gave it, and the file itself on its volume, by
@@ -331,6 +336,10 @@ impl Bin for Shell {
     fn let_go(&self, binned: &Path) -> io::Result<()> {
         RecycleBin.let_go(binned)
     }
+
+    fn binless(&self, path: &Path) -> Option<String> {
+        RecycleBin.binless(path)
+    }
 }
 
 #[cfg(test)]
@@ -345,6 +354,10 @@ impl Bin for Shell {
 
     fn let_go(&self, binned: &Path) -> io::Result<()> {
         tests::stand_in().let_go(binned)
+    }
+
+    fn binless(&self, path: &Path) -> Option<String> {
+        tests::stand_in().binless(path)
     }
 }
 
@@ -422,6 +435,74 @@ impl Bin for RecycleBin {
             done => done,
         }
     }
+
+    /// Windows keeps a Recycle Bin on a fixed drive only: a removable one, a network share, a disc
+    /// or a RAM disk has none. A drive whose kind cannot be read counts as having one.
+    fn binless(&self, path: &Path) -> Option<String> {
+        use windows_sys::Win32::Storage::FileSystem::GetDriveTypeW;
+        use windows_sys::Win32::System::WindowsProgramming::{
+            DRIVE_CDROM, DRIVE_RAMDISK, DRIVE_REMOTE, DRIVE_REMOVABLE,
+        };
+
+        let root = plain(&volume_of(path).ok()?);
+        // SAFETY: the root is NUL-terminated and outlives the call.
+        let kind = unsafe { GetDriveTypeW(wide(&root).as_ptr()) };
+        matches!(
+            kind,
+            DRIVE_REMOVABLE | DRIVE_REMOTE | DRIVE_CDROM | DRIVE_RAMDISK
+        )
+        .then(|| drive_name(&root, kind, volume_label(&root)))
+    }
+}
+
+/// A drive as Explorer names it: its label and its letter, `USB Drive (E:)`, a share and its
+/// server, `Photos (\\nas)`, or, unlabelled, by what kind of drive it is.
+#[cfg(windows)]
+fn drive_name(root: &Path, kind: u32, label: Option<String>) -> String {
+    use windows_sys::Win32::System::WindowsProgramming::{
+        DRIVE_CDROM, DRIVE_RAMDISK, DRIVE_REMOTE, DRIVE_REMOVABLE,
+    };
+
+    let text = root.to_string_lossy();
+    let text = text.trim_end_matches('\\');
+    if let Some(unc) = text.strip_prefix(r"\\") {
+        let (server, share) = unc.split_once('\\').unwrap_or((unc, unc));
+        return format!(r"{share} (\\{server})");
+    }
+    let label = label.filter(|label| !label.is_empty()).unwrap_or_else(|| {
+        match kind {
+            DRIVE_REMOVABLE => "USB Drive",
+            DRIVE_REMOTE => "Network Drive",
+            DRIVE_CDROM => "CD Drive",
+            DRIVE_RAMDISK => "RAM Disk",
+            _ => "Local Disk",
+        }
+        .to_owned()
+    });
+    format!("{label} ({text})")
+}
+
+/// The label a volume was given, when it can be read.
+#[cfg(windows)]
+fn volume_label(root: &Path) -> Option<String> {
+    use windows_sys::Win32::Storage::FileSystem::GetVolumeInformationW;
+
+    let mut label = vec![0u16; 261];
+    // SAFETY: the root is NUL-terminated, `label` is as long as the length the call is given, and
+    // every other buffer is null with no length.
+    let read = unsafe {
+        GetVolumeInformationW(
+            wide(root).as_ptr(),
+            label.as_mut_ptr(),
+            label.len() as u32,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    (read != 0).then(|| unwide(&label).to_string_lossy().into_owned())
 }
 
 #[cfg(not(windows))]
@@ -436,6 +517,10 @@ impl Bin for RecycleBin {
 
     fn let_go(&self, _binned: &Path) -> io::Result<()> {
         Ok(())
+    }
+
+    fn binless(&self, _path: &Path) -> Option<String> {
+        None
     }
 }
 
@@ -497,6 +582,8 @@ pub(crate) mod tests {
         pub(crate) asked: RefCell<Vec<PathBuf>>,
         /// Each name a file was taken back out of.
         pub(crate) let_go: RefCell<Vec<PathBuf>>,
+        /// Folders standing for drives with no Recycle Bin, each with the drive's name.
+        pub(crate) binless: Vec<(PathBuf, String)>,
     }
 
     impl Fake {
@@ -506,6 +593,7 @@ pub(crate) mod tests {
                 deletes: Vec::new(),
                 asked: RefCell::default(),
                 let_go: RefCell::default(),
+                binless: Vec::new(),
             }
         }
 
@@ -562,17 +650,26 @@ pub(crate) mod tests {
             let (Stand::Recycles(bin) | Stand::Relinks(bin)) = &self.stand else {
                 return false;
             };
-            let lower = |path: &Path| {
-                let text = path.to_string_lossy().to_lowercase();
-                PathBuf::from(text.strip_prefix(r"\\?\").unwrap_or(&text))
-            };
-            lower(name).starts_with(lower(bin))
+            plain_lower(name).starts_with(plain_lower(bin))
         }
 
         fn let_go(&self, binned: &Path) -> io::Result<()> {
             self.let_go.borrow_mut().push(binned.to_path_buf());
             Ok(())
         }
+
+        fn binless(&self, path: &Path) -> Option<String> {
+            self.binless
+                .iter()
+                .find(|(drive, _)| plain_lower(path).starts_with(plain_lower(drive)))
+                .map(|(_, name)| name.clone())
+        }
+    }
+
+    /// A path as the stand-in compares it: plain, and in lower case.
+    fn plain_lower(path: &Path) -> PathBuf {
+        let text = path.to_string_lossy().to_lowercase();
+        PathBuf::from(text.strip_prefix(r"\\?\").unwrap_or(&text))
     }
 
     fn recycled(sent: Sent) -> bool {
@@ -878,6 +975,34 @@ pub(crate) mod tests {
         assert!(send(&Fake::new(Stand::Deletes), &file).is_err());
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
         assert_eq!(std::fs::read_to_string(hold_of(&file)).unwrap(), "another");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_fixed_drive_has_a_recycle_bin_and_one_without_is_named_as_explorer_names_it() {
+        use windows_sys::Win32::System::WindowsProgramming::{DRIVE_REMOTE, DRIVE_REMOVABLE};
+
+        let dir = scratch("drive");
+        assert_eq!(RecycleBin.binless(&dir.join("trash/one.jpg")), None);
+
+        let stick = Path::new(r"E:\");
+        assert_eq!(
+            drive_name(stick, DRIVE_REMOVABLE, Some("HOLIDAY".into())),
+            "HOLIDAY (E:)"
+        );
+        assert_eq!(
+            drive_name(stick, DRIVE_REMOVABLE, Some(String::new())),
+            "USB Drive (E:)"
+        );
+        assert_eq!(drive_name(stick, DRIVE_REMOVABLE, None), "USB Drive (E:)");
+        assert_eq!(
+            drive_name(Path::new(r"Z:\"), DRIVE_REMOTE, None),
+            "Network Drive (Z:)"
+        );
+        assert_eq!(
+            drive_name(Path::new(r"\\nas\Photos\"), DRIVE_REMOTE, Some("x".into())),
+            r"Photos (\\nas)"
+        );
     }
 
     #[test]

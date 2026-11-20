@@ -1412,7 +1412,7 @@ waits, where Explorer can see it too.
 - **The bin refusing a file leaves it where it was.** The send never deletes outright, so a file
   too large for the bin, or on a drive whose bin is off, stays in its folder and the foot says so;
   the rest of a set are one batch with Undo. A drive with no Recycle Bin at all, which Windows
-  would delete from outright, is #193's to ask about first.
+  would delete from outright, asks first (DECISIONS.md "A drive with no Recycle Bin").
 - **A removed source's trashed files stay in the bin**, and so do those a restore of the index
   forgets. Their rows are forgotten; their files are already in the Recycle Bin, on the drive each
   came from, for Explorer to put back or empty. Nothing is sent, so nothing can be refused, and
@@ -1483,6 +1483,46 @@ which the app never shows on its behalf.
   names are real. Its files start with
   one name and with several, one of them already in the bin, and gain one from outside while the
   shell acts. Names that cannot be read are made so by a switch only tests have.
+
+## A drive with no Recycle Bin
+
+**Delete asks before it deletes outright a file on a drive with no Recycle Bin**, a USB stick, an
+SD card or a network share, as the owner decided on 15 November 2026 and built for #193 from
+Artboards › The Trash in the Recycle Bin. Windows deletes outright whatever is sent from such a
+drive, so the send could only ever refuse it; asking is the one way such a file can go.
+
+- **Told apart before anything is sent, by the drive's kind.** Windows keeps a Recycle Bin on a
+  fixed drive only, so `fs::recycle::Bin::binless` reads the kind of the volume a file is on
+  (`GetDriveTypeW` on the root `GetVolumePathNameW` gives): removable, remote, a disc or a RAM
+  disk has no bin. A file the bin merely refuses, too large for it or with the bin turned off, is
+  on a fixed drive and keeps the send's own refusal. A kind that cannot be read counts as a bin,
+  where the send still never deletes outright; an external disk Windows reports as fixed has a
+  bin of its own.
+- **The drive is named as Explorer names it**: its label and letter, `USB Drive (E:)` when it has
+  no label, and a share as `Photos (\\nas)`. The shell's own display name needs COM on the thread,
+  which the app's blocking threads do not set up.
+- **The send refuses such a file without asking the shell**, with a reason of its own, so nothing
+  that reaches `trash_items` without the question, an undo of a restore onto such a drive among
+  them, is ever deleted outright.
+- **One question for the whole selection.** `binless_items` names the files on such drives under
+  each drive, with their sizes; the rest go to the Recycle Bin at once as one batch with Undo,
+  and only the others are asked about. Cancel has the focus, so Enter and Escape both keep them.
+- **Asking leaves full screen.** The question is drawn above the grid, which full screen hides
+  and makes inert, and Delete is reachable there from the pane's bar and the file's menu; the
+  sheet draws no question over the pane, so the pane docks again to ask.
+- **Delete Permanently removes each file and retires its row**, as a walk retires a file it finds
+  gone, keeping its name and tags. Nothing is journalled: there is nothing to bring back, so the
+  foot has no Undo and Ctrl+Z reaches the act before it. `delete_for_good` checks each file again
+  and never deletes outright one whose drive has a bin. A read-only file is refused before it is
+  touched, and one open in another app is refused by the disk, so a file that would not go is
+  whole where it was, and the foot names it.
+- **A folder's delete asks the same in its own question**: Delete Files Too becomes Delete Files
+  Permanently, `Contents::Permanently`, whose files on such a drive go outright and any others to
+  the bin, and the folder goes once they have. The folder's delete is journalled only when some
+  of its files went to the bin, since otherwise nothing would come back with it. The foot counts
+  the two apart, and says nothing when no file went, since the banner over the grid says it all.
+- **Tests never delete outside their own folder.** The stand-in for the shell names folders of
+  the test's own as drives with no bin, so what is deleted outright is a file the test wrote.
 
 ## Settings
 

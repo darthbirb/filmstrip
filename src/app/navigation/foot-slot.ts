@@ -10,6 +10,8 @@ export type FootNews =
   | { kind: "refused"; refused: Refused }
   /** Files the Recycle Bin would not take, which stay where they were; nothing was deleted. */
   | { kind: "binRefused"; line: string; detail: string }
+  /** Files a delete for good would not remove, which stay where they were; nothing to undo. */
+  | { kind: "kept"; line: string }
   /** A destination key that moved nothing, and why. */
   | { kind: "keyRefused"; line: string; detail?: string; path?: string }
   /** An act that changed the disk, and the batch its Undo takes back. */

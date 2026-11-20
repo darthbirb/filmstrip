@@ -20,6 +20,7 @@ import { Navigation } from "./navigation/Navigation";
 import { Rail } from "./navigation/Rail";
 import { useEscapeLeavesFullScreen, useFullScreen } from "./pane/full-screen";
 import { MovePickerHost } from "./pane/move-picker";
+import { NoBinQuestion } from "./pane/no-bin";
 import { Pane, PaneHeader } from "./pane/Pane";
 import { PaneDetailProvider } from "./pane/pane-detail";
 import { whenShownInPane } from "./pane/pane-store";
@@ -79,6 +80,7 @@ export function App() {
           notices={
             <>
               <DeleteQuestion />
+              <NoBinQuestion />
               <ReportBanner />
               <Notices />
             </>

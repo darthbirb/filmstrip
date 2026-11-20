@@ -56,11 +56,18 @@ Trash's.
 A file the Recycle Bin will not take, too large for it or on a drive whose bin is off, stays where
 it was, and the foot says so; nothing is deleted outright. In a set the rest go, with Undo.
 
+A drive with no Recycle Bin at all, a USB stick, an SD card or a network share, asks first, once
+for the whole selection: the drive, how many files and how much space, and that they go for good
+with no Undo. Cancel has the focus. In a mixed selection the rest go to the bin at once, with
+Undo, and only these are asked about; a folder's Delete Files Too becomes Delete Files
+Permanently there, and the folder goes once its files have. A file that would not go, open in
+another app or read-only, stays where it was, and the foot names it.
+
 The Trash looks in the bin at launch and whenever it opens. A file emptied from the bin outside
 the app leaves the Trash, its row retired; one put back from Explorer is restored in the index,
 tags and all. A Restore or Ctrl+Z that reaches a file emptied from the bin says so, under Gone from
-the Recycle Bin. Emptying the library's files from the bin is the one way the app deletes a file
-outright, and it asks first.
+the Recycle Bin. Emptying the library's files from the bin, and Delete on a drive with no bin, are the
+only ways the app deletes a file outright, and both ask first.
 
 ## Tags and labels
 

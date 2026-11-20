@@ -3,4 +3,4 @@
 /**
  * Where the files in a folder being deleted go. PRODUCT.md "Folders and sources".
  */
-export type Contents = { "kind": "trash" } | { "kind": "moveTo", sourceId: number, };
+export type Contents = { "kind": "trash" } | { "kind": "permanently" } | { "kind": "moveTo", sourceId: number, };
