@@ -535,7 +535,8 @@ pub enum Forgot {
     /// Emptied from the Recycle Bin outside the app.
     #[default]
     EmptiedFromBin,
-    /// Found gone from disk by a walk, and its name since taken by a file the app put there.
+    /// Gone from disk, its name since taken by a file the app put there or one put back from the
+    /// Recycle Bin in Explorer.
     NotOnDisk,
     /// Its source was removed; the file itself is untouched.
     SourceRemoved { source: String },

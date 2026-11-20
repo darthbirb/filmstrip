@@ -1409,9 +1409,9 @@ waits, where Explorer can see it too.
   same transaction (SCHEMA.md "The undo journal"): an undo of the act that sent it reports it by
   the name and folder kept on its rows, and never stops on it or reaches a file given its id
   since. The mark keeps why the row went, since that is what the undo says: a file emptied from
-  the bin is listed under Gone from the Recycle Bin; a retired one whose name a file the app put
-  there took is No longer on disk, under Gone from its folder; a removed source's is "Phone was
-  removed", under Gone from that source. None of them is tried again, and none has a way to look.
+  the bin is listed under Gone from the Recycle Bin; one whose name a file the app put there, or
+  one put back from the bin in Explorer, took is No longer on disk, under Gone from its folder; a
+  removed source's is "Phone was removed", under Gone from that source. None of them is tried again, and none has a way to look.
 - **The bin refusing a file leaves it where it was.** The send never deletes outright, so a file
   too large for the bin, or on a drive whose bin is off, stays in its folder and the foot says so;
   the rest of a set are one batch with Undo. A drive with no Recycle Bin at all, which Windows
