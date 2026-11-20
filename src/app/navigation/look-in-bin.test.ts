@@ -30,6 +30,22 @@ test("opening the Trash retires what was emptied from the Recycle Bin outside th
   await expect.poll(inTrash).toEqual(["felucca.mp4"]);
 });
 
+test("Ctrl+Z after the Trash found a file emptied from the bin passes over it", async () => {
+  const [felucca, pyramid] = (await folderItems(6)).map((row) => row.id);
+  await trashItems([felucca as number, pyramid as number]);
+  emptyOutside([pyramid as number]);
+  stop = watchTrashOpening();
+  setPlace({ kind: "trash" });
+  await expect.poll(inTrash).toEqual(["felucca.mp4"]);
+
+  const undone = await undoLast();
+
+  expect(undone?.batch.files).toBe(1);
+  expect(undone?.filesBack).toBe(1);
+  expect(undone?.stayed).toEqual([]);
+  expect(await inTrash()).toEqual([]);
+});
+
 test("only opening the Trash looks, not each change of place inside it or elsewhere", async () => {
   const [felucca] = (await folderItems(6)).map((row) => row.id);
   await trashItems([felucca as number]);

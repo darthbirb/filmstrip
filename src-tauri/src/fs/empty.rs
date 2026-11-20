@@ -6,8 +6,8 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use crate::db::in_transaction;
 use crate::db::items::{self, Tally};
-use crate::db::{in_transaction, journal, now};
 use crate::error::Result;
 use crate::fs::recycle::{self, Shell};
 use crate::fs::trash::{self, Found};
@@ -118,13 +118,13 @@ fn empty_one(conn: &Connection, counted: &Counted) -> Result<Outcome> {
             }
             // The file is gone whatever the index says now; a row left in the Trash is retired by
             // the next look in the bin.
-            if let Err(err) = in_transaction(conn, |tx| leave(tx, id)) {
+            if let Err(err) = in_transaction(conn, |tx| trash::leave(tx, id)) {
                 eprintln!("empty: {} is gone, its row not yet: {err}", path.display());
             }
             Ok(Outcome::Deleted(bytes))
         }
         Found::Gone => {
-            in_transaction(conn, |tx| leave(tx, id))?;
+            in_transaction(conn, |tx| trash::leave(tx, id))?;
             Ok(Outcome::Gone)
         }
         Found::Back => {
@@ -135,17 +135,11 @@ fn empty_one(conn: &Connection, counted: &Counted) -> Result<Outcome> {
     }
 }
 
-/// Takes an emptied file out of the Trash and out of the journal, so an undo passes over it.
-fn leave(conn: &Connection, id: i64) -> Result<()> {
-    journal::drop_item(conn, id)?;
-    items::retire_trashed(conn, id, now())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::db::sources::{self, SourceKind};
-    use crate::db::{self, folders, tags};
+    use crate::db::{self, folders, journal, tags};
     use crate::fs::recycle::tests::{Fake, stand_in};
     use crate::fs::{settles_to, undo, walk};
     use std::cell::{Cell, RefCell};
@@ -461,6 +455,43 @@ mod tests {
         assert_eq!(back.batch.batch_id, named);
         assert!(!lib.root.join("Trips/Cairo").exists());
         assert!(!folders::is_live(&lib.conn, lib.cairo).unwrap());
+        assert_eq!(undo::undo_last(&lib.conn).unwrap(), None);
+    }
+
+    #[test]
+    fn a_folder_whose_files_left_the_bin_from_explorer_and_empty_trash_is_never_made_again() {
+        let lib = library("explorer-then-empty", &["a.jpg", "b.jpg"]);
+        let a = lib.id("a.jpg");
+        let trips = folders::parent(&lib.conn, lib.cairo).unwrap().unwrap();
+        std::fs::write(lib.root.join("Trips/note.jpg"), "note").unwrap();
+        walk::reconcile(&lib.conn).unwrap();
+        let note = items::existing_by_disk_name(&lib.conn, trips, "note.jpg")
+            .unwrap()
+            .unwrap()
+            .id;
+        let named = journal::new_batch();
+        crate::fs::items::rename(&lib.conn, note, "dusk.jpg", &named).unwrap();
+        let cairo = journal::new_batch();
+        let report = crate::fs::folders::delete(
+            &lib.conn,
+            lib.cairo,
+            Some(crate::fs::folders::Contents::Trash),
+            &cairo,
+        )
+        .unwrap();
+        assert!(report.deleted);
+        std::fs::remove_file(lib.in_bin(a)).unwrap();
+        assert_eq!(trash::look_in_bin(&lib.conn).unwrap().retired, 1);
+
+        assert_eq!(lib.empty(&lib.asked()).deleted, 1);
+
+        assert!(journal::batch(&lib.conn, &cairo).unwrap().is_empty());
+        let back = undo::undo_last(&lib.conn).unwrap().unwrap();
+        assert_eq!(back.batch.batch_id, named);
+        assert!(back.stayed.is_empty(), "{:?}", back.stayed);
+        assert!(!lib.root.join("Trips/Cairo").exists());
+        assert!(!folders::is_live(&lib.conn, lib.cairo).unwrap());
+        settles_to(&lib.root.join("Trips"), &["note.jpg"]);
         assert_eq!(undo::undo_last(&lib.conn).unwrap(), None);
     }
 

@@ -1576,7 +1576,10 @@ function goneFromBin(item: ItemRow, to = item.folderId): Stayed | null {
 
 function lookInBin(): Looked {
   const gone = (ITEMS[TRASH] ?? []).filter((item) => emptiedOutside.has(item.id));
-  for (const item of gone) retireGone(item);
+  for (const item of gone) {
+    dropFromJournal(item);
+    retireGone(item);
+  }
   return { retired: gone.length, restored: 0 };
 }
 
