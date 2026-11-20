@@ -5,7 +5,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::db::journal::Gone;
+use crate::db::journal::{Forgot, Gone};
 use crate::db::{folders, items};
 use crate::error::{AppError, Reason, Result};
 
@@ -30,8 +30,8 @@ pub enum Thing {
 }
 
 /// Where something that stayed is now: a folder, named from its source's own folder down, the
-/// Trash, gone from the Recycle Bin outside the app, or a directory outside the library that a
-/// copy was bringing it in from, with the folder it was bringing it into.
+/// Trash, the Recycle Bin it was emptied from, the index it left and the place it was last, or a
+/// directory outside the library a copy was bringing it from, with the folder it was going into.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[ts(export)]
@@ -43,6 +43,9 @@ pub enum Whereabouts {
     },
     Trash,
     RecycleBin,
+    Forgotten {
+        path: Vec<String>,
+    },
     Outside {
         dir: String,
         into: i64,
@@ -78,17 +81,38 @@ pub fn file(conn: &Connection, item_id: i64, err: &AppError) -> Result<Stayed> {
     })
 }
 
-/// A file the index forgot once it was emptied from the Recycle Bin, as the journal kept it.
+/// A file the index forgot, as the journal kept it, and why it was forgotten.
 pub fn forgotten(conn: &Connection, gone: &Gone) -> Result<Stayed> {
+    let name = gone.name.clone();
+    let (at, reason) = match &gone.why {
+        Forgot::EmptiedFromBin => (
+            Whereabouts::RecycleBin,
+            Reason::GoneFromBin {
+                name: name.clone(),
+                place: folders::title(conn, gone.folder_id)?.unwrap_or_default(),
+            },
+        ),
+        Forgot::NotOnDisk => (
+            Whereabouts::Forgotten {
+                path: path_of(conn, gone.folder_id)?,
+            },
+            Reason::NotOnDisk { name: name.clone() },
+        ),
+        Forgot::SourceRemoved { source } => (
+            Whereabouts::Forgotten {
+                path: vec![source.clone()],
+            },
+            Reason::SourceRemoved {
+                source: source.clone(),
+            },
+        ),
+    };
     Ok(Stayed {
         kind: Thing::File,
         id: gone.item_id,
-        name: gone.name.clone(),
-        at: Whereabouts::RecycleBin,
-        reason: Reason::GoneFromBin {
-            name: gone.name.clone(),
-            place: folders::title(conn, gone.folder_id)?.unwrap_or_default(),
-        },
+        name,
+        at,
+        reason,
     })
 }
 
@@ -126,9 +150,13 @@ pub fn outside(path: &std::path::Path, into: i64, folder: bool, err: &AppError) 
 }
 
 fn folder_at(conn: &Connection, folder_id: i64) -> Result<Whereabouts> {
-    let path = folders::ancestry(conn, folder_id)?
+    let path = path_of(conn, folder_id)?;
+    Ok(Whereabouts::Folder { folder_id, path })
+}
+
+fn path_of(conn: &Connection, folder_id: i64) -> Result<Vec<String>> {
+    Ok(folders::ancestry(conn, folder_id)?
         .into_iter()
         .map(|crumb| crumb.title)
-        .collect();
-    Ok(Whereabouts::Folder { folder_id, path })
+        .collect())
 }

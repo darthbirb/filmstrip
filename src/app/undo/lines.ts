@@ -465,6 +465,8 @@ export function reasonText(reason: Reason): string {
       return `Already in ${reason.place}`;
     case "offline":
       return `${reason.source} is offline`;
+    case "sourceRemoved":
+      return `${reason.source} was removed`;
     case "diskFull":
       return "The disk is full";
     case "goneFromBin":
@@ -477,6 +479,13 @@ export function reasonText(reason: Reason): string {
       return reason.message.charAt(0).toUpperCase() + reason.message.slice(1);
   }
 }
+
+/** A row its undo let go of, the file gone from the bin or the index: nothing is left to retry. */
+export function letGo(row: Stayed) {
+  return row.at.kind === "recycleBin" || row.at.kind === "forgotten";
+}
+
+const goneFrom = (one: Stayed) => one.at.kind === "forgotten" || one.reason.kind === "notOnDisk";
 
 export type StayedGroup = { heading: string; rows: Stayed[] };
 
@@ -492,12 +501,12 @@ export function stayedGroups(stayed: readonly Stayed[], skipped = false): Stayed
       ? one.at.kind
       : one.at.kind === "outside"
         ? `outside:${one.at.dir.toLowerCase()}`
-        : `${one.reason.kind === "notOnDisk"}:${one.at.path.join("/")}`;
+        : `${goneFrom(one)}:${one.at.path.join("/")}`;
   const groups = new Map<string, Stayed[]>();
   for (const one of stayed) groups.set(keyOf(one), [...(groups.get(keyOf(one)) ?? []), one]);
 
   const paths = [...groups.values()].flatMap(([first]) =>
-    first && first.at.kind === "folder" ? [first.at.path] : [],
+    first && (first.at.kind === "folder" || first.at.kind === "forgotten") ? [first.at.path] : [],
   );
   const shared = sharedDepth(paths);
   return [...groups.values()]
@@ -513,8 +522,11 @@ export function stayedGroups(stayed: readonly Stayed[], skipped = false): Stayed
       const path = first.at.path;
       const from = skipped ? 0 : Math.max(Math.min(shared, path.length) - 1, 0);
       const place = path.slice(from).join(" › ");
-      const gone = first.reason.kind === "notOnDisk";
-      return { heading: `${gone ? "Gone from" : still} ${place}`, rows, depth: path.length };
+      return {
+        heading: `${goneFrom(first) ? "Gone from" : still} ${place}`,
+        rows,
+        depth: path.length,
+      };
     })
     .sort((a, b) => a.depth - b.depth)
     .map(({ heading, rows }) => ({ heading, rows }));

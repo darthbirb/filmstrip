@@ -1,6 +1,8 @@
 //! The undo journal: what the app changed on disk, and what reverses it.
 //! DECISIONS.md "Undo".
 
+use std::collections::HashSet;
+
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -513,13 +515,30 @@ pub fn copying(conn: &Connection, batch_id: &str) -> Result<bool> {
     )?)
 }
 
-/// A file the index forgot while the journal still named it: its name and the folder it was in.
+/// A file the index forgot while the journal still named it: its name, the folder it was in, and
+/// why it was forgotten.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Gone {
     pub item_id: i64,
     pub name: String,
     pub folder_id: i64,
+    #[serde(default)]
+    pub why: Forgot,
+}
+
+/// Why the index forgot a file the journal named. A mark written before marks said why is the
+/// default, since a file emptied from the Recycle Bin was the only one then.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum Forgot {
+    /// Emptied from the Recycle Bin outside the app.
+    #[default]
+    EmptiedFromBin,
+    /// Found gone from disk by a walk, and its name since taken by a file the app put there.
+    NotOnDisk,
+    /// Its source was removed; the file itself is untouched.
+    SourceRemoved { source: String },
 }
 
 /// The rows about one file alone, which name it by `itemId`.
@@ -541,7 +560,33 @@ pub fn forget_item(conn: &Connection, gone: &Gone) -> Result<()> {
         ),
         params![id, mark],
     )?;
-    leave_several(conn, id)
+    leave_several(conn, &[id])
+}
+
+/// Prunes every file of a source being removed at once, as [`forget_item`] prunes one.
+/// SCHEMA.md "The undo journal".
+pub fn forget_source(conn: &Connection, source_id: i64) -> Result<()> {
+    conn.execute(
+        &format!(
+            "UPDATE journal SET forward = json_set(forward, '$.gone', json(marks.mark)),
+                                inverse = json_set(inverse, '$.gone', json(marks.mark))
+               FROM (SELECT i.id,
+                            json_object('itemId', i.id, 'name', i.disk_name, 'folderId', i.folder_id,
+                                        'why', json_object('kind', 'sourceRemoved',
+                                                           'source', s.title)) AS mark
+                       FROM item i JOIN source s ON s.id = i.source_id
+                      WHERE i.source_id = ?1) AS marks
+              WHERE journal.op IN ({}) AND json_extract(journal.inverse, '$.itemId') = marks.id
+                AND json_type(journal.inverse, '$.gone') IS NULL",
+            quoted(&ONE_FILE)
+        ),
+        params![source_id],
+    )?;
+    let ids: Vec<i64> = conn
+        .prepare("SELECT id FROM item WHERE source_id = ?1")?
+        .query_map(params![source_id], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    leave_several(conn, &ids)
 }
 
 /// Drops an emptied file from the journal: rows about it alone, a folder delete they leave alone in
@@ -571,62 +616,46 @@ pub fn drop_item(conn: &Connection, item_id: i64) -> Result<()> {
             params![batch, FOLDER_DELETE],
         )?;
     }
-    leave_several(conn, item_id)
+    leave_several(conn, &[item_id])
 }
 
-/// The files of a source that a journal row still names and could act on.
-pub fn named_in_source(conn: &Connection, source_id: i64) -> Result<Vec<i64>> {
-    let mut stmt = conn.prepare(&format!(
-        "SELECT id FROM item
-          WHERE source_id = ?1
-            AND id IN (SELECT json_extract(inverse, '$.itemId') FROM journal
-                        WHERE op IN ({}) AND json_type(inverse, '$.gone') IS NULL
-                       UNION SELECT e.value FROM journal j, json_each(j.inverse, '$.itemIds') e
-                        WHERE j.op = ?2
-                       UNION SELECT json_extract(e.value, '$.itemId')
-                         FROM journal j, json_each(j.inverse, '$.items') e WHERE j.op = ?3
-                       UNION SELECT json_extract(e.value, '$.itemId')
-                         FROM journal j, json_each(j.inverse, '$.itemUses') e WHERE j.op = ?4)
-          ORDER BY id",
-        quoted(&ONE_FILE)
-    ))?;
-    Ok(stmt
-        .query_map(params![source_id, ITEMS_TAG, ITEMS_UNTAG, RETAG], |r| {
-            r.get(0)
-        })?
-        .collect::<rusqlite::Result<_>>()?)
-}
-
-/// Takes a file's id out of every row about several, a row left about none going with it.
-fn leave_several(conn: &Connection, id: i64) -> Result<()> {
+/// Takes files' ids out of every row about several, a row left about none going with it.
+fn leave_several(conn: &Connection, ids: &[i64]) -> Result<()> {
+    let leaving: HashSet<i64> = ids.iter().copied().collect();
     let mut stmt = conn.prepare(
         "SELECT id, op, inverse FROM journal
-          WHERE (op = ?2 AND EXISTS(SELECT 1 FROM json_each(inverse, '$.itemIds') WHERE value = ?1))
+          WHERE (op = ?2 AND EXISTS(SELECT 1 FROM json_each(inverse, '$.itemIds')
+                                     WHERE value IN (SELECT value FROM json_each(?1))))
              OR (op = ?3 AND EXISTS(SELECT 1 FROM json_each(inverse, '$.items')
-                                     WHERE json_extract(value, '$.itemId') = ?1))
+                                     WHERE json_extract(value, '$.itemId')
+                                           IN (SELECT value FROM json_each(?1))))
              OR (op = ?4 AND EXISTS(SELECT 1 FROM json_each(inverse, '$.itemUses')
-                                     WHERE json_extract(value, '$.itemId') = ?1))",
+                                     WHERE json_extract(value, '$.itemId')
+                                           IN (SELECT value FROM json_each(?1))))",
     )?;
     let several: Vec<(i64, String, String)> = stmt
-        .query_map(params![id, ITEMS_TAG, ITEMS_UNTAG, RETAG], |r| {
-            Ok((r.get(0)?, r.get(1)?, r.get(2)?))
-        })?
+        .query_map(
+            params![serde_json::to_string(ids)?, ITEMS_TAG, ITEMS_UNTAG, RETAG],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )?
         .collect::<rusqlite::Result<_>>()?;
     for (row, op, inverse) in several {
         let left = match op.as_str() {
             ITEMS_TAG => {
                 let mut tagged: ItemsTagged = serde_json::from_str(&inverse)?;
-                tagged.item_ids.retain(|&one| one != id);
+                tagged.item_ids.retain(|one| !leaving.contains(one));
                 (!tagged.item_ids.is_empty()).then(|| serde_json::to_string(&tagged))
             }
             ITEMS_UNTAG => {
                 let mut untagged: ItemsUntagged = serde_json::from_str(&inverse)?;
-                untagged.items.retain(|one| one.item_id != id);
+                untagged.items.retain(|one| !leaving.contains(&one.item_id));
                 (!untagged.items.is_empty()).then(|| serde_json::to_string(&untagged))
             }
             _ => {
                 let mut retagged: Retagged = serde_json::from_str(&inverse)?;
-                retagged.item_uses.retain(|one| one.item_id != id);
+                retagged
+                    .item_uses
+                    .retain(|one| !leaving.contains(&one.item_id));
                 Some(serde_json::to_string(&retagged))
             }
         };
@@ -754,6 +783,7 @@ mod tests {
             item_id: 5,
             name: "pyramid.jpg".into(),
             folder_id: 3,
+            why: Forgot::NotOnDisk,
         };
         forget_item(&conn, &pyramid).unwrap();
         let reused = Gone {
@@ -776,6 +806,122 @@ mod tests {
         assert_eq!(retagged.item_uses, [using(6)]);
         let marks: Vec<Option<Gone>> = batch(&conn, &renamed).unwrap().iter().map(gone).collect();
         assert_eq!(marks, [None, Some(pyramid)]);
+    }
+
+    #[test]
+    fn a_removed_source_s_files_are_marked_and_taken_out_of_every_set_at_once() {
+        let conn = conn();
+        let mut folder_of = vec![];
+        for (root, title) in [("D:/library", "Library"), ("E:/phone", "Phone")] {
+            let source = db::sources::add(
+                &conn,
+                std::path::Path::new(root),
+                title,
+                db::sources::SourceKind::Library,
+            )
+            .unwrap();
+            folder_of.push((
+                source.id,
+                db::folders::source_root_folder(&conn, source.id).unwrap(),
+            ));
+        }
+        for (id, (source, folder), name) in [
+            (5, folder_of[0], "pyramid.jpg"),
+            (6, folder_of[1], "beach.jpg"),
+            (7, folder_of[0], "sphinx.jpg"),
+        ] {
+            conn.execute(
+                "INSERT INTO item (id, uuid, source_id, folder_id, disk_name, ext, size_bytes,
+                                   mtime, kind, added_at)
+                 VALUES (?1, ?1, ?2, ?3, ?4, 'jpg', 1, 1, 'image', 1)",
+                params![id, source, folder, name],
+            )
+            .unwrap();
+        }
+        let all = new_batch();
+        let tagged = ItemsTagged {
+            tag_id: 1,
+            value: "dusk".into(),
+            item_ids: vec![5, 6, 7],
+        };
+        record_items_tag(&conn, &all, &tagged).unwrap();
+        let theirs = new_batch();
+        let only_theirs = ItemsTagged {
+            item_ids: vec![5, 7],
+            ..tagged.clone()
+        };
+        record_items_tag(&conn, &theirs, &only_theirs).unwrap();
+        let untagged = new_batch();
+        let untag = |item_id| Untagged {
+            item_id,
+            added_at: 1,
+        };
+        let untag_row = ItemsUntagged {
+            tag_id: 1,
+            value: "dusk".into(),
+            items: vec![untag(5), untag(6), untag(7)],
+        };
+        record_items_untag(&conn, &untagged, &untag_row).unwrap();
+        let retagged = new_batch();
+        let using = |item_id| ItemUse {
+            item_id,
+            rowid: item_id,
+            added_at: 1,
+            from: 1,
+            to: None,
+        };
+        let retag_row = Retagged {
+            change: Change::DeleteTag { tag: "dusk".into() },
+            files: 3,
+            folders: 0,
+            reworded: vec![],
+            made: vec![],
+            removed: vec![],
+            folder_uses: vec![],
+            item_uses: vec![using(5), using(6), using(7)],
+        };
+        record_retag(&conn, &retagged, &retag_row).unwrap();
+        let renamed = new_batch();
+        for id in [5, 6, 7] {
+            record_item_rename(&conn, &renamed, id, "a.jpg", "b.jpg").unwrap();
+        }
+
+        forget_source(&conn, folder_of[0].0).unwrap();
+
+        let only = |batch_id: &str| {
+            let rows = batch(&conn, batch_id).unwrap();
+            assert_eq!(rows.len(), 1);
+            rows[0].inverse.clone()
+        };
+        let tagged: ItemsTagged = serde_json::from_value(only(&all)).unwrap();
+        assert_eq!(tagged.item_ids, [6]);
+        assert!(batch(&conn, &theirs).unwrap().is_empty());
+        let untagged: ItemsUntagged = serde_json::from_value(only(&untagged)).unwrap();
+        assert_eq!(untagged.items, [untag(6)]);
+        let retagged: Retagged = serde_json::from_value(only(&retagged)).unwrap();
+        assert_eq!(retagged.item_uses, [using(6)]);
+        let removed = |item_id, name: &str| {
+            Some(Gone {
+                item_id,
+                name: name.into(),
+                folder_id: folder_of[0].1,
+                why: Forgot::SourceRemoved {
+                    source: "Library".into(),
+                },
+            })
+        };
+        let marks: Vec<Option<Gone>> = batch(&conn, &renamed).unwrap().iter().map(gone).collect();
+        assert_eq!(
+            marks,
+            [removed(7, "sphinx.jpg"), None, removed(5, "pyramid.jpg")]
+        );
+    }
+
+    #[test]
+    fn a_mark_written_before_marks_said_why_reads_as_emptied_from_the_bin() {
+        let old: Gone =
+            serde_json::from_str(r#"{"itemId":5,"name":"a.jpg","folderId":3}"#).unwrap();
+        assert_eq!(old.why, Forgot::EmptiedFromBin);
     }
 
     #[test]

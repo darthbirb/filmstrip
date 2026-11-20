@@ -9,7 +9,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::db::items::{ItemFile, ItemRow};
-use crate::db::journal::ItemRestored;
+use crate::db::journal::{Forgot, ItemRestored};
 use crate::db::{folders, in_transaction, items, journal, now, recycling, sources, tags};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::recycle::{self, Bin, Sent, Shell};
@@ -187,7 +187,7 @@ pub(super) fn find(conn: &Connection, item_id: i64, file: &ItemFile) -> Result<F
 /// one retired at its name, describes the same file, and is forgotten. Whether it went live.
 pub(super) fn put_back(conn: &Connection, item_id: i64, file: &ItemFile) -> Result<bool> {
     if let Some(held) = items::existing_by_disk_name(conn, file.folder_id, &file.disk_name)? {
-        items::forget(conn, held.id)?;
+        items::forget(conn, held.id, Forgot::EmptiedFromBin)?;
     }
     if !folders::is_live(conn, file.folder_id)? {
         items::retire_trashed(conn, item_id, now())?;

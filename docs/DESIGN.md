@@ -669,7 +669,8 @@ toward the rest surface.
   each row the name, why, and at its end a quiet way to go and look. What an act or an undo could
   not finish is grouped under a heading per place it is still in, "Reason" said over the first;
   a file emptied from the Recycle Bin outside the app is under Gone from the Recycle Bin, last,
-  with no way to look, and Retry stays only while a row above it could succeed.
+  and one the index forgot under Gone from the folder or source it was last in, neither with a
+  way to look, and Retry stays only while a row of neither kind could succeed.
 - **Question.** The notice's shape, asking: the `danger` glyph, the question and × to answer none
   on one line; under the question its answers as buttons, the one that destroys last in `danger`;
   under them, where an answer can be kept, a checkbox. The answers hold the line or all fold into

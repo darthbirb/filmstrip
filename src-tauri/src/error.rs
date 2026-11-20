@@ -65,6 +65,10 @@ pub enum Reason {
     Offline {
         source: String,
     },
+    /// Its source was removed from the library, so the index no longer knows it.
+    SourceRemoved {
+        source: String,
+    },
     DiskFull,
     /// Emptied from the Recycle Bin outside the app, so there is nothing left to bring back to the
     /// folder it was going to.
@@ -103,6 +107,7 @@ impl fmt::Display for Reason {
             Reason::Holds { name, more } => write!(f, "it holds {name} and {more} more"),
             Reason::AlreadyIn { place } => write!(f, "it is already in {place}"),
             Reason::Offline { source } => write!(f, "{source} is offline"),
+            Reason::SourceRemoved { source } => write!(f, "{source} was removed"),
             Reason::DiskFull => f.write_str("the disk is full"),
             Reason::GoneFromBin { name, .. } => write!(f, "{name} is no longer in the Recycle Bin"),
             Reason::BinRefused => f.write_str("the Recycle Bin would not take it"),

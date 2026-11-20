@@ -507,8 +507,20 @@ mod tests {
 
         assert_eq!(report.batch.batch_id, renamed);
         assert_eq!(report.files_back, 0);
-        let stayed: Vec<i64> = report.stayed.iter().map(|one| one.id).collect();
-        assert_eq!(stayed, [pyramid]);
+        assert_eq!(
+            report.stayed,
+            [Stayed {
+                kind: stayed::Thing::File,
+                id: pyramid,
+                name: "giza.jpg".into(),
+                at: stayed::Whereabouts::Forgotten {
+                    path: vec!["Library".into(), "Trips".into(), "Cairo".into()],
+                },
+                reason: Reason::NotOnDisk {
+                    name: "giza.jpg".into(),
+                },
+            }]
+        );
         assert_eq!(journal::latest_batch(&conn).unwrap(), None);
         assert!(dir.join("library/People/giza.jpg").is_file());
         assert!(!dir.join("library/Trips/Cairo/pyramid.jpg").exists());
@@ -551,8 +563,20 @@ mod tests {
         let report = undo_last(&conn).unwrap().unwrap();
         assert_eq!(report.batch.batch_id, renamed);
         assert_eq!(report.files_back, 0);
-        let stayed: Vec<i64> = report.stayed.iter().map(|one| one.id).collect();
-        assert_eq!(stayed, [pyramid]);
+        assert_eq!(
+            report.stayed,
+            [Stayed {
+                kind: stayed::Thing::File,
+                id: pyramid,
+                name: "giza.jpg".into(),
+                at: stayed::Whereabouts::Forgotten {
+                    path: vec!["Library".into()],
+                },
+                reason: Reason::SourceRemoved {
+                    source: "Library".into(),
+                },
+            }]
+        );
         assert_eq!(journal::latest_batch(&conn).unwrap(), None);
         assert!(dir.join("library/Trips/Cairo/giza.jpg").is_file());
         assert!(!dir.join("library/Trips/Cairo/pyramid.jpg").exists());

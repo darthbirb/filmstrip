@@ -7,7 +7,7 @@ import { Glyph } from "../../ui/Glyph";
 import { openMovePicker } from "../pane/move-picker";
 import { showInPane } from "../pane/pane-store";
 import { setPlace } from "../place";
-import { reasonText, stayedGroups } from "./lines";
+import { letGo, reasonText, stayedGroups } from "./lines";
 import { type Report, showReport, useReport } from "./report-store";
 
 const COLUMNS = listRow("control");
@@ -64,10 +64,11 @@ const GO =
   "focus-ring grid size-control place-items-center justify-self-end rounded-control text-fg-dim text-glyph transition-colors duration-(--motion-quick) hover:bg-wash hover:text-fg motion-reduce:transition-none";
 
 function Row({ row, inTrash }: { row: Stayed; inTrash: "show" | "restoreTo" }) {
-  // Explorer has nothing to show for a file gone from disk or away, or one under the trash's own name.
+  // Explorer has nothing to show for a file gone from disk, the index or away, or one under the
+  // trash's own name.
   const showable =
     row.at.kind !== "trash" &&
-    row.at.kind !== "recycleBin" &&
+    !letGo(row) &&
     row.reason.kind !== "notOnDisk" &&
     row.reason.kind !== "offline";
   return (

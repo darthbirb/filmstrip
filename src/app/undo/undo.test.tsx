@@ -126,6 +126,27 @@ test("an undo that came back in part opens the banner, grouped by where each fil
   await expect.element(screen.getByRole("button", { name: "Hide Files" })).toBeVisible();
 });
 
+test("a file its removed source took from the index is gone from it, with nothing to show", async () => {
+  const screen = await render(<Harness />);
+  showReport({
+    sentence: "giza.jpg could not be pyramid.jpg again",
+    rows: [
+      {
+        kind: "file",
+        id: 9,
+        name: "giza.jpg",
+        at: { kind: "forgotten", path: ["Phone"] },
+        reason: { kind: "sourceRemoved", source: "Phone" },
+      },
+    ],
+  });
+  await expect.element(screen.getByText("Gone from Phone")).toBeVisible();
+  await expect.element(screen.getByText("Phone was removed")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Show giza.jpg in Explorer" }).elements()).toHaveLength(
+    0,
+  );
+});
+
 test("a folder a file kept is shown open in Explorer, with that file selected", async () => {
   const screen = await render(<Harness />);
   showReport({

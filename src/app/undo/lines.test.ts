@@ -19,6 +19,7 @@ import {
   forGoodKeptLine,
   forGoodLine,
   holdsLine,
+  letGo,
   movedBannerLine,
   noBinDetail,
   noBinHead,
@@ -121,6 +122,7 @@ test("each reason is said in the banner's own words", () => {
     "Emptied outside the app",
   );
   expect(reasonText({ kind: "binRefused" })).toBe("The Recycle Bin would not take it");
+  expect(reasonText({ kind: "sourceRemoved", source: "Phone" })).toBe("Phone was removed");
 });
 
 test("what the foot says when the Recycle Bin would not take what Delete sent it", () => {
@@ -196,6 +198,31 @@ test("rows are grouped under the place each is still in, named from the folder t
     "Still in Inbox",
     "Gone from the Recycle Bin",
   ]);
+});
+
+test("a file the index forgot is gone from where it was last, and has nothing left to retry", () => {
+  const row = (name: string, at: Stayed["at"], reason: Stayed["reason"]): Stayed => ({
+    kind: "file",
+    id: name.charCodeAt(0),
+    name,
+    at,
+    reason,
+  });
+  const forgotten = (name: string, path: string[], reason: Stayed["reason"]) =>
+    row(name, { kind: "forgotten", path }, reason);
+  const deleted = forgotten("a.jpg", ["Pictures", "Cairo"], { kind: "notOnDisk", name: "a.jpg" });
+  const removed = forgotten("b.jpg", ["Phone"], { kind: "sourceRemoved", source: "Phone" });
+  const cairo: Stayed["at"] = { kind: "folder", folderId: 2, path: ["Pictures", "Cairo"] };
+  const still = row("c.jpg", cairo, { kind: "inUse" });
+
+  expect(stayedGroups([deleted, still]).map((group) => group.heading)).toEqual([
+    "Gone from Cairo",
+    "Still in Cairo",
+  ]);
+  expect(stayedGroups([removed])[0]?.heading).toBe("Gone from Phone");
+  expect([deleted, removed, still].map(letGo)).toEqual([true, true, false]);
+  const emptied = { kind: "goneFromBin", name: "d.jpg", place: "Cairo" } as const;
+  expect(letGo(row("d.jpg", { kind: "recycleBin" }, emptied))).toBe(true);
 });
 
 test("a name field says where the name is taken, or why else it was refused", () => {
