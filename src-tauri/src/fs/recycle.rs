@@ -1,6 +1,6 @@
-//! The Windows Recycle Bin, where Delete sends a file and Restore takes it back from, and never a
-//! way to destroy one: a file the bin cannot take is put back where it was and reported refused.
-//! DECISIONS.md "Sending to the Recycle Bin".
+//! The Windows Recycle Bin, where Delete sends a file, Restore takes it back from and Empty Trash…
+//! deletes it for good. A send never destroys one: a file the bin cannot take is put back where it
+//! was and reported refused. DECISIONS.md "Sending to the Recycle Bin".
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -83,6 +83,110 @@ pub fn send(bin: &dyn Bin, file: &Path) -> io::Result<Sent> {
     }
     noclobber::rename(&hold, file)?;
     Ok(Sent::Refused)
+}
+
+/// Deletes for good the file the bin keeps as `binned`, then the bin's record of it: only a name
+/// inside the bin, and only while it is still the file `itself` names.
+/// DECISIONS.md "Emptying the Trash".
+pub fn purge(bin: &dyn Bin, binned: &Path, itself: &str) -> io::Result<()> {
+    if !bin.holds(binned) {
+        return Err(io::Error::other(format!(
+            "{} is not in the Recycle Bin",
+            binned.display()
+        )));
+    }
+    destroy(binned, itself)?;
+    if let Err(err) = bin.let_go(binned) {
+        eprintln!(
+            "recycle: the bin's record of {} stays: {err}",
+            binned.display()
+        );
+    }
+    Ok(())
+}
+
+fn not_itself(path: &Path) -> io::Error {
+    io::Error::other(format!(
+        "{} is not the file the Trash sent there",
+        path.display()
+    ))
+}
+
+/// Removes the one name `path` while it is the file `itself` names: read and deleted through one
+/// handle, so nothing can take the name between the two. Its other names, if any, stay.
+#[cfg(windows)]
+fn destroy(path: &Path, itself: &str) -> io::Result<()> {
+    use std::os::windows::fs::OpenOptionsExt;
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Foundation::{
+        ERROR_INVALID_FUNCTION, ERROR_INVALID_PARAMETER, ERROR_NOT_SUPPORTED,
+    };
+    use windows_sys::Win32::Storage::FileSystem::{
+        DELETE, FILE_ATTRIBUTE_DIRECTORY, FILE_ATTRIBUTE_REPARSE_POINT,
+        FILE_DISPOSITION_FLAG_DELETE, FILE_DISPOSITION_FLAG_IGNORE_READONLY_ATTRIBUTE,
+        FILE_DISPOSITION_FLAG_POSIX_SEMANTICS, FILE_DISPOSITION_INFO, FILE_DISPOSITION_INFO_EX,
+        FILE_FLAG_OPEN_REPARSE_POINT, FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ,
+        FILE_SHARE_WRITE, FileDispositionInfo, FileDispositionInfoEx, SetFileInformationByHandle,
+    };
+
+    let file = std::fs::OpenOptions::new()
+        .access_mode(DELETE | FILE_READ_ATTRIBUTES)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT)
+        .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
+        .open(path)?;
+    let (found, attributes) = held(&file)?;
+    if attributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT) != 0
+        || found.key() != itself
+    {
+        return Err(not_itself(path));
+    }
+    let set = |class, info: *const core::ffi::c_void, size: usize| {
+        // SAFETY: the handle is open for as long as `file` lives, and `info` points at `size` bytes
+        // of the structure `class` names, which outlives the call.
+        unsafe { SetFileInformationByHandle(file.as_raw_handle(), class, info, size as u32) != 0 }
+    };
+    let ex = FILE_DISPOSITION_INFO_EX {
+        Flags: FILE_DISPOSITION_FLAG_DELETE
+            | FILE_DISPOSITION_FLAG_POSIX_SEMANTICS
+            | FILE_DISPOSITION_FLAG_IGNORE_READONLY_ATTRIBUTE,
+    };
+    if set(
+        FileDispositionInfoEx,
+        (&raw const ex).cast(),
+        size_of::<FILE_DISPOSITION_INFO_EX>(),
+    ) {
+        return Ok(());
+    }
+    let err = io::Error::last_os_error();
+    let older = [
+        ERROR_INVALID_PARAMETER,
+        ERROR_NOT_SUPPORTED,
+        ERROR_INVALID_FUNCTION,
+    ];
+    if !err
+        .raw_os_error()
+        .is_some_and(|code| older.contains(&(code as u32)))
+    {
+        return Err(err);
+    }
+    let plain = FILE_DISPOSITION_INFO { DeleteFile: true };
+    if set(
+        FileDispositionInfo,
+        (&raw const plain).cast(),
+        size_of::<FILE_DISPOSITION_INFO>(),
+    ) {
+        return Ok(());
+    }
+    Err(io::Error::last_os_error())
+}
+
+#[cfg(unix)]
+fn destroy(path: &Path, itself: &str) -> io::Result<()> {
+    let is_file = std::fs::symlink_metadata(path)?.is_file();
+    if !is_file || identity(path)?.key() != itself {
+        return Err(not_itself(path));
+    }
+    std::fs::remove_file(path)
 }
 
 /// The file at `path`, as [`Binned::file`] names it; nothing when no file is there.
@@ -187,10 +291,9 @@ impl Identity {
 #[cfg(windows)]
 fn identity(path: &Path) -> io::Result<Identity> {
     use std::os::windows::fs::OpenOptionsExt;
-    use std::os::windows::io::AsRawHandle;
     use windows_sys::Win32::Storage::FileSystem::{
-        BY_HANDLE_FILE_INFORMATION, FILE_FLAG_BACKUP_SEMANTICS, FILE_READ_ATTRIBUTES,
-        FILE_SHARE_DELETE, FILE_SHARE_READ, FILE_SHARE_WRITE, GetFileInformationByHandle,
+        FILE_FLAG_BACKUP_SEMANTICS, FILE_READ_ATTRIBUTES, FILE_SHARE_DELETE, FILE_SHARE_READ,
+        FILE_SHARE_WRITE,
     };
 
     let file = std::fs::OpenOptions::new()
@@ -198,17 +301,29 @@ fn identity(path: &Path) -> io::Result<Identity> {
         .custom_flags(FILE_FLAG_BACKUP_SEMANTICS)
         .share_mode(FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE)
         .open(path)?;
+    held(&file).map(|(found, _)| found)
+}
+
+/// What an open file is, and its attributes.
+#[cfg(windows)]
+fn held(file: &std::fs::File) -> io::Result<(Identity, u32)> {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Storage::FileSystem::{
+        BY_HANDLE_FILE_INFORMATION, GetFileInformationByHandle,
+    };
+
     // SAFETY: all-zero is a valid BY_HANDLE_FILE_INFORMATION, which the call fills in.
     let mut info: BY_HANDLE_FILE_INFORMATION = unsafe { std::mem::zeroed() };
     // SAFETY: the handle is open for as long as `file` lives, and `info` outlives the call.
     if unsafe { GetFileInformationByHandle(file.as_raw_handle(), &mut info) } == 0 {
         return Err(io::Error::last_os_error());
     }
-    Ok(Identity {
+    let found = Identity {
         links: info.nNumberOfLinks,
         volume: u64::from(info.dwVolumeSerialNumber),
         index: (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow),
-    })
+    };
+    Ok((found, info.dwFileAttributes))
 }
 
 #[cfg(unix)]
@@ -1003,6 +1118,104 @@ pub(crate) mod tests {
             drive_name(Path::new(r"\\nas\Photos\"), DRIVE_REMOTE, Some("x".into())),
             r"Photos (\\nas)"
         );
+    }
+
+    /// `trash/one.jpg`, with `others` more names elsewhere, sent into `bin/` beside it.
+    fn binned_one(dir: &Path, others: u32) -> (Fake, Binned) {
+        let file = one_with_names(dir, others);
+        let bin = Fake::new(Stand::Recycles(dir.join("bin")));
+        let Sent::Recycled(binned) = send(&bin, &file).unwrap() else {
+            panic!("not recycled");
+        };
+        (bin, binned)
+    }
+
+    #[test]
+    fn a_purge_deletes_the_bins_name_for_the_file_and_its_record_and_its_other_names_stay() {
+        let dir = scratch("purge");
+        let (bin, binned) = binned_one(&dir, 1);
+
+        purge(&bin, &binned.path, &binned.file).unwrap();
+
+        assert!(std::fs::symlink_metadata(&binned.path).is_err());
+        settles_to(&dir.join("bin"), &[]);
+        assert_eq!(bin.let_go.borrow().as_slice(), [binned.path]);
+        let elsewhere = dir.join("elsewhere/0.jpg");
+        assert_eq!(std::fs::read_to_string(&elsewhere).unwrap(), "one");
+        assert_eq!(identity(&elsewhere).unwrap().links, 1);
+    }
+
+    #[test]
+    fn a_purge_never_deletes_a_name_outside_the_bin_even_of_the_file_itself() {
+        let dir = scratch("purge-outside");
+        let (bin, binned) = binned_one(&dir, 1);
+        let elsewhere = dir.join("elsewhere/0.jpg");
+
+        assert!(purge(&bin, &elsewhere, &binned.file).is_err());
+
+        assert_eq!(std::fs::read_to_string(&elsewhere).unwrap(), "one");
+        assert_eq!(std::fs::read_to_string(&binned.path).unwrap(), "one");
+        assert!(bin.let_go.borrow().is_empty());
+    }
+
+    #[test]
+    fn a_purge_never_deletes_another_file_that_took_the_bins_name() {
+        let dir = scratch("purge-another");
+        let (bin, binned) = binned_one(&dir, 0);
+        std::fs::remove_file(&binned.path).unwrap();
+        std::fs::write(&binned.path, "another").unwrap();
+
+        assert!(purge(&bin, &binned.path, &binned.file).is_err());
+
+        assert_eq!(std::fs::read_to_string(&binned.path).unwrap(), "another");
+        assert!(bin.let_go.borrow().is_empty());
+    }
+
+    #[test]
+    fn a_purge_never_removes_a_directory_at_the_bins_name() {
+        let dir = scratch("purge-directory");
+        let (bin, binned) = binned_one(&dir, 0);
+        std::fs::remove_file(&binned.path).unwrap();
+        std::fs::create_dir(&binned.path).unwrap();
+        std::fs::write(binned.path.join("inside.txt"), "inside").unwrap();
+
+        assert!(purge(&bin, &binned.path, &binned.file).is_err());
+
+        assert!(binned.path.join("inside.txt").is_file());
+    }
+
+    #[test]
+    fn a_read_only_file_in_the_bin_is_purged_all_the_same() {
+        let dir = scratch("purge-read-only");
+        let (bin, binned) = binned_one(&dir, 0);
+        let mut permissions = std::fs::metadata(&binned.path).unwrap().permissions();
+        permissions.set_readonly(true);
+        std::fs::set_permissions(&binned.path, permissions).unwrap();
+
+        purge(&bin, &binned.path, &binned.file).unwrap();
+
+        settles_to(&dir.join("bin"), &[]);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_file_in_the_bin_another_app_has_open_is_not_purged_and_stays_whole() {
+        use std::os::windows::fs::OpenOptionsExt;
+
+        let dir = scratch("purge-in-use");
+        let (bin, binned) = binned_one(&dir, 0);
+        let open = std::fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(&binned.path)
+            .unwrap();
+
+        let refused = purge(&bin, &binned.path, &binned.file);
+        drop(open);
+
+        assert!(refused.is_err());
+        assert_eq!(std::fs::read_to_string(&binned.path).unwrap(), "one");
+        assert!(bin.let_go.borrow().is_empty());
     }
 
     #[test]

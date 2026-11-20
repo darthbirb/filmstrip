@@ -69,6 +69,14 @@ tags and all. A Restore or Ctrl+Z that reaches a file emptied from the bin says 
 the Recycle Bin. Emptying the library's files from the bin, and Delete on a drive with no bin, are the
 only ways the app deletes a file outright, and both ask first.
 
+Empty Trash…, in Settings › Trash while the Trash holds anything, deletes for good the files the
+library sent to the Recycle Bin and leaves the rest of the bin as it is. Its question says how
+many files and how much space, that only these go, and that Undo cannot bring them back; Cancel
+has the focus. Emptying counts in the section's head as it goes, and a file deleted meanwhile
+stays. The foot says when it is done, with no Undo: Ctrl+Z skips the emptied files and undoes
+the act before them. A file no longer in the bin, or one that would not go, is skipped and said;
+one that would not go stays in the Trash, for Show in Trash to find and Empty Trash… to ask again.
+
 ## Tags and labels
 
 **Tags** are lowercase, may be several words such as `new york`, and belong to items and

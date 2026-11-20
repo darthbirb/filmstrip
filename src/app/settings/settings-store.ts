@@ -90,6 +90,46 @@ function subscribeRemove(listener: () => void) {
   };
 }
 
+/** The Trash emptying: how many of the files counted are settled, of how many. */
+export type Emptying = { done: number; whole: number };
+
+// Outside the tree, so Trash left and opened again finds it still counting. Settings does not
+// hold still for it: nothing in it can be cancelled. Artboards › The Trash in the Recycle Bin.
+let emptying: Emptying | null = null;
+const emptyingListeners = new Set<() => void>();
+
+function setEmptying(next: Emptying | null) {
+  emptying = next;
+  for (const listener of emptyingListeners) listener();
+}
+
+export function startEmptying(whole: number) {
+  setEmptying({ done: 0, whole });
+}
+
+export function emptyingProgress(done: number) {
+  if (emptying) setEmptying({ ...emptying, done: Math.min(done, emptying.whole) });
+}
+
+export function finishEmptying() {
+  setEmptying(null);
+}
+
+export function getEmptying() {
+  return emptying;
+}
+
+export function useEmptying() {
+  return useSyncExternalStore(subscribeEmptying, getEmptying);
+}
+
+function subscribeEmptying(listener: () => void) {
+  emptyingListeners.add(listener);
+  return () => {
+    emptyingListeners.delete(listener);
+  };
+}
+
 export function settingsHeld() {
   return restore.restoring !== null || remove.removing !== null;
 }

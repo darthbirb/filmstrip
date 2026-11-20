@@ -541,6 +541,41 @@ pub fn forget_item(conn: &Connection, gone: &Gone) -> Result<()> {
         ),
         params![id, mark],
     )?;
+    leave_several(conn, id)
+}
+
+/// Drops an emptied file from the journal: rows about it alone, a folder delete they leave alone in
+/// its batch, and its id from every row about several, so an undo passes over it.
+/// SCHEMA.md "The undo journal".
+pub fn drop_item(conn: &Connection, item_id: i64) -> Result<()> {
+    let one_file = quoted(&ONE_FILE);
+    let batches: Vec<String> = conn
+        .prepare(&format!(
+            "SELECT DISTINCT batch_id FROM journal
+              WHERE op IN ({one_file}) AND json_extract(inverse, '$.itemId') = ?1"
+        ))?
+        .query_map(params![item_id], |row| row.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    conn.execute(
+        &format!(
+            "DELETE FROM journal
+              WHERE op IN ({one_file}) AND json_extract(inverse, '$.itemId') = ?1"
+        ),
+        params![item_id],
+    )?;
+    for batch in &batches {
+        conn.execute(
+            "DELETE FROM journal
+              WHERE batch_id = ?1 AND op = ?2
+                AND NOT EXISTS (SELECT 1 FROM journal WHERE batch_id = ?1 AND op <> ?2)",
+            params![batch, FOLDER_DELETE],
+        )?;
+    }
+    leave_several(conn, item_id)
+}
+
+/// Takes a file's id out of every row about several, a row left about none going with it.
+fn leave_several(conn: &Connection, id: i64) -> Result<()> {
     let mut stmt = conn.prepare(
         "SELECT id, op, inverse FROM journal
           WHERE (op = ?2 AND EXISTS(SELECT 1 FROM json_each(inverse, '$.itemIds') WHERE value = ?1))

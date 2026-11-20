@@ -135,6 +135,7 @@ spacing:
   tile-caption: 1.3125rem
   count: 3.25rem
   row-action: 4.25rem
+  head-progress: 6rem
   ghost-thumb: 1.5rem
   card: 17rem
   card-cover: 5rem
@@ -987,8 +988,11 @@ toward the rest surface.
   dialog never grows; its Line stands at the section's foot. Backups heads itself the same way,
   with Back Up Now at the head's end, and its Band stands where the Line does. Trash heads itself
   too, how many files the library has in the Recycle Bin and their size after its name, or
-  Nothing in it, over one line on where a deleted file goes: the recycle glyph in `glyph` and the
-  sentence in `small` `fg-dim`.
+  Nothing in it, over two lines on where a deleted file goes: the recycle glyph, and the usb
+  glyph for a drive with no bin, in `glyph`, each sentence in `small` `fg-dim`. Empty Trash… in
+  `danger` ends its head while it holds anything, and asks under the head in the row question's
+  shape, its own `line-danger` ring round it. Emptying, the head counts as it goes and the
+  `progress` bar, `head-progress` wide, stands where the button was.
 - **Filter field.** Narrows the list under it as you type: `bar-field` tall on `ground` at the
   `nested` corner in a `line-control` ring, `line-strong` while it has the focus, the search glyph
   before it in `fg-dim` and "3 of 228" at its end in `small` tabular figures once something is

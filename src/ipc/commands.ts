@@ -7,10 +7,12 @@ import type { BranchFile } from "./bindings/BranchFile";
 import type { Carried } from "./bindings/Carried";
 import type { Contents } from "./bindings/Contents";
 import type { CopyStart } from "./bindings/CopyStart";
+import type { Counted } from "./bindings/Counted";
 import type { Coverage } from "./bindings/Coverage";
 import type { CoverChoice } from "./bindings/CoverChoice";
 import type { DestinationKey } from "./bindings/DestinationKey";
 import type { EffectiveTag } from "./bindings/EffectiveTag";
+import type { Emptied } from "./bindings/Emptied";
 import type { ExportStart } from "./bindings/ExportStart";
 import type { Failure } from "./bindings/Failure";
 import type { FavouritePlace } from "./bindings/FavouritePlace";
@@ -45,6 +47,7 @@ import type { SourceKind } from "./bindings/SourceKind";
 import type { SourceSummary } from "./bindings/SourceSummary";
 import type { Suggestions } from "./bindings/Suggestions";
 import type { TagOffer } from "./bindings/TagOffer";
+import type { ToEmpty } from "./bindings/ToEmpty";
 import type { Trashed } from "./bindings/Trashed";
 import type { UndoReport } from "./bindings/UndoReport";
 import type { Vocabulary } from "./bindings/Vocabulary";
@@ -268,6 +271,12 @@ export const trashListing = () => invoke<Trashed[]>("trash_listing");
 
 /** Settles the Trash with the Recycle Bin: what was emptied from it outside the app, or put back. */
 export const lookInBin = () => invoke<Looked>("look_in_bin");
+
+/** The files in the Trash as Empty Trash… asks about them, and what they weigh. */
+export const trashToEmpty = () => invoke<ToEmpty>("trash_to_empty");
+
+/** Deletes for good the files counted that are still in the Trash; `empty-progress` counts them. */
+export const emptyTrash = (counted: Counted[]) => invoke<Emptied>("empty_trash", { counted });
 
 export const libraryTotals = () => invoke<LibraryTotals>("library_totals");
 

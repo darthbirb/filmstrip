@@ -151,7 +151,7 @@ pub fn settle_unfinished_send(conn: &Connection) -> Result<()> {
 }
 
 /// Where a trashed item's file is now.
-enum Found {
+pub(super) enum Found {
     /// Still in the Recycle Bin, under this name.
     Bin(PathBuf),
     /// Back at its own path, put back from Explorer.
@@ -164,7 +164,7 @@ enum Found {
 
 /// Looks for a trashed item's file by the file itself: in the bin where it went, or back where it
 /// came from. One the bin has no record of is gone, as a file the app's own trash folder held is.
-fn find(conn: &Connection, item_id: i64, file: &ItemFile) -> Result<Found> {
+pub(super) fn find(conn: &Connection, item_id: i64, file: &ItemFile) -> Result<Found> {
     let Some((binned, itself)) = items::binned(conn, item_id)? else {
         return Ok(Found::Gone);
     };
@@ -185,7 +185,7 @@ fn find(conn: &Connection, item_id: i64, file: &ItemFile) -> Result<Found> {
 /// Brings a file back from Explorer into the index, tags and all: live in its folder, or retired
 /// there, for the walk to find, while the folder is gone. A row the walk made for it meanwhile, or
 /// one retired at its name, describes the same file, and is forgotten. Whether it went live.
-fn put_back(conn: &Connection, item_id: i64, file: &ItemFile) -> Result<bool> {
+pub(super) fn put_back(conn: &Connection, item_id: i64, file: &ItemFile) -> Result<bool> {
     if let Some(held) = items::existing_by_disk_name(conn, file.folder_id, &file.disk_name)? {
         items::forget(conn, held.id)?;
     }

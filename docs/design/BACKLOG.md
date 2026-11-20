@@ -76,17 +76,3 @@ Redrawn with it, by the owner's decision of 2026-11-15:
   since"): the question names the source and counts its files in the Recycle Bin, which stay
   there; nothing is sent while restoring. "Not restored · the Recycle Bin cannot take a file"
   goes.
-
-## Empty the library's files from the Recycle Bin · DRAWN
-
-#194. Empty Trash… deletes for good only what the library sent to the bin.
-
-Drawn in Artboards › The Trash in the Recycle Bin:
-
-- **The question**, in the row question's shape under the section's head: how many files, how
-  much space, that only these go and the rest of the bin is left as it is, and that Undo cannot
-  bring them back. Empty Trash in `danger`, Cancel with the focus. Also at the window's least.
-- **Emptying**: the head counts as it goes with the walk's bar where the button was; nothing to
-  cancel; a file deleted meanwhile joins the Trash after it and stays.
-- **The foot**: after Empty Trash, with no Undo, Ctrl+Z skipping to the act before; and files
-  skipped, two gone from the bin and one that would not go, with Show in Trash.
