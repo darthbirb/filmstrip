@@ -59,7 +59,7 @@ async function sendToBin(itemIds: number[], asked: number) {
   const binOnly =
     report.refused.length > 0 && report.refused.every((one) => one.reason.kind === "binRefused");
   if (binOnly) {
-    const line = binRefusedLine(report.refused, report.trashed);
+    const line = binRefusedLine(report.refused, report.trashed, asked);
     if (batch) afterAct(batch, 0, line);
     else setNews({ kind: "binRefused", line, detail: binRefusedDetail(report.refused.length) });
   } else if (batch) afterAct(batch, report.refused.length + asked);
@@ -84,7 +84,7 @@ async function sendToBin(itemIds: number[], asked: number) {
  * Deletes files on drives with no Recycle Bin outright, once asked, and says so at the foot with
  * no Undo; one that would not go stays where it was, and the foot names it.
  */
-export async function deleteFilesForGood(
+async function deleteFilesForGood(
   files: readonly { id: number; name: string }[],
   drives: readonly string[],
 ) {

@@ -84,19 +84,22 @@ async function settle(
       ? (sources.find((source) => source.id === contents.sourceId)?.title ?? null)
       : null;
   const forGood = contents?.kind === "permanently";
+  const binned = batch?.files ?? 0;
+  const { outright } = report;
   if (report.deleted) {
-    if (batch) afterAct(batch);
-    else if (forGood) setNews({ kind: "said", line: folderForGoodLine(folder.name, held) });
+    const line = forGood ? folderForGoodLine(folder.name, binned, outright) : undefined;
+    if (batch) afterAct(batch, 0, line);
+    else if (line) setNews({ kind: "said", line });
     showReport(null);
   } else if (forGood) {
-    const gone = (batch?.files ?? 0) + report.outright;
-    const line = folderKeptLine(folder.name, gone, held);
-    if (batch) afterAct(batch, 0, line);
+    const line = folderKeptLine(folder.name, binned, outright, held);
+    if (!line) setNews(null);
+    else if (batch) afterAct(batch, 0, line);
     else setNews({ kind: "said", line });
     showReport({
-      sentence: folderKeptBanner(folder.name, gone, held),
+      sentence: folderKeptBanner(folder.name, binned, outright, held),
       rows: report.refused,
-      retry: () => void settle(folder, contents, held - gone, sources),
+      retry: () => void settle(folder, contents, held - binned - outright, sources),
     });
   } else {
     const carried = batch?.files ?? 0;

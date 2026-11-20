@@ -1507,6 +1507,9 @@ drive, so the send could only ever refuse it; asking is the one way such a file 
 - **One question for the whole selection.** `binless_items` names the files on such drives under
   each drive, with their sizes; the rest go to the Recycle Bin at once as one batch with Undo,
   and only the others are asked about. Cancel has the focus, so Enter and Escape both keep them.
+- **Asking leaves full screen.** The question is drawn above the grid, which full screen hides
+  and makes inert, and Delete is reachable there from the pane's bar and the file's menu; the
+  sheet draws no question over the pane, so the pane docks again to ask.
 - **Delete Permanently removes each file and retires its row**, as a walk retires a file it finds
   gone, keeping its name and tags. Nothing is journalled: there is nothing to bring back, so the
   foot has no Undo and Ctrl+Z reaches the act before it. `delete_for_good` checks each file again
@@ -1516,7 +1519,8 @@ drive, so the send could only ever refuse it; asking is the one way such a file 
 - **A folder's delete asks the same in its own question**: Delete Files Too becomes Delete Files
   Permanently, `Contents::Permanently`, whose files on such a drive go outright and any others to
   the bin, and the folder goes once they have. The folder's delete is journalled only when some
-  of its files went to the bin, since otherwise nothing would come back with it.
+  of its files went to the bin, since otherwise nothing would come back with it. The foot counts
+  the two apart, and says nothing when no file went, since the banner over the grid says it all.
 - **Tests never delete outside their own folder.** The stand-in for the shell names folders of
   the test's own as drives with no bin, so what is deleted outright is a file the test wrote.
 

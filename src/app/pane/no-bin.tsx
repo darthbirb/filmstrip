@@ -7,6 +7,7 @@ import { LIST_HEADING, LIST_ROW, listRow } from "../../ui/Banner";
 import { Question } from "../../ui/Question";
 import { noBinDetail, noBinHead } from "../undo/lines";
 import { ShowInExplorer } from "../undo/ReportBanner";
+import { setFullScreen } from "./full-screen";
 
 /** Delete's question about files on drives with no Recycle Bin, and what answering yes does. */
 export type NoBinAsking = {
@@ -26,6 +27,8 @@ const listeners = new Set<() => void>();
 
 /** Asks, once for them all, before files on drives with no Recycle Bin are deleted for good. */
 export function askNoBin(next: NoBinAsking | null) {
+  // Full screen hides the grid's notices, where this is drawn. DECISIONS.md "A drive with no Recycle Bin".
+  if (next) setFullScreen(false);
   asking = next;
   count += 1;
   for (const listener of listeners) listener();

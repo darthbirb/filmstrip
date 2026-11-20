@@ -145,6 +145,9 @@ test("what the foot says when the Recycle Bin would not take what Delete sent it
   expect(binRefusedLine(one, 4)).toBe(
     "Deleted 4 of 5 files. The Recycle Bin would not take MVI_0412.mov, so it stays in Cairo.",
   );
+  expect(binRefusedLine(one, 4, 2)).toBe(
+    "Deleted 4 of 7 files. The Recycle Bin would not take MVI_0412.mov, so it stays in Cairo.",
+  );
   expect(binRefusedLine(two)).toBe(
     "The Recycle Bin would not take 2 files, so they stay in Cairo.",
   );
@@ -393,17 +396,31 @@ test("what went for good is said with no Undo, and what would not go is named", 
   expect(forGoodKeptLine([kept("a.jpg"), kept("b.jpg", "Porto")], 0)).toBe(
     "2 files could not be deleted and stay where they were.",
   );
-  expect(folderForGoodLine("Lisbon", 214)).toBe("Deleted Lisbon and its 214 files for good.");
-  expect(folderKeptLine("Lisbon", 213, 214)).toBe(
+  expect(folderForGoodLine("Lisbon", 0, 214)).toBe("Deleted Lisbon and its 214 files for good.");
+  expect(folderForGoodLine("Trips", 1, 2)).toBe(
+    "Deleted Trips and its 3 files, 2 of them for good.",
+  );
+  expect(folderForGoodLine("Trips", 3, 0)).toBe("Deleted Trips and its 3 files.");
+  expect(folderKeptLine("Lisbon", 0, 213, 214)).toBe(
     "Deleted 213 of Lisbon’s 214 files for good. Lisbon is in the banner.",
   );
-  expect(folderKeptBanner("Lisbon", 213, 214)).toBe(
+  expect(folderKeptLine("Trips", 1, 2, 4)).toBe(
+    "Deleted 3 of Trips’ 4 files, 2 of them for good. Trips is in the banner.",
+  );
+  expect(folderKeptLine("Trips", 1, 0, 4)).toBe(
+    "Deleted 1 of Trips’ 4 files. Trips is in the banner.",
+  );
+  expect(folderKeptLine("Lisbon", 0, 0, 1)).toBeNull();
+  expect(folderKeptBanner("Lisbon", 0, 213, 214)).toBe(
     "213 of Lisbon’s 214 files are gone for good · Lisbon stayed",
   );
-  expect(folderKeptBanner("Lisbon", 0, 214)).toBe(
+  expect(folderKeptBanner("Trips", 1, 2, 3)).toBe(
+    "Trips could not go · its 3 files are gone, 2 of them for good",
+  );
+  expect(folderKeptBanner("Lisbon", 0, 0, 214)).toBe(
     "Lisbon’s 214 files could not be deleted · Lisbon stayed",
   );
-  expect(folderKeptBanner("Lisbon", 214, 214)).toBe(
+  expect(folderKeptBanner("Lisbon", 0, 214, 214)).toBe(
     "Lisbon could not go · its 214 files are gone for good",
   );
 });

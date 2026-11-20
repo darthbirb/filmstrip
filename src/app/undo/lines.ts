@@ -298,9 +298,10 @@ const folderOf = (one: Stayed) => (one.at.kind === "folder" ? (one.at.path.at(-1
 
 /**
  * What the foot says when the Recycle Bin would not take files Delete sent it: what went, when
- * any did, then where the refused stay. Artboards › The Trash in the Recycle Bin.
+ * any did, out of all it was asked to delete, then where the refused stay. `asked` counts those
+ * waiting on the question a drive with no Recycle Bin asks. Artboards › The Trash in the Recycle Bin.
  */
-export function binRefusedLine(rows: readonly Stayed[], trashed = 0) {
+export function binRefusedLine(rows: readonly Stayed[], trashed = 0, asked = 0) {
   const [first] = rows;
   const places = new Set(rows.map(folderOf));
   const [place] = places;
@@ -310,7 +311,7 @@ export function binRefusedLine(rows: readonly Stayed[], trashed = 0) {
       ? `The Recycle Bin would not take ${first.name}, so it stays${place ? ` in ${place}` : " where it was"}.`
       : `The Recycle Bin would not take ${files(rows.length)}, so they stay${where}.`;
   if (trashed === 0) return refused;
-  return `Deleted ${formatCount(trashed)} of ${files(trashed + rows.length)}. ${refused}`;
+  return `Deleted ${formatCount(trashed)} of ${files(trashed + rows.length + asked)}. ${refused}`;
 }
 
 /** Drives with no Recycle Bin, as a question's head names them: one or two by name, more counted. */
@@ -394,25 +395,39 @@ export function forGoodKeptLine(rows: readonly Stayed[], deleted: number) {
   return `Deleted ${formatCount(deleted)} of ${files(deleted + rows.length)} for good. ${kept}`;
 }
 
-/** The line at the foot after a folder and its files went for good. */
-export const folderForGoodLine = (name: string, held: number) =>
-  `Deleted ${name} and its ${files(held)} for good.`;
+/** How many of a folder's gone files went for good, when some went to the Trash instead. */
+function ofThem(binned: number, outright: number) {
+  if (outright === 0) return "";
+  return binned === 0 ? " for good" : `, ${formatCount(outright)} of them for good`;
+}
 
-/** The line at the foot after a folder's files went for good in part, and the folder stayed. */
-export function folderKeptLine(name: string, gone: number, whole: number) {
+/** The line at the foot after a folder and its files went, some or all of them for good. */
+export const folderForGoodLine = (name: string, binned: number, outright: number) =>
+  `Deleted ${name} and its ${files(binned + outright)}${ofThem(binned, outright)}.`;
+
+/**
+ * The line at the foot after a folder's files went in part, some for good, and the folder stayed;
+ * none when nothing went, since the banner says it all.
+ */
+export function folderKeptLine(name: string, binned: number, outright: number, whole: number) {
+  const gone = binned + outright;
+  if (gone === 0) return null;
+  if (outright === 0) return folderStayedLine(name, binned, whole, null);
   const what =
     gone === whole
       ? `${whose(name)} ${files(whole)}`
       : `${formatCount(gone)} of ${whose(name)} ${files(whole)}`;
-  return `Deleted ${what} for good. ${name} is in the banner.`;
+  return `Deleted ${what}${ofThem(binned, outright)}. ${name} is in the banner.`;
 }
 
 /** The banner's sentence for a folder that stayed while its files went for good, or would not. */
-export function folderKeptBanner(name: string, gone: number, whole: number) {
-  if (gone === whole)
-    return `${name} could not go · its ${files(whole)} ${are(whole)} gone for good`;
+export function folderKeptBanner(name: string, binned: number, outright: number, whole: number) {
+  const gone = binned + outright;
   if (gone === 0) return `${whose(name)} ${files(whole)} could not be deleted · ${name} stayed`;
-  return `${formatCount(gone)} of ${whose(name)} ${files(whole)} ${are(gone)} gone for good · ${name} stayed`;
+  if (outright === 0) return folderStayedBanner(name, binned, whole, null);
+  if (gone === whole)
+    return `${name} could not go · its ${files(whole)} ${are(whole)} gone${ofThem(binned, outright)}`;
+  return `${formatCount(gone)} of ${whose(name)} ${files(whole)} ${are(gone)} gone${ofThem(binned, outright)} · ${name} stayed`;
 }
 
 /** Why it may have refused, said once, since the app cannot tell which it was. */

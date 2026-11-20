@@ -376,6 +376,53 @@ mod tests {
         assert_eq!(journal::latest_batch(&conn).unwrap(), None);
     }
 
+    #[test]
+    fn a_folder_across_two_drives_sends_some_to_the_bin_and_undo_brings_back_those_alone() {
+        let (conn, root, _) = library("folder-across");
+        std::fs::write(root.join("Trips/boat.jpg"), "boat").unwrap();
+        walk::reconcile(&conn).unwrap();
+        let mut bin = Fake::new(Stand::Recycles(root.parent().unwrap().join("bin")));
+        bin.binless = vec![(root.join("Trips/Cairo"), "USB Drive (E:)".into())];
+        let bin = stand_in_as(bin);
+        let top = folders::source_root_folder(&conn, 1).unwrap();
+        let trips = folders::child_id(&conn, top, "Trips").unwrap().unwrap();
+        let boat = id_of(&conn, &["Trips"], "boat.jpg");
+        let pyramid = id_of(&conn, &["Trips", "Cairo"], "pyramid.jpg");
+        let batch = journal::new_batch();
+
+        let report = crate::fs::folders::delete(
+            &conn,
+            trips,
+            Some(crate::fs::folders::Contents::Permanently),
+            &batch,
+        )
+        .unwrap();
+
+        assert!(report.deleted, "{:?}", report.refused);
+        assert_eq!(report.outright, 2);
+        assert_eq!(bin.asked.borrow().as_slice(), [root.join("Trips/boat.jpg")]);
+        let mut ops: Vec<String> = journal::batch(&conn, &batch)
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.op)
+            .collect();
+        ops.sort();
+        assert_eq!(ops, [journal::FOLDER_DELETE, journal::ITEM_TRASH]);
+        assert!(!root.join("Trips").exists());
+
+        let back = crate::fs::undo::undo_last(&conn).unwrap().unwrap();
+
+        assert_eq!(back.batch.batch_id, batch);
+        assert!(folders::is_live(&conn, trips).unwrap());
+        assert_eq!(
+            std::fs::read_to_string(root.join("Trips/boat.jpg")).unwrap(),
+            "boat"
+        );
+        assert!(items::is_live(&conn, boat).unwrap());
+        assert!(!items::is_live(&conn, pyramid).unwrap());
+        assert!(!root.join("Trips/Cairo/pyramid.jpg").exists());
+    }
+
     #[cfg(windows)]
     #[test]
     fn a_folder_keeps_a_file_that_would_not_go_and_stays_until_it_has() {

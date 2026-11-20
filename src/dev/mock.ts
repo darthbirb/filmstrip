@@ -1500,6 +1500,8 @@ const binless = new Map<number, string>();
 const undeletable = new Set<number>();
 /** Files deleted for good, which only a test's reset brings back. */
 let goneForGood: ItemRow[] = [];
+/** Folders deleted with nothing journalled, every file in them gone for good. */
+let foldersGoneForGood: { node: FolderNode; parent: number }[] = [];
 
 /** Puts these files on a drive with no Recycle Bin. */
 export function onDriveWithoutBin(itemIds: readonly number[], drive: string) {
@@ -1519,6 +1521,8 @@ export function resetBin() {
   undeletable.clear();
   for (const item of goneForGood) ITEMS[item.folderId] = [...(ITEMS[item.folderId] ?? []), item];
   goneForGood = [];
+  for (const { node, parent } of foldersGoneForGood) attach(node, parent);
+  foldersGoneForGood = [];
   recount();
 }
 
@@ -1820,6 +1824,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       detach(node);
       if (how?.kind !== "permanently" || steps.length > 0)
         steps.push({ op: "deleteFolder", node, parent });
+      else foldersGoneForGood.push({ node, parent });
     }
     return {
       batch: record(steps),

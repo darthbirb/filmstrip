@@ -5,6 +5,7 @@ import { render } from "vitest-browser-react";
 import { onDriveWithoutBin, refuseDeleting, resetBin } from "../../dev/mock";
 import { folderItems, undoLast } from "../../ipc/commands";
 import { formatBytes } from "../../lib/format";
+import { Frame } from "../frame/Frame";
 import { checkAll, clearChecked, getSelection, useSelectionKeys } from "../grid/selection";
 import {
   DeleteQuestion,
@@ -12,11 +13,12 @@ import {
   resetDeleteQuestion,
 } from "../navigation/delete-folder";
 import { Foot } from "../navigation/Foot";
-import { setNews } from "../navigation/foot-slot";
+import { getNews, setNews } from "../navigation/foot-slot";
 import { getIndex, loadIndex, resetIndex } from "../navigation/index-store";
 import { type Place, setPlace } from "../place";
 import { getReport, showReport } from "../undo/report-store";
 import { deleteFiles } from "./delete";
+import { getFullScreen, setFullScreen, useFullScreen } from "./full-screen";
 import { NoBinQuestion, resetNoBinQuestion } from "./no-bin";
 
 // Against the dev mock: Cairo (6) holds felucca.mp4, pyramid.jpg and sphinx.jpg, 2.4 MB each.
@@ -32,6 +34,7 @@ const CAIRO: Place = {
 };
 
 beforeEach(async () => {
+  setFullScreen(false);
   resetBin();
   resetNoBinQuestion();
   resetDeleteQuestion();
@@ -189,6 +192,63 @@ test("a folder on such a drive says it once: its files go permanently, and × ha
   await screen.getByRole("button", { name: "Delete Files Permanently" }).click();
   await expect.element(screen.getByText("Deleted Cairo and its 3 files for good.")).toBeVisible();
   expect(screen.getByRole("button", { name: "Undo" }).query()).toBeNull();
+});
+
+test("a folder with files on two drives counts those gone for good apart, and Undo is offered", async () => {
+  onDriveWithoutBin(
+    (await folderItems(6)).map((row) => row.id),
+    "USB Drive (E:)",
+  );
+  const screen = await render(<Harness />);
+  await deleteFolderAsking({ id: 4, name: "Trips" }, getIndex().sources ?? []);
+  await screen.getByRole("button", { name: "Delete Files Permanently" }).click();
+
+  await expect
+    .element(screen.getByText(/^Deleted Trips and its \d+ files, 3 of them for good\.$/))
+    .toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "Undo" })).toBeVisible();
+});
+
+test("a folder none of whose files would go keeps them, and the foot says nothing of it", async () => {
+  const cairo = (await folderItems(6)).map((row) => row.id);
+  onDriveWithoutBin(cairo, "USB Drive (E:)");
+  refuseDeleting(cairo);
+  const screen = await render(<Harness />);
+  await deleteFolderAsking({ id: 6, name: "Cairo" }, getIndex().sources ?? []);
+  await screen.getByRole("button", { name: "Delete Files Permanently" }).click();
+
+  await expect
+    .poll(() => getReport()?.sentence)
+    .toBe("Cairo’s 3 files could not be deleted · Cairo stayed");
+  expect(getNews()).toBeNull();
+  expect(screen.getByText(/^Deleted 0 of/).query()).toBeNull();
+  expect(await names()).toEqual(["felucca.mp4", "pyramid.jpg", "sphinx.jpg"]);
+});
+
+/** The frame as the app fills it: the question above the grid, the pane beside it. */
+function FullScreenHarness() {
+  const full = useFullScreen();
+  return (
+    <div className="flex h-dvh flex-col">
+      <Frame notices={<NoBinQuestion />} grid={<p>grid</p>} pane={<p>pane</p>} full={full} />
+    </div>
+  );
+}
+
+test("asked from full screen, the pane docks again and the question has the focus", async () => {
+  const pyramid = await id("pyramid.jpg");
+  onDriveWithoutBin([pyramid], "USB Drive (E:)");
+  const screen = await render(<FullScreenHarness />);
+  setFullScreen(true);
+  await expect.poll(() => getFullScreen()).toBe(true);
+
+  await deleteFiles([pyramid]);
+
+  expect(getFullScreen()).toBe(false);
+  const cancel = screen.getByRole("button", { name: "Cancel" });
+  await expect.element(cancel).toHaveFocus();
+  await expect.element(cancel).toBeVisible();
+  await expect.element(screen.getByText("USB Drive (E:) has no Recycle Bin")).toBeVisible();
 });
 
 test("Escape puts the question away and the files stay selected as they were", async () => {
