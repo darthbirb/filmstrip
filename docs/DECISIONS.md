@@ -36,9 +36,10 @@ configuration fetches whatever was published minutes ago, every time it starts.
 
 Everything the app writes lives beside its own executable: the index, thumbnails, backups and
 WebView2's profile. A deleted file goes to the Windows Recycle Bin on its own drive, which is
-Windows', not the app's: DECISIONS.md "The Trash is the Recycle Bin". `lib.rs` passes `data_directory` to the window builder. Measured on 12
-September 2026, `%LOCALAPPDATA%\com.darthbirb.filmstrip` is never created — the builder call
-is sufficient on its own.
+Windows', not the app's: DECISIONS.md "The Trash is the Recycle Bin". `lib.rs` passes
+`data_directory` to the window builder. Measured on 12 September 2026,
+`%LOCALAPPDATA%\com.darthbirb.filmstrip` is never created — the builder call is sufficient on its
+own.
 
 The library is a folder the user chooses. Nothing in it is touched except when they ask.
 
@@ -613,10 +614,10 @@ a source that is away keeps the verb.
 September 2026. Its bar holds Restore and Restore to…, worded and from the left, and no ⋯, since
 nothing is left to fold; its menu holds the same two under Full Screen. Favourite, Move to… and
 Rename would change a file that is not in the library, and Show in Explorer, Copy and Open with
-Default App would hand Windows the name the Recycle Bin keeps it under, never the one it was given; all
-of them are absent rather than greyed. Nothing purges: emptying the Trash is under Later. Its
-details say where it came from and when it went, in place of where it is, and the Name row is
-only its name. Restored from the Trash, the pane moves on as it does after a delete.
+Default App would hand Windows the name the Recycle Bin keeps it under, never the one it was given;
+all of them are absent rather than greyed. Nothing purges: emptying the Trash is under Later. Its
+details say where it came from and when it went, in place of where it is, and the Name row is only
+its name. Restored from the Trash, the pane moves on as it does after a delete.
 
 **A video plays on a plate of the app's own**, drawn by Claude Design and built on 12 October
 2026, in place of the controls the window brings with it: play, the track, the time and the mute
@@ -1351,16 +1352,16 @@ does not: tags, labels, notes, statuses, covers, favourites, keys and the undo j
   restore that has swapped.
 - **What a restore leaves as it is now.** The index goes back; the disk does not. The Trash is kept
   as it is now: a file in it since the backup is in it again from the folder it left, found by its
-  source's root and the titles below it, with the folders on the way made retired where the
-  backup has none, with where the Recycle Bin keeps its file. One from a source added since, or
-  from a place the backup cannot find, is forgotten as that source's other rows are, and its file
-  stays in the Recycle Bin, as a removed source's do; the question names the sources and counts
-  the files beforehand. Nothing is sent, so nothing can be refused. A row the backup has in the
-  Trash whose file is no longer where the bin kept it is retired where it was, keeping its tags
-  and uuid for the walk to find again, or dropped where a file there now has its name. The job queue starts empty but for the walk, which
-  runs at once, so a copy or an export waiting in the backup never runs again and files moved or
-  added since are found where they are. A source added since is forgotten, and its files on disk
-  are left as they are.
+  source's root and the titles below it, with the folders on the way made retired where the backup
+  has none, with where the Recycle Bin keeps its file. One from a source added since, or from a
+  place the backup cannot find, is forgotten as that source's other rows are, and its file stays in
+  the Recycle Bin, as a removed source's do; the question names the sources and counts the files
+  beforehand. Nothing is sent, so nothing can be refused. A row the backup has in the Trash whose
+  file is no longer where the bin kept it is retired where it was, keeping its tags and uuid for
+  the walk to find again, or dropped where a file there now has its name. The job queue starts
+  empty but for the walk, which runs at once, so a copy or an export waiting in the backup never
+  runs again and files moved or added since are found where they are. A source added since is
+  forgotten, and its files on disk are left as they are.
 - **Undo goes no further back than a restore.** The journal comes back as it was then, so restoring
   the "before restore" backup puts the index back whole, but what it holds describes a disk the
   walk has read again since. A restore records the newest journal row it kept in `setting`, and
@@ -1396,9 +1397,10 @@ waits, where Explorer can see it too.
   Restore had done it; a row a walk made for it meanwhile, under the name it took back, is
   forgotten. In neither, it was emptied outside the app: its row retires where it was, keeping its
   name and tags, as a walk retires a file it finds gone. A drive that is away is left until it is
-  back, and so is one where another volume answers at its letter, since its serial is not the
-  one `bin_file` names: that drive's bin is not where the file went. A row with no record of where the bin keeps it is retired too: only a build before this
-  one made such rows, and no library predates it.
+  back, and so is one where another volume answers at its letter or folder, since its serial is
+  not the one `bin_file` names: that volume's bin is not where the file went. A row with no
+  record of where the bin keeps it is retired too: only a build before this one made such rows,
+  and no library predates it.
 - **A Restore or Ctrl+Z that reaches a file emptied from the bin says so**: listed under Gone from
   the Recycle Bin, with no row button, its row retired. Retry stays only while a row still in the
   Trash could succeed.
@@ -1430,10 +1432,10 @@ waits, where Explorer can see it too.
 ## Sending to the Recycle Bin
 
 **`fs::recycle::send` hands a file to the shell's Recycle Bin and never lets it be destroyed**,
-built on 20 October 2026 for #110, and since #192 the way every Delete goes. The Recycle Bin cannot take
-every file: a drive with none, such as a removable one or a network share, the bin turned off,
-or a file over its quota. There the shell deletes it outright, and asking it not to means a
-dialog, which the app never shows on its behalf.
+built on 20 October 2026 for #110, and since #192 the way every Delete goes. The Recycle Bin cannot
+take every file: a drive with none, such as a removable one or a network share, the bin turned off,
+or a file over its quota. There the shell deletes it outright, and asking it not to means a dialog,
+which the app never shows on its behalf.
 
 - **A second name first, then its names, then the shell, then its names again.** Before the
   shell is asked, the file is given a second name beside it by a hard link, and that file's names

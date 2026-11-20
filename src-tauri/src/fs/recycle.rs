@@ -88,9 +88,17 @@ pub fn file_at(path: &Path) -> Option<String> {
         .flatten()
 }
 
-/// The serial of the volume a directory is on, as [`Binned::file`] begins; nothing when it cannot
-/// be reached.
-pub fn serial_at(dir: &Path) -> Option<String> {
+/// The serial of the volume `path` is on, at a drive letter or mounted at a folder, as
+/// [`Binned::file`] begins; nothing when it cannot be reached.
+pub fn volume_serial(path: &Path) -> Option<String> {
+    #[cfg(windows)]
+    let root = volume_of(path).ok()?;
+    #[cfg(unix)]
+    let root = path.ancestors().find(|dir| dir.is_dir())?.to_path_buf();
+    serial_at(&root)
+}
+
+fn serial_at(dir: &Path) -> Option<String> {
     let is_dir = std::fs::metadata(dir).is_ok_and(|meta| meta.is_dir());
     is_dir
         .then(|| {

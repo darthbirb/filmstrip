@@ -2,7 +2,7 @@
 //! back. Sending one there is journalled, so it can be undone.
 //! DECISIONS.md "The Trash is the Recycle Bin".
 
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
 use serde::Serialize;
@@ -173,17 +173,10 @@ fn find(conn: &Connection, item_id: i64, file: &ItemFile) -> Result<Found> {
     if recycle::file_at(&home).as_deref() == Some(itself.as_str()) {
         return Ok(Found::Back);
     }
-    match recycle::serial_at(&drive_of(&binned)) {
+    match recycle::volume_serial(&binned) {
         Some(volume) if volume == recycle::serial_of(&itself) => Ok(Found::Gone),
         _ => Ok(Found::Away),
     }
-}
-
-/// The root of the drive a path is on, `D:\` for `D:\$Recycle.Bin\…`; empty for a relative one.
-fn drive_of(path: &Path) -> PathBuf {
-    path.components()
-        .take_while(|part| matches!(part, Component::Prefix(_) | Component::RootDir))
-        .collect()
 }
 
 /// Brings a file back from Explorer into the index, tags and all: live in its folder, or retired
@@ -1082,7 +1075,7 @@ mod tests {
         let (binned, itself) = items::binned(&conn, pyramid).unwrap().unwrap();
         let away = format!(r"{}:\$Recycle.Bin\$RAWAY.jpg", free_letter());
         items::set_binned(&conn, pyramid, &away, &itself).unwrap();
-        let ours = recycle::serial_at(&drive_of(Path::new(&binned))).unwrap();
+        let ours = recycle::volume_serial(Path::new(&binned)).unwrap();
         let other = if ours == "1" { "2" } else { "1" };
         let (sphinx_binned, sphinx_itself) = items::binned(&conn, sphinx).unwrap().unwrap();
         std::fs::remove_file(&sphinx_binned).unwrap();
@@ -1190,14 +1183,5 @@ mod tests {
         );
         assert!(!items::is_trashed(&conn, sphinx).unwrap());
         assert!(stand_in().asked.borrow().is_empty());
-    }
-
-    #[test]
-    fn a_drive_is_its_root_and_nothing_else() {
-        assert_eq!(
-            drive_of(Path::new(r"D:\$Recycle.Bin\S-1-5-21\$RAB12CD.jpg")),
-            Path::new(r"D:\")
-        );
-        assert_eq!(drive_of(Path::new("relative/one.jpg")), PathBuf::new());
     }
 }
