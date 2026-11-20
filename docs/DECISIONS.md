@@ -1396,21 +1396,26 @@ waits, where Explorer can see it too.
   Back at its path, put back from Explorer, it is restored in the index, tags and all, as if
   Restore had done it; a row a walk made for it meanwhile, under the name it took back, is
   forgotten. In neither, it was emptied outside the app: its row retires where it was, keeping its
-  name and tags, as a walk retires a file it finds gone. A drive that is away is left until it is
+  name and tags, as a walk retires a file it finds gone, and the journal lets it go in the same
+  transaction, as it lets go of a file Empty Trash… deleted (DECISIONS.md "Emptying the Trash").
+  The look has already said the file left the Trash, so Ctrl+Z passes over it to the act before;
+  a folder deleted with its files goes from the journal with the last of them, and is never made
+  again empty. A drive that is away is left until it is
   back, and so is one where another volume answers at its letter or folder, since its serial is
   not the one `bin_file` names: that volume's bin is not where the file went. A row with no
   record of where the bin keeps it is retired too: only a build before this one made such rows,
   and no library predates it.
-- **A Restore or Ctrl+Z that reaches a file emptied from the bin says so**: listed under Gone from
-  the Recycle Bin, with no row button, its row retired. Retry stays only while a row still in the
-  Trash could succeed.
+- **A Restore or Ctrl+Z that reaches a file emptied from the bin says so**, before any look has
+  found it: listed under Gone from the Recycle Bin, with no row button, its row retired. Retry
+  stays only while a row still in the Trash could succeed.
 - **A row forgotten rather than retired leaves the journal with it.** Retiring keeps a name
   another file holds by then, so that row is forgotten instead, and the journal forgets it in the
   same transaction (SCHEMA.md "The undo journal"): an undo of the act that sent it reports it by
   the name and folder kept on its rows, and never stops on it or reaches a file given its id
-  since. The mark keeps why the row went, since that is what the undo says: a file emptied from
-  the bin is listed under Gone from the Recycle Bin; one whose name a file the app put there, or
-  one put back from the bin in Explorer, took is No longer on disk, under Gone from its folder; a
+  since. The look in the bin lets go of its file's journal rows before forgetting it, so it leaves
+  no mark. The mark keeps why the row went, since that is what the undo says: a file a Restore or
+  Ctrl+Z found emptied from the bin is listed under Gone from the Recycle Bin; one whose name a
+  file the app put there, or one put back from the bin in Explorer, took is No longer on disk, under Gone from its folder; a
   removed source's is "Phone was removed", under Gone from that source. None of them is tried again, and none has a way to look.
 - **The bin refusing a file leaves it where it was.** The send never deletes outright, so a file
   too large for the bin, or on a drive whose bin is off, stays in its folder and the foot says so;
@@ -1466,7 +1471,7 @@ the way back; a single file is never purged from the app, as Explorer's bin can 
   earlier move or rename of a file now gone never sticks an undo. A folder deleted with its files
   goes from the journal with the last of them, so Ctrl+Z never makes it again empty; one deleted
   with no file in it keeps its undo. A row that fails to retire after its file went is retired by
-  the next look in the bin.
+  the next look in the bin, which lets its journal go the same way.
 - **Nothing to cancel.** What has gone has gone, so the head counts as it goes with the walk's bar
   where the button was, and the foot says when it is done; leaving Settings loses nothing.
 - **Tests never reach the real bin.** In a test build `Shell::holds` is the stand-in's, so only a

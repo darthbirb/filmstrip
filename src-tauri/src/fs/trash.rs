@@ -198,6 +198,13 @@ pub(super) fn put_back(conn: &Connection, item_id: i64, file: &ItemFile) -> Resu
     Ok(true)
 }
 
+/// Takes a file gone from the Recycle Bin out of the Trash and out of the journal, so an undo
+/// passes over it. SCHEMA.md "The undo journal".
+pub(super) fn leave(conn: &Connection, id: i64) -> Result<()> {
+    journal::drop_item(conn, id)?;
+    items::retire_trashed(conn, id, now())
+}
+
 /// What looking in the Recycle Bin found: rows retired for files emptied from it outside the app,
 /// and rows restored for files put back from Explorer.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, TS)]
@@ -209,7 +216,7 @@ pub struct Looked {
 }
 
 /// Looks for each trashed item's file in the Recycle Bin, at launch and as the Trash opens: gone
-/// from the bin and not back at its path, its row retires; back at its path, it is restored in the
+/// from the bin, its row leaves the Trash and the journal; back at its path, it is restored in the
 /// index. One on a drive that is away waits. Artboards › The Trash in the Recycle Bin.
 pub fn look_in_bin(conn: &Connection) -> Result<Looked> {
     let _turn = super::turn();
@@ -221,7 +228,7 @@ pub fn look_in_bin(conn: &Connection) -> Result<Looked> {
         match find(conn, row.id, &file)? {
             Found::Bin(_) | Found::Away => {}
             Found::Gone => {
-                in_transaction(conn, |tx| items::retire_trashed(tx, row.id, now()))?;
+                in_transaction(conn, |tx| leave(tx, row.id))?;
                 looked.retired += 1;
             }
             Found::Back => {
@@ -990,7 +997,7 @@ mod tests {
     }
 
     #[test]
-    fn an_undo_after_the_trash_found_a_file_emptied_or_put_back_says_so_or_counts_it_back() {
+    fn an_undo_after_the_trash_found_a_file_emptied_or_put_back_passes_over_it_or_counts_it_back() {
         let (conn, root, cairo) = library("undo-after-look");
         let pyramid = id_of(&conn, cairo, "pyramid.jpg");
         let sphinx = id_of(&conn, cairo, "sphinx.jpg");
@@ -1002,18 +1009,80 @@ mod tests {
 
         let report = undo::undo_batch(&conn, &batch).unwrap();
 
-        assert_eq!(report.files_back, 1);
-        assert_eq!(report.stayed.len(), 1);
-        assert_eq!(report.stayed[0].id, pyramid);
         assert_eq!(
-            report.stayed[0].reason,
-            Reason::GoneFromBin {
-                name: "pyramid.jpg".into(),
-                place: "Cairo".into(),
+            report.batch.act,
+            acts::Act::Delete {
+                from: Some("Cairo".into()),
+                one: Some("sphinx.jpg".into()),
             }
         );
+        assert_eq!((report.batch.files, report.files_back), (1, 1));
+        assert!(report.stayed.is_empty(), "{:?}", report.stayed);
+        assert!(!items::is_live(&conn, pyramid).unwrap());
         assert!(items::is_live(&conn, sphinx).unwrap());
         assert_eq!(journal::latest_batch(&conn).unwrap(), None);
+    }
+
+    /// Trips/Cairo deleted with its files, as Delete Files Too does, after an act on Trips alone.
+    fn delete_cairo(conn: &Connection, root: &Path, cairo: i64) -> (String, String) {
+        let trips = folders::parent(conn, cairo).unwrap().unwrap();
+        std::fs::write(root.join("Trips/note.jpg"), "n").unwrap();
+        walk::reconcile(conn).unwrap();
+        let note = id_of(conn, trips, "note.jpg");
+        let named = journal::new_batch();
+        crate::fs::items::rename(conn, note, "dusk.jpg", &named).unwrap();
+        let deleted = journal::new_batch();
+        let report = crate::fs::folders::delete(
+            conn,
+            cairo,
+            Some(crate::fs::folders::Contents::Trash),
+            &deleted,
+        )
+        .unwrap();
+        assert!(report.deleted);
+        (named, deleted)
+    }
+
+    #[test]
+    fn a_folder_whose_files_were_all_emptied_from_explorer_is_never_made_again_by_undo() {
+        let (conn, root, cairo) = library("look-emptied-folder");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        let (named, deleted) = delete_cairo(&conn, &root, cairo);
+        std::fs::remove_file(bin_file(&conn, pyramid)).unwrap();
+        std::fs::remove_file(bin_file(&conn, sphinx)).unwrap();
+
+        assert_eq!(look_in_bin(&conn).unwrap().retired, 2);
+
+        assert!(journal::batch(&conn, &deleted).unwrap().is_empty());
+        let back = undo::undo_last(&conn).unwrap().unwrap();
+        assert_eq!(back.batch.batch_id, named);
+        assert!(back.stayed.is_empty(), "{:?}", back.stayed);
+        assert!(!root.join("Trips/Cairo").exists());
+        assert!(!folders::is_live(&conn, cairo).unwrap());
+        crate::fs::settles_to(&root.join("Trips"), &["note.jpg"]);
+    }
+
+    #[test]
+    fn a_folder_one_of_whose_files_was_emptied_from_explorer_comes_back_with_the_rest() {
+        let (conn, root, cairo) = library("look-emptied-one");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        let (_, deleted) = delete_cairo(&conn, &root, cairo);
+        std::fs::remove_file(bin_file(&conn, pyramid)).unwrap();
+
+        assert_eq!(look_in_bin(&conn).unwrap().retired, 1);
+
+        let back = undo::undo_last(&conn).unwrap().unwrap();
+        assert_eq!(back.batch.batch_id, deleted);
+        assert_eq!(
+            (back.batch.files, back.files_back, back.folders_back),
+            (1, 1, 1)
+        );
+        assert!(back.stayed.is_empty(), "{:?}", back.stayed);
+        assert!(folders::is_live(&conn, cairo).unwrap());
+        assert!(items::is_live(&conn, sphinx).unwrap());
+        cairo_holds(&root, &["sphinx.jpg"]);
     }
 
     #[test]
@@ -1056,7 +1125,24 @@ mod tests {
     }
 
     #[test]
-    fn an_undo_of_a_file_the_index_forgot_once_it_was_emptied_says_so_and_leaves_nothing_to_redo() {
+    fn a_file_the_look_forgot_once_it_was_emptied_leaves_nothing_to_undo() {
+        let (conn, root, cairo) = library("look-forgotten");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+        std::fs::write(root.join("Trips/Cairo/pyramid.jpg"), "another").unwrap();
+        walk::reconcile(&conn).unwrap();
+        let newcomer = id_of(&conn, cairo, "pyramid.jpg");
+        std::fs::remove_file(bin_file(&conn, pyramid)).unwrap();
+
+        assert_eq!(look_in_bin(&conn).unwrap().retired, 1);
+
+        assert!(items::file_of(&conn, pyramid).unwrap().is_none());
+        assert_eq!(journal::latest_batch(&conn).unwrap(), None);
+        assert!(items::is_live(&conn, newcomer).unwrap());
+    }
+
+    #[test]
+    fn an_undo_of_a_file_a_restore_forgot_once_it_was_emptied_says_so_and_leaves_nothing_to_redo() {
         let (conn, root, cairo) = library("undo-forgotten");
         let pyramid = id_of(&conn, cairo, "pyramid.jpg");
         let batch = journal::new_batch();
@@ -1065,7 +1151,8 @@ mod tests {
         walk::reconcile(&conn).unwrap();
         let newcomer = id_of(&conn, cairo, "pyramid.jpg");
         std::fs::remove_file(bin_file(&conn, pyramid)).unwrap();
-        assert_eq!(look_in_bin(&conn).unwrap().retired, 1);
+        let restored = restore_items(&conn, &[pyramid], None, &journal::new_batch()).unwrap();
+        assert_eq!((restored.restored, restored.refused.len()), (0, 1));
         assert!(items::file_of(&conn, pyramid).unwrap().is_none());
 
         let report = undo::undo_last(&conn).unwrap().unwrap();

@@ -140,8 +140,8 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 - An undo that finds a trashed file gone from the Recycle Bin reports it and deletes the row
   that sent it there.
 - Every file's row deleted outright leaves the journal in the same transaction: through
-  `items::forget`, a trashed row whose name another file holds once its file is emptied from the
-  Recycle Bin, a row a file put back from Explorer replaces, and a retired row whose name a file
+  `items::forget`, a trashed row whose name another file holds once a Restore or an undo finds
+  its file emptied from the Recycle Bin, a row a file put back from Explorer replaces, and a retired row whose name a file
   the app moves, renames, pastes or restores takes (`items::forget_retired`); and every row of a
   source Remove Source deletes, all at once (`journal::forget_source`). Each journal row about it
   alone gains `gone`, its name, its folder and why it went (`why`: `emptiedFromBin`,
@@ -150,9 +150,10 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   `items_untag` and `retag` row, an emptied tag row going with it. A marked row is never acted
   on, since SQLite may give its id to another file. A removed source's folders, and rows naming
   them, do not leave the journal yet (#206).
-- A file Empty Trash… deleted leaves the journal in the transaction that retires its row: each
-  row about it alone is deleted outright, unmarked, and its id leaves every row about several as
-  above, so an undo passes over it to the act before. A `folder_delete` row left alone in its
+- A file Empty Trash… deleted, or the Trash's look in the Recycle Bin found emptied from it,
+  leaves the journal in the transaction that retires or forgets its row (`journal::drop_item`):
+  each row about it alone is deleted outright, unmarked, and its id leaves every row about
+  several as above, so an undo passes over it to the act before. A `folder_delete` row left alone in its
   batch by the last of them is deleted too; one whose batch never held a file stays.
 - Undo never reaches a row at or below `setting.undo_floor`, which a restore sets to the newest
   row the restored journal holds.
