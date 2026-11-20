@@ -77,23 +77,6 @@ Redrawn with it, by the owner's decision of 2026-11-15:
   there; nothing is sent while restoring. "Not restored · the Recycle Bin cannot take a file"
   goes.
 
-## Ask before deleting on a drive with no Recycle Bin · DRAWN
-
-#193. A file on a USB stick, an SD card or a network share has no Recycle Bin to go to.
-
-Drawn in Artboards › The Trash in the Recycle Bin, "A drive with no Recycle Bin":
-
-- **The question above the grid**, once for the selection, in the question's shape: the drive
-  by its label and letter, how many files and how much space, that they go for good and Undo
-  cannot bring them back. Delete Permanently in `danger`, Cancel with the focus.
-- **A mixed set**: the rest go to the bin at once with Undo; the banner lists the asked ones under
-  their drive with their sizes. A selection wholly on two such drives names both in the head,
-  and three or more are counted.
-- **A folder's question** says it once rather than asking twice: Delete Files Too becomes Delete
-  Files Permanently, with the drive's line under the answers, and × has the focus.
-- **The foot**: deleted for good with no Undo, and a file that would not go staying where it was.
-  Also drawn: the window's least, a long name wrapping, the keyboard on Delete Permanently.
-
 ## Empty the library's files from the Recycle Bin · DRAWN
 
 #194. Empty Trash… deletes for good only what the library sent to the bin.

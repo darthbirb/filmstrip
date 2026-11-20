@@ -33,13 +33,18 @@ type Props = Choices & {
   files?: { open: boolean; onToggle: () => void; list: ReactNode };
   /** What × is called: Cancel, unless answering none keeps something. */
   dismiss?: string;
+  /** An answer that cannot be undone: the keyboard starts on the way out rather than the question. */
+  guarded?: boolean;
+  /** Cancel stands on the line after the answers, where × would be at the end of the question. */
+  cancelOnLine?: boolean;
   onDismiss: () => void;
 };
 
 /**
  * Something only you can settle, above the grid in the banner's shape: the question, its answers
- * under it, and × to answer none. The answers hold one line or all fold into one button, and a
- * fold that still does not fit stacks. Measured against its own line. DESIGN.md "Components".
+ * under it, and × to answer none, or Cancel after the answers. The answers hold one line or all
+ * fold into one button, and a fold that still does not fit stacks. Measured against its own line.
+ * DESIGN.md "Components".
  */
 export function Question({
   sentence,
@@ -51,6 +56,8 @@ export function Question({
   box,
   files,
   dismiss = "Cancel",
+  guarded = false,
+  cancelOnLine = false,
   onDismiss,
 }: Props) {
   const said = useId();
@@ -59,14 +66,16 @@ export function Question({
   const named = useRef<HTMLDivElement>(null);
   const folded = useRef<HTMLDivElement>(null);
   const foldButton = useRef<HTMLButtonElement>(null);
+  const out = useRef<HTMLButtonElement>(null);
   const [shape, setShape] = useState<"named" | "folded" | "stacked">("named");
   const [menu, setMenu] = useState<HTMLElement | null>(null);
   const labels = choices.map((choice) => choice.label).join("\n");
 
   // The question has just come up in answer to a key or a click: the keyboard goes to it.
   useLayoutEffect(() => {
-    root.current?.focus({ preventScroll: true });
-  }, []);
+    const first = guarded ? out.current : root.current;
+    first?.focus({ preventScroll: true });
+  }, [guarded]);
 
   useLayoutEffect(() => {
     const element = line.current;
@@ -88,6 +97,12 @@ export function Question({
       {last.label}
     </Button>
   );
+  const cancelButton = (shown: boolean) =>
+    cancelOnLine && (
+      <Button ref={shown ? out : undefined} tone="quiet" onClick={onDismiss}>
+        {dismiss}
+      </Button>
+    );
   // Drawn twice, once out of sight to be measured, so only the one on the line holds the ref.
   const foldedButton = (shown: boolean) => (
     <Button
@@ -110,6 +125,7 @@ export function Question({
       <section
         ref={root}
         aria-labelledby={said}
+        data-question
         tabIndex={-1}
         onKeyDown={(event) => {
           if (event.key !== "Escape") return;
@@ -126,17 +142,26 @@ export function Question({
             <span id={said} className="min-w-0 flex-1 text-fg text-ui tabular-nums">
               {sentence}
             </span>
-            {files && <FilesToggle open={files.open} onToggle={files.onToggle} />}
+            {files && !cancelOnLine && <FilesToggle open={files.open} onToggle={files.onToggle} />}
           </span>
-          <button
-            type="button"
-            aria-label={dismiss}
-            title={dismiss}
-            onClick={onDismiss}
-            className="focus-ring grid size-control shrink-0 place-items-center rounded-control text-fg-dim text-glyph transition-colors duration-(--motion-quick) hover:bg-wash hover:text-fg motion-reduce:transition-none"
-          >
-            <Glyph name="close" />
-          </button>
+          {cancelOnLine ? (
+            files ? (
+              <FilesToggle open={files.open} onToggle={files.onToggle} />
+            ) : (
+              <span />
+            )
+          ) : (
+            <button
+              ref={out}
+              type="button"
+              aria-label={dismiss}
+              title={dismiss}
+              onClick={onDismiss}
+              className="focus-ring grid size-control shrink-0 place-items-center rounded-control text-fg-dim text-glyph transition-colors duration-(--motion-quick) hover:bg-wash hover:text-fg motion-reduce:transition-none"
+            >
+              <Glyph name="close" />
+            </button>
+          )}
           {detail && (
             <span className="col-span-2 col-start-2 text-pretty text-fg-dim text-small tabular-nums">
               {detail}
@@ -155,6 +180,7 @@ export function Question({
                   >
                     {everyChoice}
                     {lastButton}
+                    {cancelButton(false)}
                   </div>
                   <div
                     ref={folded}
@@ -164,6 +190,7 @@ export function Question({
                   >
                     {foldedButton(false)}
                     {lastButton}
+                    {cancelButton(false)}
                   </div>
                 </>
               )}
@@ -172,6 +199,7 @@ export function Question({
               >
                 {shape === "named" ? everyChoice : foldedButton(true)}
                 {lastButton}
+                {cancelButton(true)}
               </div>
             </div>
           )}

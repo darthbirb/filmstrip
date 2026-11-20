@@ -10,10 +10,18 @@ import {
   copiedBannerLine,
   copyCancelledLine,
   deletedBannerLine,
+  folderForGoodLine,
+  folderKeptBanner,
+  folderKeptLine,
+  folderNoBinDetail,
   folderStayedBanner,
   folderStayedLine,
+  forGoodKeptLine,
+  forGoodLine,
   holdsLine,
   movedBannerLine,
+  noBinDetail,
+  noBinHead,
   reasonText,
   refusedName,
   restoredBannerLine,
@@ -325,4 +333,77 @@ test("what a copy left outside the library is grouped under the directory it is 
     ["Still in Downloads", 2],
     ["Still in 100CANON", 1],
   ]);
+});
+
+test("a drive with no Recycle Bin is named, two are, three or more are counted", () => {
+  expect(noBinHead(["USB Drive (E:)"], 1, 1)).toBe("USB Drive (E:) has no Recycle Bin");
+  expect(noBinHead(["USB Drive (E:)", "SD Card (F:)"], 4, 4)).toBe(
+    "USB Drive (E:) and SD Card (F:) have no Recycle Bin",
+  );
+  expect(noBinHead(["E", "F", "G"], 3, 3)).toBe("3 drives have no Recycle Bin");
+  expect(noBinHead(["USB Drive (E:)"], 3, 15)).toBe(
+    "3 of 15 files are on a drive with no Recycle Bin",
+  );
+  expect(noBinHead(["E", "F"], 1, 15)).toBe("1 of 15 files is on drives with no Recycle Bin");
+  expect(reasonText({ kind: "noBin", drive: "USB Drive (E:)" })).toBe(
+    "USB Drive (E:) has no Recycle Bin",
+  );
+});
+
+test("the question says what goes for good, its size, and what went to the bin", () => {
+  const mb = 1024 * 1024;
+  const file = (name: string, bytes: number) => ({ name, bytes });
+  expect(noBinDetail([file("MVI_0412.mov", 12 * mb)], 1, 0)).toBe(
+    "Delete MVI_0412.mov, 12 MB, for good? Undo cannot bring it back.",
+  );
+  const three = [file("a.jpg", mb), file("b.jpg", mb), file("c.jpg", 2 * mb)];
+  expect(noBinDetail(three, 3, 0)).toBe(
+    "Delete 3 files, 4 MB, for good? Undo cannot bring them back.",
+  );
+  expect(noBinDetail(three, 15, 12)).toBe(
+    "Delete them, 4 MB, for good? Undo cannot bring them back. The other 12 went to the Recycle Bin.",
+  );
+  expect(noBinDetail(three, 15, 10)).toBe(
+    "Delete them, 4 MB, for good? Undo cannot bring them back. 10 of the other 12 went to the Recycle Bin.",
+  );
+  expect(folderNoBinDetail(["USB Drive (E:)"], 214, 214, 3 * mb)).toBe(
+    "USB Drive (E:) has no Recycle Bin. Deleted, its files go for good, 3 MB, and Undo cannot bring them back.",
+  );
+  expect(folderNoBinDetail(["USB Drive (E:)"], 2, 5, mb)).toBe(
+    "USB Drive (E:) has no Recycle Bin. Deleted, 2 of its files go for good, 1 MB, and Undo cannot bring them back.",
+  );
+});
+
+test("what went for good is said with no Undo, and what would not go is named", () => {
+  const kept = (name: string, place = "Lisbon"): Stayed => ({
+    kind: "file",
+    id: name.length,
+    name,
+    at: { kind: "folder", folderId: 1, path: ["Pictures", place] },
+    reason: { kind: "inUse" },
+  });
+  expect(forGoodLine(3, ["USB Drive (E:)"])).toBe("Deleted 3 files from USB Drive (E:) for good.");
+  expect(forGoodLine(1, ["USB Drive (E:)"], "a.jpg")).toBe(
+    "Deleted a.jpg from USB Drive (E:) for good.",
+  );
+  expect(forGoodLine(5, ["E", "F"])).toBe("Deleted 5 files for good.");
+  expect(forGoodKeptLine([kept("DSC_0102.jpg")], 2)).toBe(
+    "Deleted 2 of 3 files for good. DSC_0102.jpg could not be deleted and stays in Lisbon.",
+  );
+  expect(forGoodKeptLine([kept("a.jpg"), kept("b.jpg", "Porto")], 0)).toBe(
+    "2 files could not be deleted and stay where they were.",
+  );
+  expect(folderForGoodLine("Lisbon", 214)).toBe("Deleted Lisbon and its 214 files for good.");
+  expect(folderKeptLine("Lisbon", 213, 214)).toBe(
+    "Deleted 213 of Lisbon’s 214 files for good. Lisbon is in the banner.",
+  );
+  expect(folderKeptBanner("Lisbon", 213, 214)).toBe(
+    "213 of Lisbon’s 214 files are gone for good · Lisbon stayed",
+  );
+  expect(folderKeptBanner("Lisbon", 0, 214)).toBe(
+    "Lisbon’s 214 files could not be deleted · Lisbon stayed",
+  );
+  expect(folderKeptBanner("Lisbon", 214, 214)).toBe(
+    "Lisbon could not go · its 214 files are gone for good",
+  );
 });

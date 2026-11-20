@@ -221,6 +221,9 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
   if (news.kind === "binRefused") {
     return <Band sentence={news.line} detail={news.detail} onDismiss={dismiss} />;
   }
+  if (news.kind === "kept") {
+    return <Band sentence={news.line} onDismiss={dismiss} />;
+  }
   const exported = news.kind === "exported" ? news : null;
   const reveal = exported?.path;
 

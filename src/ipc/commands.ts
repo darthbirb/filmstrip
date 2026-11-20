@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { AddOutcome } from "./bindings/AddOutcome";
 import type { Backup } from "./bindings/Backup";
 import type { Batch } from "./bindings/Batch";
+import type { BinlessDrive } from "./bindings/BinlessDrive";
 import type { BranchFile } from "./bindings/BranchFile";
 import type { Carried } from "./bindings/Carried";
 import type { Contents } from "./bindings/Contents";
@@ -20,6 +21,7 @@ import type { FolderMade } from "./bindings/FolderMade";
 import type { FolderNode } from "./bindings/FolderNode";
 import type { FolderStatus } from "./bindings/FolderStatus";
 import type { Forgets } from "./bindings/Forgets";
+import type { GoneReport } from "./bindings/GoneReport";
 import type { ItemDetail } from "./bindings/ItemDetail";
 import type { ItemRow } from "./bindings/ItemRow";
 import type { ItemsMoved } from "./bindings/ItemsMoved";
@@ -100,6 +102,15 @@ export const renameItem = (itemId: number, name: string) =>
   invoke<Batch | null>("rename_item", { itemId, name });
 
 export const trashItems = (itemIds: number[]) => invoke<ItemsTrashed>("trash_items", { itemIds });
+
+export const binlessItems = (itemIds: number[]) =>
+  invoke<BinlessDrive[]>("binless_items", { itemIds });
+
+export const binlessUnder = (folderId: number) =>
+  invoke<BinlessDrive[]>("binless_under", { folderId });
+
+export const deleteForGood = (itemIds: number[]) =>
+  invoke<GoneReport>("delete_for_good", { itemIds });
 
 export const restoreItems = (itemIds: number[], folderId: number | null) =>
   invoke<ItemsRestored>("restore_items", { itemIds, folderId });

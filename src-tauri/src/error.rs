@@ -74,6 +74,10 @@ pub enum Reason {
     },
     /// The Recycle Bin would not take it, so it is where it was.
     BinRefused,
+    /// Its drive has no Recycle Bin, so it was never sent, and goes only when deleted for good.
+    NoBin {
+        drive: String,
+    },
     /// Anything else, in the words it came with.
     Other {
         message: String,
@@ -102,6 +106,7 @@ impl fmt::Display for Reason {
             Reason::DiskFull => f.write_str("the disk is full"),
             Reason::GoneFromBin { name, .. } => write!(f, "{name} is no longer in the Recycle Bin"),
             Reason::BinRefused => f.write_str("the Recycle Bin would not take it"),
+            Reason::NoBin { drive } => write!(f, "{drive} has no Recycle Bin"),
             Reason::Other { message } => f.write_str(message),
         }
     }

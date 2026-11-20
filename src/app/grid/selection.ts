@@ -226,15 +226,17 @@ function same(a: readonly BranchFile[], b: readonly BranchFile[]) {
 whenLibraryChanges(readBranchAgain);
 
 /**
- * Ctrl+A takes the whole place and Escape clears it, from anywhere but a field or Settings. What
- * is open closes first: a menu, a field, full screen. Artboards › Selecting.
+ * Ctrl+A takes the whole place and Escape clears it, from anywhere but a field, a question or
+ * Settings. What is open closes first: a menu, a field, full screen. Artboards › Selecting.
  */
 export function useSelectionKeys(order: readonly number[]) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.altKey || event.metaKey) return;
       const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest("input, textarea, select, [contenteditable], [role=menu], [popover]")) {
+      const own =
+        "input, textarea, select, [contenteditable], [role=menu], [popover], [data-question]";
+      if (target?.closest(own)) {
         return;
       }
       if (document.querySelector("dialog[open]")) return;

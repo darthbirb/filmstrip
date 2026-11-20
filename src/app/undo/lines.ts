@@ -4,7 +4,7 @@ import type { Reason } from "../../ipc/bindings/Reason";
 import type { Stayed } from "../../ipc/bindings/Stayed";
 import type { UndoReport } from "../../ipc/bindings/UndoReport";
 import type { AppError } from "../../ipc/commands";
-import { formatCount } from "../../lib/format";
+import { formatBytes, formatCount } from "../../lib/format";
 
 // Every sentence an act and its undo say, as Artboards › Undo words them. DECISIONS.md "Undo".
 
@@ -313,6 +313,108 @@ export function binRefusedLine(rows: readonly Stayed[], trashed = 0) {
   return `Deleted ${formatCount(trashed)} of ${files(trashed + rows.length)}. ${refused}`;
 }
 
+/** Drives with no Recycle Bin, as a question's head names them: one or two by name, more counted. */
+export function noBinDrives(drives: readonly string[]) {
+  const [one, two] = drives;
+  if (drives.length === 1) return `${one} has no Recycle Bin`;
+  if (drives.length === 2) return `${one} and ${two} have no Recycle Bin`;
+  return `${formatCount(drives.length)} drives have no Recycle Bin`;
+}
+
+/**
+ * The head of Delete's question about files on drives with no Recycle Bin: the drives, or, when
+ * the rest of the selection went to the bin, how many of it are asked about.
+ * Artboards › The Trash in the Recycle Bin.
+ */
+export function noBinHead(drives: readonly string[], asked: number, whole: number) {
+  if (asked === whole) return noBinDrives(drives);
+  const on = drives.length === 1 ? "a drive" : "drives";
+  return `${formatCount(asked)} of ${files(whole)} ${are(asked)} on ${on} with no Recycle Bin`;
+}
+
+/** The question under the head: what goes for good and its size, and what went to the bin. */
+export function noBinDetail(
+  asked: readonly { name: string; bytes: number }[],
+  whole: number,
+  went: number,
+) {
+  const [first] = asked;
+  const bytes = asked.reduce((sum, one) => sum + one.bytes, 0);
+  const what =
+    asked.length === 1 && first ? first.name : asked.length < whole ? "them" : files(asked.length);
+  const it = asked.length === 1 ? "it" : "them";
+  const question = `Delete ${what}, ${formatBytes(bytes)}, for good? Undo cannot bring ${it} back.`;
+  const rest = whole - asked.length;
+  if (went === 0) return question;
+  const others =
+    went === rest
+      ? `The other ${formatCount(went)}`
+      : `${formatCount(went)} of the other ${formatCount(rest)}`;
+  return `${question} ${others} went to the Recycle Bin.`;
+}
+
+/** What a folder's question adds under itself when its files would go for good. */
+export function folderNoBinDetail(
+  drives: readonly string[],
+  asked: number,
+  held: number,
+  bytes: number,
+) {
+  const size = formatBytes(bytes);
+  const its =
+    asked < held
+      ? `${formatCount(asked)} of its files go`
+      : held === 1
+        ? "its file goes"
+        : "its files go";
+  const it = asked === 1 ? "it" : "them";
+  return `${noBinDrives(drives)}. Deleted, ${its} for good, ${size}, and Undo cannot bring ${it} back.`;
+}
+
+/** The line at the foot after files went for good, with nothing to undo. */
+export function forGoodLine(deleted: number, drives: readonly string[], one?: string) {
+  const what = one ?? files(deleted);
+  const [drive] = drives;
+  return drives.length === 1
+    ? `Deleted ${what} from ${drive} for good.`
+    : `Deleted ${what} for good.`;
+}
+
+/** The line at the foot when files would not go for good: what went, then where the rest stay. */
+export function forGoodKeptLine(rows: readonly Stayed[], deleted: number) {
+  const [first] = rows;
+  const places = new Set(rows.map(folderOf));
+  const [place] = places;
+  const where = places.size === 1 && place ? ` in ${place}` : " where they were";
+  const kept =
+    rows.length === 1 && first
+      ? `${first.name} could not be deleted and stays${place ? ` in ${place}` : " where it was"}.`
+      : `${files(rows.length)} could not be deleted and stay${where}.`;
+  if (deleted === 0) return kept;
+  return `Deleted ${formatCount(deleted)} of ${files(deleted + rows.length)} for good. ${kept}`;
+}
+
+/** The line at the foot after a folder and its files went for good. */
+export const folderForGoodLine = (name: string, held: number) =>
+  `Deleted ${name} and its ${files(held)} for good.`;
+
+/** The line at the foot after a folder's files went for good in part, and the folder stayed. */
+export function folderKeptLine(name: string, gone: number, whole: number) {
+  const what =
+    gone === whole
+      ? `${whose(name)} ${files(whole)}`
+      : `${formatCount(gone)} of ${whose(name)} ${files(whole)}`;
+  return `Deleted ${what} for good. ${name} is in the banner.`;
+}
+
+/** The banner's sentence for a folder that stayed while its files went for good, or would not. */
+export function folderKeptBanner(name: string, gone: number, whole: number) {
+  if (gone === whole)
+    return `${name} could not go · its ${files(whole)} ${are(whole)} gone for good`;
+  if (gone === 0) return `${whose(name)} ${files(whole)} could not be deleted · ${name} stayed`;
+  return `${formatCount(gone)} of ${whose(name)} ${files(whole)} ${are(gone)} gone for good · ${name} stayed`;
+}
+
 /** Why it may have refused, said once, since the app cannot tell which it was. */
 export function binRefusedDetail(count: number) {
   const which = count === 1 ? "It" : "They";
@@ -354,6 +456,8 @@ export function reasonText(reason: Reason): string {
       return "Emptied outside the app";
     case "binRefused":
       return "The Recycle Bin would not take it";
+    case "noBin":
+      return `${reason.drive} has no Recycle Bin`;
     case "other":
       return reason.message.charAt(0).toUpperCase() + reason.message.slice(1);
   }

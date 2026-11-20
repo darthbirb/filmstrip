@@ -43,10 +43,12 @@ chrono = { version = "=0.4.45", default-features = false, features = ["clock"] }
 [target.'cfg(windows)'.dependencies]
 clipboard-win = "5"
 # MoveFileExW, for a rename that refuses a name already taken where std's replaces it; a file's
-# names, and SHFileOperationW, for a send to the Recycle Bin that never destroys a file.
+# names, and SHFileOperationW, for a send to the Recycle Bin that never destroys a file; a drive's
+# kind, for one with no Recycle Bin.
 windows-sys = { version = "=0.61.2", features = [
     "Win32_Foundation",
     "Win32_Storage_FileSystem",
+    "Win32_System_WindowsProgramming",
     "Win32_UI_Shell",
 ] }
 

@@ -27,6 +27,7 @@ use crate::db::vocabulary::{self, KeyClashFor, Vocabulary};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::acts::{self, Batch};
 use crate::fs::backups::{self, Backup, Forgets, Restored, Shelf, Shelved, Taken};
+use crate::fs::binless::{self, BinlessDrive, GoneReport};
 use crate::fs::clipboard;
 use crate::fs::export::{self, Naming, Plan, Scope};
 use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
@@ -315,6 +316,31 @@ pub async fn trash_items(state: State<'_, AppState>, item_ids: Vec<i64>) -> Resu
         })
     })
     .await
+}
+
+/// Which of these files are on a drive with no Recycle Bin, under each drive, for Delete to ask
+/// about before it sends the rest.
+#[tauri::command]
+pub async fn binless_items(
+    state: State<'_, AppState>,
+    item_ids: Vec<i64>,
+) -> Result<Vec<BinlessDrive>> {
+    run(&state, move |conn| binless::among(conn, &item_ids)).await
+}
+
+/// The files at or below a folder on a drive with no Recycle Bin, for its delete to ask about.
+#[tauri::command]
+pub async fn binless_under(
+    state: State<'_, AppState>,
+    folder_id: i64,
+) -> Result<Vec<BinlessDrive>> {
+    run(&state, move |conn| binless::under(conn, folder_id)).await
+}
+
+/// Files on a drive with no Recycle Bin deleted outright, once asked; nothing can undo it.
+#[tauri::command]
+pub async fn delete_for_good(state: State<'_, AppState>, item_ids: Vec<i64>) -> Result<GoneReport> {
+    run(&state, move |conn| binless::delete_items(conn, &item_ids)).await
 }
 
 /// What restoring files did, and the batch that undoes it when anything came back.

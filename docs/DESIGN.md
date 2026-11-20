@@ -676,7 +676,9 @@ toward the rest surface.
   still do not fit take a line each, left-aligned. Only the answers ever change shape. Why it is
   asked can stand under the question in `small` `fg-dim`. A question about several files has
   Hide Files before × and their list under its answers, as the notice's, each file's size where a
-  reason would be.
+  reason would be. Where an answer cannot be undone the keyboard starts on the way out, ×; over
+  the grid, Delete's question about a drive with no Recycle Bin puts a quiet Cancel after its
+  answers in place of ×, with the focus, and Hide Files takes ×'s place.
 - **Selection bar.** The grid's own foot row while anything is checked: `toolbar` tall on `panel`
   with a `line` hairline above, arriving and leaving as a box pushing down does, the grid giving up
   its height. From the left: the count in `ui` semibold `fg` with its size after it in `small`

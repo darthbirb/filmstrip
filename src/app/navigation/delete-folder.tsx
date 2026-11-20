@@ -1,22 +1,38 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 
+import type { BinlessDrive } from "../../ipc/bindings/BinlessDrive";
 import type { Contents } from "../../ipc/bindings/Contents";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
-import { deleteFolder, folderDetail, folderFileCount } from "../../ipc/commands";
+import { binlessUnder, deleteFolder, folderDetail, folderFileCount } from "../../ipc/commands";
 import { Question } from "../../ui/Question";
 import { libraryChanged } from "../library";
 import { dropPaneFolder, getPaneFolder } from "../pane/pane-store";
 import { getPreferences, updatePreferences } from "../preferences";
-import { folderStayedBanner, folderStayedLine, holdsLine } from "../undo/lines";
+import {
+  folderForGoodLine,
+  folderKeptBanner,
+  folderKeptLine,
+  folderNoBinDetail,
+  folderStayedBanner,
+  folderStayedLine,
+  holdsLine,
+} from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
+import { setNews } from "./foot-slot";
 import { useIndex } from "./index-store";
 
 /** A folder about to be deleted. */
 export type Doomed = { id: number; name: string };
 
 // The one question a folder's delete asks, drawn above the grid. DECISIONS.md "Right-click menus".
-let asking: { folder: Doomed; held: number; back: HTMLElement | null } | null = null;
+let asking: {
+  folder: Doomed;
+  held: number;
+  back: HTMLElement | null;
+  /** Drives with no Recycle Bin its files are on, which deleting them would empty for good. */
+  binless: BinlessDrive[];
+} | null = null;
 const listeners = new Set<() => void>();
 
 function ask(next: typeof asking) {
@@ -41,9 +57,11 @@ export async function deleteFolderAsking(folder: Doomed, sources: readonly Sourc
   if (sortingSources(sources).some((source) => source.id === into) && into !== undefined) {
     return settle(folder, { kind: "moveTo", sourceId: into }, held, sources);
   }
-  showReport(null);
   const focused = document.activeElement;
-  ask({ folder, held, back: focused instanceof HTMLElement ? focused : null });
+  const binless = await binlessUnder(folder.id).catch(() => null);
+  if (binless === null) return;
+  showReport(null);
+  ask({ folder, held, back: focused instanceof HTMLElement ? focused : null, binless });
 }
 
 /**
@@ -65,9 +83,21 @@ async function settle(
     contents?.kind === "moveTo"
       ? (sources.find((source) => source.id === contents.sourceId)?.title ?? null)
       : null;
+  const forGood = contents?.kind === "permanently";
   if (report.deleted) {
     if (batch) afterAct(batch);
+    else if (forGood) setNews({ kind: "said", line: folderForGoodLine(folder.name, held) });
     showReport(null);
+  } else if (forGood) {
+    const gone = (batch?.files ?? 0) + report.outright;
+    const line = folderKeptLine(folder.name, gone, held);
+    if (batch) afterAct(batch, 0, line);
+    else setNews({ kind: "said", line });
+    showReport({
+      sentence: folderKeptBanner(folder.name, gone, held),
+      rows: report.refused,
+      retry: () => void settle(folder, contents, held - gone, sources),
+    });
   } else {
     const carried = batch?.files ?? 0;
     if (batch) afterAct(batch, 0, folderStayedLine(folder.name, carried, held, into));
@@ -102,7 +132,7 @@ export function DeleteQuestion() {
   return shown ? <Asked key={shown.folder.id} {...shown} /> : null;
 }
 
-function Asked({ folder, held, back }: NonNullable<typeof asking>) {
+function Asked({ folder, held, back, binless }: NonNullable<typeof asking>) {
   const { sources } = useIndex();
   const [always, setAlways] = useState(false);
   const every = sources ?? [];
@@ -126,9 +156,23 @@ function Asked({ folder, held, back }: NonNullable<typeof asking>) {
     void settle(folder, contents, held, every);
   };
 
+  const asked = binless.flatMap((drive) => drive.files);
+  const bytes = asked.reduce((sum, file) => sum + file.bytes, 0);
+  const forGood = asked.length > 0;
+
   return (
     <Question
       sentence={holdsLine(folder.name, held)}
+      detail={
+        forGood
+          ? folderNoBinDetail(
+              binless.map((drive) => drive.drive),
+              asked.length,
+              held,
+              bytes,
+            )
+          : undefined
+      }
       choices={sorting.map((source) => ({
         id: String(source.id),
         label: `Move Files to ${source.title}`,
@@ -137,12 +181,20 @@ function Asked({ folder, held, back }: NonNullable<typeof asking>) {
       }))}
       choiceGlyph="sortingBox"
       fold="Move Files to…"
-      last={{ label: "Delete Files Too", onChoose: () => answer({ kind: "trash" }) }}
+      last={
+        forGood
+          ? {
+              label: "Delete Files Permanently",
+              onChoose: () => answer({ kind: "permanently" }),
+            }
+          : { label: "Delete Files Too", onChoose: () => answer({ kind: "trash" }) }
+      }
       box={
         sorting.length > 0
           ? { label: "Always Move to the One I Choose", checked: always, onChange: setAlways }
           : undefined
       }
+      guarded={forGood}
       onDismiss={() => ask(null)}
     />
   );
