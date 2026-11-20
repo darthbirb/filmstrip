@@ -3,7 +3,17 @@ import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { emptyOutside, refuseDeleting, resetBin } from "../../dev/mock";
-import { folderItems, renameItem, trashItems, trashListing, undoLast } from "../../ipc/commands";
+import {
+  deleteFolder,
+  emptyTrash,
+  folderItems,
+  renameItem,
+  restoreItems,
+  trashItems,
+  trashListing,
+  trashToEmpty,
+  undoLast,
+} from "../../ipc/commands";
 import { formatBytes } from "../../lib/format";
 import { Foot } from "../navigation/Foot";
 import { getNews, setNews } from "../navigation/foot-slot";
@@ -140,4 +150,26 @@ test("a file deleted while the question waits is not counted, and stays", async 
   await emptied();
 
   expect((await trashListing()).map((one) => one.id)).toEqual([later]);
+});
+
+test("emptying when every file counted has left the Trash leaves the foot as it was", async () => {
+  const [one] = await cairo(1);
+  if (one === undefined) throw new Error("Cairo holds files");
+  await trashed([one]);
+  const screen = await opened();
+  await screen.getByRole("button", { name: "Empty Trash…" }).click();
+  await restoreItems([one], null);
+  const before = { kind: "said", line: "Restored 1 file." } as const;
+  setNews(before);
+  await screen.getByRole("button", { name: "Empty Trash", exact: true }).click();
+  await emptied();
+
+  expect(getNews()).toEqual(before);
+});
+
+test("a folder deleted with its files leaves Undo once they are emptied", async () => {
+  await deleteFolder(6, { kind: "trash" });
+  await emptyTrash((await trashToEmpty()).files);
+
+  expect(await undoLast()).toBeNull();
 });

@@ -131,8 +131,8 @@ async function emptyAll(counted: Counted[]) {
     const emptied = await emptyTrash(counted);
     await libraryChanged();
     const whole = emptied.deleted + emptied.gone + emptied.kept;
-    if (whole === 0) setNews(null);
-    else if (whole === emptied.deleted) setNews({ kind: "said", line: emptiedLine(emptied) });
+    if (whole === 0) return;
+    if (whole === emptied.deleted) setNews({ kind: "said", line: emptiedLine(emptied) });
     else setNews({ kind: "skipped", line: skippedLine(emptied), first: emptied.firstKept });
   } catch (error) {
     await libraryChanged();

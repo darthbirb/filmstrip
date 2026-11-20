@@ -111,11 +111,11 @@ fn empty_one(conn: &Connection, counted: &Counted) -> Result<Outcome> {
             let Some((_, itself)) = binned else {
                 return Ok(Outcome::NotCounted);
             };
+            let bytes = items::size_of(conn, id)?.unwrap_or_default();
             if let Err(err) = recycle::purge(&Shell, &path, &itself) {
                 eprintln!("empty: {} stays in the Trash: {err}", path.display());
                 return Ok(Outcome::Kept);
             }
-            let bytes = items::size_of(conn, id)?.unwrap_or_default();
             // The file is gone whatever the index says now; a row left in the Trash is retired by
             // the next look in the bin.
             if let Err(err) = in_transaction(conn, |tx| leave(tx, id)) {
@@ -417,6 +417,50 @@ mod tests {
         assert_eq!(lib.empty(&lib.asked()).deleted, 1);
 
         assert_eq!(journal::latest_batch(&lib.conn).unwrap(), None);
+        assert_eq!(undo::undo_last(&lib.conn).unwrap(), None);
+    }
+
+    #[test]
+    fn a_folder_whose_files_were_all_emptied_is_never_made_again_by_undo() {
+        let lib = library("folder", &["a.jpg", "b.jpg"]);
+        let trips = folders::parent(&lib.conn, lib.cairo).unwrap().unwrap();
+        std::fs::write(lib.root.join("Trips/note.jpg"), "note").unwrap();
+        std::fs::create_dir(lib.root.join("Trips/Empty")).unwrap();
+        walk::reconcile(&lib.conn).unwrap();
+        let note = items::existing_by_disk_name(&lib.conn, trips, "note.jpg")
+            .unwrap()
+            .unwrap()
+            .id;
+        let named = journal::new_batch();
+        crate::fs::items::rename(&lib.conn, note, "dusk.jpg", &named).unwrap();
+        let empty_dir = folders::child_id(&lib.conn, trips, "Empty")
+            .unwrap()
+            .unwrap();
+        let emptied_dir = journal::new_batch();
+        crate::fs::folders::delete(&lib.conn, empty_dir, None, &emptied_dir).unwrap();
+        let cairo = journal::new_batch();
+        let report = crate::fs::folders::delete(
+            &lib.conn,
+            lib.cairo,
+            Some(crate::fs::folders::Contents::Trash),
+            &cairo,
+        )
+        .unwrap();
+        assert!(report.deleted);
+
+        assert_eq!(lib.empty(&lib.asked()).deleted, 2);
+
+        assert!(journal::batch(&lib.conn, &cairo).unwrap().is_empty());
+        let back = undo::undo_last(&lib.conn).unwrap().unwrap();
+        assert_eq!(
+            back.batch.batch_id, emptied_dir,
+            "a folder that held no file keeps its undo"
+        );
+        assert!(lib.root.join("Trips/Empty").is_dir());
+        let back = undo::undo_last(&lib.conn).unwrap().unwrap();
+        assert_eq!(back.batch.batch_id, named);
+        assert!(!lib.root.join("Trips/Cairo").exists());
+        assert!(!folders::is_live(&lib.conn, lib.cairo).unwrap());
         assert_eq!(undo::undo_last(&lib.conn).unwrap(), None);
     }
 

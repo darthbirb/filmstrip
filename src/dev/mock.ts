@@ -1602,6 +1602,7 @@ function toEmpty(): ToEmpty {
 /** Takes an emptied file out of every act, so an undo passes over it. */
 function dropFromJournal(item: ItemRow) {
   for (const batch of journal) {
+    const held = batch.steps.some((step) => "item" in step && step.item === item);
     batch.steps = batch.steps.flatMap((step): Step[] => {
       if ("item" in step) return step.item === item ? [] : [step];
       if (step.op === "tag") {
@@ -1614,6 +1615,7 @@ function dropFromJournal(item: ItemRow) {
       }
       return [step];
     });
+    if (held && batch.steps.every((step) => step.op === "deleteFolder")) batch.steps = [];
   }
   for (let at = journal.length - 1; at >= 0; at--) {
     if (journal[at]?.steps.length === 0) journal.splice(at, 1);

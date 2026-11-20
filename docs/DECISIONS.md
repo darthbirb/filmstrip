@@ -1460,8 +1460,10 @@ the way back; a single file is never purged from the app, as Explorer's bin can 
   the Trash retires one emptied outside the app, and every journal row about it alone goes in the
   same transaction, its id leaving every row about several (SCHEMA.md "The undo journal"). Nothing
   of the act is journalled, so Ctrl+Z skips the emptied files and undoes the act before them; an
-  earlier move or rename of a file now gone never sticks an undo. A row that fails to retire after
-  its file went is retired by the next look in the bin.
+  earlier move or rename of a file now gone never sticks an undo. A folder deleted with its files
+  goes from the journal with the last of them, so Ctrl+Z never makes it again empty; one deleted
+  with no file in it keeps its undo. A row that fails to retire after its file went is retired by
+  the next look in the bin.
 - **Nothing to cancel.** What has gone has gone, so the head counts as it goes with the walk's bar
   where the button was, and the foot says when it is done; leaving Settings loses nothing.
 - **Tests never reach the real bin.** In a test build `Shell::holds` is the stand-in's, so only a

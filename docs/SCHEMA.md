@@ -148,7 +148,8 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   its name (`items::forget_retired`), or by Remove Source, does not yet (#200).
 - A file Empty Trash… deleted leaves the journal in the transaction that retires its row: each
   row about it alone is deleted outright, unmarked, and its id leaves every row about several as
-  above, so an undo passes over it to the act before.
+  above, so an undo passes over it to the act before. A `folder_delete` row left alone in its
+  batch by the last of them is deleted too; one whose batch never held a file stays.
 - Undo never reaches a row at or below `setting.undo_floor`, which a restore sets to the newest
   row the restored journal holds.
 
