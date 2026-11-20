@@ -1561,9 +1561,11 @@ drive, so the send could only ever refuse it; asking is the one way such a file 
   whole where it was, and the foot names it.
 - **A folder's delete asks the same in its own question**: Delete Files Too becomes Delete Files
   Permanently, `Contents::Permanently`, whose files on such a drive go outright and any others to
-  the bin, and the folder goes once they have. The folder's delete is journalled only when some
-  of its files went to the bin, since otherwise nothing would come back with it. The foot counts
-  the two apart, and says nothing when no file went, since the banner over the grid says it all.
+  the bin, and the folder goes once they have. The folder's delete is journalled unless files
+  went for good and none to the bin, since then nothing would come back with it; one emptied
+  while the question waited goes with Undo, as any empty folder does. The foot counts the two
+  apart, and is left as it was when no file went: the banner over the grid says it all, and
+  Ctrl+Z still reaches the act before.
 - **Tests never delete outside their own folder.** The stand-in for the shell names folders of
   the test's own as drives with no bin, so what is deleted outright is a file the test wrote.
 

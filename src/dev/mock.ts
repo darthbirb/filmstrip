@@ -1905,8 +1905,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     }
     if (refused.length === 0) {
       detach(node);
-      if (how?.kind !== "permanently" || steps.length > 0)
-        steps.push({ op: "deleteFolder", node, parent });
+      if (outright === 0 || steps.length > 0) steps.push({ op: "deleteFolder", node, parent });
       else foldersGoneForGood.push({ node, parent });
     }
     return {

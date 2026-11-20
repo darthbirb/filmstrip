@@ -377,6 +377,46 @@ mod tests {
     }
 
     #[test]
+    fn a_folder_emptied_before_the_answer_goes_with_undo_and_comes_back() {
+        let (conn, root, bin) = library("folder-emptied");
+        let lisbon = lisbon(&conn);
+        let stick = folders::parent(&conn, lisbon).unwrap().unwrap();
+        let tram = id_of(&conn, &["Stick", "Lisbon"], "tram.jpg");
+        let fado = id_of(&conn, &["Stick", "Lisbon"], "fado.mov");
+        let moved =
+            crate::fs::items::move_items(&conn, &[tram, fado], stick, &journal::new_batch())
+                .unwrap();
+        assert_eq!(moved.moved, 2, "{:?}", moved.refused);
+        let batch = journal::new_batch();
+
+        let report = crate::fs::folders::delete(
+            &conn,
+            lisbon,
+            Some(crate::fs::folders::Contents::Permanently),
+            &batch,
+        )
+        .unwrap();
+
+        assert!(report.deleted, "{:?}", report.refused);
+        assert_eq!(report.outright, 0);
+        assert!(!root.join("Stick/Lisbon").exists());
+        let ops: Vec<String> = journal::batch(&conn, &batch)
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.op)
+            .collect();
+        assert_eq!(ops, [journal::FOLDER_DELETE]);
+
+        let back = crate::fs::undo::undo_last(&conn).unwrap().unwrap();
+
+        assert_eq!(back.batch.batch_id, batch);
+        assert!(folders::is_live(&conn, lisbon).unwrap());
+        assert!(root.join("Stick/Lisbon").is_dir());
+        settles_to(&root.join("Stick"), &["Lisbon", "fado.mov", "tram.jpg"]);
+        assert!(bin.asked.borrow().is_empty());
+    }
+
+    #[test]
     fn a_folder_across_two_drives_sends_some_to_the_bin_and_undo_brings_back_those_alone() {
         let (conn, root, _) = library("folder-across");
         std::fs::write(root.join("Trips/boat.jpg"), "boat").unwrap();
