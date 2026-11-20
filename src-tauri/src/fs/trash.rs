@@ -9,7 +9,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::db::items::{ItemFile, ItemRow};
-use crate::db::journal::ItemRestored;
+use crate::db::journal::{Forgot, ItemRestored};
 use crate::db::{folders, in_transaction, items, journal, now, recycling, sources, tags};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::recycle::{self, Bin, Sent, Shell};
@@ -187,7 +187,7 @@ pub(super) fn find(conn: &Connection, item_id: i64, file: &ItemFile) -> Result<F
 /// one retired at its name, describes the same file, and is forgotten. Whether it went live.
 pub(super) fn put_back(conn: &Connection, item_id: i64, file: &ItemFile) -> Result<bool> {
     if let Some(held) = items::existing_by_disk_name(conn, file.folder_id, &file.disk_name)? {
-        items::forget(conn, held.id)?;
+        items::forget(conn, held.id, Forgot::NotOnDisk)?;
     }
     if !folders::is_live(conn, file.folder_id)? {
         items::retire_trashed(conn, item_id, now())?;
@@ -1014,6 +1014,45 @@ mod tests {
         );
         assert!(items::is_live(&conn, sphinx).unwrap());
         assert_eq!(journal::latest_batch(&conn).unwrap(), None);
+    }
+
+    #[test]
+    fn an_undo_of_a_file_whose_name_one_put_back_from_explorer_took_says_it_left_the_disk() {
+        let (conn, root, cairo) = library("undo-put-back-over");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        let trashed = journal::new_batch();
+        trash_items(&conn, &[sphinx], &trashed).unwrap();
+        crate::fs::items::rename(&conn, pyramid, "sphinx.jpg", &journal::new_batch()).unwrap();
+        std::fs::remove_file(root.join("Trips/Cairo/sphinx.jpg")).unwrap();
+        walk::reconcile(&conn).unwrap();
+        std::fs::rename(bin_file(&conn, sphinx), root.join("Trips/Cairo/sphinx.jpg")).unwrap();
+        look_in_bin(&conn).unwrap();
+        assert!(items::file_of(&conn, pyramid).unwrap().is_none());
+
+        let report = undo::undo_last(&conn).unwrap().unwrap();
+
+        assert_eq!(report.files_back, 0);
+        assert_eq!(
+            report.stayed,
+            [Stayed {
+                kind: stayed::Thing::File,
+                id: pyramid,
+                name: "sphinx.jpg".into(),
+                at: stayed::Whereabouts::Forgotten {
+                    path: vec!["Library".into(), "Trips".into(), "Cairo".into()],
+                },
+                reason: Reason::NotOnDisk {
+                    name: "sphinx.jpg".into(),
+                },
+            }]
+        );
+        assert_eq!(journal::latest_batch(&conn).unwrap(), Some(trashed));
+        assert!(items::is_live(&conn, sphinx).unwrap());
+        assert_eq!(
+            std::fs::read_to_string(root.join("Trips/Cairo/sphinx.jpg")).unwrap(),
+            "s"
+        );
     }
 
     #[test]

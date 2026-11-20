@@ -6,7 +6,7 @@ import type { UndoReport } from "../../ipc/bindings/UndoReport";
 import { undoBatch, undoLast } from "../../ipc/commands";
 import { libraryChanged } from "../library";
 import { sayOnce, setNews } from "../navigation/foot-slot";
-import { actLine, undoBannerLine, undoneLine } from "./lines";
+import { actLine, letGo, undoBannerLine, undoneLine } from "./lines";
 import { showReport } from "./report-store";
 
 // What follows an act, and the way back from it. DECISIONS.md "Undo".
@@ -20,8 +20,8 @@ let undoing = false;
 
 /**
  * Takes back one batch, or the newest when none is named, and says what came back. What was gone
- * from the Recycle Bin is listed until the banner goes, and only what is still in the Trash is
- * tried again.
+ * from the Recycle Bin or the index is listed until the banner goes, and only what is still there
+ * is tried again.
  */
 export async function undo(batchId?: string, earlier: readonly Stayed[] = []) {
   if (undoing) return;
@@ -39,8 +39,8 @@ export async function undo(batchId?: string, earlier: readonly Stayed[] = []) {
       return;
     }
     await libraryChanged();
-    const left = report.stayed.filter((row) => row.at.kind !== "recycleBin");
-    const gone = [...earlier, ...report.stayed.filter((row) => row.at.kind === "recycleBin")];
+    const left = report.stayed.filter((row) => !letGo(row));
+    const gone = [...earlier, ...report.stayed.filter(letGo)];
     if (left.length + gone.length === 0) {
       setNews({ kind: "undone", line: undoneLine(report), batchId: report.batch.batchId });
       return;

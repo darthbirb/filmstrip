@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::db::folders::{self, Crumb};
-use crate::db::journal::{self, Gone};
+use crate::db::journal::{self, Forgot, Gone};
 use crate::db::now;
 use crate::db::sources::SourceKind;
 use crate::error::Result;
@@ -391,24 +391,30 @@ pub fn set_name(conn: &Connection, id: i64, disk_name: &str) -> Result<()> {
     crate::db::search::index_item(conn, id)
 }
 
-/// Removes a retired row outright: one whose file a walk found gone, holding a name another file
+/// Forgets a retired row outright: one whose file a walk found gone, holding a name another file
 /// is now arriving at.
 pub fn forget_retired(conn: &Connection, id: i64) -> Result<()> {
-    conn.execute(
-        "DELETE FROM item WHERE id = ?1 AND deleted_at IS NOT NULL AND trashed_at IS NULL",
+    let retired: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM item
+                        WHERE id = ?1 AND deleted_at IS NOT NULL AND trashed_at IS NULL)",
         params![id],
+        |r| r.get(0),
     )?;
+    if retired {
+        forget(conn, id, Forgot::NotOnDisk)?;
+    }
     Ok(())
 }
 
 /// Forgets an item outright, and has the journal forget it with it. Covers point in from outside
 /// the cascade, so go first.
-pub fn forget(conn: &Connection, id: i64) -> Result<()> {
+pub fn forget(conn: &Connection, id: i64, why: Forgot) -> Result<()> {
     if let Some(file) = file_of(conn, id)? {
         let gone = Gone {
             item_id: id,
             name: file.disk_name,
             folder_id: file.folder_id,
+            why,
         };
         journal::forget_item(conn, &gone)?;
     }
@@ -435,7 +441,7 @@ pub fn retire_trashed(conn: &Connection, id: i64, at: i64) -> Result<()> {
         params![id, at],
     )?;
     if retired == 0 {
-        return forget(conn, id);
+        return forget(conn, id, Forgot::EmptiedFromBin);
     }
     crate::db::search::index_item(conn, id)
 }
