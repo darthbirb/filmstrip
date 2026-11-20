@@ -144,7 +144,8 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   from Explorer replaces. Each journal row about it alone gains `gone`, its name and folder, for
   an undo to report and delete, and its id leaves every `items_tag`, `items_untag` and `retag`
   row, an emptied tag row going with it. A marked row is never acted on, since SQLite may give
-  its id to another file. A row a walk's newcomer or Remove Source deletes does not yet (#200).
+  its id to another file. A row deleted by a file the app moves, renames, pastes or restores onto
+  its name (`items::forget_retired`), or by Remove Source, does not yet (#200).
 - Undo never reaches a row at or below `setting.undo_floor`, which a restore sets to the newest
   row the restored journal holds.
 
