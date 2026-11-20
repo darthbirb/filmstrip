@@ -1424,10 +1424,48 @@ waits, where Explorer can see it too.
 - **`data\trash` is never touched.** A folder of that name from an earlier build is neither read,
   emptied nor deleted; the app no longer makes one.
 - **Emptying stays the one irreversible act**, as PRD.md "What must always hold" has it: Empty
-  Trash… (#194) deletes for good only what the library sent to the bin, and asks first.
+  Trash… deletes for good only what the library sent to the bin, and asks first (DECISIONS.md
+  "Emptying the Trash").
 - **Tests never reach the real bin.** Every send goes through `fs::recycle::Shell`, which in a
   test build hands the file to a stand-in of the test's own thread, recycling into a folder under
   `target`; the real `RecycleBin` refuses to run in one.
+
+## Emptying the Trash
+
+**Empty Trash… deletes for good the files the library sent to the Recycle Bin, and nothing else
+in it**, as the owner decided on 15 November 2026 and built for #194 from Artboards › The Trash in
+the Recycle Bin. It lives in Settings › Trash, one question away, since the Trash place keeps only
+the way back; a single file is never purged from the app, as Explorer's bin can do that.
+
+- **Only what the question counted.** Asking reads each trashed row and the name the bin keeps its
+  file under, `bin_path`; the answer hands those pairs back. A row taken out of the Trash since, or
+  sent there again under a new name, is passed over, so a file deleted while the question waits
+  joins the Trash after it and stays.
+- **Each file found again, by what it is.** Under the disk's turn, one file at a time, the row is
+  looked for as the Trash looks (DECISIONS.md "The Trash is the Recycle Bin"): at `bin_path` with
+  the identity `bin_file` names, then at its own path. A restore or an undo between two files takes
+  its file out of reach.
+- **Deleted through the handle that read it.** `fs::recycle::purge` refuses a name the bin does not
+  hold, opens the `$R…` name without following a link and never a directory, reads the file's
+  volume and index from that handle, and only while they are `bin_file`'s marks that same handle
+  for deletion, read-only or not. Nothing can take the name between the reading and the deleting.
+  Only that one name goes: a file with other names outside the bin, from a dedup tool or a
+  link-based backup, keeps them. The `$I…` record beside it is then removed as a restore removes
+  it, only inside the bin and only once `$R…` is gone.
+- **One no longer there, or that would not go, is skipped and said.** Emptied outside the app, its
+  row retires; put back from Explorer, it is restored in the index; either way it was no longer in
+  the Recycle Bin. One open in another app, on a drive that is away, or whose name in the bin is
+  no longer its own stays in the Trash under its row, whole, and Empty Trash… asks again for it.
+- **The row retires and the journal lets it go.** A deleted file's row retires where it was, as
+  the Trash retires one emptied outside the app, and every journal row about it alone goes in the
+  same transaction, its id leaving every row about several (SCHEMA.md "The undo journal"). Nothing
+  of the act is journalled, so Ctrl+Z skips the emptied files and undoes the act before them; an
+  earlier move or rename of a file now gone never sticks an undo. A row that fails to retire after
+  its file went is retired by the next look in the bin.
+- **Nothing to cancel.** What has gone has gone, so the head counts as it goes with the walk's bar
+  where the button was, and the foot says when it is done; leaving Settings loses nothing.
+- **Tests never reach the real bin.** In a test build `Shell::holds` is the stand-in's, so only a
+  folder of the test's own can be emptied, and each test writes the files it deletes.
 
 ## Sending to the Recycle Bin
 
@@ -1547,9 +1585,9 @@ has gone is in the red and says where it was, and keeps its key until it is free
 another folder. The picker opens inside the dialog, since the window behind it is inert.
 
 **Trash sits in the Library group, after Backups**: how many files the library has in the Recycle
-Bin and their size in the section's head, and a line under it on where a deleted file goes. It
-keeps no limits, since the Recycle Bin keeps Windows' own for each drive.
-DECISIONS.md "The Trash is the Recycle Bin".
+Bin and their size in the section's head, with Empty Trash… at its end, and two lines under it on
+where a deleted file goes. It keeps no limits, since the Recycle Bin keeps Windows' own for each
+drive. DECISIONS.md "The Trash is the Recycle Bin" and "Emptying the Trash".
 
 **A rail of sections, grouped and filtered**, because it will grow: tabs hold six or seven names
 and then scroll, and a rail takes twenty. A section with nothing in it yet is not in the rail.

@@ -12,6 +12,8 @@ export type FootNews =
   | { kind: "binRefused"; line: string; detail: string }
   /** Files a delete for good would not remove, which stay where they were; nothing to undo. */
   | { kind: "kept"; line: string }
+  /** Files Empty Trash skipped, and the first of those that stay in the Trash, to show there. */
+  | { kind: "skipped"; line: string; first: number | null }
   /** A destination key that moved nothing, and why. */
   | { kind: "keyRefused"; line: string; detail?: string; path?: string }
   /** An act that changed the disk, and the batch its Undo takes back. */

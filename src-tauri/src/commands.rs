@@ -29,6 +29,7 @@ use crate::fs::acts::{self, Batch};
 use crate::fs::backups::{self, Backup, Forgets, Restored, Shelf, Shelved, Taken};
 use crate::fs::binless::{self, BinlessDrive, GoneReport};
 use crate::fs::clipboard;
+use crate::fs::empty::{self, Counted, Emptied, ToEmpty};
 use crate::fs::export::{self, Naming, Plan, Scope};
 use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
 use crate::fs::items::{self as fs_items, MoveReport};
@@ -49,6 +50,8 @@ pub struct AppState {
 
 /// How far a restore has got, from 0 to 100, as its row's bar shows it.
 pub const RESTORE_PROGRESS_EVENT: &str = "restore-progress";
+/// How many of the files Empty Trash… counted are settled so far.
+pub const EMPTY_PROGRESS_EVENT: &str = "empty-progress";
 /// The launch's backup has ended, taken, refused or not due, so a list showing it writing is stale.
 pub const BACKUPS_CHANGED_EVENT: &str = "backups-changed";
 
@@ -341,6 +344,32 @@ pub async fn binless_under(
 #[tauri::command]
 pub async fn delete_for_good(state: State<'_, AppState>, item_ids: Vec<i64>) -> Result<GoneReport> {
     run(&state, move |conn| binless::delete_items(conn, &item_ids)).await
+}
+
+/// The files in the Trash as Empty Trash… asks about them, and what they weigh.
+#[tauri::command]
+pub async fn trash_to_empty(state: State<'_, AppState>) -> Result<ToEmpty> {
+    run(&state, empty::to_empty).await
+}
+
+/// Deletes for good, from the Recycle Bin, the files counted that are still in the Trash, saying
+/// how many are settled as it goes; nothing can undo it.
+#[tauri::command]
+pub async fn empty_trash(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    counted: Vec<Counted>,
+) -> Result<Emptied> {
+    run(&state, move |conn| {
+        let whole = u32::try_from(counted.len()).unwrap_or(u32::MAX);
+        let every = (whole / 200).max(1);
+        empty::empty(conn, &counted, &|done| {
+            if done % every == 0 || done == whole {
+                let _ = app.emit(EMPTY_PROGRESS_EVENT, done);
+            }
+        })
+    })
+    .await
 }
 
 /// What restoring files did, and the batch that undoes it when anything came back.

@@ -146,6 +146,9 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   row, an emptied tag row going with it. A marked row is never acted on, since SQLite may give
   its id to another file. A row deleted by a file the app moves, renames, pastes or restores onto
   its name (`items::forget_retired`), or by Remove Source, does not yet (#200).
+- A file Empty Trash… deleted leaves the journal in the transaction that retires its row: each
+  row about it alone is deleted outright, unmarked, and its id leaves every row about several as
+  above, so an undo passes over it to the act before.
 - Undo never reaches a row at or below `setting.undo_floor`, which a restore sets to the newest
   row the restored journal holds.
 

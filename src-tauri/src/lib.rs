@@ -117,6 +117,8 @@ pub fn run() {
             commands::binless_under,
             commands::delete_for_good,
             commands::look_in_bin,
+            commands::trash_to_empty,
+            commands::empty_trash,
             commands::folder_file_count,
             commands::delete_folder,
             commands::undo_last,

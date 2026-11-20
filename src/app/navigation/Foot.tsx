@@ -17,6 +17,8 @@ import { Line } from "../../ui/Line";
 import { keepEscape, SURFACE } from "../../ui/Menu";
 import { PushDown } from "../../ui/PushDown";
 import { Tallies, type TallyNote, type TallyRow } from "../../ui/Tallies";
+import { showInPane } from "../pane/pane-store";
+import { setPlace } from "../place";
 import { undo } from "../undo/undo";
 import { refusalSentence } from "./add-source";
 import { type FootNews, setNews, useNews } from "./foot-slot";
@@ -224,6 +226,22 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
   if (news.kind === "kept") {
     return <Band sentence={news.line} onDismiss={dismiss} />;
   }
+  if (news.kind === "skipped") {
+    const { first } = news;
+    return (
+      <Band
+        sentence={news.line}
+        action={
+          first !== null && (
+            <Button glyph="trash" onClick={() => showInTrash(first)}>
+              Show in Trash
+            </Button>
+          )
+        }
+        onDismiss={dismiss}
+      />
+    );
+  }
   const exported = news.kind === "exported" ? news : null;
   const reveal = exported?.path;
 
@@ -297,6 +315,13 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
 }
 
 const NO_FILES = "The clipboard holds no files.";
+
+/** Goes to the Trash with a file there in the pane. */
+function showInTrash(itemId: number) {
+  const trash = { kind: "trash" } as const;
+  setPlace(trash);
+  showInPane(itemId, trash);
+}
 
 /** Folded, the rail has no room for the sentence, so it comes out beside the slot. */
 function Nothing({ noFiles = false }: { noFiles?: boolean }) {

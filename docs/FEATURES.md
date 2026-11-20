@@ -114,7 +114,7 @@ drawn. **Not started** — neither.
 | Destination hotkeys | Built | `destination_keys`, `set_destination_key`, `remove_destination_key`; the digits 1 to 0, bound from a folder's menu or Settings, shown on its row, a press moving the set or the pane's file |
 | The trash as a place, in the Recycle Bin | Built | `trash_listing`, `library_totals`: newest first under a heading per day, each tile saying where it came from, counted on its row and header and in Settings › Trash. `look_in_bin` at launch and as the Trash opens retires what was emptied from the bin outside the app and restores what was put back from Explorer. On a drive with no Recycle Bin, Delete asks first (`binless_items`, `binless_under`, `delete_for_good`): the rest of the selection goes to the bin with Undo, the asked files go outright with none, and a folder's Delete Files Permanently takes its files and then the folder |
 | Restore from the trash, or restore to another folder | Built | `restore_items`, journalled, taking the file out of the Recycle Bin; Restore and Restore to… on a trashed file's bar and menu, refused into the banner, a file emptied from the bin under Gone from the Recycle Bin |
-| Empty the library's files from the Recycle Bin, the one irreversible act | Not started | #194 |
+| Empty the library's files from the Recycle Bin, the one irreversible act | Built | `trash_to_empty`, `empty_trash`: Empty Trash… in Settings › Trash asks first, then deletes for good each file it counted, found again in the bin by what it is, and nothing else in the bin; one no longer there or that would not go is skipped and said at the foot, and Ctrl+Z passes over what went |
 
 ## Export and undo
 

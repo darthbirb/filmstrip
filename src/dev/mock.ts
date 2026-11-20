@@ -10,11 +10,13 @@ import type { Change } from "../ipc/bindings/Change";
 import type { Contents } from "../ipc/bindings/Contents";
 import type { Copied } from "../ipc/bindings/Copied";
 import type { CopyStart } from "../ipc/bindings/CopyStart";
+import type { Counted } from "../ipc/bindings/Counted";
 import type { Coverage } from "../ipc/bindings/Coverage";
 import type { Covered } from "../ipc/bindings/Covered";
 import type { Crumb } from "../ipc/bindings/Crumb";
 import type { DestinationKey } from "../ipc/bindings/DestinationKey";
 import type { EffectiveTag } from "../ipc/bindings/EffectiveTag";
+import type { Emptied } from "../ipc/bindings/Emptied";
 import type { End } from "../ipc/bindings/End";
 import type { Exported } from "../ipc/bindings/Exported";
 import type { Exporting } from "../ipc/bindings/Exporting";
@@ -58,6 +60,7 @@ import type { Suggestions } from "../ipc/bindings/Suggestions";
 import type { TagRow } from "../ipc/bindings/TagRow";
 import type { Taken } from "../ipc/bindings/Taken";
 import type { Tally } from "../ipc/bindings/Tally";
+import type { ToEmpty } from "../ipc/bindings/ToEmpty";
 import type { Trashed } from "../ipc/bindings/Trashed";
 import type { UndoReport } from "../ipc/bindings/UndoReport";
 import type { Vocabulary } from "../ipc/bindings/Vocabulary";
@@ -1577,6 +1580,82 @@ function lookInBin(): Looked {
   return { retired: gone.length, restored: 0 };
 }
 
+/** How long the mock takes over each file it empties, so the head is seen counting. */
+const EMPTY_STEP_MS = 150;
+
+/** Where the mock's Recycle Bin keeps a trashed file, named afresh each time it is sent. */
+const binPathOf = (item: ItemRow) => {
+  const went = trashed.get(item.id);
+  return went ? `C:\\$Recycle.Bin\\S-1-5-21\\$R${item.id}-${went.at}` : null;
+};
+
+function toEmpty(): ToEmpty {
+  const held = [...(ITEMS[TRASH] ?? [])].sort(
+    (a, b) => (trashed.get(a.id)?.at ?? 0) - (trashed.get(b.id)?.at ?? 0) || a.id - b.id,
+  );
+  return {
+    files: held.map((item) => ({ itemId: item.id, binPath: binPathOf(item) })),
+    held: { count: held.length, bytes: held.reduce((sum, item) => sum + item.sizeBytes, 0) },
+  };
+}
+
+/** Takes an emptied file out of every act, so an undo passes over it. */
+function dropFromJournal(item: ItemRow) {
+  for (const batch of journal) {
+    batch.steps = batch.steps.flatMap((step): Step[] => {
+      if ("item" in step) return step.item === item ? [] : [step];
+      if (step.op === "tag") {
+        const items = step.items.filter((one) => one !== item);
+        return items.length > 0 ? [{ ...step, items }] : [];
+      }
+      if (step.op === "untag") {
+        const items = step.items.filter((one) => one.item !== item);
+        return items.length > 0 ? [{ ...step, items }] : [];
+      }
+      return [step];
+    });
+  }
+  for (let at = journal.length - 1; at >= 0; at--) {
+    if (journal[at]?.steps.length === 0) journal.splice(at, 1);
+  }
+}
+
+/** Deletes for good the files counted still in the Trash, one at a time, as the Rust side does. */
+function emptyTrash(counted: readonly Counted[]): Promise<Emptied> {
+  const emptied: Emptied = { deleted: 0, bytes: 0, gone: 0, kept: 0, firstKept: null };
+  return new Promise((resolve) => {
+    let at = 0;
+    const step = () => {
+      const one = counted[at];
+      if (!one) {
+        resolve(emptied);
+        return;
+      }
+      const item = (ITEMS[TRASH] ?? []).find((held) => held.id === one.itemId);
+      if (item && binPathOf(item) === one.binPath) {
+        if (emptiedOutside.has(item.id)) {
+          dropFromJournal(item);
+          retireGone(item);
+          emptied.gone += 1;
+        } else if (undeletable.has(item.id)) {
+          emptied.kept += 1;
+          emptied.firstKept ??= item.id;
+        } else {
+          dropFromJournal(item);
+          retireGone(item);
+          goneForGood.push(item);
+          emptied.deleted += 1;
+          emptied.bytes += item.sizeBytes;
+        }
+      }
+      at += 1;
+      void emit("empty-progress", at);
+      setTimeout(step, EMPTY_STEP_MS);
+    };
+    setTimeout(step, EMPTY_STEP_MS);
+  });
+}
+
 function withTrashCount(one: SourceSummary): SourceSummary {
   const trashCount = [...trashed.values()].filter((gone) => gone.home.id === one.id).length;
   return { ...one, trashCount };
@@ -1735,6 +1814,8 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     return { deleted, refused };
   },
   look_in_bin: () => lookInBin(),
+  trash_to_empty: () => toEmpty(),
+  empty_trash: ({ counted }) => emptyTrash(counted as Counted[]),
   restore_items: ({ itemIds, folderId }) => {
     const steps: Step[] = [];
     const refused: Stayed[] = [];

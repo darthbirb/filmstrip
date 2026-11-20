@@ -541,6 +541,26 @@ pub fn forget_item(conn: &Connection, gone: &Gone) -> Result<()> {
         ),
         params![id, mark],
     )?;
+    leave_several(conn, id)
+}
+
+/// Drops an emptied file from the journal: each row about it alone is deleted, and its id leaves
+/// every row about several, so an undo passes over it to what was done before.
+/// SCHEMA.md "The undo journal".
+pub fn drop_item(conn: &Connection, item_id: i64) -> Result<()> {
+    conn.execute(
+        &format!(
+            "DELETE FROM journal
+              WHERE op IN ({}) AND json_extract(inverse, '$.itemId') = ?1",
+            quoted(&ONE_FILE)
+        ),
+        params![item_id],
+    )?;
+    leave_several(conn, item_id)
+}
+
+/// Takes a file's id out of every row about several, a row left about none going with it.
+fn leave_several(conn: &Connection, id: i64) -> Result<()> {
     let mut stmt = conn.prepare(
         "SELECT id, op, inverse FROM journal
           WHERE (op = ?2 AND EXISTS(SELECT 1 FROM json_each(inverse, '$.itemIds') WHERE value = ?1))
