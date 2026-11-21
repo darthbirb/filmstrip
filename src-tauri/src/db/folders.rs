@@ -1,7 +1,7 @@
 //! Folders. A folder's path is never stored — it is derived from ancestry, so
 //! renaming a directory costs one row. DECISIONS.md "Places, not queries".
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
@@ -415,6 +415,25 @@ pub fn is_live(conn: &Connection, folder_id: i64) -> Result<bool> {
         params![folder_id],
         |r| r.get(0),
     )?)
+}
+
+/// Each folder in `ids` and every folder beneath it, retired or not.
+pub fn at_or_under(conn: &Connection, ids: &[i64]) -> Result<HashSet<i64>> {
+    let mut found: HashSet<i64> = ids.iter().copied().collect();
+    let mut stmt = conn.prepare(
+        "WITH RECURSIVE under(id) AS (
+             SELECT ?1
+           UNION
+             SELECT f.id FROM folder f JOIN under u ON f.parent_id = u.id
+         )
+         SELECT id FROM under",
+    )?;
+    for &id in ids {
+        for under in stmt.query_map(params![id], |r| r.get(0))? {
+            found.insert(under?);
+        }
+    }
+    Ok(found)
 }
 
 /// Every live folder below this one, parents before their children.

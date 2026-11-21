@@ -291,15 +291,15 @@ pub fn reconcile_until(conn: &Connection, halt: &dyn Fn() -> bool) -> Result<Opt
     reconcile_list(conn, sources::list(conn)?, halt, &read_tree)
 }
 
-/// A source the pass read, and the folders in it whose subtrees it could not.
+/// A source the pass read, and the folders in it at or under one it could not read in full.
 struct Walk {
     source_id: i64,
     root: PathBuf,
-    unread: Vec<i64>,
+    kept: HashSet<i64>,
 }
 
 enum Walked {
-    Read(Vec<i64>),
+    Read(HashSet<i64>),
     Halted,
     Away,
 }
@@ -326,10 +326,10 @@ fn reconcile_list(
         let walked_one = walk_source(conn, &source, &mut report, halt, read);
         drop(turn);
         match walked_one {
-            Ok(Walked::Read(unread)) => walked.push(Walk {
+            Ok(Walked::Read(kept)) => walked.push(Walk {
                 source_id: source.id,
                 root,
-                unread,
+                kept,
             }),
             Ok(Walked::Away) => {}
             Ok(Walked::Halted) => return Ok(None),
@@ -367,9 +367,10 @@ fn walk_source(
     if !root.is_dir() || unread.contains(&root_folder) {
         return Ok(Walked::Away);
     }
-    report.items_retired += items::finish_sweep(conn, source.id, &unread)?;
+    let kept = folders::at_or_under(conn, &unread)?;
+    report.items_retired += items::finish_sweep(conn, source.id, &kept)?;
     sources::mark_indexed(conn, source.id)?;
-    Ok(Walked::Read(unread))
+    Ok(Walked::Read(kept))
 }
 
 /// Every directory under `dir` mirrored into folders under `folder_id`, and every file recorded,
@@ -427,6 +428,10 @@ fn keep_unread(conn: &Connection, file: &Path, folder_id: i64) -> Result<()> {
 /// One folder read again, as the whole walk reads a source, judging nothing outside its subtree.
 /// A folder in an unreachable source is left as it is; one whose own directory is gone retires.
 pub fn reconcile_folder(conn: &Connection, folder_id: i64) -> Result<WalkReport> {
+    reconcile_folder_with(conn, folder_id, &read_tree)
+}
+
+fn reconcile_folder_with(conn: &Connection, folder_id: i64, read: Reader) -> Result<WalkReport> {
     let _turn = super::turn();
     let mut report = WalkReport::default();
     if !folders::is_live(conn, folder_id)? {
@@ -450,7 +455,7 @@ pub fn reconcile_folder(conn: &Connection, folder_id: i64) -> Result<WalkReport>
             source_id,
             &mut report,
             &|| false,
-            &read_tree,
+            read,
         )?;
         let Some(unread) = read else {
             return Ok(report);
@@ -459,12 +464,13 @@ pub fn reconcile_folder(conn: &Connection, folder_id: i64) -> Result<WalkReport>
     } else {
         Vec::new()
     };
-    if !root.is_dir() || unread.contains(&folder_id) {
+    if !root.is_dir() {
         return Ok(report);
     }
-    report.items_retired += items::finish_sweep_under(conn, folder_id, &unread)?;
+    let kept = folders::at_or_under(conn, &unread)?;
+    report.items_retired += items::finish_sweep_under(conn, folder_id, &kept)?;
     report.folders_retired = if dir.is_dir() {
-        retire_gone(conn, root, folders::descendants(conn, folder_id)?, &unread)?
+        retire_gone(conn, root, folders::descendants(conn, folder_id)?, &kept)?
     } else {
         folders::trash_subtree(conn, folder_id)?
     };
@@ -493,23 +499,19 @@ fn retire_vanished_folders(conn: &Connection, walked: &[Walk]) -> Result<i64> {
     let mut retired = 0;
     for walk in walked {
         let read = by_source.remove(&walk.source_id).unwrap_or_default();
-        retired += retire_gone(conn, &walk.root, read, &walk.unread)?;
+        retired += retire_gone(conn, &walk.root, read, &walk.kept)?;
     }
     Ok(retired)
 }
 
 /// Retires each folder, in the order given, whose directory is no longer there while its source's
-/// root still is, but none at or under a folder in `unread`.
+/// root still is, but none in `kept`.
 fn retire_gone(
     conn: &Connection,
     root: &Path,
     candidates: Vec<i64>,
-    unread: &[i64],
+    kept: &HashSet<i64>,
 ) -> Result<i64> {
-    let mut kept: HashSet<i64> = unread.iter().copied().collect();
-    for &folder_id in unread {
-        kept.extend(folders::descendants(conn, folder_id)?);
-    }
     let mut retired = 0;
     for folder_id in candidates {
         if kept.contains(&folder_id) {
@@ -1068,6 +1070,58 @@ pub(crate) mod tests {
 
         assert!(live(&conn, trips));
         assert_eq!(names(&conn), ["a.jpg"]);
+    }
+
+    #[test]
+    fn reading_a_folder_again_keeps_a_subdirectory_it_cannot_read_and_judges_its_sibling() {
+        let (conn, root) = library("again-unreadable");
+        write(&root.join("Trips/a.jpg"), "a");
+        write(&root.join("Trips/Cairo/Day 1/b.jpg"), "b");
+        write(&root.join("Trips/Luxor/c.jpg"), "c");
+        reconcile(&conn).unwrap();
+        let top = folders::source_root_folder(&conn, 1).unwrap();
+        let trips = folder_under(&conn, top, "Trips");
+        let cairo = folder_under(&conn, trips, "Cairo");
+        let day_1 = folder_under(&conn, cairo, "Day 1");
+        let luxor = folder_under(&conn, trips, "Luxor");
+
+        // Under a directory that cannot be opened, what lies beneath reads as not there.
+        std::fs::remove_dir_all(root.join("Trips/Cairo/Day 1")).unwrap();
+        std::fs::remove_dir_all(root.join("Trips/Luxor")).unwrap();
+        let read = failing_at(root.join("Trips/Cairo"));
+        let report = reconcile_folder_with(&conn, trips, &read).unwrap();
+
+        assert_eq!(names(&conn), ["a.jpg", "b.jpg"], "Luxor was read in full");
+        assert!(live(&conn, cairo) && live(&conn, day_1));
+        assert!(!live(&conn, luxor));
+        assert_eq!((report.items_retired, report.folders_retired), (1, 1));
+    }
+
+    #[test]
+    fn reading_a_folder_again_as_its_drive_goes_retires_nothing() {
+        let (conn, root) = library("again-lost");
+        write(&root.join("Trips/a.jpg"), "a");
+        write(&root.join("Trips/Cairo/b.jpg"), "b");
+        reconcile(&conn).unwrap();
+        let top = folders::source_root_folder(&conn, 1).unwrap();
+        let trips = folder_under(&conn, top, "Trips");
+        let cairo = folder_under(&conn, trips, "Cairo");
+
+        // The drive goes as the listing ends, before it reached Cairo.
+        let gone = root.clone();
+        let read = move |dir: &Path| -> Box<dyn Iterator<Item = Read>> {
+            let cut = dir.join("Cairo");
+            let listed: Vec<Read> = read_tree(dir)
+                .filter(|read| !matches!(read, Read::Entry(e) if e.path().starts_with(&cut)))
+                .collect();
+            std::fs::remove_dir_all(&gone).unwrap();
+            Box::new(listed.into_iter())
+        };
+        let report = reconcile_folder_with(&conn, trips, &read).unwrap();
+
+        assert_eq!(names(&conn), ["a.jpg", "b.jpg"]);
+        assert!(live(&conn, trips) && live(&conn, cairo));
+        assert_eq!((report.items_retired, report.folders_retired), (0, 0));
     }
 
     /// Writing the same number of bytes within the same second would leave
