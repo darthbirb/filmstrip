@@ -1417,9 +1417,13 @@ waits, where Explorer can see it too.
   Ctrl+Z found emptied from the bin is listed under Gone from the Recycle Bin; one whose name a
   file the app put there, or one put back from the bin in Explorer, took is No longer on disk, under Gone from its folder; a
   removed source's is "Phone was removed", under Gone from that source. A removed source's
-  folder is reported the same way, and a file or folder still in the library whose way back led
-  into the removed source says "Phone was removed" under Still in where it is. None of them is
-  tried again, and none has a way to look.
+  folder is reported the same way, and a file or folder still in the library whose row names a
+  folder of the removed source says "Phone was removed" under Still in where it is now. None of
+  them is tried again; only that last kind has a way to look, being still there.
+- **Any folder a row names ties it to that folder's source.** A row naming a removed source's
+  folder is let go even when the undo would not go through that folder, as a move whose origin
+  was in it: only a marked row keeps the removed folder's title for its line, since the id may
+  name another folder by then, and the file stays where the later act put it.
 - **The bin refusing a file leaves it where it was.** The send never deletes outright, so a file
   too large for the bin, or on a drive whose bin is off, stays in its folder and the foot says so;
   the rest of a set are one batch with Undo. A drive with no Recycle Bin at all, which Windows

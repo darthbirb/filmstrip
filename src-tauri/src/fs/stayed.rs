@@ -81,7 +81,8 @@ pub fn file(conn: &Connection, item_id: i64, err: &AppError) -> Result<Stayed> {
     })
 }
 
-/// A file or folder whose row can no longer be undone, as the journal kept it, and why.
+/// A file or folder whose row can no longer be undone, and why: one still in the index where it is
+/// now, and one gone from it as the journal kept it.
 pub fn forgotten(conn: &Connection, gone: &Gone) -> Result<Stayed> {
     let name = gone.name.clone();
     let (at, reason) = match &gone.why {
@@ -106,12 +107,16 @@ pub fn forgotten(conn: &Connection, gone: &Gone) -> Result<Stayed> {
                 source: source.clone(),
             },
         ),
-        Forgot::PlaceRemoved { source } => (
-            folder_at(conn, gone.folder_id)?,
-            Reason::SourceRemoved {
+        Forgot::PlaceRemoved { source } => {
+            let err = AppError::refused(Reason::SourceRemoved {
                 source: source.clone(),
-            },
-        ),
+            });
+            return if gone.folder {
+                folder(conn, gone.id, &err)
+            } else {
+                file(conn, gone.id, &err)
+            };
+        }
     };
     Ok(Stayed {
         kind: if gone.folder {

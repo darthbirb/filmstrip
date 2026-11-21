@@ -1316,6 +1316,38 @@ mod tests {
     }
 
     #[test]
+    fn an_undo_of_a_copy_into_a_removed_source_says_so_and_sends_nothing_to_the_trash() {
+        let (conn, dir, lisbon) = library("into-removed");
+        write(&dir.join("Downloads/Alexandria/Day 1/a.jpg"), "a");
+        write(&dir.join("Downloads/Alexandria/Day 2/b.jpg"), "b");
+        let batch = journal::new_batch();
+        let entries = [dir.join("Downloads/Alexandria")];
+        run(&conn, &batch, lisbon, &entries, &Script::default()).unwrap();
+        sources::remove(&conn, 1).unwrap();
+
+        let back = undo::undo_batch(&conn, &batch).unwrap();
+        assert_eq!(
+            back.batch.act,
+            Act::Copy {
+                to: "Lisbon".into(),
+                one: None,
+                folder: Some("Alexandria".into()),
+                folders: 1
+            }
+        );
+        assert_eq!((back.files_back, back.folders_back), (0, 0));
+        let removed = Reason::SourceRemoved {
+            source: "Library".into(),
+        };
+        assert_eq!(back.stayed.len(), 5, "{:?}", back.stayed);
+        assert!(back.stayed.iter().all(|one| one.reason == removed));
+        let landed = dir.join("library/Trips/Lisbon/Alexandria");
+        assert!(landed.join("Day 1/a.jpg").is_file());
+        assert!(landed.join("Day 2/b.jpg").is_file());
+        assert_eq!(undo::undo_last(&conn).unwrap(), None);
+    }
+
+    #[test]
     fn a_copied_file_gone_from_the_disk_and_the_index_since_does_not_hold_up_its_undo() {
         let (conn, dir, lisbon) = library("gone-since");
         let a = write(&dir.join("Downloads/a.jpg"), "a");

@@ -65,7 +65,7 @@ fn reverse_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
         if let Some(forgotten) = journal::gone(entry) {
             journal::drop_entry(conn, entry.id)?;
             let copy_forgotten = entry.op == journal::ITEM_COPY
-                && !matches!(forgotten.why, Forgot::PlaceRemoved { .. });
+                && matches!(forgotten.why, Forgot::EmptiedFromBin | Forgot::NotOnDisk);
             if !copy_forgotten {
                 stayed.push(stayed::forgotten(conn, &forgotten)?);
                 let (files, folders) = acts::count(conn, std::slice::from_ref(entry))?;
@@ -610,10 +610,13 @@ mod tests {
         let cairo = rows::child_id(&conn, trips, "Cairo").unwrap().unwrap();
         let pyramid = db::items::in_folder(&conn, cairo).unwrap()[0].id;
         let made = journal::new_batch();
-        folders::create(&conn, phone_top, "Lisbon", &made).unwrap();
+        let lisbon = folders::create(&conn, phone_top, "Lisbon", &made).unwrap();
         items::move_items(&conn, &[pyramid], phone_top, &journal::new_batch()).unwrap();
+        items::move_items(&conn, &[pyramid], lisbon, &journal::new_batch()).unwrap();
         sources::remove(&conn, 1).unwrap();
 
+        let within = undo_last(&conn).unwrap().unwrap();
+        assert_eq!((within.files_back, within.stayed.len()), (1, 0));
         let report = undo_last(&conn).unwrap().unwrap();
         assert_eq!(
             report.batch.act,

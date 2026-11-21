@@ -677,11 +677,12 @@ fn mark_removed(
                               'folder', json('{folder}'),
                               'places', json_patch(
                                 COALESCE(json_extract(j.inverse, '$.gone.places'), '{{}}'),
-                                (SELECT json_group_object(f.id, f.title) FROM folder f
-                                  WHERE f.id IN (SELECT value FROM json_each(?2))
-                                    AND (f.id = t.at
-                                         OR f.id IN (SELECT e.value FROM json_each(j.inverse) e
-                                                      WHERE e.key IN ({places})))))) AS mark
+                                (SELECT json_group_object(f.id, f.title)
+                                   FROM (SELECT t.at AS id
+                                         UNION SELECT e.value FROM json_each(j.inverse) e
+                                                WHERE e.key IN ({places})) n
+                                   JOIN folder f ON f.id = n.id
+                                  WHERE f.id IN (SELECT value FROM json_each(?2))))) AS mark
                        FROM journal j JOIN ({subjects}) t
                          ON t.id = json_extract(j.inverse, '$.{key}')
                       WHERE j.op IN ({ops})
@@ -1190,5 +1191,65 @@ mod tests {
             (back.from.as_str(), back.to.as_str()),
             ("Cairo", "Untitled")
         );
+    }
+
+    mod timing {
+        use super::*;
+
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn removing_a_source_of_four_hundred_folders_marks_four_thousand_rows_well_inside_a_second()
+        {
+            let conn = conn();
+            let mut tops = vec![];
+            for (root, title) in [("D:/library", "Library"), ("E:/phone", "Phone")] {
+                let source = db::sources::add(
+                    &conn,
+                    std::path::Path::new(root),
+                    title,
+                    db::sources::SourceKind::Library,
+                )
+                .unwrap();
+                tops.push((
+                    source.id,
+                    db::folders::source_root_folder(&conn, source.id).unwrap(),
+                ));
+            }
+            let (library, phone) = (tops[0], tops[1]);
+            let tx = db::begin(&conn).unwrap();
+            let removed: Vec<i64> = (0..400)
+                .map(|n| db::folders::create(&tx, library.1, &format!("Day {n}")).unwrap())
+                .collect();
+            let batch_id = new_batch();
+            for n in 0..4_000_i64 {
+                let (source, folder) = if n % 2 == 0 {
+                    phone
+                } else {
+                    (library.0, removed[n as usize % removed.len()])
+                };
+                tx.execute(
+                    "INSERT INTO item (id, uuid, source_id, folder_id, disk_name, ext, size_bytes,
+                                       mtime, kind, added_at)
+                     VALUES (?1, ?1, ?2, ?3, ?1 || '.jpg', 'jpg', 1, 1, 'image', 1)",
+                    params![n + 1, source, folder],
+                )
+                .unwrap();
+                let left = removed[(n as usize * 7) % removed.len()];
+                record_item_move(&tx, &batch_id, n + 1, left, folder).unwrap();
+            }
+            tx.commit().unwrap();
+
+            let started = std::time::Instant::now();
+            forget_source(&conn, library.0).unwrap();
+            let took = started.elapsed();
+
+            let marked = batch(&conn, &batch_id)
+                .unwrap()
+                .iter()
+                .filter(|entry| gone(entry).is_some_and(|mark| !mark.places.is_empty()))
+                .count();
+            assert_eq!(marked, 4_000);
+            assert!(took < std::time::Duration::from_secs(1), "took {took:?}");
+        }
     }
 }
