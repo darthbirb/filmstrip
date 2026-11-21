@@ -118,6 +118,7 @@ pub fn count(conn: &Connection, entries: &[Entry]) -> Result<(u32, u32)> {
             | journal::ITEM_RENAME
             | journal::ITEM_RESTORE
             | journal::ITEM_COPY => files += 1,
+            journal::FOLDER_MOVE if journal::gone(entry).is_some() => folders_held += 1,
             journal::FOLDER_MOVE => {
                 let moved: FolderMoved = forward(entry)?;
                 files += items::live_under(conn, moved.folder_id)?.len() as u32;
@@ -138,10 +139,20 @@ pub fn count(conn: &Connection, entries: &[Entry]) -> Result<(u32, u32)> {
 
 fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
     let of = |op: &'static str| entries.iter().filter(move |entry| entry.op == op);
-    let gone: HashMap<i64, Gone> = entries
-        .iter()
-        .filter_map(journal::gone)
-        .map(|one| (one.item_id, one))
+    let marks: Vec<Gone> = entries.iter().filter_map(journal::gone).collect();
+    let places = Places {
+        conn,
+        kept: marks.iter().flat_map(|one| one.places.clone()).collect(),
+        parents: marks
+            .iter()
+            .filter(|one| one.folder)
+            .map(|one| (one.id, one.folder_id))
+            .collect(),
+    };
+    let gone: HashMap<i64, Gone> = marks
+        .into_iter()
+        .filter(|one| !one.folder)
+        .map(|one| (one.id, one))
         .collect();
     if let Some(entry) = of(journal::ITEMS_TAG).next() {
         let tag = forward::<ItemsTagged>(entry)?.value;
@@ -160,7 +171,7 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
         .map(forward)
         .collect::<Result<_>>()?;
     if !copied.is_empty() || !made.is_empty() {
-        return copy_act(conn, &copied, &made, &gone);
+        return copy_act(&places, &copied, &made, &gone);
     }
     if let Some(entry) = of(journal::FOLDER_DELETE).next() {
         let deleted: FolderDeleted = forward(entry)?;
@@ -169,21 +180,21 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
             of(journal::ITEM_MOVE).next(),
             of(journal::FOLDER_MOVE).next(),
         ) {
-            (Some(entry), _) => Some(name(conn, forward::<ItemMoved>(entry)?.to_folder_id)?),
-            (None, Some(entry)) => Some(name(conn, forward::<FolderMoved>(entry)?.to_parent_id)?),
+            (Some(entry), _) => Some(places.name(forward::<ItemMoved>(entry)?.to_folder_id)?),
+            (None, Some(entry)) => Some(places.name(forward::<FolderMoved>(entry)?.to_parent_id)?),
             (None, None) => None,
         };
         return Ok(Act::DeleteFolder {
-            name: name(conn, deleted.folder_id)?,
-            parent: parent_name(conn, deleted.folder_id)?,
+            name: places.name(deleted.folder_id)?,
+            parent: places.parent_name(deleted.folder_id)?,
             into,
         });
     }
     if let Some(entry) = of(journal::FOLDER_CREATE).next() {
         let made: FolderCreated = forward(entry)?;
         return Ok(Act::CreateFolder {
-            name: name(conn, made.folder_id)?,
-            parent: name(conn, made.parent_id)?,
+            name: places.name(made.folder_id)?,
+            parent: places.name(made.parent_id)?,
         });
     }
     if let Some(entry) = of(journal::ITEM_RENAME).next() {
@@ -207,7 +218,7 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
         let homes = restored.iter().map(|one| one.to_folder_id).collect();
         let ids: Vec<i64> = restored.iter().map(|one| one.item_id).collect();
         return Ok(Act::Restore {
-            to: only(conn, homes)?,
+            to: only(&places, homes)?,
             one: one_name(conn, &ids, &gone)?,
         });
     }
@@ -225,15 +236,15 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
             .map(|id| file_of(conn, *id, &gone).map(|file| file.map_or(0, |file| file.0)))
             .collect::<Result<BTreeSet<i64>>>()?;
         return Ok(Act::Delete {
-            from: only(conn, origins)?,
+            from: only(&places, origins)?,
             one: one_name(conn, &ids, &gone)?,
         });
     }
     if let ([folder], []) = (carried.as_slice(), moved.as_slice()) {
         return Ok(Act::MoveFolder {
-            name: name(conn, folder.folder_id)?,
-            from: name(conn, folder.from_parent_id)?,
-            to: name(conn, folder.to_parent_id)?,
+            name: places.name(folder.folder_id)?,
+            from: places.name(folder.from_parent_id)?,
+            to: places.name(folder.to_parent_id)?,
         });
     }
     let to = moved
@@ -248,8 +259,8 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
         .collect();
     let ids: Vec<i64> = moved.iter().map(|one| one.item_id).collect();
     Ok(Act::Move {
-        from: only(conn, origins)?,
-        to: name(conn, to)?,
+        from: only(&places, origins)?,
+        to: places.name(to)?,
         one: if carried.is_empty() {
             one_name(conn, &ids, &gone)?
         } else {
@@ -260,7 +271,7 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
 
 /// A copy, named by where it went and by what came in at its top: one file, one folder, or counts.
 fn copy_act(
-    conn: &Connection,
+    places: &Places,
     copied: &[ItemCopied],
     made: &[FolderCopied],
     gone: &HashMap<i64, Gone>,
@@ -277,13 +288,13 @@ fn copy_act(
         .map(|one| one.item_id)
         .collect();
     let folder = match (tops.as_slice(), loose.is_empty()) {
-        ([only], true) => Some(name(conn, only.folder_id)?),
+        ([only], true) => Some(places.name(only.folder_id)?),
         _ => None,
     };
     Ok(Act::Copy {
-        to: name(conn, into)?,
+        to: places.name(into)?,
         one: if tops.is_empty() {
-            one_name(conn, &loose, gone)?
+            one_name(places.conn, &loose, gone)?
         } else {
             None
         },
@@ -307,10 +318,34 @@ fn parent_name(conn: &Connection, folder_id: i64) -> Result<String> {
     }
 }
 
+/// Folders as an act names them: one a removed source took, by the title its row's mark kept,
+/// since its id may name another folder now.
+struct Places<'a> {
+    conn: &'a Connection,
+    kept: HashMap<i64, String>,
+    parents: HashMap<i64, i64>,
+}
+
+impl Places<'_> {
+    fn name(&self, folder_id: i64) -> Result<String> {
+        match self.kept.get(&folder_id) {
+            Some(title) => Ok(title.clone()),
+            None => name(self.conn, folder_id),
+        }
+    }
+
+    fn parent_name(&self, folder_id: i64) -> Result<String> {
+        match self.parents.get(&folder_id) {
+            Some(parent) => self.name(*parent),
+            None => parent_name(self.conn, folder_id),
+        }
+    }
+}
+
 /// The one folder a set of files came from, or nothing when there were several.
-fn only(conn: &Connection, origins: BTreeSet<i64>) -> Result<Option<String>> {
+fn only(places: &Places, origins: BTreeSet<i64>) -> Result<Option<String>> {
     match origins.into_iter().collect::<Vec<_>>().as_slice() {
-        [folder] => name(conn, *folder).map(Some),
+        [folder] => places.name(*folder).map(Some),
         _ => Ok(None),
     }
 }

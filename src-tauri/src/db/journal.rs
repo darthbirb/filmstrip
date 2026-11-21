@@ -1,7 +1,7 @@
 //! The undo journal: what the app changed on disk, and what reverses it.
 //! DECISIONS.md "Undo".
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
@@ -515,20 +515,39 @@ pub fn copying(conn: &Connection, batch_id: &str) -> Result<bool> {
     )?)
 }
 
-/// A file the index forgot while the journal still named it: its name, the folder it was in, and
-/// why it was forgotten.
+/// The file or folder a row is about, once the row can no longer be undone: its name, the folder
+/// it was in, and why. A mark written before folders were marked names a file by `itemId`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Gone {
-    pub item_id: i64,
+    #[serde(alias = "itemId")]
+    pub id: i64,
     pub name: String,
     pub folder_id: i64,
     #[serde(default)]
     pub why: Forgot,
+    #[serde(default)]
+    pub folder: bool,
+    /// The removed folders the row names, by id, as they were titled.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub places: BTreeMap<i64, String>,
 }
 
-/// Why the index forgot a file the journal named. A mark written before marks said why is the
-/// default, since a file emptied from the Recycle Bin was the only one then.
+impl Gone {
+    pub fn file(id: i64, name: String, folder_id: i64, why: Forgot) -> Self {
+        Gone {
+            id,
+            name,
+            folder_id,
+            why,
+            folder: false,
+            places: BTreeMap::new(),
+        }
+    }
+}
+
+/// Why a row can no longer be undone. A mark written before marks said why is the default, since
+/// a file emptied from the Recycle Bin was the only one then.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Forgot {
@@ -538,56 +557,148 @@ pub enum Forgot {
     /// Gone from disk, its name since taken by a file the app put there or one put back from the
     /// Recycle Bin in Explorer.
     NotOnDisk,
-    /// Its source was removed; the file itself is untouched.
+    /// Its source was removed; the file or folder itself is untouched.
     SourceRemoved { source: String },
+    /// A folder the row names was in a source since removed; the file or folder it is about stays
+    /// where it is.
+    PlaceRemoved { source: String },
 }
 
 /// The rows about one file alone, which name it by `itemId`.
 const ONE_FILE: [&str; 5] = [ITEM_MOVE, ITEM_TRASH, ITEM_RENAME, ITEM_RESTORE, ITEM_COPY];
 
+/// The rows about one folder alone, which name it by `folderId`.
+const ONE_FOLDER: [&str; 5] = [
+    FOLDER_CREATE,
+    FOLDER_RENAME,
+    FOLDER_MOVE,
+    FOLDER_DELETE,
+    FOLDER_COPY,
+];
+
+/// Every key a row names a folder by.
+const PLACES: [&str; 8] = [
+    "folderId",
+    "parentId",
+    "fromParentId",
+    "toParentId",
+    "fromFolderId",
+    "toFolderId",
+    "leftFolderId",
+    "into",
+];
+
 /// Prunes a forgotten file from the journal: each row about it alone is marked with what it was,
 /// for an undo to report and drop, and its id leaves every row about several, so an id the index
 /// may give another file is never acted on. SCHEMA.md "The undo journal".
 pub fn forget_item(conn: &Connection, gone: &Gone) -> Result<()> {
-    let id = gone.item_id;
+    let id = gone.id;
     let mark = serde_json::to_string(gone)?;
     conn.execute(
         &format!(
-            "UPDATE journal SET forward = json_set(forward, '$.gone', json(?2)),
-                                inverse = json_set(inverse, '$.gone', json(?2))
+            "UPDATE journal SET forward = json_set(forward, '$.gone', {mark}),
+                                inverse = json_set(inverse, '$.gone', {mark})
               WHERE op IN ({}) AND json_extract(inverse, '$.itemId') = ?1
-                AND json_type(inverse, '$.gone') IS NULL",
-            quoted(&ONE_FILE)
+                AND (json_type(inverse, '$.gone') IS NULL
+                     OR json_extract(inverse, '$.gone.why.kind') = 'placeRemoved')",
+            quoted(&ONE_FILE),
+            mark = "json_patch(json(?2), json_object('places', json(COALESCE(
+                      json_extract(inverse, '$.gone.places'), '{}'))))"
         ),
         params![id, mark],
     )?;
-    leave_several(conn, &[id])
+    leave_several(conn, &[id], &[])
 }
 
-/// Prunes every file of a source being removed at once, as [`forget_item`] prunes one.
-/// SCHEMA.md "The undo journal".
+/// Prunes every file and folder of a source being removed at once, as [`forget_item`] prunes one
+/// file, and marks every row that names one of its folders. SCHEMA.md "The undo journal".
 pub fn forget_source(conn: &Connection, source_id: i64) -> Result<()> {
-    conn.execute(
-        &format!(
-            "UPDATE journal SET forward = json_set(forward, '$.gone', json(marks.mark)),
-                                inverse = json_set(inverse, '$.gone', json(marks.mark))
-               FROM (SELECT i.id,
-                            json_object('itemId', i.id, 'name', i.disk_name, 'folderId', i.folder_id,
-                                        'why', json_object('kind', 'sourceRemoved',
-                                                           'source', s.title)) AS mark
-                       FROM item i JOIN source s ON s.id = i.source_id
-                      WHERE i.source_id = ?1) AS marks
-              WHERE journal.op IN ({}) AND json_extract(journal.inverse, '$.itemId') = marks.id
-                AND json_type(journal.inverse, '$.gone') IS NULL",
-            quoted(&ONE_FILE)
-        ),
-        params![source_id],
+    let folders: Vec<i64> = conn
+        .prepare(
+            "WITH RECURSIVE removed(id) AS (
+                 SELECT id FROM folder WHERE source_id = ?1
+               UNION ALL
+                 SELECT f.id FROM folder f JOIN removed r ON f.parent_id = r.id
+             )
+             SELECT id FROM removed",
+        )?
+        .query_map(params![source_id], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    let removed = serde_json::to_string(&folders)?;
+    let files =
+        "SELECT id, disk_name AS name, folder_id AS at, source_id = ?1 AS removed FROM item";
+    mark_removed(conn, source_id, &removed, &ONE_FILE, "itemId", files, false)?;
+    let folder_rows = "SELECT id, title AS name, COALESCE(parent_id, id) AS at,
+                              id IN (SELECT value FROM json_each(?2)) AS removed FROM folder";
+    mark_removed(
+        conn,
+        source_id,
+        &removed,
+        &ONE_FOLDER,
+        "folderId",
+        folder_rows,
+        true,
     )?;
     let ids: Vec<i64> = conn
         .prepare("SELECT id FROM item WHERE source_id = ?1")?
         .query_map(params![source_id], |r| r.get(0))?
         .collect::<rusqlite::Result<_>>()?;
-    leave_several(conn, &ids)
+    leave_several(conn, &ids, &folders)
+}
+
+/// Marks, in one statement, every row of `ops` whose file or folder, read from `subjects` by
+/// `key`, is in the removed source, or which names one of its folders: `sourceRemoved` for the
+/// one, overriding an earlier `placeRemoved`, and `placeRemoved` for the other, on rows unmarked.
+fn mark_removed(
+    conn: &Connection,
+    source_id: i64,
+    removed: &str,
+    ops: &[&str],
+    key: &str,
+    subjects: &str,
+    folder: bool,
+) -> Result<()> {
+    let names_removed = format!(
+        "EXISTS (SELECT 1 FROM json_each(j.inverse) e
+                  WHERE e.key IN ({}) AND e.value IN (SELECT value FROM json_each(?2)))",
+        quoted(&PLACES)
+    );
+    conn.execute(
+        &format!(
+            "UPDATE journal SET forward = json_set(forward, '$.gone', json(marks.mark)),
+                                inverse = json_set(inverse, '$.gone', json(marks.mark))
+               FROM (SELECT j.id AS row,
+                            json_object(
+                              'id', t.id, 'name', t.name, 'folderId', t.at,
+                              'why', json_object(
+                                'kind', CASE WHEN t.removed THEN 'sourceRemoved'
+                                             ELSE 'placeRemoved' END,
+                                'source', (SELECT title FROM source WHERE id = ?1)),
+                              'folder', json('{folder}'),
+                              'places', json_patch(
+                                COALESCE(json_extract(j.inverse, '$.gone.places'), '{{}}'),
+                                (SELECT json_group_object(f.id, f.title)
+                                   FROM (SELECT t.at AS id
+                                         UNION SELECT e.value FROM json_each(j.inverse) e
+                                                WHERE e.key IN ({places})) n
+                                   JOIN folder f ON f.id = n.id
+                                  WHERE f.id IN (SELECT value FROM json_each(?2))))) AS mark
+                       FROM journal j JOIN ({subjects}) t
+                         ON t.id = json_extract(j.inverse, '$.{key}')
+                      WHERE j.op IN ({ops})
+                        AND CASE WHEN t.removed
+                                 THEN json_type(j.inverse, '$.gone') IS NULL
+                                      OR json_extract(j.inverse, '$.gone.why.kind')
+                                         = 'placeRemoved'
+                                 ELSE json_type(j.inverse, '$.gone') IS NULL AND {names_removed}
+                            END) AS marks
+              WHERE journal.id = marks.row",
+            places = quoted(&PLACES),
+            ops = quoted(ops),
+        ),
+        params![source_id, removed],
+    )?;
+    Ok(())
 }
 
 /// Drops an emptied file from the journal: rows about it alone, a folder delete they leave alone in
@@ -617,12 +728,14 @@ pub fn drop_item(conn: &Connection, item_id: i64) -> Result<()> {
             params![batch, FOLDER_DELETE],
         )?;
     }
-    leave_several(conn, &[item_id])
+    leave_several(conn, &[item_id], &[])
 }
 
-/// Takes files' ids out of every row about several, a row left about none going with it.
-fn leave_several(conn: &Connection, ids: &[i64]) -> Result<()> {
+/// Takes files' and folders' ids out of every row about several, a tag's row left about none
+/// going with it.
+fn leave_several(conn: &Connection, ids: &[i64], folders: &[i64]) -> Result<()> {
     let leaving: HashSet<i64> = ids.iter().copied().collect();
+    let folders_leaving: HashSet<i64> = folders.iter().copied().collect();
     let mut stmt = conn.prepare(
         "SELECT id, op, inverse FROM journal
           WHERE (op = ?2 AND EXISTS(SELECT 1 FROM json_each(inverse, '$.itemIds')
@@ -632,11 +745,20 @@ fn leave_several(conn: &Connection, ids: &[i64]) -> Result<()> {
                                            IN (SELECT value FROM json_each(?1))))
              OR (op = ?4 AND EXISTS(SELECT 1 FROM json_each(inverse, '$.itemUses')
                                      WHERE json_extract(value, '$.itemId')
-                                           IN (SELECT value FROM json_each(?1))))",
+                                           IN (SELECT value FROM json_each(?1))))
+             OR (op = ?4 AND EXISTS(SELECT 1 FROM json_each(inverse, '$.folderUses')
+                                     WHERE json_extract(value, '$.folderId')
+                                           IN (SELECT value FROM json_each(?5))))",
     )?;
     let several: Vec<(i64, String, String)> = stmt
         .query_map(
-            params![serde_json::to_string(ids)?, ITEMS_TAG, ITEMS_UNTAG, RETAG],
+            params![
+                serde_json::to_string(ids)?,
+                ITEMS_TAG,
+                ITEMS_UNTAG,
+                RETAG,
+                serde_json::to_string(folders)?
+            ],
             |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
         )?
         .collect::<rusqlite::Result<_>>()?;
@@ -657,6 +779,9 @@ fn leave_several(conn: &Connection, ids: &[i64]) -> Result<()> {
                 retagged
                     .item_uses
                     .retain(|one| !leaving.contains(&one.item_id));
+                retagged
+                    .folder_uses
+                    .retain(|one| !folders_leaving.contains(&one.folder_id));
                 Some(serde_json::to_string(&retagged))
             }
         };
@@ -780,12 +905,7 @@ mod tests {
         record_item_rename(&conn, &renamed, 5, "a.jpg", "pyramid.jpg").unwrap();
         record_item_rename(&conn, &renamed, 6, "b.jpg", "sphinx.jpg").unwrap();
 
-        let pyramid = Gone {
-            item_id: 5,
-            name: "pyramid.jpg".into(),
-            folder_id: 3,
-            why: Forgot::NotOnDisk,
-        };
+        let pyramid = Gone::file(5, "pyramid.jpg".into(), 3, Forgot::NotOnDisk);
         forget_item(&conn, &pyramid).unwrap();
         let reused = Gone {
             name: "another.jpg".into(),
@@ -903,12 +1023,15 @@ mod tests {
         assert_eq!(retagged.item_uses, [using(6)]);
         let removed = |item_id, name: &str| {
             Some(Gone {
-                item_id,
-                name: name.into(),
-                folder_id: folder_of[0].1,
-                why: Forgot::SourceRemoved {
-                    source: "Library".into(),
-                },
+                places: BTreeMap::from([(folder_of[0].1, "Library".to_string())]),
+                ..Gone::file(
+                    item_id,
+                    name.into(),
+                    folder_of[0].1,
+                    Forgot::SourceRemoved {
+                        source: "Library".into(),
+                    },
+                )
             })
         };
         let marks: Vec<Option<Gone>> = batch(&conn, &renamed).unwrap().iter().map(gone).collect();
@@ -919,10 +1042,136 @@ mod tests {
     }
 
     #[test]
+    fn a_removed_source_s_folders_and_every_row_naming_them_are_marked_at_once() {
+        let conn = conn();
+        let mut tops = vec![];
+        for (root, title) in [("D:/library", "Library"), ("E:/phone", "Phone")] {
+            let source = db::sources::add(
+                &conn,
+                std::path::Path::new(root),
+                title,
+                db::sources::SourceKind::Library,
+            )
+            .unwrap();
+            tops.push((
+                source.id,
+                db::folders::source_root_folder(&conn, source.id).unwrap(),
+            ));
+        }
+        let (library, phone) = (tops[0], tops[1]);
+        let trips = db::folders::create(&conn, library.1, "Trips").unwrap();
+        let beach = db::folders::create(&conn, phone.1, "Beach").unwrap();
+        conn.execute(
+            "INSERT INTO item (id, uuid, source_id, folder_id, disk_name, ext, size_bytes,
+                               mtime, kind, added_at)
+             VALUES (6, 6, ?1, ?2, 'sand.jpg', 'jpg', 1, 1, 'image', 1),
+                    (7, 7, ?1, ?2, 'shell.jpg', 'jpg', 1, 1, 'image', 1)",
+            params![phone.0, beach],
+        )
+        .unwrap();
+        let renamed = new_batch();
+        record_folder_rename(&conn, &renamed, trips, "Cairo", "Trips").unwrap();
+        let moved = new_batch();
+        record_item_move(&conn, &moved, 6, trips, beach).unwrap();
+        record_folder_move(&conn, &moved, beach, trips, phone.1).unwrap();
+        let shell_moved = new_batch();
+        record_item_move(&conn, &shell_moved, 7, trips, beach).unwrap();
+        let elsewhere = new_batch();
+        record_folder_rename(&conn, &elsewhere, beach, "Sea", "Beach").unwrap();
+        let retagged = new_batch();
+        let held = |folder_id| FolderUse {
+            folder_id,
+            rowid: folder_id,
+            source: "manual".into(),
+            from: 1,
+            to: None,
+        };
+        let retag_row = Retagged {
+            change: Change::DeleteTag { tag: "dusk".into() },
+            files: 0,
+            folders: 2,
+            reworded: vec![],
+            made: vec![],
+            removed: vec![],
+            folder_uses: vec![held(trips), held(beach)],
+            item_uses: vec![],
+        };
+        record_retag(&conn, &retagged, &retag_row).unwrap();
+
+        forget_source(&conn, library.0).unwrap();
+
+        let marks = |batch_id: &str| -> Vec<Option<Gone>> {
+            batch(&conn, batch_id).unwrap().iter().map(gone).collect()
+        };
+        let why = |source: &str, gone: bool| {
+            let source = source.to_string();
+            if gone {
+                Forgot::SourceRemoved { source }
+            } else {
+                Forgot::PlaceRemoved { source }
+            }
+        };
+        let trips_place = (trips, "Trips".to_string());
+        assert_eq!(
+            marks(&renamed),
+            [Some(Gone {
+                folder: true,
+                places: BTreeMap::from([trips_place.clone(), (library.1, "Library".into())]),
+                ..Gone::file(trips, "Trips".into(), library.1, why("Library", true))
+            })]
+        );
+        let sand = Gone {
+            places: BTreeMap::from([trips_place.clone()]),
+            ..Gone::file(6, "sand.jpg".into(), beach, why("Library", false))
+        };
+        assert_eq!(
+            marks(&moved),
+            [
+                Some(Gone {
+                    folder: true,
+                    places: BTreeMap::from([trips_place.clone()]),
+                    ..Gone::file(beach, "Beach".into(), phone.1, why("Library", false))
+                }),
+                Some(sand.clone()),
+            ]
+        );
+        assert_eq!(marks(&elsewhere), [None]);
+        let left: Retagged =
+            serde_json::from_value(batch(&conn, &retagged).unwrap()[0].inverse.clone()).unwrap();
+        assert_eq!(left.folder_uses, [held(beach)]);
+
+        let shell = Gone::file(7, "shell.jpg".into(), beach, Forgot::NotOnDisk);
+        forget_item(&conn, &shell).unwrap();
+        assert_eq!(
+            marks(&shell_moved),
+            [Some(Gone {
+                places: BTreeMap::from([trips_place.clone()]),
+                ..shell
+            })],
+            "a file forgotten since is reported as forgotten, by the places named before"
+        );
+
+        forget_source(&conn, phone.0).unwrap();
+        let [_, sand_now] = &marks(&moved)[..] else {
+            panic!("the batch keeps both rows");
+        };
+        assert_eq!(
+            sand_now.as_ref(),
+            Some(&Gone {
+                why: why("Phone", true),
+                places: BTreeMap::from([trips_place, (beach, "Beach".into())]),
+                ..sand
+            }),
+            "removing its own source too says so, and keeps the places named before"
+        );
+    }
+
+    #[test]
     fn a_mark_written_before_marks_said_why_reads_as_emptied_from_the_bin() {
         let old: Gone =
             serde_json::from_str(r#"{"itemId":5,"name":"a.jpg","folderId":3}"#).unwrap();
         assert_eq!(old.why, Forgot::EmptiedFromBin);
+        assert_eq!((old.id, old.folder), (5, false));
     }
 
     #[test]
@@ -942,5 +1191,65 @@ mod tests {
             (back.from.as_str(), back.to.as_str()),
             ("Cairo", "Untitled")
         );
+    }
+
+    mod timing {
+        use super::*;
+
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn removing_a_source_of_four_hundred_folders_marks_four_thousand_rows_well_inside_a_second()
+        {
+            let conn = conn();
+            let mut tops = vec![];
+            for (root, title) in [("D:/library", "Library"), ("E:/phone", "Phone")] {
+                let source = db::sources::add(
+                    &conn,
+                    std::path::Path::new(root),
+                    title,
+                    db::sources::SourceKind::Library,
+                )
+                .unwrap();
+                tops.push((
+                    source.id,
+                    db::folders::source_root_folder(&conn, source.id).unwrap(),
+                ));
+            }
+            let (library, phone) = (tops[0], tops[1]);
+            let tx = db::begin(&conn).unwrap();
+            let removed: Vec<i64> = (0..400)
+                .map(|n| db::folders::create(&tx, library.1, &format!("Day {n}")).unwrap())
+                .collect();
+            let batch_id = new_batch();
+            for n in 0..4_000_i64 {
+                let (source, folder) = if n % 2 == 0 {
+                    phone
+                } else {
+                    (library.0, removed[n as usize % removed.len()])
+                };
+                tx.execute(
+                    "INSERT INTO item (id, uuid, source_id, folder_id, disk_name, ext, size_bytes,
+                                       mtime, kind, added_at)
+                     VALUES (?1, ?1, ?2, ?3, ?1 || '.jpg', 'jpg', 1, 1, 'image', 1)",
+                    params![n + 1, source, folder],
+                )
+                .unwrap();
+                let left = removed[(n as usize * 7) % removed.len()];
+                record_item_move(&tx, &batch_id, n + 1, left, folder).unwrap();
+            }
+            tx.commit().unwrap();
+
+            let started = std::time::Instant::now();
+            forget_source(&conn, library.0).unwrap();
+            let took = started.elapsed();
+
+            let marked = batch(&conn, &batch_id)
+                .unwrap()
+                .iter()
+                .filter(|entry| gone(entry).is_some_and(|mark| !mark.places.is_empty()))
+                .count();
+            assert_eq!(marked, 4_000);
+            assert!(took < std::time::Duration::from_secs(1), "took {took:?}");
+        }
     }
 }
