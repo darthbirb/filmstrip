@@ -225,6 +225,21 @@ test("a file the index forgot is gone from where it was last, and has nothing le
   expect(letGo(row("d.jpg", { kind: "recycleBin" }, emptied))).toBe(true);
 });
 
+test("a file whose way back was in a removed source is still where it is, with nothing to retry", () => {
+  const phone: Stayed["at"] = { kind: "folder", folderId: 3, path: ["Phone"] };
+  const stays: Stayed = {
+    kind: "file",
+    id: 5,
+    name: "pyramid.jpg",
+    at: phone,
+    reason: { kind: "sourceRemoved", source: "Library" },
+  };
+
+  expect(stayedGroups([stays])[0]?.heading).toBe("Still in Phone");
+  expect(reasonText(stays.reason)).toBe("Library was removed");
+  expect(letGo(stays)).toBe(true);
+});
+
 test("a name field says where the name is taken, or why else it was refused", () => {
   const taken = { kind: "nameTaken", place: "Trips", name: "Cairo", folder: true } as const;
   expect(refusedName({ kind: "refused", message: "", reason: taken })).toBe(

@@ -148,8 +148,17 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   `notOnDisk`, or `sourceRemoved` with the source's title; a mark without one reads as
   `emptiedFromBin`), for an undo to report and delete, and its id leaves every `items_tag`,
   `items_untag` and `retag` row, an emptied tag row going with it. A marked row is never acted
-  on, since SQLite may give its id to another file. A removed source's folders, and rows naming
-  them, do not leave the journal yet (#206).
+  on, since SQLite may give its id to another file.
+- A removed source's folders leave the journal with its files, in the same statements
+  (`journal::forget_source`). A row about one of them alone, by its `folderId`, gains `gone` with
+  `folder` set, its title, its parent and `sourceRemoved`. A row about a file or folder that stays
+  in another source but names a removed folder anywhere, as an `item_move`'s way back, an
+  `item_restore`'s `leftFolderId` or an `item_copy`'s `into` do, gains `gone` with
+  `placeRemoved`, the source's title and the folder it is in now; removing that source too turns
+  the mark into `sourceRemoved`. Every mark keeps the titles of the removed folders its row names
+  in `places`, for the undo's line to name them, and the removed folders leave every `retag`
+  row's `folderUses`, since SQLite may give their ids to other folders. A mark's `id` names the
+  file or folder; one written before folders were marked names a file by `itemId`.
 - A file Empty Trash… deleted, or the Trash's look in the Recycle Bin found emptied from it,
   leaves the journal in the transaction that retires or forgets its row (`journal::drop_item`):
   each row about it alone is deleted outright, unmarked, and its id leaves every row about

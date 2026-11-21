@@ -8,7 +8,7 @@ use serde::de::DeserializeOwned;
 use ts_rs::TS;
 
 use crate::db::journal::{
-    self, Entry, FolderCopied, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed,
+    self, Entry, FolderCopied, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, Forgot,
     ItemCopied, ItemMoved, ItemRenamed, ItemRestored, ItemTrashed, ItemsTagged,
 };
 use crate::db::{tags, vocabulary};
@@ -60,13 +60,17 @@ fn reverse_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
     // Described before anything comes back, while every name is still where the act left it.
     let batch = acts::describe(conn, batch_id)?;
     let mut stayed = Vec::new();
-    let mut gone = 0;
+    let (mut gone, mut folders_gone) = (0, 0);
     for entry in &entries {
         if let Some(forgotten) = journal::gone(entry) {
             journal::drop_entry(conn, entry.id)?;
-            if entry.op != journal::ITEM_COPY {
+            let copy_forgotten = entry.op == journal::ITEM_COPY
+                && !matches!(forgotten.why, Forgot::PlaceRemoved { .. });
+            if !copy_forgotten {
                 stayed.push(stayed::forgotten(conn, &forgotten)?);
-                gone += 1;
+                let (files, folders) = acts::count(conn, std::slice::from_ref(entry))?;
+                gone += files;
+                folders_gone += folders;
             }
             continue;
         }
@@ -88,7 +92,7 @@ fn reverse_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
     let (files_left, folders_left) = acts::count(conn, &journal::batch(conn, batch_id)?)?;
     Ok(UndoReport {
         files_back: batch.files.saturating_sub(files_left + gone),
-        folders_back: batch.folders.saturating_sub(folders_left),
+        folders_back: batch.folders.saturating_sub(folders_left + folders_gone),
         batch,
         stayed,
     })
@@ -580,5 +584,163 @@ mod tests {
         assert_eq!(journal::latest_batch(&conn).unwrap(), None);
         assert!(dir.join("library/Trips/Cairo/giza.jpg").is_file());
         assert!(!dir.join("library/Trips/Cairo/pyramid.jpg").exists());
+    }
+
+    /// The library under `dir` with a second source, Phone, beside it: the Trips folder, and the
+    /// Phone source's own folder.
+    fn library_and_phone(dir: &Path) -> (Connection, i64, i64) {
+        std::fs::create_dir_all(dir.join("phone")).unwrap();
+        let (conn, trips) = library(dir);
+        let phone = sources::add(&conn, &dir.join("phone"), "Phone", SourceKind::Library).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let phone_top = rows::source_root_folder(&conn, phone.id).unwrap();
+        (conn, trips, phone_top)
+    }
+
+    fn library_removed() -> Reason {
+        Reason::SourceRemoved {
+            source: "Library".into(),
+        }
+    }
+
+    #[test]
+    fn an_undo_of_a_file_moved_out_of_a_removed_source_says_so_and_reaches_the_act_before() {
+        let dir = scratch("moved-out-of-removed");
+        let (conn, trips, phone_top) = library_and_phone(&dir);
+        let cairo = rows::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        let pyramid = db::items::in_folder(&conn, cairo).unwrap()[0].id;
+        let made = journal::new_batch();
+        folders::create(&conn, phone_top, "Lisbon", &made).unwrap();
+        items::move_items(&conn, &[pyramid], phone_top, &journal::new_batch()).unwrap();
+        sources::remove(&conn, 1).unwrap();
+
+        let report = undo_last(&conn).unwrap().unwrap();
+        assert_eq!(
+            report.batch.act,
+            Act::Move {
+                from: Some("Cairo".into()),
+                to: "Phone".into(),
+                one: Some("pyramid.jpg".into())
+            }
+        );
+        assert_eq!(report.files_back, 0);
+        assert_eq!(
+            report.stayed,
+            [Stayed {
+                kind: stayed::Thing::File,
+                id: pyramid,
+                name: "pyramid.jpg".into(),
+                at: stayed::Whereabouts::Folder {
+                    folder_id: phone_top,
+                    path: vec!["Phone".into()],
+                },
+                reason: library_removed(),
+            }]
+        );
+        assert!(dir.join("phone/pyramid.jpg").is_file());
+        assert_eq!(journal::latest_batch(&conn).unwrap(), Some(made.clone()));
+
+        let before = undo_last(&conn).unwrap().unwrap();
+        assert_eq!(before.batch.batch_id, made);
+        assert!(!dir.join("phone/Lisbon").exists());
+    }
+
+    #[test]
+    fn an_undo_of_a_rename_of_a_removed_source_s_folder_says_so_and_reaches_the_act_before() {
+        let dir = scratch("renamed-in-removed");
+        let (conn, trips, phone_top) = library_and_phone(&dir);
+        let made = journal::new_batch();
+        folders::create(&conn, phone_top, "Lisbon", &made).unwrap();
+        let cairo = rows::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        folders::rename(&conn, cairo, "Giza", &journal::new_batch()).unwrap();
+        sources::remove(&conn, 1).unwrap();
+
+        let report = undo_last(&conn).unwrap().unwrap();
+        assert_eq!(
+            report.batch.act,
+            Act::RenameFolder {
+                from: "Cairo".into(),
+                to: "Giza".into()
+            }
+        );
+        assert_eq!(report.folders_back, 0);
+        assert_eq!(
+            report.stayed,
+            [Stayed {
+                kind: stayed::Thing::Folder,
+                id: cairo,
+                name: "Giza".into(),
+                at: stayed::Whereabouts::Forgotten {
+                    path: vec!["Library".into()],
+                },
+                reason: library_removed(),
+            }]
+        );
+        assert!(dir.join("library/Trips/Giza/pyramid.jpg").is_file());
+        assert_eq!(journal::latest_batch(&conn).unwrap(), Some(made));
+    }
+
+    #[test]
+    fn an_undo_of_a_restore_out_of_a_removed_source_leaves_the_file_where_it_is_and_says_why() {
+        let dir = scratch("restored-out-of-removed");
+        let (conn, trips, phone_top) = library_and_phone(&dir);
+        let cairo = rows::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        let pyramid = db::items::in_folder(&conn, cairo).unwrap()[0].id;
+        trash::trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+        trash::restore_items(&conn, &[pyramid], Some(phone_top), &journal::new_batch()).unwrap();
+        sources::remove(&conn, 1).unwrap();
+
+        let report = undo_last(&conn).unwrap().unwrap();
+        assert_eq!(report.files_back, 0);
+        assert_eq!(
+            report.stayed,
+            [Stayed {
+                kind: stayed::Thing::File,
+                id: pyramid,
+                name: "pyramid.jpg".into(),
+                at: stayed::Whereabouts::Folder {
+                    folder_id: phone_top,
+                    path: vec!["Phone".into()],
+                },
+                reason: library_removed(),
+            }]
+        );
+        assert!(dir.join("phone/pyramid.jpg").is_file());
+        assert!(db::items::is_live(&conn, pyramid).unwrap());
+    }
+
+    #[test]
+    fn an_undo_of_a_folder_moved_out_of_a_removed_source_leaves_it_where_it_is_and_says_why() {
+        let dir = scratch("folder-out-of-removed");
+        let (conn, trips, phone_top) = library_and_phone(&dir);
+        let cairo = rows::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        folders::move_into(&conn, cairo, phone_top, &journal::new_batch()).unwrap();
+        sources::remove(&conn, 1).unwrap();
+
+        let report = undo_last(&conn).unwrap().unwrap();
+        assert_eq!(
+            report.batch.act,
+            Act::MoveFolder {
+                name: "Cairo".into(),
+                from: "Trips".into(),
+                to: "Phone".into()
+            }
+        );
+        assert_eq!((report.files_back, report.folders_back), (0, 0));
+        assert_eq!(
+            report.stayed,
+            [Stayed {
+                kind: stayed::Thing::Folder,
+                id: cairo,
+                name: "Cairo".into(),
+                at: stayed::Whereabouts::Folder {
+                    folder_id: phone_top,
+                    path: vec!["Phone".into()],
+                },
+                reason: library_removed(),
+            }]
+        );
+        assert!(dir.join("phone/Cairo/pyramid.jpg").is_file());
+        assert_eq!(journal::latest_batch(&conn).unwrap(), None);
     }
 }

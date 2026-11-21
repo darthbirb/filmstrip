@@ -410,12 +410,7 @@ pub fn forget_retired(conn: &Connection, id: i64) -> Result<()> {
 /// the cascade, so go first.
 pub fn forget(conn: &Connection, id: i64, why: Forgot) -> Result<()> {
     if let Some(file) = file_of(conn, id)? {
-        let gone = Gone {
-            item_id: id,
-            name: file.disk_name,
-            folder_id: file.folder_id,
-            why,
-        };
+        let gone = Gone::file(id, file.disk_name, file.folder_id, why);
         journal::forget_item(conn, &gone)?;
     }
     conn.execute(

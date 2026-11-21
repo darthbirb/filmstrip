@@ -147,6 +147,27 @@ test("a file its removed source took from the index is gone from it, with nothin
   );
 });
 
+test("a file whose way back a removed source took is still where it is, with nothing to show", async () => {
+  const screen = await render(<Harness />);
+  showReport({
+    sentence: "pyramid.jpg could not go back",
+    rows: [
+      {
+        kind: "file",
+        id: 9,
+        name: "pyramid.jpg",
+        at: { kind: "folder", folderId: 3, path: ["Phone"] },
+        reason: { kind: "sourceRemoved", source: "Library" },
+      },
+    ],
+  });
+  await expect.element(screen.getByText("Still in Phone")).toBeVisible();
+  await expect.element(screen.getByText("Library was removed")).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "Show pyramid.jpg in Explorer" }).elements(),
+  ).toHaveLength(0);
+});
+
 test("a folder a file kept is shown open in Explorer, with that file selected", async () => {
   const screen = await render(<Harness />);
   showReport({
