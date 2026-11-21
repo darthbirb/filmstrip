@@ -4,6 +4,7 @@ import { page } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
+import { getNews, setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { Settings } from "./Settings";
 import { finishRemove, settingsHeld } from "./settings-store";
@@ -31,12 +32,17 @@ function source(id: number, title: string, trashCount: number, reachable = true)
 
 let sources: SourceSummary[] = [];
 let answer: () => void = () => undefined;
+let fail: () => void = () => undefined;
 const removed: number[] = [];
+/** The batches the journal still holds. */
+let held = new Set<string>();
 
 beforeEach(async () => {
   await page.viewport(1280, 820);
   sources = [source(1, "Pictures", 2), source(2, "Incoming", 0), source(3, "Archive", 1, false)];
   removed.length = 0;
+  held = new Set();
+  setNews(null);
   finishRemove(null);
   mockIPC(
     (cmd, payload) => {
@@ -44,10 +50,12 @@ beforeEach(async () => {
       if (cmd === "remove_source") {
         const { id } = payload as { id: number };
         removed.push(id);
-        return new Promise<null>((resolve) => {
+        return new Promise<null>((resolve, reject) => {
           answer = () => resolve(null);
+          fail = () => reject({ kind: "invalid", message: "the index is busy" });
         });
       }
+      if (cmd === "can_undo") return held.has((payload as { batchId: string }).batchId);
       return undefined;
     },
     { shouldMockEvents: true },
@@ -107,4 +115,38 @@ test("Remove Source forgets the source with no bar, holding Settings still until
       .getByText(/Recycle Bin/)
       .query(),
   ).toBeNull();
+});
+
+test("a removal that took a tagging's files from the journal takes Undo off its line", async () => {
+  const line = "Tagged 3 files dusk.";
+  setNews({ kind: "done", line, batchId: "tagged" });
+  const question = await asking("Pictures");
+  await question.getByRole("button", { name: "Remove Source" }).click();
+
+  answer();
+  await expect.poll(settingsHeld).toBe(false);
+  expect(getNews()).toEqual({ kind: "said", line });
+});
+
+test("a line whose act the journal still holds keeps its Undo after a removal", async () => {
+  const kept = { kind: "done", line: "Tagged 3 files dusk.", batchId: "tagged" } as const;
+  held.add("tagged");
+  setNews(kept);
+  const question = await asking("Pictures");
+  await question.getByRole("button", { name: "Remove Source" }).click();
+
+  answer();
+  await expect.poll(settingsHeld).toBe(false);
+  expect(getNews()).toBe(kept);
+});
+
+test("a removal that failed leaves the line as it was", async () => {
+  const kept = { kind: "done", line: "Tagged 3 files dusk.", batchId: "tagged" } as const;
+  setNews(kept);
+  const question = await asking("Pictures");
+  await question.getByRole("button", { name: "Remove Source" }).click();
+
+  fail();
+  await expect.poll(settingsHeld).toBe(false);
+  expect(getNews()).toBe(kept);
 });

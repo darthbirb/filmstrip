@@ -123,6 +123,7 @@ pub fn run() {
             commands::delete_folder,
             commands::undo_last,
             commands::undo_batch,
+            commands::can_undo,
             commands::clipboard_files,
             commands::count_carried,
             commands::paste_files,

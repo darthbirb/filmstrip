@@ -3,9 +3,9 @@ import { useEffect } from "react";
 import type { Batch } from "../../ipc/bindings/Batch";
 import type { Stayed } from "../../ipc/bindings/Stayed";
 import type { UndoReport } from "../../ipc/bindings/UndoReport";
-import { undoBatch, undoLast } from "../../ipc/commands";
+import { canUndo, undoBatch, undoLast } from "../../ipc/commands";
 import { libraryChanged } from "../library";
-import { sayOnce, setNews } from "../navigation/foot-slot";
+import { getNews, sayOnce, setNews } from "../navigation/foot-slot";
 import { actLine, letGo, undoBannerLine, undoneLine } from "./lines";
 import { showReport } from "./report-store";
 
@@ -14,6 +14,14 @@ import { showReport } from "./report-store";
 /** After an act: its line at the foot with Undo, the newest news there. */
 export function afterAct(batch: Batch, stayed = 0, line = actLine(batch, stayed)) {
   setNews({ kind: "done", line, batchId: batch.batchId });
+}
+
+/** Takes Undo off the foot's line once its act has left the journal, keeping what it did. */
+export async function settleLine() {
+  const shown = getNews();
+  if (shown?.kind !== "done") return;
+  const held = await canUndo(shown.batchId).catch(() => true);
+  if (!held && getNews() === shown) setNews({ kind: "said", line: shown.line });
 }
 
 let undoing = false;

@@ -1400,11 +1400,15 @@ waits, where Explorer can see it too.
   transaction, as it lets go of a file Empty Trash… deleted (DECISIONS.md "Emptying the Trash").
   The look has already said the file left the Trash, so Ctrl+Z passes over it to the act before;
   a folder deleted with its files goes from the journal with the last of them, and is never made
-  again empty. A drive that is away is left until it is
-  back, and so is one where another volume answers at its letter or folder, since its serial is
-  not the one `bin_file` names: that volume's bin is not where the file went. A row with no
-  record of where the bin keeps it is retired too: only a build before this one made such rows,
-  and no library predates it.
+  again empty. A look that changed anything, either way, can take a whole act from the journal: a
+  forgotten row leaves every tagging it was the last file of. So an act's line still at the foot
+  then asks `can_undo` of its batch, and one the journal no longer holds loses its Undo, its
+  sentence kept, since an Undo there could only say "Nothing to undo."; removing a source asks
+  the same, and Empty Trash… already puts its own line in its place. A drive that is away is
+  left until it is back, and so is one where another volume answers at its letter or folder,
+  since its serial is not the one `bin_file` names: that volume's bin is not where the file went.
+  A row with no record of where the bin keeps it is retired too: only a build before this one
+  made such rows, and no library predates it.
 - **A Restore or Ctrl+Z that reaches a file emptied from the bin says so**, before any look has
   found it: listed under Gone from the Recycle Bin, with no row button, its row retired. Retry
   stays only while a row still in the Trash could succeed.

@@ -483,8 +483,10 @@ mod tests {
         std::fs::remove_file(lib.in_bin(a)).unwrap();
         assert_eq!(trash::look_in_bin(&lib.conn).unwrap().retired, 1);
 
+        assert!(undo::can_undo(&lib.conn, &cairo).unwrap());
         assert_eq!(lib.empty(&lib.asked()).deleted, 1);
 
+        assert!(!undo::can_undo(&lib.conn, &cairo).unwrap());
         assert!(journal::batch(&lib.conn, &cairo).unwrap().is_empty());
         let back = undo::undo_last(&lib.conn).unwrap().unwrap();
         assert_eq!(back.batch.batch_id, named);

@@ -917,6 +917,29 @@ mod tests {
     }
 
     #[test]
+    fn a_tag_on_a_walk_made_row_can_no_longer_be_undone_once_the_look_puts_its_file_back() {
+        let (conn, root, cairo) = library("look-put-back-tagged");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        trash_items(&conn, &[sphinx], &journal::new_batch()).unwrap();
+        std::fs::rename(bin_file(&conn, sphinx), root.join("Trips/Cairo/sphinx.jpg")).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let newcomer = id_of(&conn, cairo, "sphinx.jpg");
+        let tagged = journal::new_batch();
+        tags::add_items_tag(&conn, &[newcomer], "dusk", &tagged).unwrap();
+        assert!(undo::can_undo(&conn, &tagged).unwrap());
+
+        assert_eq!(
+            look_in_bin(&conn).unwrap(),
+            Looked {
+                retired: 0,
+                restored: 1
+            }
+        );
+
+        assert!(!undo::can_undo(&conn, &tagged).unwrap());
+    }
+
+    #[test]
     fn a_file_put_back_from_explorer_into_a_folder_the_index_has_retired_counts_as_retired() {
         let (conn, root, cairo) = library("look-folder-gone");
         let pyramid = id_of(&conn, cairo, "pyramid.jpg");
@@ -1061,6 +1084,24 @@ mod tests {
         assert!(!root.join("Trips/Cairo").exists());
         assert!(!folders::is_live(&conn, cairo).unwrap());
         crate::fs::settles_to(&root.join("Trips"), &["note.jpg"]);
+    }
+
+    #[test]
+    fn an_act_the_look_took_whole_from_the_journal_can_no_longer_be_undone_by_name() {
+        let (conn, root, cairo) = library("look-undoable");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        let (named, deleted) = delete_cairo(&conn, &root, cairo);
+        assert!(undo::can_undo(&conn, &deleted).unwrap());
+
+        std::fs::remove_file(bin_file(&conn, pyramid)).unwrap();
+        look_in_bin(&conn).unwrap();
+        assert!(undo::can_undo(&conn, &deleted).unwrap());
+
+        std::fs::remove_file(bin_file(&conn, sphinx)).unwrap();
+        look_in_bin(&conn).unwrap();
+        assert!(!undo::can_undo(&conn, &deleted).unwrap());
+        assert!(undo::can_undo(&conn, &named).unwrap());
     }
 
     #[test]

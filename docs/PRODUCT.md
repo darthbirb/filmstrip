@@ -65,10 +65,12 @@ another app or read-only, stays where it was, and the foot names it.
 
 The Trash looks in the bin at launch and whenever it opens. A file emptied from the bin outside
 the app leaves the Trash, its row retired, and Ctrl+Z skips it as it skips a file Empty Trash…
-deleted; one put back from Explorer is restored in the index, tags and all. A Restore or Ctrl+Z
-that reaches a file emptied from the bin before the Trash has looked says so, under Gone from
-the Recycle Bin. Emptying the library's files from the bin, and Delete on a drive with no bin, are the
-only ways the app deletes a file outright, and both ask first.
+deleted. One put back from Explorer is restored in the index, tags and all. When the look, or
+removing a source, leaves an act with nothing to undo, the act's line at the foot keeps its
+sentence and loses its Undo. A Restore or Ctrl+Z that reaches a file emptied from the bin before
+the Trash has looked says so, under Gone from the Recycle Bin. Emptying the library's files from
+the bin, and Delete on a drive with no bin, are the only ways the app deletes a file outright, and
+both ask first.
 
 Empty Trash…, in Settings › Trash while the Trash holds anything, deletes for good the files the
 library sent to the Recycle Bin and leaves the rest of the bin as it is. Its question says how

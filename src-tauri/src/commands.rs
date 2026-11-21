@@ -448,6 +448,12 @@ pub async fn undo_batch(state: State<'_, AppState>, batch_id: String) -> Result<
     run(&state, move |conn| undo::undo_batch(conn, &batch_id)).await
 }
 
+/// Whether the act a line offers Undo for is still in the journal.
+#[tauri::command]
+pub async fn can_undo(state: State<'_, AppState>, batch_id: String) -> Result<bool> {
+    run(&state, move |conn| undo::can_undo(conn, &batch_id)).await
+}
+
 /// What came of asking for a copy: a job started, a refusal of the whole, or nothing to bring.
 #[derive(Debug, Clone, Serialize, TS)]
 #[serde(tag = "kind", rename_all = "camelCase")]
