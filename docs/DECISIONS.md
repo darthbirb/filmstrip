@@ -1400,8 +1400,10 @@ waits, where Explorer can see it too.
   transaction, as it lets go of a file Empty Trash… deleted (DECISIONS.md "Emptying the Trash").
   The look has already said the file left the Trash, so Ctrl+Z passes over it to the act before;
   a folder deleted with its files goes from the journal with the last of them, and is never made
-  again empty. A drive that is away is left until it is
-  back, and so is one where another volume answers at its letter or folder, since its serial is
+  again empty. An act's line still at the foot then asks `can_undo` of its batch, and one the
+  journal no longer holds loses its Undo, its sentence kept, since an Undo there could only say
+  "Nothing to undo."; Empty Trash… already puts its own line in its place. A drive that is away
+  is left until it is back, and so is one where another volume answers at its letter or folder, since its serial is
   not the one `bin_file` names: that volume's bin is not where the file went. A row with no
   record of where the bin keeps it is retired too: only a build before this one made such rows,
   and no library predates it.

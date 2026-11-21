@@ -1064,6 +1064,24 @@ mod tests {
     }
 
     #[test]
+    fn an_act_the_look_took_whole_from_the_journal_can_no_longer_be_undone_by_name() {
+        let (conn, root, cairo) = library("look-undoable");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        let (named, deleted) = delete_cairo(&conn, &root, cairo);
+        assert!(undo::can_undo(&conn, &deleted).unwrap());
+
+        std::fs::remove_file(bin_file(&conn, pyramid)).unwrap();
+        look_in_bin(&conn).unwrap();
+        assert!(undo::can_undo(&conn, &deleted).unwrap());
+
+        std::fs::remove_file(bin_file(&conn, sphinx)).unwrap();
+        look_in_bin(&conn).unwrap();
+        assert!(!undo::can_undo(&conn, &deleted).unwrap());
+        assert!(undo::can_undo(&conn, &named).unwrap());
+    }
+
+    #[test]
     fn a_folder_one_of_whose_files_was_emptied_from_explorer_comes_back_with_the_rest() {
         let (conn, root, cairo) = library("look-emptied-one");
         let pyramid = id_of(&conn, cairo, "pyramid.jpg");

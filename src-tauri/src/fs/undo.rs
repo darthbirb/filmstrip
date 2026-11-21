@@ -43,6 +43,12 @@ pub fn undo_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
     reverse_batch(conn, batch_id)
 }
 
+/// Whether a batch still has anything an undo could take back: Empty Trash… and the look in the
+/// Recycle Bin can take a whole act from the journal. SCHEMA.md "The undo journal".
+pub fn can_undo(conn: &Connection, batch_id: &str) -> Result<bool> {
+    Ok(!journal::batch(conn, batch_id)?.is_empty() && !journal::below_floor(conn, batch_id)?)
+}
+
 /// Reverses whatever was done last, in this session or an earlier one; nothing when nothing is left.
 pub fn undo_last(conn: &Connection) -> Result<Option<UndoReport>> {
     let _turn = super::turn();
@@ -278,6 +284,7 @@ mod tests {
         journal::set_floor(&conn).unwrap();
 
         assert_eq!(undo_last(&conn).unwrap(), None);
+        assert!(!can_undo(&conn, &batch).unwrap());
         assert!(undo_batch(&conn, &batch).is_err());
         assert!(dir.join("library/Trips/Giza").is_dir());
     }

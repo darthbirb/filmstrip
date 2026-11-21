@@ -1922,6 +1922,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     if (at >= 0) return takeBack(at);
     return Promise.reject<AppError>({ kind: "invalid", message: "nothing left to undo here" });
   },
+  can_undo: ({ batchId }) => journal.some((batch) => batch.batchId === batchId),
   folder_children: ({ folderId }) => FOLDERS[folderId as number] ?? [],
   // A source's favourite is its own folder's, as the Rust side keeps it.
   set_folder_favorite: ({ folderId, favorite }) => {
