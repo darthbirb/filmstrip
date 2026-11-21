@@ -154,8 +154,8 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   `folder` set, its title, its parent and `sourceRemoved`. A row about a file or folder that stays
   in another source but names a removed folder anywhere, as an `item_move`'s way back, an
   `item_restore`'s `leftFolderId` or an `item_copy`'s `into` do, gains `gone` with
-  `placeRemoved`, the source's title and the folder it is in now; removing that source too turns
-  the mark into `sourceRemoved`. Every mark keeps the titles of the removed folders its row names
+  `placeRemoved`, the source's title and the folder it is in now; forgetting that file, or
+  removing its own source too, rewrites the mark to say so. Every mark keeps the titles of the removed folders its row names
   in `places`, for the undo's line to name them, and the removed folders leave every `retag`
   row's `folderUses`, since SQLite may give their ids to other folders. A mark's `id` names the
   file or folder; one written before folders were marked names a file by `itemId`.

@@ -596,11 +596,14 @@ pub fn forget_item(conn: &Connection, gone: &Gone) -> Result<()> {
     let mark = serde_json::to_string(gone)?;
     conn.execute(
         &format!(
-            "UPDATE journal SET forward = json_set(forward, '$.gone', json(?2)),
-                                inverse = json_set(inverse, '$.gone', json(?2))
+            "UPDATE journal SET forward = json_set(forward, '$.gone', {mark}),
+                                inverse = json_set(inverse, '$.gone', {mark})
               WHERE op IN ({}) AND json_extract(inverse, '$.itemId') = ?1
-                AND json_type(inverse, '$.gone') IS NULL",
-            quoted(&ONE_FILE)
+                AND (json_type(inverse, '$.gone') IS NULL
+                     OR json_extract(inverse, '$.gone.why.kind') = 'placeRemoved')",
+            quoted(&ONE_FILE),
+            mark = "json_patch(json(?2), json_object('places', json(COALESCE(
+                      json_extract(inverse, '$.gone.places'), '{}'))))"
         ),
         params![id, mark],
     )?;
@@ -1060,7 +1063,8 @@ mod tests {
         conn.execute(
             "INSERT INTO item (id, uuid, source_id, folder_id, disk_name, ext, size_bytes,
                                mtime, kind, added_at)
-             VALUES (6, 6, ?1, ?2, 'sand.jpg', 'jpg', 1, 1, 'image', 1)",
+             VALUES (6, 6, ?1, ?2, 'sand.jpg', 'jpg', 1, 1, 'image', 1),
+                    (7, 7, ?1, ?2, 'shell.jpg', 'jpg', 1, 1, 'image', 1)",
             params![phone.0, beach],
         )
         .unwrap();
@@ -1069,6 +1073,8 @@ mod tests {
         let moved = new_batch();
         record_item_move(&conn, &moved, 6, trips, beach).unwrap();
         record_folder_move(&conn, &moved, beach, trips, phone.1).unwrap();
+        let shell_moved = new_batch();
+        record_item_move(&conn, &shell_moved, 7, trips, beach).unwrap();
         let elsewhere = new_batch();
         record_folder_rename(&conn, &elsewhere, beach, "Sea", "Beach").unwrap();
         let retagged = new_batch();
@@ -1132,6 +1138,17 @@ mod tests {
         let left: Retagged =
             serde_json::from_value(batch(&conn, &retagged).unwrap()[0].inverse.clone()).unwrap();
         assert_eq!(left.folder_uses, [held(beach)]);
+
+        let shell = Gone::file(7, "shell.jpg".into(), beach, Forgot::NotOnDisk);
+        forget_item(&conn, &shell).unwrap();
+        assert_eq!(
+            marks(&shell_moved),
+            [Some(Gone {
+                places: BTreeMap::from([trips_place.clone()]),
+                ..shell
+            })],
+            "a file forgotten since is reported as forgotten, by the places named before"
+        );
 
         forget_source(&conn, phone.0).unwrap();
         let [_, sand_now] = &marks(&moved)[..] else {
