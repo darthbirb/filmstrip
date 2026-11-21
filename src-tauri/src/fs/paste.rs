@@ -617,8 +617,9 @@ fn files_in(path: &Path) -> u32 {
 
 /// Windows' own litter and hidden entries, which a walk never reads, so a copy never brings them.
 fn skipped(path: &Path) -> bool {
-    let name = file_name(path);
-    name.starts_with('.') || walk::IGNORED_FILES.contains(&name.to_lowercase().as_str())
+    let name = path.file_name().unwrap_or_default();
+    walk::is_hidden(name, std::fs::symlink_metadata(path).ok().as_ref())
+        || walk::IGNORED_FILES.contains(&name.to_string_lossy().to_lowercase().as_str())
 }
 
 fn already_in(path: &Path, dir: &Path) -> bool {
@@ -1544,6 +1545,40 @@ mod tests {
                 folders: 1
             }
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn what_windows_marks_hidden_or_system_is_never_copied() {
+        use windows_sys::Win32::Storage::FileSystem::{
+            FILE_ATTRIBUTE_HIDDEN, FILE_ATTRIBUTE_SYSTEM,
+        };
+        let (conn, dir, lisbon) = library("hidden-attribute");
+        write(&dir.join("Downloads/Alexandria/a.jpg"), "a");
+        let inside = write(&dir.join("Downloads/Alexandria/inside.jpg"), "h");
+        let on_top = write(&dir.join("Downloads/on-top.jpg"), "t");
+        walk::tests::mark(&inside, FILE_ATTRIBUTE_HIDDEN);
+        walk::tests::mark(&on_top, FILE_ATTRIBUTE_SYSTEM);
+        let entries = [dir.join("Downloads/Alexandria"), on_top];
+
+        assert_eq!(
+            carried(&entries),
+            Carried {
+                files: 0,
+                folders: 1
+            }
+        );
+        let outcome = run(
+            &conn,
+            &journal::new_batch(),
+            lisbon,
+            &entries,
+            &Script::default(),
+        )
+        .unwrap();
+        assert_eq!((outcome.whole, outcome.done), (1, 1));
+        settles_to(&dir.join("library/Trips/Lisbon/Alexandria"), &["a.jpg"]);
+        assert!(!dir.join("library/Trips/Lisbon/on-top.jpg").exists());
     }
 
     #[cfg(windows)]

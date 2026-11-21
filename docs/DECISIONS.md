@@ -95,6 +95,20 @@ there", and treating that as "everything in it was deleted" would empty the inde
 that is merely away. **A sweep is scoped to one source:** a walk reads one root, so it can only
 speak for that root's files and folders.
 
+**The same holds mid-walk.** A drive can be unplugged halfway through its walk, and one directory
+can refuse to open — access denied, a sharing violation — while the rest read. Both look like
+"nothing here", so the walk collects its read errors per source: under a directory it could not
+read in full, no item or folder is retired, and a file it found but could not read keeps its row.
+A failure the walker cannot place keeps the whole source. A source whose root is not there once
+its walk ends retires nothing at all and is not stamped as read, and a folder retires only while
+its source's root is still there to show its directory gone. Nothing is recreated on the drive's
+return, so tags, notes, covers and thumbnails stay on the rows they belong to.
+
+**Hidden is a dot-name or a Windows attribute:** a name starting with a dot, or an entry carrying
+the hidden or system attribute, as `System Volume Information` at a drive's root does. The walk
+never reads them and a paste never copies them. A source's own root is always read, since a
+drive's root carries both attributes.
+
 A file whose size and modification time match its row is not opened again. That is the common
 case, and what keeps walking an unchanged library cheap.
 

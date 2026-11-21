@@ -1,6 +1,8 @@
 //! Items. Every item is a real file in a real folder, so a row is only ever
 //! a description of something on disk.
 
+use std::collections::HashSet;
+
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
@@ -565,11 +567,31 @@ pub fn mark_seen(conn: &Connection, uuid: &str) -> Result<()> {
     Ok(())
 }
 
-/// Trashes what the sweep did not see, **in this source only**, and returns how
-/// many. DECISIONS.md "A walk only judges what it read".
+/// Holds `kept` in `temp.kept` for the sweep's own statement.
+fn hold_kept(conn: &Connection, kept: &HashSet<i64>) -> Result<()> {
+    conn.execute_batch(
+        "DROP TABLE IF EXISTS temp.kept;
+         CREATE TEMP TABLE kept (id INTEGER PRIMARY KEY);",
+    )?;
+    let mut hold = conn.prepare("INSERT INTO temp.kept (id) VALUES (?1)")?;
+    for id in kept {
+        hold.execute(params![id])?;
+    }
+    Ok(())
+}
+
+fn end_sweep(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "DROP TABLE IF EXISTS temp.seen;
+         DROP TABLE IF EXISTS temp.kept;",
+    )?;
+    Ok(())
+}
+
 /// As `finish_sweep`, for a walk that read only one folder's subtree.
-pub fn finish_sweep_under(conn: &Connection, folder_id: i64) -> Result<usize> {
+pub fn finish_sweep_under(conn: &Connection, folder_id: i64, kept: &HashSet<i64>) -> Result<usize> {
     conn.execute_batch("CREATE INDEX IF NOT EXISTS temp.idx_seen ON seen(uuid);")?;
+    hold_kept(conn, kept)?;
     let gone = conn.execute(
         "WITH RECURSIVE subtree(id) AS (
              SELECT ?2
@@ -579,23 +601,28 @@ pub fn finish_sweep_under(conn: &Connection, folder_id: i64) -> Result<usize> {
          UPDATE item SET deleted_at = ?1
           WHERE deleted_at IS NULL
             AND folder_id IN (SELECT id FROM subtree)
+            AND folder_id NOT IN (SELECT id FROM temp.kept)
             AND NOT EXISTS (SELECT 1 FROM temp.seen s WHERE s.uuid = item.uuid)",
         params![now(), folder_id],
     )?;
-    conn.execute_batch("DROP TABLE IF EXISTS temp.seen;")?;
+    end_sweep(conn)?;
     Ok(gone)
 }
 
-pub fn finish_sweep(conn: &Connection, source_id: i64) -> Result<usize> {
+/// Trashes what the sweep did not see, **in this source only** and in no folder of `kept`, and
+/// returns how many. DECISIONS.md "A walk only judges what it read".
+pub fn finish_sweep(conn: &Connection, source_id: i64, kept: &HashSet<i64>) -> Result<usize> {
     conn.execute_batch("CREATE INDEX IF NOT EXISTS temp.idx_seen ON seen(uuid);")?;
+    hold_kept(conn, kept)?;
     let gone = conn.execute(
         "UPDATE item SET deleted_at = ?1
           WHERE deleted_at IS NULL
             AND source_id = ?2
+            AND folder_id NOT IN (SELECT id FROM temp.kept)
             AND NOT EXISTS (SELECT 1 FROM temp.seen s WHERE s.uuid = item.uuid)",
         params![now(), source_id],
     )?;
-    conn.execute_batch("DROP TABLE IF EXISTS temp.seen;")?;
+    end_sweep(conn)?;
     Ok(gone)
 }
 
@@ -1263,7 +1290,7 @@ mod tests {
 
         begin_sweep(&conn).unwrap();
         mark_seen(&conn, "uuid-1-kept.jpg").unwrap();
-        let retired = finish_sweep(&conn, 1).unwrap();
+        let retired = finish_sweep(&conn, 1, &HashSet::new()).unwrap();
 
         assert_eq!(retired, 1);
         let deleted = |id: i64| -> bool {
