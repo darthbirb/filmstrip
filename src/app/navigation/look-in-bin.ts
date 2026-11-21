@@ -22,5 +22,5 @@ export async function settleTrash() {
   const looked = await lookInBin().catch(() => null);
   if (!looked || looked.retired + looked.restored === 0) return;
   await libraryChanged();
-  if (looked.retired > 0) await settleLine();
+  await settleLine();
 }

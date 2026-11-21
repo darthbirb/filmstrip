@@ -17,6 +17,7 @@ import { loadIndex, useIndex } from "../navigation/index-store";
 import { setRefused, useRefused } from "../navigation/refusal-store";
 import { useWork } from "../navigation/work-store";
 import { updatePreferences, usePreferences } from "../preferences";
+import { settleLine } from "../undo/undo";
 import { whyFailed } from "./backup-words";
 import { Caption, Rows } from "./Rows";
 import { binStays } from "./recycle-words";
@@ -286,5 +287,6 @@ async function removeNow(source: SourceSummary, onKept: () => void) {
   }
   await libraryChanged().catch(() => undefined);
   if (ended) onKept();
+  else await settleLine();
   finishRemove(ended);
 }

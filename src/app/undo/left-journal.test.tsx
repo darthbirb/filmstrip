@@ -7,7 +7,7 @@ import { deleteFolder, folderItems, trashItems, trashListing, undoLast } from ".
 import { Foot } from "../navigation/Foot";
 import { getNews, setNews } from "../navigation/foot-slot";
 import { loadIndex, refreshIndex, resetIndex } from "../navigation/index-store";
-import { watchTrashOpening } from "../navigation/look-in-bin";
+import { settleTrash, watchTrashOpening } from "../navigation/look-in-bin";
 import { setPlace } from "../place";
 import { Settings } from "../settings/Settings";
 import { getEmptying } from "../settings/settings-store";
@@ -42,15 +42,13 @@ test("opening the Trash takes Undo off the line of an act whose files were all e
   const line = `Deleted Cairo and its ${files.length} files.`;
   await expect.element(screen.getByText(line)).toBeVisible();
   await expect.element(undoButton(screen)).toBeVisible();
-  stop = watchTrashOpening();
 
   emptyOutside(files.slice(0, 1));
-  setPlace({ kind: "trash" });
-  await expect.poll(async () => (await trashListing()).length).toBe(files.length - 1);
-  await new Promise((settled) => setTimeout(settled, 50));
+  await settleTrash();
+  expect(await trashListing()).toHaveLength(files.length - 1);
   await expect.element(undoButton(screen)).toBeVisible();
 
-  setPlace({ kind: "sorting" });
+  stop = watchTrashOpening();
   emptyOutside(files.slice(1));
   setPlace({ kind: "trash" });
 
