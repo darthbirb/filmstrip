@@ -98,7 +98,8 @@ fn gained(bin: &dyn Bin, hold: &Path, before: &[PathBuf]) -> Option<PathBuf> {
 }
 
 /// Where the bin put `file` when a send was cut short after the shell took it: a name its second
-/// name gained there since it had only `before`, while it is still the file `itself`.
+/// name gained there since it had only `before`, while it is still the file `itself` and not
+/// still at its own path.
 pub fn found_in_bin(
     bin: &dyn Bin,
     file: &Path,
@@ -106,7 +107,7 @@ pub fn found_in_bin(
     before: &[PathBuf],
 ) -> Option<Binned> {
     let hold = hold_of(file);
-    if std::fs::symlink_metadata(file).is_ok() || identity(&hold).ok()?.key() != itself {
+    if file_at(file).as_deref() == Some(itself) || identity(&hold).ok()?.key() != itself {
         return None;
     }
     gained(bin, &hold, before).map(|path| Binned {
@@ -731,6 +732,9 @@ pub(crate) mod tests {
         DeletesWhileLinked(PathBuf),
         /// Moves it as [`Stand::Recycles`] does, and the app stops before the shell returns.
         Stops(PathBuf),
+        /// Moves it as [`Stand::Recycles`] does, and another file takes its name before the send
+        /// returns.
+        Occupied(PathBuf, RefCell<Option<PathBuf>>),
     }
 
     pub(crate) struct Fake {
@@ -758,7 +762,10 @@ pub(crate) mod tests {
         /// The folder it recycles into, as a bin of its own.
         pub(crate) fn dir(&self) -> Option<&Path> {
             match &self.stand {
-                Stand::Recycles(bin) | Stand::Relinks(bin) | Stand::Stops(bin) => Some(bin),
+                Stand::Recycles(bin)
+                | Stand::Relinks(bin)
+                | Stand::Stops(bin)
+                | Stand::Occupied(bin, _) => Some(bin),
                 _ => None,
             }
         }
@@ -806,12 +813,22 @@ pub(crate) mod tests {
                     std::fs::rename(file, binned_name(bin, file))?;
                     panic!("the app stopped");
                 }
+                Stand::Occupied(bin, taken) => {
+                    std::fs::create_dir_all(bin)?;
+                    std::fs::rename(file, binned_name(bin, file))?;
+                    *taken.borrow_mut() = Some(file.to_path_buf());
+                    Ok(())
+                }
             }
         }
 
         fn holds(&self, name: &Path) -> bool {
-            let (Stand::Recycles(bin) | Stand::Relinks(bin) | Stand::Stops(bin)) = &self.stand
-            else {
+            if let Stand::Occupied(_, taken) = &self.stand
+                && let Some(file) = taken.borrow_mut().take()
+            {
+                std::fs::write(file, "theirs").unwrap();
+            }
+            let Some(bin) = self.dir() else {
                 return false;
             };
             plain_lower(name).starts_with(plain_lower(bin))
@@ -1179,6 +1196,9 @@ pub(crate) mod tests {
         assert_eq!(found.path, dir.join("bin/one.jpg"));
         assert_eq!(found.file, itself);
         assert!(found_in_bin(&bin, &file, "another", &before).is_none());
+        std::fs::write(&file, "theirs").unwrap();
+        assert_eq!(found_in_bin(&bin, &file, &itself, &before), Some(found));
+        std::fs::remove_file(&file).unwrap();
         release(&file, &itself).unwrap();
         settles_to(&dir.join("trash"), &[]);
     }

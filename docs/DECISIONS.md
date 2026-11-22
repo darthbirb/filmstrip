@@ -1524,13 +1524,14 @@ which the app never shows on its behalf.
   took gains a name under that volume's `$Recycle.Bin`. Only with a name there that was not there
   before is the file counted as sent; its second name goes once the Trash has recorded it, so a
   stop between the two still finds it. Otherwise, and when its names cannot be read afterwards,
-  the second name is given the file's own name back and the file is refused. Whatever the shell answers, the disk says which happened, so a refusal is never
-  mistaken for a send. The count of names, compared before and after, is not enough: something on
-  the disk giving the file a name elsewhere while the shell deletes it outright leaves the count
-  unchanged, with the file in neither the Trash nor the bin. A user's file can already have other
-  names, from a dedup tool or a link-based backup, and keeps them into the Trash, since trashing
-  within a volume is a rename; one can even be in the bin already, when the user recycled another
-  of its names. Those never count as the send, being there before it.
+  the second name is given the file's own name back and the file is refused. Whatever the shell
+  answers, the disk says which happened, so a refusal is never mistaken for a send. The count of
+  names, compared before and after, is not enough: something on the disk giving the file a name
+  elsewhere while the shell deletes it outright leaves the count unchanged, with the file in
+  neither the Trash nor the bin. A user's file can already have other names, from a dedup tool or
+  a link-based backup, and keeps them into the Trash, since trashing within a volume is a rename;
+  one can even be in the bin already, when the user recycled another of its names. Those never
+  count as the send, being there before it.
 - **A file whose names cannot be read is never sent.** A drive or filter that cannot list a
   file's names, or one without hard links, would leave the app unable to tell a send from a
   delete; read only after the shell, it turned a file the bin took into a refusal, and every retry
@@ -1549,8 +1550,12 @@ which the app never shows on its behalf.
   name gained in the bin since is where the bin put it, and the row is recorded as the send would
   have: in the Trash with its tags, under its act, so one undo still brings it back. The look in
   the bin that follows finds it there, or retires it if the bin was emptied while the app was
-  closed. A row no longer live, or no such name, leaves the second name settled as above; a name
-  the file had in the bin before is never taken for the send's.
+  closed. The row must still be the file the mark names, live at that path: a source removed
+  while its drive was away can free its items' ids for another source's files, and such a mark
+  only settles the second name as above, as does one with no such name in the bin. A name the
+  file had in the bin before is never taken for the send's, and another file that took the
+  file's name meanwhile does not stop it being recorded. Removing a source leaves its marks, since
+  each still has a second name beside its file to settle once that folder is reached.
 - **The send says where the bin put it**: the name the file gained under `$Recycle.Bin`, and its
   identity, read from the second name before the shell is asked, since the file keeps it in the
   bin. DECISIONS.md "The Trash is the Recycle Bin".
@@ -1564,7 +1569,8 @@ which the app never shows on its behalf.
   the send has been recorded and its second name let go. A send that fails partway keeps it; a
   later send of the same file settles what that one left before marking its own. At launch each
   one whose folder can be reached is settled as the cut-short bullets above say. One on a drive
-  that is away waits for a launch that finds it. The rest of the library is never swept for second names.
+  that is away waits for a launch that finds it. The rest of the library is never swept for
+  second names.
 - **Tests never reach the real bin.** The shell is behind the `Bin` trait, which also says
   whether a name is inside it and lets go of the record it keeps; the tests' stand-in recycles
   into a folder of its own, deletes outright or refuses, while the second name and the file's
