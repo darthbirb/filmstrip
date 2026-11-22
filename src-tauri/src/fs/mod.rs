@@ -80,6 +80,32 @@ pub(crate) fn just_before_taking_away(then: impl FnMut(&Path) + 'static) {
     TAKING_AWAY.with(|hook| *hook.borrow_mut() = Some(Box::new(then)));
 }
 
+/// Writes `file`, at `path`, through to its drive, so a drive pulled or power lost straight after
+/// cannot leave it short. DECISIONS.md "Undo".
+pub(crate) fn flush(file: &std::fs::File, _path: &Path) -> std::io::Result<()> {
+    file.sync_all()?;
+    #[cfg(test)]
+    FLUSHED.with(|hook| {
+        if let Some(then) = hook.borrow_mut().as_mut() {
+            then(_path);
+        }
+    });
+    Ok(())
+}
+
+#[cfg(test)]
+thread_local! {
+    static FLUSHED: std::cell::RefCell<Option<Meanwhile>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Runs `then` with each file this thread flushes from now on, just after it is written through:
+/// where a test sees what was on the disk at that moment.
+#[cfg(test)]
+pub(crate) fn just_after_flushing(then: impl FnMut(&Path) + 'static) {
+    FLUSHED.with(|hook| *hook.borrow_mut() = Some(Box::new(then)));
+}
+
 /// The names in `dir`, sorted.
 #[cfg(test)]
 fn names_in(dir: &std::path::Path) -> Vec<String> {

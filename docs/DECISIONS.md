@@ -1162,6 +1162,12 @@ it.
   walk, so the index follows the copy and no file loses its identity. Both removals take only
   what the copy read and wrote, each directory only once empty: a file someone put in either
   meanwhile stays.
+- **Each copy is flushed to its drive before any original goes.** `CopyFileW` returns once
+  Windows holds the bytes, not once the drive does, so a USB drive pulled or power lost seconds
+  after a move would otherwise leave copies short or empty and the originals gone. So each file is
+  written through with `fs::flush`, `sync_all`, as it is checked, and the removals start only once
+  every copy is. A read-only copy cannot be opened to flush, so it gives up the attribute for the
+  flush and takes it back after: a crash between the two costs the attribute, never the bytes.
 - **No move, rename or restore ever replaces what is there.** Checking a name and then moving
   onto it leaves a moment in which another program can take it, and `std::fs::rename` and
   `std::fs::copy` replace a file on Windows. So every move, rename, trash, restore and undo of
@@ -1245,7 +1251,9 @@ arrive, and the originals stay as Explorer left them.
   is its own, never a file it would refuse as someone else's; a folder is made the same way. A
   copy the app's closing cuts short removes the file in hand and waits; at the next launch it goes
   on under the same batch, which is how it tells what it already brought in from a name someone
-  else has taken, and it clears every hidden part left in the folders it went into.
+  else has taken, and it clears every hidden part left in the folders it went into. The part is
+  flushed to its drive with `fs::flush` before it takes its name, so the index never trusts a file
+  a drive pulled or a power cut left holding zeros ("Undo").
 - **A run starts by taking back what its journal claims but the disk does not hold.** Each row of
   the batch whose file is not live or not under its name is dropped and the file retired, whatever
   a walk made of it meanwhile: the launch's walk runs before the copy goes on, and retires the row

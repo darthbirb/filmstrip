@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use crate::error::{AppError, Result};
-use crate::fs::{noclobber, take_away, take_away_once};
+use crate::fs::{flush, noclobber, take_away, take_away_once};
 
 /// Windows' ERROR_NOT_SAME_DEVICE: a rename cannot cross from one drive to another.
 const NOT_SAME_DEVICE: i32 = 17;
@@ -34,9 +34,9 @@ pub fn taken_as(taken: impl FnOnce() -> AppError) -> impl FnOnce(AppError) -> Ap
     }
 }
 
-/// The move between drives: everything copied and each copy's size checked against its original
-/// before the original goes. Any failure removes what the copy wrote, and only that, and keeps
-/// the original whole.
+/// The move between drives: everything copied, each copy's size checked against its original and
+/// each flushed to its drive before any original goes. Any failure removes what the copy wrote,
+/// and only that, and keeps the original whole.
 pub(crate) fn copy_across(from: &Path, to: &Path) -> Result<()> {
     let mut made = Vec::new();
     if let Err(err) = copy_into(from, to, from.is_dir(), &mut made) {
@@ -94,7 +94,28 @@ fn copy_into(
             from.display()
         )));
     }
-    Ok(())
+    flush_copy(to)
+}
+
+/// Writes a copy through to its drive. A read-only copy cannot be opened to write, so it gives up
+/// the attribute for the flush and takes it back after.
+fn flush_copy(copy: &Path) -> Result<()> {
+    let mut permissions = std::fs::metadata(copy)?.permissions();
+    let read_only = permissions.readonly();
+    if read_only {
+        #[allow(clippy::permissions_set_readonly_false)]
+        permissions.set_readonly(false);
+        std::fs::set_permissions(copy, permissions.clone())?;
+    }
+    let flushed = std::fs::OpenOptions::new()
+        .write(true)
+        .open(copy)
+        .and_then(|file| flush(&file, copy));
+    if read_only {
+        permissions.set_readonly(true);
+        std::fs::set_permissions(copy, permissions)?;
+    }
+    Ok(flushed?)
 }
 
 #[cfg(test)]
@@ -325,6 +346,69 @@ mod tests {
             "stars"
         );
         assert!(!dir.join("from/Cairo").exists());
+    }
+
+    /// Each file this thread flushes from now on, with whether every one of `originals` was still
+    /// there as it was.
+    fn flushes_while(originals: &[PathBuf]) -> Rc<RefCell<Vec<(PathBuf, bool)>>> {
+        let flushed = Rc::new(RefCell::new(Vec::new()));
+        let seen = Rc::clone(&flushed);
+        let originals = originals.to_vec();
+        crate::fs::just_after_flushing(move |path| {
+            let all_there = originals.iter().all(|original| original.is_file());
+            seen.borrow_mut().push((path.to_path_buf(), all_there));
+        });
+        flushed
+    }
+
+    #[test]
+    fn every_copy_across_is_flushed_before_any_original_goes() {
+        let dir = scratch("flushed");
+        std::fs::create_dir_all(dir.join("from/Cairo/Night")).unwrap();
+        std::fs::write(dir.join("from/Cairo/pyramid.jpg"), "pyramid").unwrap();
+        std::fs::write(dir.join("from/Cairo/Night/stars.jpg"), "stars").unwrap();
+        let flushed = flushes_while(&[
+            dir.join("from/Cairo/pyramid.jpg"),
+            dir.join("from/Cairo/Night/stars.jpg"),
+        ]);
+
+        copy_across(&dir.join("from/Cairo"), &dir.join("Cairo")).unwrap();
+        let mut flushed = flushed.take();
+        flushed.sort();
+        assert_eq!(
+            flushed,
+            [
+                (dir.join("Cairo/Night/stars.jpg"), true),
+                (dir.join("Cairo/pyramid.jpg"), true),
+            ]
+        );
+        assert!(!dir.join("from/Cairo").exists());
+    }
+
+    #[test]
+    fn a_read_only_file_copied_across_is_flushed_and_stays_read_only() {
+        let dir = scratch("read-only");
+        let original = dir.join("from/pyramid.jpg");
+        std::fs::create_dir_all(dir.join("from")).unwrap();
+        std::fs::write(&original, "pyramid").unwrap();
+        let mut permissions = std::fs::metadata(&original).unwrap().permissions();
+        permissions.set_readonly(true);
+        std::fs::set_permissions(&original, permissions).unwrap();
+        let flushed = flushes_while(std::slice::from_ref(&original));
+
+        copy_across(&original, &dir.join("pyramid.jpg")).unwrap();
+        assert_eq!(flushed.take(), [(dir.join("pyramid.jpg"), true)]);
+        let copy = std::fs::metadata(dir.join("pyramid.jpg")).unwrap();
+        assert!(copy.permissions().readonly());
+        assert_eq!(
+            std::fs::read_to_string(dir.join("pyramid.jpg")).unwrap(),
+            "pyramid"
+        );
+        assert!(!original.exists());
+        let mut permissions = copy.permissions();
+        #[allow(clippy::permissions_set_readonly_false)]
+        permissions.set_readonly(false);
+        std::fs::set_permissions(dir.join("pyramid.jpg"), permissions).unwrap();
     }
 
     #[cfg(windows)]

@@ -473,7 +473,7 @@ impl<C: Control> Run<'_, C> {
             .map_err(AppError::from)
             .and_then(|source| Ok((source, self.open_part(folder)?)))
             .and_then(|(source, (part, target))| {
-                let whole = copy_bytes(from, source, target, self.control);
+                let whole = copy_bytes(from, source, &part, target, self.control);
                 if !matches!(whole, Ok(true)) {
                     let _ = std::fs::remove_file(&part);
                 }
@@ -549,11 +549,12 @@ impl<C: Control> Run<'_, C> {
     }
 }
 
-/// Copies a file's bytes into its part. `false` when the app began closing partway; the caller
-/// removes what was written.
+/// Copies a file's bytes into its part at `part` and flushes it to its drive. `false` when the app
+/// began closing partway; the caller removes what was written.
 fn copy_bytes(
     from: &Path,
     mut source: std::fs::File,
+    part: &Path,
     mut target: std::fs::File,
     control: &impl Control,
 ) -> Result<bool> {
@@ -580,6 +581,7 @@ fn copy_bytes(
     if let Ok(modified) = meta.modified() {
         target.set_modified(modified)?;
     }
+    super::flush(&target, part)?;
     Ok(true)
 }
 
@@ -745,6 +747,38 @@ mod tests {
             }
         );
         assert_eq!(described.files, 2);
+    }
+
+    #[test]
+    fn each_copy_is_flushed_whole_under_its_part_before_it_takes_its_name() {
+        let (conn, dir, lisbon) = library("flushed");
+        let a = write(&dir.join("Downloads/IMG_5001.jpg"), "a");
+        let named = dir.join("library/Trips/Lisbon/IMG_5001.jpg");
+        let flushed = Rc::new(RefCell::new(Vec::new()));
+        let seen = Rc::clone(&flushed);
+        let watched = named.clone();
+        crate::fs::just_after_flushing(move |path| {
+            let held = std::fs::read_to_string(path).unwrap();
+            seen.borrow_mut()
+                .push((path.to_path_buf(), held, watched.exists()));
+        });
+
+        let outcome = run(
+            &conn,
+            &journal::new_batch(),
+            lisbon,
+            &[a],
+            &Script::default(),
+        )
+        .unwrap();
+        assert_eq!(outcome.done, 1);
+        let flushed = flushed.take();
+        assert_eq!(flushed.len(), 1, "{flushed:?}");
+        let (part, held, named_yet) = &flushed[0];
+        assert_eq!(part.parent(), named.parent());
+        assert_ne!(part, &named);
+        assert_eq!((held.as_str(), *named_yet), ("a", false));
+        assert_eq!(std::fs::read_to_string(&named).unwrap(), "a");
     }
 
     #[test]
