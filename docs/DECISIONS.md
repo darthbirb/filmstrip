@@ -1522,9 +1522,9 @@ which the app never shows on its behalf.
   shell is asked, the file is given a second name beside it by a hard link, and that file's names
   are read through `FindFirstFileNameW`. The bin moves a file within its own volume, so a file it
   took gains a name under that volume's `$Recycle.Bin`. Only with a name there that was not there
-  before is the second name removed and the file counted as sent. Otherwise, and when its names
-  cannot be read afterwards, the second name is given the file's own name back and the file is
-  refused. Whatever the shell answers, the disk says which happened, so a refusal is never
+  before is the file counted as sent; its second name goes once the Trash has recorded it, so a
+  stop between the two still finds it. Otherwise, and when its names cannot be read afterwards,
+  the second name is given the file's own name back and the file is refused. Whatever the shell answers, the disk says which happened, so a refusal is never
   mistaken for a send. The count of names, compared before and after, is not enough: something on
   the disk giving the file a name elsewhere while the shell deletes it outright leaves the count
   unchanged, with the file in neither the Trash nor the bin. A user's file can already have other
@@ -1538,12 +1538,19 @@ which the app never shows on its behalf.
   cannot be, the second name is removed and the file refused without asking. Names are read in
   verbatim form, as `std::fs` and `noclobber` pass theirs, since the second name is longer than
   the file's and can pass MAX_PATH where the file does not.
-- **What a cut-short send left is settled at the next, and never counted as sent.** A crash
-  between the steps leaves the second name. Beside the file it is removed. Alone, it is the file
-  again, put back and sent once more; at worst the bin then holds the same file twice. A lone one
-  with a name in the bin is not counted as sent either: the disk can change while the app is
-  closed, so that name may be gone or emptied by the next look, and the twin costs only space. A
-  second name that is not the same file is never removed.
+- **What a cut-short send left is settled at the next.** A crash between the steps leaves the
+  second name. Beside the file it is removed. Alone, it is the file again, put back and sent once
+  more, unless the launch finds the bin took it, as the next bullet says; at worst the bin then
+  holds the same file twice. A second name that is not the same file is never removed.
+- **A send the bin took before the app stopped is in the Trash at the next launch**, built for
+  #215. Before the shell is asked, the send's mark keeps the item, its act, the file's identity
+  and every name it has; the second name stays until the row is recorded. At launch a mark whose
+  row already names that file in the bin only lets the second name go. Otherwise a name the second
+  name gained in the bin since is where the bin put it, and the row is recorded as the send would
+  have: in the Trash with its tags, under its act, so one undo still brings it back. The look in
+  the bin that follows finds it there, or retires it if the bin was emptied while the app was
+  closed. A row no longer live, or no such name, leaves the second name settled as above; a name
+  the file had in the bin before is never taken for the send's.
 - **The send says where the bin put it**: the name the file gained under `$Recycle.Bin`, and its
   identity, read from the second name before the shell is asked, since the file keeps it in the
   bin. DECISIONS.md "The Trash is the Recycle Bin".
@@ -1553,11 +1560,11 @@ which the app never shows on its behalf.
   three are the Recycle Bin refusing, and a send that fails on the disk is said in the log.
 - **The second name is made in the file's own folder.** Delete hands `send` a file where it is,
   so its second name is made there, hidden by its dot from the walk, and nothing else would ever
-  find it. Its path joins the list in `setting.recycling` before the send and
-  leaves only once the send has settled. A send that fails partway keeps it, and a later send
-  never displaces it. At launch each one whose folder can be reached is settled as the next
-  send would settle it: a lone second name is the file again. One on a drive that is away waits
-  for a launch that finds it. The rest of the library is never swept for second names.
+  find it. Its mark joins the list in `setting.recycling` before the send and leaves only once
+  the send has been recorded and its second name let go. A send that fails partway keeps it; a
+  later send of the same file settles what that one left before marking its own. At launch each
+  one whose folder can be reached is settled as the cut-short bullets above say. One on a drive
+  that is away waits for a launch that finds it. The rest of the library is never swept for second names.
 - **Tests never reach the real bin.** The shell is behind the `Bin` trait, which also says
   whether a name is inside it and lets go of the record it keeps; the tests' stand-in recycles
   into a folder of its own, deletes outright or refuses, while the second name and the file's
