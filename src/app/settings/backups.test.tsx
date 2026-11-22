@@ -1,3 +1,4 @@
+import { emit } from "@tauri-apps/api/event";
 import { beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
@@ -5,6 +6,7 @@ import { render } from "vitest-browser-react";
 import { forgetOnRestore, resetBackups } from "../../dev/mock";
 import { listBackups } from "../../ipc/commands";
 import { getNews, setNews } from "../navigation/foot-slot";
+import { watchWork } from "../navigation/work-store";
 import { useLaunchBackup } from "./backup-words";
 import { Settings } from "./Settings";
 import { settingsHeld } from "./settings-store";
@@ -49,6 +51,41 @@ test("Restore… asks on its row, and Escape puts the row back with the focus on
   await expect.poll(() => document.querySelector("dialog[open]")).not.toBeNull();
   await expect.element(page.getByRole("button", { name: "Restore Index" })).not.toBeInTheDocument();
   expect(document.activeElement).toBe(restoreOn(2));
+});
+
+test("Restore… names each copy, move and export it stops first", async () => {
+  await watchWork();
+  await opened();
+  await expect.poll(() => rows().length).toBe(7);
+  const line = { folderId: 5, to: "People", done: 1, whole: 4 };
+  const export_ = { jobId: 3, zip: "Trips.zip", path: "D:ExportsTrips.zip", done: 0, whole: 2 };
+  await emit("job-progress", {
+    phase: "idle",
+    pending: 0,
+    running: 0,
+    failed: 0,
+    completed: 0,
+    copies: [{ jobId: 1, ...line }],
+    moves: [{ jobId: 2, ...line }],
+    exports: [export_],
+  });
+  await userEvent.click(restoreOn(2) as HTMLElement);
+  await expect
+    .poll(() => rowText(2))
+    .toContain(
+      "The copy, the move and the export running now are stopped first, as Cancel would stop them.",
+    );
+  await userEvent.keyboard("{Escape}");
+  await emit("job-progress", {
+    phase: "idle",
+    pending: 0,
+    running: 0,
+    failed: 0,
+    completed: 0,
+    copies: [],
+    moves: [],
+    exports: [],
+  });
 });
 
 test("a restore holds Settings open, then keeps the way back on top with the focus on it", async () => {

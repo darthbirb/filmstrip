@@ -47,7 +47,7 @@ drawn. **Not started** — neither.
 | Read one folder again | Built | `read_folder_again`, its row's menu; ggallery walked only whole sources |
 | A folder's own details | Built | `folder_detail`, the band under a folder's header |
 | Create a folder | Built | `create_folder`, New Folder on a folder's and a source's menu, a row already in its name field |
-| Move a folder | Built | `move_folder`, across drives too; Move to… on its menu, its own branch not a choice |
+| Move a folder | Built | `move_folder`, across drives too, as a job with its line and Cancel (`cancel_move`); Move to… on its menu, its own branch not a choice |
 | Delete a folder, choosing what happens to what is inside | Built | `delete_folder`, `folder_file_count`; asks in a banner, and Settings › Sources keeps the answer |
 | Rename a folder, on disk | Built | `rename_folder`, in its tree row, a name already there said under it |
 | A folder's cover | Built | `folder_cover_choices`, `set_folder_cover`, the pencil on the band's cover, which takes only a live picture at or below the folder; the first picture stands in while none is chosen |
@@ -65,7 +65,7 @@ drawn. **Not started** — neither.
 | Favourite an item | Built | `set_item_favorite` |
 | Reveal, open, copy the file | Built | the pane's bar |
 | Sort by key and direction, random order held steady | Built | `folder_items`, `sorting_items` and `search` take the order; the grid's header chooses it per kind of place |
-| Move items between folders | Built | `move_items`, Move to… on the pane's bar and a file's menu; a name already taken is reported, never changed |
+| Move items between folders | Built | `move_items`, Move to… on the pane's bar and a file's menu; a name already taken is reported, never changed; between drives a job with its line and Cancel, `cancel_move`: DECISIONS.md "Undo" |
 | Delete items to the trash | Built | `trash_items`, Delete on the pane's bar and a file's menu, sending each file to the Windows Recycle Bin on its own drive through `fs::recycle`; one the bin will not take stays where it was, said at the foot; undo takes an item back out of the bin |
 | Rename a file, on disk | Built | `rename_item`, the pane's Name row; not in ggallery; a name already taken is refused |
 | Paste files in, and take an OS drop | Built | `paste_files`, `drop_files`: Paste on a folder's, a source's and the Sorting Box's menus, on the rows and on the grid's ground, Ctrl+V, and a drop from Explorer on a row or a folder's grid, the tree scrolling near its edges; a copy as a job with Cancel, a name taken refused, never changed; undo sends what came in to the Trash |

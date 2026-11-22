@@ -10,11 +10,14 @@ use crate::db::{self, items, journal};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::export as fs_export;
 use crate::fs::paste::{self, Halt};
-use crate::fs::stayed::Stayed;
-use crate::fs::{paths, walk};
-use crate::jobs::kinds::{self, CopyPayload, ExportPayload, FolderPayload, ItemPayload};
+use crate::fs::stayed::{self, Stayed};
+use crate::fs::{folders as fs_folders, items as fs_items, paths, relocate, walk};
+use crate::jobs::kinds::{
+    self, CopyPayload, ExportPayload, FolderPayload, ItemPayload, MovePayload,
+};
 use crate::jobs::{
-    Copied, Copying, Exporting, QueueInner, enqueue_scrub, enqueue_thumb, exported, lock,
+    Copied, Copying, Exporting, Moved, Moving, QueueInner, enqueue_scrub, enqueue_thumb, exported,
+    lock,
 };
 use crate::media::ffmpeg::Ffmpeg;
 use crate::media::probe::Probe;
@@ -39,6 +42,7 @@ pub fn execute(inner: &QueueInner, conn: &mut Connection, job: &QueuedJob) -> Re
         kinds::THUMB => finished(thumb(inner, conn, serde_json::from_str(&job.payload)?)),
         kinds::SCRUB => finished(scrub(inner, conn, serde_json::from_str(&job.payload)?)),
         kinds::COPY_IN => copy_in(inner, conn, job.id, serde_json::from_str(&job.payload)?),
+        kinds::MOVE => move_across(inner, conn, job.id, &serde_json::from_str(&job.payload)?),
         kinds::EXPORT => {
             export(inner, conn, job.id, &serde_json::from_str(&job.payload)?);
             Ok(Done::Finished)
@@ -93,6 +97,143 @@ fn copy_in(
     Ok(Done::Finished)
 }
 
+/// A move between drives, its line kept while it runs, and how it ended said once it has. One the
+/// app's closing stopped goes on at the next launch under the same batch.
+fn move_across(
+    inner: &QueueInner,
+    conn: &Connection,
+    job_id: i64,
+    payload: &MovePayload,
+) -> Result<Done> {
+    let line = Moving {
+        job_id,
+        folder_id: payload.into,
+        to: crate::fs::acts::name(conn, payload.into).unwrap_or_default(),
+        done: 0,
+        whole: payload.whole,
+    };
+    lock(&inner.moves).insert(job_id, line);
+    let control = MoveControl { inner, job_id };
+    let mut ended = Ended {
+        whole: payload.whole,
+        refused: Vec::new(),
+        cancelled: false,
+        stopped: None,
+    };
+    let halted = match payload.folder_id {
+        Some(folder_id) => {
+            match fs_folders::move_watched(
+                conn,
+                folder_id,
+                payload.into,
+                &payload.batch_id,
+                &control,
+            ) {
+                Ok(halted) => halted,
+                Err(err) => {
+                    ended.refused.push(stayed::folder(conn, folder_id, &err)?);
+                    None
+                }
+            }
+        }
+        None => match fs_items::move_watched(
+            conn,
+            &payload.item_ids,
+            payload.into,
+            &payload.batch_id,
+            &control,
+        ) {
+            Ok(outcome) => {
+                ended.refused = outcome.report.refused;
+                ended.stopped = outcome.stopped;
+                outcome.halted
+            }
+            Err(err) => {
+                ended.stopped = Some(Reason::of(&err));
+                None
+            }
+        },
+    };
+    drop(control);
+    if halted == Some(Halt::Stop) {
+        return Ok(Done::Paused);
+    }
+    ended.cancelled = halted == Some(Halt::Cancel);
+    announce_move(inner, conn, job_id, payload, ended)?;
+    Ok(Done::Finished)
+}
+
+/// A move taken off the queue as it waited: it ends as one cancelled while running does, with
+/// what a run before a restart moved, if any did.
+pub fn moved_waiting(
+    inner: &QueueInner,
+    conn: &Connection,
+    job_id: i64,
+    payload: &MovePayload,
+) -> Result<()> {
+    let ended = Ended {
+        whole: payload.whole,
+        refused: Vec::new(),
+        cancelled: true,
+        stopped: None,
+    };
+    announce_move(inner, conn, job_id, payload, ended)
+}
+
+fn announce_move(
+    inner: &QueueInner,
+    conn: &Connection,
+    job_id: i64,
+    payload: &MovePayload,
+    ended: Ended,
+) -> Result<()> {
+    (inner.moved)(&Moved {
+        job_id,
+        folder_id: payload.into,
+        to: crate::fs::acts::name(conn, payload.into).unwrap_or_default(),
+        batch: batch_of(conn, &payload.batch_id)?,
+        whole: ended.whole,
+        refused: ended.refused,
+        cancelled: ended.cancelled,
+        stopped: ended.stopped,
+    });
+    Ok(())
+}
+
+/// What a job's batch did, described; nothing when it wrote nothing.
+fn batch_of(conn: &Connection, batch_id: &str) -> Result<Option<crate::fs::acts::Batch>> {
+    if journal::batch(conn, batch_id)?.is_empty() {
+        return Ok(None);
+    }
+    crate::fs::acts::describe(conn, batch_id).map(Some)
+}
+
+struct MoveControl<'a> {
+    inner: &'a QueueInner,
+    job_id: i64,
+}
+
+/// A move's line and its Cancel go when it ends, however it ends: a panic included.
+impl Drop for MoveControl<'_> {
+    fn drop(&mut self) {
+        lock(&self.inner.moves).remove(&self.job_id);
+        lock(&self.inner.cancelled).remove(&self.job_id);
+    }
+}
+
+impl relocate::Control for MoveControl<'_> {
+    fn halt(&self) -> Option<Halt> {
+        halt_of(self.inner, self.job_id)
+    }
+
+    fn progress(&self, done: u32, whole: u32) {
+        if let Some(line) = lock(&self.inner.moves).get_mut(&self.job_id) {
+            line.done = done;
+            line.whole = whole;
+        }
+    }
+}
+
 /// An export, its line kept while it runs, and how it ended said once it has. One the app's
 /// closing stopped says nothing, and is not taken up again.
 fn export(inner: &QueueInner, conn: &Connection, job_id: i64, payload: &ExportPayload) {
@@ -138,13 +279,7 @@ impl Drop for ExportControl<'_> {
 
 impl fs_export::Control for ExportControl<'_> {
     fn halt(&self) -> Option<Halt> {
-        if self.inner.stop.load(Ordering::Relaxed) {
-            Some(Halt::Stop)
-        } else if lock(&self.inner.cancelled).contains(&self.job_id) {
-            Some(Halt::Cancel)
-        } else {
-            None
-        }
+        halt_of(self.inner, self.job_id)
     }
 
     fn progress(&self, done: u32, whole: u32) {
@@ -152,6 +287,17 @@ impl fs_export::Control for ExportControl<'_> {
             line.done = done;
             line.whole = whole;
         }
+    }
+}
+
+/// Why a job stops before its next file: the app closing, or its Cancel.
+fn halt_of(inner: &QueueInner, job_id: i64) -> Option<Halt> {
+    if inner.stop.load(Ordering::Relaxed) {
+        Some(Halt::Stop)
+    } else if lock(&inner.cancelled).contains(&job_id) {
+        Some(Halt::Cancel)
+    } else {
+        None
     }
 }
 
@@ -189,17 +335,11 @@ fn announce(
     payload: &CopyPayload,
     ended: Ended,
 ) -> Result<()> {
-    let journalled = !journal::batch(conn, &payload.batch_id)?.is_empty();
-    let batch = if journalled {
-        Some(crate::fs::acts::describe(conn, &payload.batch_id)?)
-    } else {
-        None
-    };
     (inner.announce)(&Copied {
         job_id,
         folder_id: payload.folder_id,
         to: crate::fs::acts::name(conn, payload.folder_id).unwrap_or_default(),
-        batch,
+        batch: batch_of(conn, &payload.batch_id)?,
         whole: ended.whole,
         refused: ended.refused,
         cancelled: ended.cancelled,
@@ -223,13 +363,7 @@ impl Drop for QueueControl<'_> {
 
 impl paste::Control for QueueControl<'_> {
     fn halt(&self) -> Option<Halt> {
-        if self.inner.stop.load(Ordering::Relaxed) {
-            Some(Halt::Stop)
-        } else if lock(&self.inner.cancelled).contains(&self.job_id) {
-            Some(Halt::Cancel)
-        } else {
-            None
-        }
+        halt_of(self.inner, self.job_id)
     }
 
     fn progress(&self, done: u32, whole: u32) {
@@ -373,6 +507,7 @@ mod tests {
             dir.join("library.db"),
             dir.join("thumbs"),
             Ffmpeg::discover(&tools),
+            Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),

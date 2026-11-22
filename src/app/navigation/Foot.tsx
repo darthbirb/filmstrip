@@ -3,9 +3,10 @@ import { type CSSProperties, useId, useLayoutEffect, useRef, useState } from "re
 import type { Copying } from "../../ipc/bindings/Copying";
 import type { Exporting } from "../../ipc/bindings/Exporting";
 import type { LibraryTotals } from "../../ipc/bindings/LibraryTotals";
+import type { Moving } from "../../ipc/bindings/Moving";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import type { Tally } from "../../ipc/bindings/Tally";
-import { cancelCopy, cancelExport, revealPath } from "../../ipc/commands";
+import { cancelCopy, cancelExport, cancelMove, revealPath } from "../../ipc/commands";
 import { formatBytes, formatCount, formatShortDay } from "../../lib/format";
 import { Band } from "../../ui/Band";
 import { Bar } from "../../ui/Bar";
@@ -41,6 +42,7 @@ export function Foot({ rail = false }: { rail?: boolean }) {
   // Newest highest, above the walk, as the foot is ordered by permanence from the bottom.
   const jobs: Job[] = [
     ...(progress?.copies ?? []).map((copy) => ({ kind: "copy" as const, ...copy })),
+    ...(progress?.moves ?? []).map((one) => ({ kind: "move" as const, ...one })),
     ...(progress?.exports ?? []).map((one) => ({ kind: "export" as const, ...one })),
   ].sort((a, b) => b.jobId - a.jobId);
   const left = progress ? progress.pending + progress.running : 0;
@@ -53,10 +55,10 @@ export function Foot({ rail = false }: { rail?: boolean }) {
     <div className="w-full shrink-0" style={{ anchorName: anchor } as CSSProperties}>
       <PushDown open={shown}>{shown && <News news={news} rail={rail} />}</PushDown>
       {jobs.map((job) =>
-        job.kind === "copy" ? (
-          <CopyLine key={job.jobId} copy={job} rail={rail} />
-        ) : (
+        job.kind === "export" ? (
           <ExportLine key={job.jobId} job={job} rail={rail} />
+        ) : (
+          <CarryLine key={job.jobId} job={job} rail={rail} />
         ),
       )}
       <PushDown open={busy}>
@@ -81,8 +83,11 @@ export function Foot({ rail = false }: { rail?: boolean }) {
   );
 }
 
-/** A copy's or an export's line, by the job that runs it. */
-type Job = (Copying & { kind: "copy" }) | (Exporting & { kind: "export" });
+/** A copy's, a move's or an export's line, by the job that runs it. */
+type Job =
+  | (Copying & { kind: "copy" })
+  | (Moving & { kind: "move" })
+  | (Exporting & { kind: "export" });
 
 const NONE: Tally = { count: 0, bytes: 0 };
 const NOTHING: LibraryTotals = {
@@ -352,12 +357,14 @@ function Nothing({ noFiles = false }: { noFiles?: boolean }) {
 }
 
 /**
- * A copy's own line, the walk's shape: where it is going, how far, and its dismiss, which cancels
- * it after the file in hand. Artboards › Bringing files in.
+ * A copy's or a move's own line, the walk's shape: where it is going, how far, and its dismiss,
+ * which cancels it after the file in hand. Artboards › Bringing files in.
  */
-function CopyLine({ copy, rail }: { copy: Copying; rail: boolean }) {
-  const percent = copy.whole > 0 ? Math.round((copy.done / copy.whole) * 100) : 0;
-  const left = `Copying to ${copy.to} · ${formatCount(copy.whole - copy.done)} of ${formatCount(copy.whole)} left`;
+function CarryLine({ job, rail }: { job: Extract<Job, { kind: "copy" | "move" }>; rail: boolean }) {
+  const percent = job.whole > 0 ? Math.round((job.done / job.whole) * 100) : 0;
+  const verb = job.kind === "copy" ? "Copying" : "Moving";
+  const cancel = job.kind === "copy" ? cancelCopy : cancelMove;
+  const left = `${verb} to ${job.to} · ${formatCount(job.whole - job.done)} of ${formatCount(job.whole)} left`;
   if (rail) {
     return (
       <div title={left} className="border-line border-t px-1.5 pt-2 pb-1.5">
@@ -368,12 +375,14 @@ function CopyLine({ copy, rail }: { copy: Copying; rail: boolean }) {
   return (
     <div title={left} className="flex flex-col gap-1 border-line border-t py-1.5 pr-1.5 pl-2.5">
       <span className="flex items-center gap-2 text-fg-mid text-small">
-        <span className="min-w-0 flex-1 truncate">Copying to {copy.to}…</span>
+        <span className="min-w-0 flex-1 truncate">
+          {verb} to {job.to}…
+        </span>
         <span className="text-fg tabular-nums">{percent}%</span>
         <GlyphButton
           glyph="close"
-          label="Cancel Copy"
-          onClick={() => void cancelCopy(copy.jobId).catch(() => false)}
+          label={job.kind === "copy" ? "Cancel Copy" : "Cancel Move"}
+          onClick={() => void cancel(job.jobId).catch(() => false)}
         />
       </span>
       <span className="pr-1">

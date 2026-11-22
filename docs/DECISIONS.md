@@ -1162,6 +1162,26 @@ it.
   walk, so the index follows the copy and no file loses its identity. Both removals take only
   what the copy read and wrote, each directory only once empty: a file someone put in either
   meanwhile stays.
+- **A move between drives is a job**, as a copy in is, since a card's worth of files copied
+  inside the command held the window and every other verb with no progress and no Cancel. The
+  command decides by the drive or share each path names: files moving on one drive are renamed at
+  once, as before, and a selection with any file going to another drive goes on the queue whole,
+  one batch and one undo. A drive mounted in a folder is judged the drive around it, so its move
+  copies inside the command as it always did. The move has a line at the foot as a copy has,
+  "Moving to Lisbon…", whose dismiss is Cancel Move, and ends with the Line and Undo for what went
+  and the banner for what stayed.
+  - **Files go one to a turn**, each moved whole or left where it was, so Cancel finishes the file
+    in hand and starts no other, and a walk or another verb waits for one file, never the
+    selection. A folder the move is going into that goes meanwhile stops it, and the foot says
+    why.
+  - **A folder goes in one turn**, its whole tree: a walk must never read it half copied, so the
+    other verbs wait for it, but the window does not. Cancel stops it between files and takes
+    away what it copied, so the folder stays where it was, whole; once every copy is whole and
+    flushed it has moved, and nothing stops it then.
+  - **A move the app's closing stops goes on at the next launch** under the same batch, passing
+    over what already went. Until it ends its batch is no act: Ctrl+Z passes over it and its Undo
+    is refused, as a copy's is ("Bringing files in"). Restoring the index cancels it first, as
+    it does a copy.
 - **Each copy is flushed to its drive before any original goes.** `CopyFileW` returns once
   Windows holds the bytes, not once the drive does, so a USB drive pulled or power lost seconds
   after a move would otherwise leave copies short or empty and the originals gone. So each file is

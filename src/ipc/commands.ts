@@ -20,6 +20,7 @@ import type { FolderDeleted } from "./bindings/FolderDeleted";
 import type { FolderDetail } from "./bindings/FolderDetail";
 import type { FolderEntry } from "./bindings/FolderEntry";
 import type { FolderMade } from "./bindings/FolderMade";
+import type { FolderMoved } from "./bindings/FolderMoved";
 import type { FolderNode } from "./bindings/FolderNode";
 import type { FolderStatus } from "./bindings/FolderStatus";
 import type { Forgets } from "./bindings/Forgets";
@@ -96,7 +97,7 @@ export const renameFolder = (folderId: number, title: string) =>
   invoke<Batch | null>("rename_folder", { folderId, title });
 
 export const moveFolder = (folderId: number, parentId: number) =>
-  invoke<Batch | null>("move_folder", { folderId, parentId });
+  invoke<FolderMoved>("move_folder", { folderId, parentId });
 
 export const moveItems = (itemIds: number[], folderId: number) =>
   invoke<ItemsMoved>("move_items", { itemIds, folderId });
@@ -140,6 +141,8 @@ export const dropFiles = (folderId: number, paths: string[]) =>
   invoke<CopyStart>("drop_files", { folderId, paths });
 
 export const cancelCopy = (jobId: number) => invoke<boolean>("cancel_copy", { jobId });
+
+export const cancelMove = (jobId: number) => invoke<boolean>("cancel_move", { jobId });
 
 export const exportPlan = (scope: Scope) => invoke<Plan>("export_plan", { scope });
 

@@ -6,23 +6,71 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use crate::error::{AppError, Result};
+use crate::fs::paste::Halt;
 use crate::fs::{flush, noclobber, take_away, take_away_once};
 
 /// Windows' ERROR_NOT_SAME_DEVICE: a rename cannot cross from one drive to another.
 const NOT_SAME_DEVICE: i32 = 17;
 
+/// What long disk work answers to while it runs: being stopped, and saying how far it has got.
+pub trait Control {
+    fn halt(&self) -> Option<Halt>;
+    fn progress(&self, done: u32, whole: u32);
+}
+
+/// Work run inside a command, which nothing stops and nobody watches.
+pub struct Unwatched;
+
+impl Control for Unwatched {
+    fn halt(&self) -> Option<Halt> {
+        None
+    }
+    fn progress(&self, _done: u32, _whole: u32) {}
+}
+
 /// Moves `from` to `to`, refused with `AlreadyExists` when anything has that name, however late
 /// it came.
 pub fn relocate(from: &Path, to: &Path) -> Result<()> {
+    relocate_watched(from, to, &Unwatched).map(|_| ())
+}
+
+/// `relocate`, answering to `control` between the files a move between drives copies. Stopped,
+/// it takes away what it copied and leaves `from` whole, and says why it stopped.
+pub fn relocate_watched(from: &Path, to: &Path, control: &impl Control) -> Result<Option<Halt>> {
     match noclobber::rename(from, to) {
-        Ok(()) => Ok(()),
+        Ok(()) => Ok(None),
         Err(err)
             if err.kind() == std::io::ErrorKind::CrossesDevices
                 || err.raw_os_error() == Some(NOT_SAME_DEVICE) =>
         {
-            copy_across(from, to)
+            copy_across_watched(from, to, control)
         }
         Err(err) => Err(err.into()),
+    }
+}
+
+/// Whether a move from `from` into `dir` is a copy between drives, judged by the drive or share
+/// each path names. A drive mounted in a folder is judged the drive around it, and then copies as
+/// any move between drives does, inside the act that asked for it.
+pub fn crosses_drives(from: &Path, dir: &Path) -> bool {
+    drive_of(from) != drive_of(dir)
+}
+
+fn drive_of(path: &Path) -> Option<String> {
+    use std::path::{Component, Prefix};
+    match path.components().next()? {
+        Component::Prefix(prefix) => Some(match prefix.kind() {
+            Prefix::Disk(letter) | Prefix::VerbatimDisk(letter) => {
+                char::from(letter).to_ascii_lowercase().to_string()
+            }
+            Prefix::UNC(server, share) | Prefix::VerbatimUNC(server, share) => format!(
+                "//{}/{}",
+                server.to_string_lossy().to_lowercase(),
+                share.to_string_lossy().to_lowercase()
+            ),
+            _ => prefix.as_os_str().to_string_lossy().to_lowercase(),
+        }),
+        _ => None,
     }
 }
 
@@ -37,16 +85,43 @@ pub fn taken_as(taken: impl FnOnce() -> AppError) -> impl FnOnce(AppError) -> Ap
 /// The move between drives: everything copied, each copy's size checked against its original and
 /// each flushed to its drive before any original goes. Any failure removes what the copy wrote,
 /// and only that, and keeps the original whole.
+#[cfg(test)]
 pub(crate) fn copy_across(from: &Path, to: &Path) -> Result<()> {
-    let mut made = Vec::new();
-    if let Err(err) = copy_into(from, to, from.is_dir(), &mut made) {
-        remove_deepest_first(made.iter().map(|(_, copy)| copy.as_path()));
-        return Err(err);
+    copy_across_watched(from, to, &Unwatched).map(|_| ())
+}
+
+/// The move between drives, stopped between files when `control` says so, as a failure is.
+pub(crate) fn copy_across_watched(
+    from: &Path,
+    to: &Path,
+    control: &impl Control,
+) -> Result<Option<Halt>> {
+    let mut copy = Across {
+        made: Vec::new(),
+        control,
+        done: 0,
+        whole: files_under(from),
+    };
+    control.progress(0, copy.whole);
+    let copied = copy.copy(from, to, from.is_dir());
+    if !matches!(copied, Ok(None)) {
+        remove_deepest_first(copy.made.iter().map(|(_, copy)| copy.as_path()));
+        return copied;
     }
     // The copy is whole, so the move has happened and the index follows it; an original that will
     // not go, or anything that arrived in it since it was read, is left for the next walk.
-    remove_deepest_first(made.iter().map(|(original, _)| original.as_path()));
-    Ok(())
+    remove_deepest_first(copy.made.iter().map(|(original, _)| original.as_path()));
+    Ok(None)
+}
+
+/// Every file at or under `path`, as the copy will meet them.
+fn files_under(path: &Path) -> u32 {
+    let count = walkdir::WalkDir::new(path)
+        .into_iter()
+        .flatten()
+        .filter(|entry| !entry.file_type().is_dir())
+        .count();
+    u32::try_from(count).unwrap_or(u32::MAX)
 }
 
 /// Removes what `made` lists, each directory listed before what is in it, as far as it will go. A
@@ -69,32 +144,46 @@ fn remove_deepest_first<'a>(made: impl DoubleEndedIterator<Item = &'a Path>) {
     }
 }
 
-/// Copies `from` to `to`, never onto anything there, recording each pair it wrote in `made`.
-fn copy_into(
-    from: &Path,
-    to: &Path,
-    is_dir: bool,
-    made: &mut Vec<(PathBuf, PathBuf)>,
-) -> Result<()> {
-    if is_dir {
-        noclobber::make_dir(to)?;
-        made.push((from.to_path_buf(), to.to_path_buf()));
-        for entry in std::fs::read_dir(from)? {
-            let entry = entry?;
-            let is_dir = entry.file_type()?.is_dir();
-            copy_into(&entry.path(), &to.join(entry.file_name()), is_dir, made)?;
+/// A copy between drives as it goes: each pair it wrote, and how many files are whole.
+struct Across<'a, C: Control> {
+    made: Vec<(PathBuf, PathBuf)>,
+    control: &'a C,
+    done: u32,
+    whole: u32,
+}
+
+impl<C: Control> Across<'_, C> {
+    /// Copies `from` to `to`, never onto anything there, recording each pair it wrote; stopped
+    /// before the next file once `control` says so.
+    fn copy(&mut self, from: &Path, to: &Path, is_dir: bool) -> Result<Option<Halt>> {
+        if let Some(halt) = self.control.halt() {
+            return Ok(Some(halt));
         }
-        return Ok(());
+        if is_dir {
+            noclobber::make_dir(to)?;
+            self.made.push((from.to_path_buf(), to.to_path_buf()));
+            for entry in std::fs::read_dir(from)? {
+                let entry = entry?;
+                let is_dir = entry.file_type()?.is_dir();
+                if let Some(halt) = self.copy(&entry.path(), &to.join(entry.file_name()), is_dir)? {
+                    return Ok(Some(halt));
+                }
+            }
+            return Ok(None);
+        }
+        noclobber::copy(from, to)?;
+        self.made.push((from.to_path_buf(), to.to_path_buf()));
+        if std::fs::metadata(to)?.len() != std::fs::metadata(from)?.len() {
+            return Err(AppError::invalid(format!(
+                "{} did not copy whole",
+                from.display()
+            )));
+        }
+        flush_copy(to)?;
+        self.done = (self.done + 1).min(self.whole);
+        self.control.progress(self.done, self.whole);
+        Ok(None)
     }
-    noclobber::copy(from, to)?;
-    made.push((from.to_path_buf(), to.to_path_buf()));
-    if std::fs::metadata(to)?.len() != std::fs::metadata(from)?.len() {
-        return Err(AppError::invalid(format!(
-            "{} did not copy whole",
-            from.display()
-        )));
-    }
-    flush_copy(to)
 }
 
 /// Writes a copy through to its drive. A read-only copy cannot be opened to write, so it gives up
@@ -409,6 +498,83 @@ mod tests {
         #[allow(clippy::permissions_set_readonly_false)]
         permissions.set_readonly(false);
         std::fs::set_permissions(dir.join("pyramid.jpg"), permissions).unwrap();
+    }
+
+    /// Cancels once `after` files are whole, keeping every count it was given.
+    struct CancelAfter {
+        after: u32,
+        said: RefCell<Vec<(u32, u32)>>,
+    }
+
+    impl Control for CancelAfter {
+        fn halt(&self) -> Option<Halt> {
+            let done = self.said.borrow().last().map_or(0, |(done, _)| *done);
+            (done >= self.after).then_some(Halt::Cancel)
+        }
+        fn progress(&self, done: u32, whole: u32) {
+            self.said.borrow_mut().push((done, whole));
+        }
+    }
+
+    #[test]
+    fn a_folder_copy_across_cancelled_between_files_leaves_every_file_where_it_was() {
+        let dir = scratch("cancelled");
+        std::fs::create_dir_all(dir.join("from/Cairo/Night")).unwrap();
+        std::fs::write(dir.join("from/Cairo/a-pyramid.jpg"), "pyramid").unwrap();
+        std::fs::write(dir.join("from/Cairo/b-sphinx.jpg"), "sphinx").unwrap();
+        std::fs::write(dir.join("from/Cairo/Night/stars.jpg"), "stars").unwrap();
+        let control = CancelAfter {
+            after: 1,
+            said: RefCell::new(Vec::new()),
+        };
+
+        let halted =
+            copy_across_watched(&dir.join("from/Cairo"), &dir.join("Cairo"), &control).unwrap();
+        assert_eq!(halted, Some(Halt::Cancel));
+        assert_eq!(control.said.take(), [(0, 3), (1, 3)]);
+        assert!(!dir.join("Cairo").exists(), "nothing of the copy is left");
+        for (name, bytes) in [
+            ("a-pyramid.jpg", "pyramid"),
+            ("b-sphinx.jpg", "sphinx"),
+            ("Night/stars.jpg", "stars"),
+        ] {
+            let original = dir.join("from/Cairo").join(name);
+            assert_eq!(std::fs::read_to_string(original).unwrap(), bytes);
+        }
+    }
+
+    #[test]
+    fn a_folder_copy_across_counts_each_file_as_it_is_whole() {
+        let dir = scratch("counted");
+        std::fs::create_dir_all(dir.join("from/Cairo/Night")).unwrap();
+        std::fs::write(dir.join("from/Cairo/pyramid.jpg"), "pyramid").unwrap();
+        std::fs::write(dir.join("from/Cairo/Night/stars.jpg"), "stars").unwrap();
+        let control = CancelAfter {
+            after: u32::MAX,
+            said: RefCell::new(Vec::new()),
+        };
+
+        let halted =
+            copy_across_watched(&dir.join("from/Cairo"), &dir.join("Cairo"), &control).unwrap();
+        assert_eq!(halted, None);
+        assert_eq!(control.said.take(), [(0, 2), (1, 2), (2, 2)]);
+        assert!(!dir.join("from/Cairo").exists());
+        assert_eq!(
+            std::fs::read_to_string(dir.join("Cairo/Night/stars.jpg")).unwrap(),
+            "stars"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_move_crosses_drives_only_between_two_drives_or_shares() {
+        let crosses = |a: &str, b: &str| crosses_drives(Path::new(a), Path::new(b));
+        assert!(!crosses(r"D:\Pictures\Cairo", r"d:\Archive"));
+        assert!(!crosses(r"\\?\D:\Pictures", r"D:\Archive"));
+        assert!(crosses(r"D:\Pictures", r"E:\Archive"));
+        assert!(!crosses(r"\\nas\photos\Cairo", r"\\NAS\Photos\Lisbon"));
+        assert!(crosses(r"\\nas\photos", r"\\nas\videos"));
+        assert!(crosses(r"\\nas\photos", r"D:\Archive"));
     }
 
     #[cfg(windows)]

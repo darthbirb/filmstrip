@@ -12,6 +12,7 @@ use ts_rs::TS;
 use crate::db::sources::{self, SourceKind};
 use crate::db::{folders, in_transaction, items, journal, now, tags};
 use crate::error::{AppError, Reason, Result};
+use crate::fs::paste::Halt;
 use crate::fs::stayed::{self, Stayed};
 use crate::fs::{
     PASSING, binless, items as fs_items, noclobber, paths, relocate, sanitize, take_away, trash,
@@ -112,6 +113,63 @@ pub(super) fn move_unjournalled(
     parent_id: i64,
     batch_id: Option<&str>,
 ) -> Result<bool> {
+    let Some(planned) = plan_move(conn, folder_id, parent_id)? else {
+        return Ok(false);
+    };
+    relocate::relocate(&planned.from, &planned.to).map_err(relocate::taken_as(|| {
+        taken(conn, parent_id, &planned.title)
+    }))?;
+    record_move(conn, &planned, folder_id, parent_id, batch_id)
+}
+
+/// A folder moved as a job: in one turn, since a walk must never read its tree half copied, and
+/// answering to `control` between the files a move between drives copies. Stopped, the folder is
+/// where it was, whole. `Ok(None)` once it has moved, or was already there.
+pub fn move_watched(
+    conn: &Connection,
+    folder_id: i64,
+    parent_id: i64,
+    batch_id: &str,
+    control: &impl relocate::Control,
+) -> Result<Option<Halt>> {
+    let _turn = super::turn();
+    let Some(planned) = plan_move(conn, folder_id, parent_id)? else {
+        return Ok(None);
+    };
+    let halted = relocate::relocate_watched(&planned.from, &planned.to, control).map_err(
+        relocate::taken_as(|| taken(conn, parent_id, &planned.title)),
+    )?;
+    if halted.is_some() {
+        return Ok(halted);
+    }
+    record_move(conn, &planned, folder_id, parent_id, Some(batch_id))?;
+    Ok(None)
+}
+
+/// Whether moving a folder into `parent_id` copies it between drives.
+pub fn crosses_drives(conn: &Connection, folder_id: i64, parent_id: i64) -> Result<bool> {
+    Ok(relocate::crosses_drives(
+        &paths::folder_dir(conn, folder_id)?,
+        &paths::folder_dir(conn, parent_id)?,
+    ))
+}
+
+/// Whether a folder can move into another, for a move that is queued: refused now, the move is
+/// never queued.
+pub fn check_move(conn: &Connection, folder_id: i64, parent_id: i64) -> Result<bool> {
+    Ok(plan_move(conn, folder_id, parent_id)?.is_some())
+}
+
+/// Where a folder's directory goes, and from where.
+struct PlannedMove {
+    from_parent: i64,
+    title: String,
+    from: PathBuf,
+    to: PathBuf,
+}
+
+/// A move checked as the disk and the index stand; nothing when the folder is already there.
+fn plan_move(conn: &Connection, folder_id: i64, parent_id: i64) -> Result<Option<PlannedMove>> {
     if !folders::is_live(conn, folder_id)? || !folders::is_live(conn, parent_id)? {
         return Err(AppError::invalid("that folder is no longer in the index"));
     }
@@ -121,29 +179,39 @@ pub(super) fn move_unjournalled(
         ));
     };
     if from_parent == parent_id {
-        return Ok(false);
+        return Ok(None);
     }
     if folders::is_within(conn, parent_id, folder_id)? {
         return Err(AppError::invalid("a folder cannot go inside itself"));
     }
     let title = folders::title(conn, folder_id)?.unwrap_or_default();
     refuse_clash(conn, parent_id, &title, None)?;
+    Ok(Some(PlannedMove {
+        from_parent,
+        from: paths::folder_dir(conn, folder_id)?,
+        to: paths::folder_dir(conn, parent_id)?.join(&title),
+        title,
+    }))
+}
 
-    let from = paths::folder_dir(conn, folder_id)?;
-    let to = paths::folder_dir(conn, parent_id)?.join(&title);
-    relocate::relocate(&from, &to)
-        .map_err(relocate::taken_as(|| taken(conn, parent_id, &title)))?;
-
+/// The index follows a directory that has moved, or the directory goes back.
+fn record_move(
+    conn: &Connection,
+    planned: &PlannedMove,
+    folder_id: i64,
+    parent_id: i64,
+    batch_id: Option<&str>,
+) -> Result<bool> {
     let recorded = in_transaction(conn, |tx| {
         folders::set_parent(tx, folder_id, parent_id)?;
         tags::rebuild_subtree(tx, folder_id)?;
         if let Some(batch_id) = batch_id {
-            journal::record_folder_move(tx, batch_id, folder_id, from_parent, parent_id)?;
+            journal::record_folder_move(tx, batch_id, folder_id, planned.from_parent, parent_id)?;
         }
         Ok(true)
     });
     if recorded.is_err() {
-        let _ = relocate::relocate(&to, &from);
+        let _ = relocate::relocate(&planned.to, &planned.from);
     }
     recorded
 }

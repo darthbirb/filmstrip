@@ -234,20 +234,48 @@ pub async fn rename_folder(
     .await
 }
 
-/// A folder moved into another with everything in it; the batch that undoes it, or nothing when it
-/// was already there.
+/// What came of moving a folder: moved, with the batch that undoes it or nothing when it was
+/// already there, or a move between drives started as a job.
+#[derive(Debug, Clone, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(export)]
+pub enum FolderMoved {
+    Done {
+        batch: Option<Batch>,
+    },
+    Started {
+        #[serde(rename = "jobId")]
+        job_id: i64,
+    },
+}
+
+/// A folder moved into another with everything in it. Between drives it is a job, refused before
+/// it is queued as a move on one drive is refused. DECISIONS.md "Undo".
 #[tauri::command]
 pub async fn move_folder(
     state: State<'_, AppState>,
     folder_id: i64,
     parent_id: i64,
-) -> Result<Option<Batch>> {
+) -> Result<FolderMoved> {
     run(&state, move |conn| {
-        let batch_id = journal::new_batch();
-        let moved = fs_folders::move_into(conn, folder_id, parent_id, &batch_id)?;
-        described(conn, moved, &batch_id)
+        start_folder_move(conn, folder_id, parent_id)
     })
     .await
+}
+
+pub fn start_folder_move(conn: &Connection, folder_id: i64, parent_id: i64) -> Result<FolderMoved> {
+    if fs_folders::crosses_drives(conn, folder_id, parent_id)? {
+        if !fs_folders::check_move(conn, folder_id, parent_id)? {
+            return Ok(FolderMoved::Done { batch: None });
+        }
+        let job_id = jobs::enqueue_move_folder(conn, folder_id, parent_id)?;
+        return Ok(FolderMoved::Started { job_id });
+    }
+    let batch_id = journal::new_batch();
+    let moved = fs_folders::move_into(conn, folder_id, parent_id, &batch_id)?;
+    Ok(FolderMoved::Done {
+        batch: described(conn, moved, &batch_id)?,
+    })
 }
 
 /// The batch an act wrote, described, or nothing when the act changed nothing.
@@ -255,16 +283,24 @@ fn described(conn: &Connection, changed: bool, batch_id: &str) -> Result<Option<
     changed.then(|| acts::describe(conn, batch_id)).transpose()
 }
 
-/// What a move of files did, and the batch that undoes it when anything went.
+/// What a move of files did, and the batch that undoes it when anything went; or a move between
+/// drives started as a job.
 #[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "kind", rename_all = "camelCase")]
 #[ts(export)]
-pub struct ItemsMoved {
-    pub batch: Option<Batch>,
-    pub report: MoveReport,
+pub enum ItemsMoved {
+    Done {
+        batch: Option<Batch>,
+        report: MoveReport,
+    },
+    Started {
+        #[serde(rename = "jobId")]
+        job_id: i64,
+    },
 }
 
 /// Files moved into a folder, each under its own name; a name already taken there is reported.
+/// One of them going between drives makes the whole move a job, still one batch.
 #[tauri::command]
 pub async fn move_items(
     state: State<'_, AppState>,
@@ -272,14 +308,25 @@ pub async fn move_items(
     folder_id: i64,
 ) -> Result<ItemsMoved> {
     run(&state, move |conn| {
-        let batch_id = journal::new_batch();
-        let report = fs_items::move_items(conn, &item_ids, folder_id, &batch_id)?;
-        Ok(ItemsMoved {
-            batch: described(conn, report.moved > 0, &batch_id)?,
-            report,
-        })
+        start_items_move(conn, &item_ids, folder_id)
     })
     .await
+}
+
+pub fn start_items_move(conn: &Connection, item_ids: &[i64], folder_id: i64) -> Result<ItemsMoved> {
+    if !folders::is_live(conn, folder_id)? {
+        return Err(AppError::invalid("that folder is no longer in the index"));
+    }
+    if fs_items::cross_drives(conn, item_ids, folder_id)? {
+        let job_id = jobs::enqueue_move_items(conn, item_ids, folder_id)?;
+        return Ok(ItemsMoved::Started { job_id });
+    }
+    let batch_id = journal::new_batch();
+    let report = fs_items::move_items(conn, item_ids, folder_id, &batch_id)?;
+    Ok(ItemsMoved::Done {
+        batch: described(conn, report.moved > 0, &batch_id)?,
+        report,
+    })
 }
 
 /// A file renamed where it is; the batch that undoes it, or nothing when the name did not change.
@@ -540,6 +587,14 @@ pub fn start_copy(conn: &Connection, folder_id: i64, entries: &[PathBuf]) -> Res
 pub async fn cancel_copy(state: State<'_, AppState>, job_id: i64) -> Result<bool> {
     let conn = crate::db::open(&state.db)?;
     state.queue.cancel_copy(&conn, job_id)
+}
+
+/// Stops a move between drives after the file in hand; what went stays, as one batch with its
+/// Undo, and a folder stays where it was, whole.
+#[tauri::command]
+pub async fn cancel_move(state: State<'_, AppState>, job_id: i64) -> Result<bool> {
+    let conn = crate::db::open(&state.db)?;
+    state.queue.cancel_move(&conn, job_id)
 }
 
 /// What an export of a branch or a set would hold, read before the save dialog opens.

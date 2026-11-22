@@ -120,13 +120,17 @@ export async function afterCopied(copied: Copied) {
   else afterAct(batch, whole - came, actLine(batch, whole - came));
 }
 
-/** Follows each copy: the grid reads its folder again as files land, and hears how it ended. */
+/**
+ * Follows each copy and each move between drives: the grid reads its folder again as files land,
+ * and hears how a copy ended.
+ */
 export async function watchCopies() {
   const seen = new Map<number, number>();
   await listen<Progress>("job-progress", ({ payload }) => {
-    const moved = payload.copies.some((one) => seen.get(one.jobId) !== one.done);
+    const lines = [...payload.copies, ...payload.moves];
+    const moved = lines.some((one) => seen.get(one.jobId) !== one.done);
     seen.clear();
-    for (const one of payload.copies) seen.set(one.jobId, one.done);
+    for (const one of lines) seen.set(one.jobId, one.done);
     if (moved) void libraryChanged();
   }).catch(() => undefined);
   await listen<Copied>("copy-done", ({ payload }) => void afterCopied(payload)).catch(

@@ -41,6 +41,8 @@ import type { KeyClashFor } from "../ipc/bindings/KeyClashFor";
 import type { KeyRow } from "../ipc/bindings/KeyRow";
 import type { LibraryTotals } from "../ipc/bindings/LibraryTotals";
 import type { Looked } from "../ipc/bindings/Looked";
+import type { Moved } from "../ipc/bindings/Moved";
+import type { Moving } from "../ipc/bindings/Moving";
 import type { Plan } from "../ipc/bindings/Plan";
 import type { Progress } from "../ipc/bindings/Progress";
 import type { QueryTerm } from "../ipc/bindings/QueryTerm";
@@ -1357,10 +1359,69 @@ function zipNamed(path: string) {
 }
 
 function sendExports() {
-  void emit("job-progress", {
-    ...(COMMANDS.index_progress?.({}) as Progress),
-    exports: [...exporting.values()],
+  void emit("job-progress", COMMANDS.index_progress?.({}) as Progress);
+}
+
+/** One file moved into a folder, or refused there as a name taken. */
+function moveOne(item: ItemRow, to: number, steps: Step[], refused: Stayed[]) {
+  if (item.folderId === to) return;
+  if (taken(to, item.diskName, item)) {
+    const reason = { kind: "nameTaken" as const, place: folderName(to), folder: false };
+    refused.push(stayedIn(item, { ...reason, name: item.diskName }));
+    return;
+  }
+  steps.push({ op: "move", item, from: item.folderId });
+  relocate(item, to);
+}
+
+// `?across` makes every move of files one between drives: a job with its line, so its Cancel
+// can be reached.
+const movesAcross = () => new URLSearchParams(location.search).has("across");
+let nextMoveJob = 8000;
+const moving = new Map<number, Moving>();
+const cancelMoves = new Map<number, () => void>();
+const MOVE_STEP_MS = 900;
+
+/** A move between drives, a file a step, ending as the Rust job ends: what went, as one batch. */
+function startMoveJob(going: ItemRow[], to: number): ItemsMoved {
+  const jobId = nextMoveJob++;
+  const whole = going.length;
+  const steps: Step[] = [];
+  const refused: Stayed[] = [];
+  moving.set(jobId, { jobId, folderId: to, to: folderName(to), done: 0, whole });
+  const ended = (cancelled: boolean) => {
+    moving.delete(jobId);
+    cancelMoves.delete(jobId);
+    sendExports();
+    const batch = record(steps);
+    const moved: Moved = {
+      jobId,
+      folderId: to,
+      to: folderName(to),
+      batch,
+      whole,
+      refused,
+      cancelled,
+      stopped: null,
+    };
+    void emit("move-done", moved);
+  };
+  const step = () => {
+    const line = moving.get(jobId);
+    if (!line) return;
+    const item = going[line.done];
+    if (!item) return ended(false);
+    moveOne(item, to, steps, refused);
+    moving.set(jobId, { ...line, done: line.done + 1 });
+    sendExports();
+    setTimeout(step, MOVE_STEP_MS);
+  };
+  setTimeout(() => {
+    sendExports();
+    setTimeout(step, MOVE_STEP_MS);
   });
+  cancelMoves.set(jobId, () => ended(true));
+  return { kind: "started", jobId };
 }
 
 /** An export that takes a few moments, its line moving, so its Cancel can be reached. */
@@ -1751,29 +1812,22 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     const to = parentId as number;
     if (!found) return invalid("a source's own folder sits inside nothing");
     const { node, parent } = found;
-    if (parent === to) return null;
+    if (parent === to) return { kind: "done", batch: null };
     if (crumbs(to).folders.some((crumb) => crumb.id === node.id))
       return invalid("a folder cannot go inside itself");
     if (folderTaken(to, node.title)) return refusedName(to, node.title, true);
     detach(node);
     attach(node, to);
-    return record([{ op: "moveFolder", node, from: parent, to }]);
+    return { kind: "done", batch: record([{ op: "moveFolder", node, from: parent, to }]) };
   },
   move_items: ({ itemIds, folderId }): ItemsMoved => {
     const to = folderId as number;
+    const going = everyItem().filter((one) => (itemIds as number[]).includes(one.id));
+    if (movesAcross()) return startMoveJob(going, to);
     const steps: Step[] = [];
     const refused: Stayed[] = [];
-    for (const item of everyItem().filter((one) => (itemIds as number[]).includes(one.id))) {
-      if (item.folderId === to) continue;
-      if (taken(to, item.diskName, item)) {
-        const reason = { kind: "nameTaken" as const, place: folderName(to), folder: false };
-        refused.push(stayedIn(item, { ...reason, name: item.diskName }));
-        continue;
-      }
-      steps.push({ op: "move", item, from: item.folderId });
-      relocate(item, to);
-    }
-    return { batch: record(steps), report: { moved: steps.length, refused } };
+    for (const item of going) moveOne(item, to, steps, refused);
+    return { kind: "done", batch: record(steps), report: { moved: steps.length, refused } };
   },
   rename_item: ({ itemId, name }) => {
     const item = everyItem().find((one) => one.id === itemId);
@@ -2306,6 +2360,12 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   paste_files: ({ folderId }) => copyIn(folderId as number, clipboard),
   drop_files: ({ folderId, paths }) => copyIn(folderId as number, paths as string[]),
   cancel_copy: () => false,
+  cancel_move: ({ jobId }) => {
+    const cancel = cancelMoves.get(jobId as number);
+    if (!cancel) return false;
+    cancel();
+    return true;
+  },
   export_plan: ({ scope }) => exportPlanOf(scope as Scope),
   pick_export_zip: ({ name, dir }): ZipPick => {
     const path = `${(dir as string | null) ?? "D:\\Exports"}\\${name as string}.zip`;
@@ -2331,7 +2391,8 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     failed: 0,
     completed: 0,
     copies: [],
-    exports: [],
+    exports: [...exporting.values()],
+    moves: [...moving.values()],
   }),
   index_failures: () => [],
   retry_failed_jobs: () => 0,

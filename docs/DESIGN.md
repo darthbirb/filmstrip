@@ -1052,6 +1052,10 @@ toward the rest surface.
   keeps the bar alone. One that stops on its own says why: in the Line after what came in, or in
   the Band when nothing did. What it left out before it stopped is still in the banner, and then
   the Band gives the reason alone.
+- **Move line.** A move between drives has the copy's line: "Moving to Lisbon…", its figure,
+  Cancel Move on its dismiss, and the bar; it stacks with copies and exports, the newest highest.
+  It ends as a move on one drive does, with the Line and Undo, and the banner for what stayed.
+  Cancelled, the Line counts what went against what it carried.
 - **Export line.** An export's line is the copy's: "Exporting Trips.zip…", its figure, Cancel
   Export on its dismiss, and the bar, its tooltip the whole path and what is left. Copies and
   exports stack together, the newest highest. It ends with the Line and Show in Explorer where
