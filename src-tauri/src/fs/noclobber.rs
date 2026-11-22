@@ -52,6 +52,73 @@ pub fn copy(from: &Path, to: &Path) -> io::Result<()> {
     io::copy(&mut source, &mut target).map(|_| ())
 }
 
+/// Copies the file `from` to a new file `to`, as `copy` does, asking `stop` as each part of it is
+/// written: `Ok(false)` once it says so, and then nothing of `to` is left. `to` is a copy's own
+/// part, which nobody else takes, so it runs no test's last-moment arrival.
+#[cfg(windows)]
+pub fn copy_unless(from: &Path, to: &Path, stop: &dyn Fn() -> bool) -> io::Result<bool> {
+    use windows_sys::Win32::Foundation::{ERROR_REQUEST_ABORTED, HANDLE};
+    use windows_sys::Win32::Storage::FileSystem::{
+        COPY_FILE_FAIL_IF_EXISTS, CopyFileExW, PROGRESS_CANCEL, PROGRESS_CONTINUE,
+    };
+
+    unsafe extern "system" fn asked(
+        _total: i64,
+        _done: i64,
+        _stream: i64,
+        _stream_done: i64,
+        _number: u32,
+        _reason: u32,
+        _from: HANDLE,
+        _to: HANDLE,
+        data: *const core::ffi::c_void,
+    ) -> u32 {
+        // SAFETY: `data` is the `&dyn Fn` below, alive for the whole of the call that passes it.
+        let stop = unsafe { &*data.cast::<&dyn Fn() -> bool>() };
+        if stop() {
+            PROGRESS_CANCEL
+        } else {
+            PROGRESS_CONTINUE
+        }
+    }
+
+    let (from, to) = (verbatim(from)?, verbatim(to)?);
+    let data: *const &dyn Fn() -> bool = &stop;
+    // SAFETY: both paths are NUL-terminated wide strings, and `data` points at `stop`; all three
+    // outlive the call, which runs `asked` on this thread only.
+    let copied = unsafe {
+        CopyFileExW(
+            from.as_ptr(),
+            to.as_ptr(),
+            Some(asked),
+            data.cast(),
+            std::ptr::null_mut(),
+            COPY_FILE_FAIL_IF_EXISTS,
+        )
+    };
+    if copied != 0 {
+        return Ok(true);
+    }
+    let err = io::Error::last_os_error();
+    if err.raw_os_error() == Some(ERROR_REQUEST_ABORTED as i32) {
+        return Ok(false);
+    }
+    Err(err)
+}
+
+#[cfg(not(windows))]
+pub fn copy_unless(from: &Path, to: &Path, stop: &dyn Fn() -> bool) -> io::Result<bool> {
+    if stop() {
+        return Ok(false);
+    }
+    let mut source = std::fs::File::open(from)?;
+    let mut target = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(to)?;
+    io::copy(&mut source, &mut target).map(|_| true)
+}
+
 /// Makes the directory `to`, or fails when anything is there already.
 pub fn make_dir(to: &Path) -> io::Result<()> {
     arriving(to);

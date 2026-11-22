@@ -7,6 +7,7 @@ import {
   deleteFolder,
   destinationKeys,
   folderItems,
+  indexProgress,
   removeDestinationKey,
   setDestinationKey,
   undoLast,
@@ -96,6 +97,22 @@ test("with nothing checked it moves the pane's file, and the pane moves on to th
   });
   await expect.poll(getPaneItem).toBe(sphinx);
   await expect.element(page.getByText("Moved pyramid.jpg to People.")).toBeVisible();
+});
+
+test("a move of the pane's file that runs as a job between drives moves the pane on too", async () => {
+  await renderIt();
+  const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
+  showInPane(pyramid, CAIRO);
+  const before = location.href;
+  history.replaceState(null, "", "?across");
+  try {
+    await userEvent.keyboard("1");
+    await expect.poll(getPaneItem).toBe(sphinx);
+  } finally {
+    history.replaceState(null, "", before);
+  }
+  await expect.poll(async () => (await indexProgress()).moves, { timeout: 5000 }).toEqual([]);
+  expect((await folderItems(5)).map((row) => row.id)).toEqual([pyramid]);
 });
 
 test("with a set in the pane and nothing checked a key moves nothing, and says why", async () => {

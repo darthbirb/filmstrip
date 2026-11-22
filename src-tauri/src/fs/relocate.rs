@@ -34,8 +34,9 @@ pub fn relocate(from: &Path, to: &Path) -> Result<()> {
     relocate_watched(from, to, &Unwatched).map(|_| ())
 }
 
-/// `relocate`, answering to `control` between the files a move between drives copies. Stopped,
-/// it takes away what it copied and leaves `from` whole, and says why it stopped.
+/// `relocate`, answering to `control` between the files a move between drives copies, and to
+/// Stop within the one in hand. Stopped, it takes away what it copied and leaves `from` whole, and
+/// says why it stopped.
 pub fn relocate_watched(from: &Path, to: &Path, control: &impl Control) -> Result<Option<Halt>> {
     match noclobber::rename(from, to) {
         Ok(()) => Ok(None),
@@ -82,20 +83,27 @@ pub fn taken_as(taken: impl FnOnce() -> AppError) -> impl FnOnce(AppError) -> Ap
     }
 }
 
-/// The move between drives: everything copied, each copy's size checked against its original and
-/// each flushed to its drive before any original goes. Any failure removes what the copy wrote,
+/// The move between drives: copied under a hidden part name, each copy checked and flushed, then
+/// given its name, and only then any original removed. Any failure removes what the copy wrote,
 /// and only that, and keeps the original whole.
 #[cfg(test)]
 pub(crate) fn copy_across(from: &Path, to: &Path) -> Result<()> {
     copy_across_watched(from, to, &Unwatched).map(|_| ())
 }
 
-/// The move between drives, stopped between files when `control` says so, as a failure is.
+/// The move between drives, stopped between files when `control` says so, as a failure is, and
+/// within the file in hand when the app is closing. A part a stopped or cut-short copy of `from`
+/// left is cleared first.
 pub(crate) fn copy_across_watched(
     from: &Path,
     to: &Path,
     control: &impl Control,
 ) -> Result<Option<Halt>> {
+    if std::fs::symlink_metadata(to).is_ok() {
+        return Err(std::io::Error::from(std::io::ErrorKind::AlreadyExists).into());
+    }
+    let part = part_beside(to);
+    clear_part(from, &part);
     let mut copy = Across {
         made: Vec::new(),
         control,
@@ -103,7 +111,12 @@ pub(crate) fn copy_across_watched(
         whole: files_under(from),
     };
     control.progress(0, copy.whole);
-    let copied = copy.copy(from, to, from.is_dir());
+    let mut copied = copy.copy(from, &part, from.is_dir());
+    if matches!(copied, Ok(None)) {
+        copied = noclobber::rename(&part, to)
+            .map(|()| None)
+            .map_err(AppError::from);
+    }
     if !matches!(copied, Ok(None)) {
         remove_deepest_first(copy.made.iter().map(|(_, copy)| copy.as_path()));
         return copied;
@@ -114,8 +127,44 @@ pub(crate) fn copy_across_watched(
     Ok(None)
 }
 
+/// Hidden, so a walk passes it over; named after `to`, so a copy that goes on after a restart
+/// finds what it left.
+fn part_beside(to: &Path) -> PathBuf {
+    let name = to.file_name().unwrap_or_default().to_string_lossy();
+    let kept: String = name.chars().take(PART_NAME_KEPT).collect();
+    to.with_file_name(format!(".{kept}.filmstrip-part"))
+}
+
+/// Within a file name's 255, with room for the part's own dot and suffix.
+const PART_NAME_KEPT: usize = 200;
+
+/// Takes away a part of `from` that a copy the app's closing or a crash cut short left: what the
+/// copy would have written there, and only that.
+fn clear_part(from: &Path, part: &Path) {
+    let Ok(meta) = std::fs::symlink_metadata(part) else {
+        return;
+    };
+    if !meta.is_dir() {
+        let _ = std::fs::remove_file(part);
+        return;
+    }
+    let mirrored: Vec<PathBuf> = walkdir::WalkDir::new(from)
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| entry.path().strip_prefix(from).ok().map(Path::to_path_buf))
+        .map(|rel| {
+            if rel.as_os_str().is_empty() {
+                part.to_path_buf()
+            } else {
+                part.join(rel)
+            }
+        })
+        .collect();
+    remove_deepest_first(mirrored.iter().map(PathBuf::as_path));
+}
+
 /// Every file at or under `path`, as the copy will meet them.
-fn files_under(path: &Path) -> u32 {
+pub(crate) fn files_under(path: &Path) -> u32 {
     let count = walkdir::WalkDir::new(path)
         .into_iter()
         .flatten()
@@ -154,13 +203,13 @@ struct Across<'a, C: Control> {
 
 impl<C: Control> Across<'_, C> {
     /// Copies `from` to `to`, never onto anything there, recording each pair it wrote; stopped
-    /// before the next file once `control` says so.
+    /// before the next file once `control` says so, or within this one as the app closes.
     fn copy(&mut self, from: &Path, to: &Path, is_dir: bool) -> Result<Option<Halt>> {
         if let Some(halt) = self.control.halt() {
             return Ok(Some(halt));
         }
         if is_dir {
-            noclobber::make_dir(to)?;
+            std::fs::create_dir(to)?;
             self.made.push((from.to_path_buf(), to.to_path_buf()));
             for entry in std::fs::read_dir(from)? {
                 let entry = entry?;
@@ -171,7 +220,11 @@ impl<C: Control> Across<'_, C> {
             }
             return Ok(None);
         }
-        noclobber::copy(from, to)?;
+        let control = self.control;
+        if !noclobber::copy_unless(from, to, &|| control.halt() == Some(Halt::Stop))? {
+            let _ = std::fs::remove_file(to);
+            return Ok(Some(Halt::Stop));
+        }
         self.made.push((from.to_path_buf(), to.to_path_buf()));
         if std::fs::metadata(to)?.len() != std::fs::metadata(from)?.len() {
             return Err(AppError::invalid(format!(
@@ -285,24 +338,21 @@ mod tests {
         let dir = scratch("given-up");
         std::fs::create_dir_all(dir.join("from/Cairo/Night")).unwrap();
         std::fs::write(dir.join("from/Cairo/Night/stars.jpg"), "stars").unwrap();
-        let cairo = dir.join("Cairo");
-        noclobber::just_before_the_next(move |_| {
-            noclobber::just_before_the_next(move |_| {
-                noclobber::just_before_the_next(move |to| {
-                    std::fs::write(cairo.join("theirs.jpg"), "theirs").unwrap();
-                    std::fs::write(to, "their stars").unwrap();
-                });
-            });
+        let part = dir.join(".Cairo.filmstrip-part");
+        noclobber::just_before_the_next(move |to| {
+            std::fs::write(part.join("theirs.jpg"), "theirs").unwrap();
+            std::fs::write(to, "their Cairo").unwrap();
         });
 
         assert!(copy_across(&dir.join("from/Cairo"), &dir.join("Cairo")).is_err());
         assert_eq!(
-            std::fs::read_to_string(dir.join("Cairo/theirs.jpg")).unwrap(),
+            std::fs::read_to_string(dir.join(".Cairo.filmstrip-part/theirs.jpg")).unwrap(),
             "theirs"
         );
+        assert!(!dir.join(".Cairo.filmstrip-part/Night").exists());
         assert_eq!(
-            std::fs::read_to_string(dir.join("Cairo/Night/stars.jpg")).unwrap(),
-            "their stars"
+            std::fs::read_to_string(dir.join("Cairo")).unwrap(),
+            "their Cairo"
         );
         assert_eq!(
             std::fs::read_to_string(dir.join("from/Cairo/Night/stars.jpg")).unwrap(),
@@ -318,11 +368,7 @@ mod tests {
         let night = dir.join("from/Cairo/Night");
         // Named to sort before the file being copied, so the folder's reading has passed it.
         noclobber::just_before_the_next(move |_| {
-            noclobber::just_before_the_next(move |_| {
-                noclobber::just_before_the_next(move |_| {
-                    std::fs::write(night.join("a-late.jpg"), "late").unwrap();
-                });
-            });
+            std::fs::write(night.join("a-late.jpg"), "late").unwrap();
         });
 
         copy_across(&dir.join("from/Cairo"), &dir.join("Cairo")).unwrap();
@@ -467,8 +513,8 @@ mod tests {
         assert_eq!(
             flushed,
             [
-                (dir.join("Cairo/Night/stars.jpg"), true),
-                (dir.join("Cairo/pyramid.jpg"), true),
+                (dir.join(".Cairo.filmstrip-part/Night/stars.jpg"), true),
+                (dir.join(".Cairo.filmstrip-part/pyramid.jpg"), true),
             ]
         );
         assert!(!dir.join("from/Cairo").exists());
@@ -486,7 +532,10 @@ mod tests {
         let flushed = flushes_while(std::slice::from_ref(&original));
 
         copy_across(&original, &dir.join("pyramid.jpg")).unwrap();
-        assert_eq!(flushed.take(), [(dir.join("pyramid.jpg"), true)]);
+        assert_eq!(
+            flushed.take(),
+            [(dir.join(".pyramid.jpg.filmstrip-part"), true)]
+        );
         let copy = std::fs::metadata(dir.join("pyramid.jpg")).unwrap();
         assert!(copy.permissions().readonly());
         assert_eq!(
@@ -563,6 +612,107 @@ mod tests {
             std::fs::read_to_string(dir.join("Cairo/Night/stars.jpg")).unwrap(),
             "stars"
         );
+    }
+
+    /// Stops, as the app's closing does, from the moment `within` is begun.
+    struct StopWithin {
+        within: PathBuf,
+        stopped: Cell<bool>,
+    }
+
+    impl Control for StopWithin {
+        fn halt(&self) -> Option<Halt> {
+            if self.within.exists() {
+                self.stopped.set(true);
+            }
+            self.stopped.get().then_some(Halt::Stop)
+        }
+        fn progress(&self, _done: u32, _whole: u32) {}
+    }
+
+    fn big() -> Vec<u8> {
+        (0..4 << 20).map(|at: u32| at as u8).collect()
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_file_stopped_partway_leaves_nothing_at_its_name_and_goes_on_whole_after() {
+        let dir = scratch("stopped-file");
+        std::fs::create_dir_all(dir.join("from")).unwrap();
+        std::fs::write(dir.join("from/film.mp4"), big()).unwrap();
+        let control = StopWithin {
+            within: dir.join(".film.mp4.filmstrip-part"),
+            stopped: Cell::new(false),
+        };
+
+        let halted =
+            copy_across_watched(&dir.join("from/film.mp4"), &dir.join("film.mp4"), &control)
+                .unwrap();
+        assert_eq!(halted, Some(Halt::Stop));
+        assert!(control.stopped.get());
+        assert!(!dir.join("film.mp4").exists());
+        assert!(!dir.join(".film.mp4.filmstrip-part").exists());
+        assert_eq!(std::fs::read(dir.join("from/film.mp4")).unwrap(), big());
+
+        let resumed = copy_across_watched(
+            &dir.join("from/film.mp4"),
+            &dir.join("film.mp4"),
+            &Unwatched,
+        )
+        .unwrap();
+        assert_eq!(resumed, None);
+        assert_eq!(std::fs::read(dir.join("film.mp4")).unwrap(), big());
+        assert!(!dir.join("from/film.mp4").exists());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_folder_stopped_partway_through_a_file_leaves_nothing_at_its_name_and_goes_on_whole_after()
+    {
+        let dir = scratch("stopped-folder");
+        std::fs::create_dir_all(dir.join("from/Cairo")).unwrap();
+        std::fs::write(dir.join("from/Cairo/a-pyramid.jpg"), "pyramid").unwrap();
+        std::fs::write(dir.join("from/Cairo/b-film.mp4"), big()).unwrap();
+        let control = StopWithin {
+            within: dir.join(".Cairo.filmstrip-part/b-film.mp4"),
+            stopped: Cell::new(false),
+        };
+
+        let halted =
+            copy_across_watched(&dir.join("from/Cairo"), &dir.join("Cairo"), &control).unwrap();
+        assert_eq!(halted, Some(Halt::Stop));
+        assert!(control.stopped.get());
+        assert!(!dir.join("Cairo").exists());
+        assert!(!dir.join(".Cairo.filmstrip-part").exists());
+        assert_eq!(
+            std::fs::read(dir.join("from/Cairo/b-film.mp4")).unwrap(),
+            big()
+        );
+
+        let resumed =
+            copy_across_watched(&dir.join("from/Cairo"), &dir.join("Cairo"), &Unwatched).unwrap();
+        assert_eq!(resumed, None);
+        assert_eq!(std::fs::read(dir.join("Cairo/b-film.mp4")).unwrap(), big());
+        assert!(!dir.join("from/Cairo").exists());
+    }
+
+    #[test]
+    fn a_part_a_crash_left_is_cleared_before_the_move_goes_on() {
+        let dir = scratch("crash-part");
+        std::fs::create_dir_all(dir.join("from/Cairo/Night")).unwrap();
+        std::fs::write(dir.join("from/Cairo/pyramid.jpg"), "pyramid").unwrap();
+        std::fs::write(dir.join("from/Cairo/Night/stars.jpg"), "stars").unwrap();
+        std::fs::create_dir_all(dir.join(".Cairo.filmstrip-part/Night")).unwrap();
+        std::fs::write(dir.join(".Cairo.filmstrip-part/pyramid.jpg"), "pyramid").unwrap();
+        std::fs::write(dir.join(".Cairo.filmstrip-part/Night/stars.jpg"), "st").unwrap();
+
+        copy_across_watched(&dir.join("from/Cairo"), &dir.join("Cairo"), &Unwatched).unwrap();
+        assert!(!dir.join(".Cairo.filmstrip-part").exists());
+        assert_eq!(
+            std::fs::read_to_string(dir.join("Cairo/Night/stars.jpg")).unwrap(),
+            "stars"
+        );
+        assert!(!dir.join("from/Cairo").exists());
     }
 
     #[cfg(windows)]

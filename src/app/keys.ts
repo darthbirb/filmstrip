@@ -98,7 +98,8 @@ export async function press(digit: string) {
   const origin = getPaneOrigin();
   const next = await neighbour(origin, [shown]);
   const report = await moveFiles([shown], to);
-  const stayed = report === null || report.refused.some((one) => one.id === shown);
+  const stayed =
+    report === null || (report !== "started" && report.refused.some((one) => one.id === shown));
   if (!stayed && leaves(origin, bound.sourceId)) showInPane(next, origin);
 }
 

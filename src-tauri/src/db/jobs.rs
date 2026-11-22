@@ -150,9 +150,10 @@ pub fn take_all(conn: &Connection, kind: &str) -> Result<Vec<String>> {
 pub fn counts(conn: &Connection) -> Result<Counts> {
     let mut counts = Counts::default();
     let mut stmt = conn.prepare(
-        "SELECT status, COUNT(*) FROM job WHERE kind NOT IN (?1, ?2, ?3) GROUP BY status",
+        "SELECT status, COUNT(*) FROM job
+          WHERE kind NOT IN (SELECT value FROM json_each(?1)) GROUP BY status",
     )?;
-    let rows = stmt.query_map(OWN_LINES, |r| {
+    let rows = stmt.query_map([serde_json::to_string(&OWN_LINES)?], |r| {
         Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
     })?;
     for row in rows {

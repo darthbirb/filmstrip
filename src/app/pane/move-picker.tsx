@@ -245,13 +245,13 @@ type Into = Pick<FolderEntry, "id" | "title">;
 /**
  * Moves the files and says what happened: the line at the foot for what went, the banner over
  * the grid for what did not; and hands back the report. A move between drives is a job, which
- * says so when it ends, and hands back nothing. DECISIONS.md "Undo".
+ * says so when it ends, and hands back only that it started. DECISIONS.md "Undo".
  */
 export async function moveFiles(itemIds: number[], to: Into) {
   const moved = await moveItems(itemIds, to.id).catch(() => null);
   if (!moved) return null;
   remember(to);
-  if (moved.kind === "started") return null;
+  if (moved.kind === "started") return "started" as const;
   const { batch, report } = moved;
   if (batch) afterAct(batch, report.refused.length);
   const whole = report.moved + report.refused.length;

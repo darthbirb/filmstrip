@@ -461,11 +461,12 @@ pub fn latest_batch(conn: &Connection) -> Result<Option<String>> {
         .query_row(
             "SELECT batch_id FROM journal
               WHERE batch_id NOT IN (SELECT json_extract(payload, '$.batchId') FROM job
-                                      WHERE kind IN (?1, ?2) AND status IN ('pending', 'running')
+                                      WHERE kind IN (SELECT value FROM json_each(?1))
+                                        AND status IN ('pending', 'running')
                                         AND json_extract(payload, '$.batchId') IS NOT NULL)
-                AND id > ?3
+                AND id > ?2
               ORDER BY id DESC LIMIT 1",
-            params![ACTS[0], ACTS[1], floor(conn)?],
+            params![serde_json::to_string(&ACTS)?, floor(conn)?],
             |r| r.get(0),
         )
         .optional()?)
@@ -509,9 +510,10 @@ pub fn below_floor(conn: &Connection, batch_id: &str) -> Result<bool> {
 pub fn unended(conn: &Connection, batch_id: &str) -> Result<bool> {
     Ok(conn.query_row(
         "SELECT EXISTS(SELECT 1 FROM job
-                        WHERE kind IN (?1, ?2) AND status IN ('pending', 'running')
-                          AND json_extract(payload, '$.batchId') = ?3)",
-        params![ACTS[0], ACTS[1], batch_id],
+                        WHERE kind IN (SELECT value FROM json_each(?1))
+                          AND status IN ('pending', 'running')
+                          AND json_extract(payload, '$.batchId') = ?2)",
+        params![serde_json::to_string(&ACTS)?, batch_id],
         |r| r.get(0),
     )?)
 }

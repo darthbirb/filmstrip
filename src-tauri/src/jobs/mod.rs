@@ -633,7 +633,7 @@ pub fn enqueue_move_items(conn: &Connection, item_ids: &[i64], into: i64) -> Res
 
 /// Queues a move of a folder, with everything in it, into another, and returns its job.
 pub fn enqueue_move_folder(conn: &Connection, folder_id: i64, into: i64) -> Result<i64> {
-    let whole = crate::db::items::live_under(conn, folder_id)?.len();
+    let whole = crate::fs::relocate::files_under(&crate::fs::paths::folder_dir(conn, folder_id)?);
     enqueue_move(
         conn,
         kinds::MovePayload {
@@ -641,7 +641,7 @@ pub fn enqueue_move_folder(conn: &Connection, folder_id: i64, into: i64) -> Resu
             into,
             item_ids: Vec::new(),
             folder_id: Some(folder_id),
-            whole: u32::try_from(whole).unwrap_or(u32::MAX),
+            whole,
         },
     )
 }

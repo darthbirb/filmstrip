@@ -30,7 +30,8 @@ pub fn move_items(
     folder_id: i64,
     batch_id: &str,
 ) -> Result<MoveReport> {
-    let outcome = move_watched(conn, item_ids, folder_id, batch_id, &Unwatched)?;
+    let _turn = super::turn();
+    let outcome = move_each(conn, item_ids, folder_id, batch_id, &Unwatched, false)?;
     match outcome.stopped {
         Some(reason) => Err(AppError::refused(reason)),
         None => Ok(outcome.report),
@@ -46,14 +47,26 @@ pub struct MoveOutcome {
     pub stopped: Option<Reason>,
 }
 
-/// `move_items`, one file to a turn, answering to `control` between files: a file is either moved
-/// whole or left where it was. Run again under the same batch, what already went is passed over.
+/// `move_items`, one file to a turn, answering to `control` between files and to Stop within the
+/// one in hand: a file is either moved whole or left where it was. Run again under the same batch,
+/// what already went is passed over.
 pub fn move_watched(
     conn: &Connection,
     item_ids: &[i64],
     folder_id: i64,
     batch_id: &str,
     control: &impl Control,
+) -> Result<MoveOutcome> {
+    move_each(conn, item_ids, folder_id, batch_id, control, true)
+}
+
+fn move_each(
+    conn: &Connection,
+    item_ids: &[i64],
+    folder_id: i64,
+    batch_id: &str,
+    control: &impl Control,
+    turn_each: bool,
 ) -> Result<MoveOutcome> {
     let whole = u32::try_from(item_ids.len()).unwrap_or(u32::MAX);
     let mut outcome = MoveOutcome::default();
@@ -63,15 +76,19 @@ pub fn move_watched(
             outcome.halted = Some(halt);
             break;
         }
-        let _turn = super::turn();
+        let _turn = turn_each.then(super::turn);
         if !folders::is_live(conn, folder_id)? {
             let name = crate::fs::acts::name(conn, folder_id)?;
             outcome.stopped = Some(Reason::FolderGone { name });
             break;
         }
-        match move_unjournalled(conn, item_id, folder_id, Some(batch_id)) {
-            Ok(true) => outcome.report.moved += 1,
-            Ok(false) => {}
+        match move_one(conn, item_id, folder_id, Some(batch_id), &InHand(control)) {
+            Ok(Went::Moved) => outcome.report.moved += 1,
+            Ok(Went::There) => {}
+            Ok(Went::Halted(halt)) => {
+                outcome.halted = Some(halt);
+                break;
+            }
             Err(err) => outcome
                 .report
                 .refused
@@ -100,6 +117,22 @@ pub fn cross_drives(conn: &Connection, item_ids: &[i64], folder_id: i64) -> Resu
     Ok(false)
 }
 
+/// The file in hand's own halts, its count of the files within it left out: a move counts files.
+struct InHand<'a, C>(&'a C);
+
+impl<C: Control> Control for InHand<'_, C> {
+    fn halt(&self) -> Option<Halt> {
+        self.0.halt()
+    }
+    fn progress(&self, _done: u32, _whole: u32) {}
+}
+
+enum Went {
+    Moved,
+    There,
+    Halted(Halt),
+}
+
 /// The move itself, which undo also uses to put an item back without journalling it again.
 /// `false` when the item is already there.
 pub(super) fn move_unjournalled(
@@ -108,6 +141,17 @@ pub(super) fn move_unjournalled(
     folder_id: i64,
     batch_id: Option<&str>,
 ) -> Result<bool> {
+    let went = move_one(conn, item_id, folder_id, batch_id, &Unwatched)?;
+    Ok(matches!(went, Went::Moved))
+}
+
+fn move_one(
+    conn: &Connection,
+    item_id: i64,
+    folder_id: i64,
+    batch_id: Option<&str>,
+    control: &impl Control,
+) -> Result<Went> {
     if !items::is_live(conn, item_id)? {
         return Err(AppError::invalid("that file is no longer in the index"));
     }
@@ -117,7 +161,7 @@ pub(super) fn move_unjournalled(
     let file = items::file_of(conn, item_id)?
         .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
     if file.folder_id == folder_id {
-        return Ok(false);
+        return Ok(Went::There);
     }
 
     let taken = || {
@@ -136,7 +180,11 @@ pub(super) fn move_unjournalled(
     }
     let from = paths::item_path(conn, file.folder_id, &file.disk_name)?;
     let to = paths::folder_dir(conn, folder_id)?.join(&file.disk_name);
-    relocate::relocate(&from, &to).map_err(relocate::taken_as(taken))?;
+    if let Some(halt) =
+        relocate::relocate_watched(&from, &to, control).map_err(relocate::taken_as(taken))?
+    {
+        return Ok(Went::Halted(halt));
+    }
 
     let recorded = in_transaction(conn, |tx| {
         // A retired row holding the name describes a file that is gone; the arriving one takes it.
@@ -148,7 +196,7 @@ pub(super) fn move_unjournalled(
         if let Some(batch_id) = batch_id {
             journal::record_item_move(tx, batch_id, item_id, file.folder_id, folder_id)?;
         }
-        Ok(true)
+        Ok(Went::Moved)
     });
     if recorded.is_err() {
         let _ = relocate::relocate(&to, &from);
