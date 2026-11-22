@@ -1177,15 +1177,23 @@ it.
     always did: it is quick, and a walk between its files would read it half done.
   - **A folder goes in one turn**, its whole tree: a walk must never read it half copied, so the
     other verbs wait for it, but the window does not. Cancel stops it between files and takes
-    away what it copied, so the folder stays where it was, whole; once every copy is whole and
-    flushed it has moved, and nothing stops it then.
+    away what it copied, so the folder stays where it was, whole. Its line counts the files the
+    index holds until the move starts, then the files on the disk, so the command never waits on
+    a walk of a slow card before it answers.
+  - **The index follows a folder's copy before its originals go.** Once the copy has its name the
+    folder's row moves to it, tags and all, and only then do the originals go, first renamed to
+    a hidden `.Trips.filmstrip-gone` a walk passes over. Taking away a card's worth of originals
+    can outlast the shutdown's grace; cut short, the next launch's walk sees no second folder, and
+    the resumed move finds the move in its batch and finishes taking away what the copy holds
+    whole, and only that. Anything else there takes the folder's name back for the next walk.
   - **Copies arrive under a hidden part name and are named only once whole**, as a paste's do:
     `.Lisbon.filmstrip-part` beside the place, copied, checked and flushed, then renamed onto
     the name, refused if anything took it meanwhile. The app's closing stops the file in hand,
     `CopyFileExW` cancelled from its progress routine, rather than waiting out a film the
     shutdown's grace cannot cover; that file's part is taken away, so nothing is ever left at the
     real name half written for the resumed move to be refused by. A part a crash left is cleared
-    before the move goes on: what the copy would have written there, and only that.
+    before the move goes on: what the copy would have written there, and only that, read from the
+    part itself and never through a link in it, so nothing outside the part can go.
   - **A move the app's closing stops goes on at the next launch** under the same batch, passing
     over what already went. Until it ends its batch is no act: Ctrl+Z passes over it and its Undo
     is refused, as a copy's is ("Bringing files in"). Restoring the index cancels it first, as

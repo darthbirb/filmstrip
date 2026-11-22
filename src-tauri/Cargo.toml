@@ -61,3 +61,11 @@ strip = true
 [dev-dependencies]
 proptest = "1.11.0"
 rusqlite = { version = "0.43", features = ["extra_check"] }
+
+# DeviceIoControl, for a test's own junction: Windows makes one without admin rights.
+[target.'cfg(windows)'.dev-dependencies]
+windows-sys = { version = "=0.61.2", features = [
+    "Win32_System_IO",
+    "Win32_System_Ioctl",
+    "Win32_System_SystemServices",
+] }

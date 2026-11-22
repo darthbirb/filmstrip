@@ -122,9 +122,9 @@ pub(super) fn move_unjournalled(
     record_move(conn, &planned, folder_id, parent_id, batch_id)
 }
 
-/// A folder moved as a job: in one turn, since a walk must never read its tree half copied, and
-/// answering to `control` between the files a move between drives copies. Stopped, the folder is
-/// where it was, whole. `Ok(None)` once it has moved, or was already there.
+/// A folder moved as a job, in one turn, answering to `control` between the files a move between
+/// drives copies; stopped, the folder is where it was, whole. The index follows the copy before
+/// the originals go, and a run cut short there is finished by the next. DECISIONS.md "Undo".
 pub fn move_watched(
     conn: &Connection,
     folder_id: i64,
@@ -133,17 +133,37 @@ pub fn move_watched(
     control: &impl relocate::Control,
 ) -> Result<Option<Halt>> {
     let _turn = super::turn();
+    if let Some(from_parent) = journal::folder_moved_from(conn, batch_id, folder_id)? {
+        let to = paths::folder_dir(conn, folder_id)?;
+        let from = paths::folder_dir(conn, from_parent)?.join(to.file_name().unwrap_or_default());
+        relocate::finish_leaving(&from, &to);
+        return Ok(None);
+    }
     let Some(planned) = plan_move(conn, folder_id, parent_id)? else {
         return Ok(None);
     };
-    let halted = relocate::relocate_watched(&planned.from, &planned.to, control).map_err(
+    let arrival = relocate::arrive(&planned.from, &planned.to, control).map_err(
         relocate::taken_as(|| taken(conn, parent_id, &planned.title)),
     )?;
-    if halted.is_some() {
-        return Ok(halted);
+    match arrival {
+        relocate::Arrival::Halted(halt) => Ok(Some(halt)),
+        relocate::Arrival::Moved => {
+            record_move(conn, &planned, folder_id, parent_id, Some(batch_id))?;
+            Ok(None)
+        }
+        relocate::Arrival::Copied(left) => {
+            match record(conn, &planned, folder_id, parent_id, Some(batch_id)) {
+                Ok(_) => {
+                    left.take_away();
+                    Ok(None)
+                }
+                Err(err) => {
+                    left.give_back();
+                    Err(err)
+                }
+            }
+        }
     }
-    record_move(conn, &planned, folder_id, parent_id, Some(batch_id))?;
-    Ok(None)
 }
 
 /// Whether moving a folder into `parent_id` copies it between drives.
@@ -202,18 +222,28 @@ fn record_move(
     parent_id: i64,
     batch_id: Option<&str>,
 ) -> Result<bool> {
-    let recorded = in_transaction(conn, |tx| {
+    let recorded = record(conn, planned, folder_id, parent_id, batch_id);
+    if recorded.is_err() {
+        let _ = relocate::relocate(&planned.to, &planned.from);
+    }
+    recorded
+}
+
+fn record(
+    conn: &Connection,
+    planned: &PlannedMove,
+    folder_id: i64,
+    parent_id: i64,
+    batch_id: Option<&str>,
+) -> Result<bool> {
+    in_transaction(conn, |tx| {
         folders::set_parent(tx, folder_id, parent_id)?;
         tags::rebuild_subtree(tx, folder_id)?;
         if let Some(batch_id) = batch_id {
             journal::record_folder_move(tx, batch_id, folder_id, planned.from_parent, parent_id)?;
         }
         Ok(true)
-    });
-    if recorded.is_err() {
-        let _ = relocate::relocate(&planned.to, &planned.from);
-    }
-    recorded
+    })
 }
 
 /// Where the files in a folder being deleted go. PRODUCT.md "Folders and sources".
@@ -672,6 +702,59 @@ mod tests {
         assert!(tags.iter().any(|value| value == "people"), "{tags:?}");
         assert!(!tags.iter().any(|value| value == "trips"), "{tags:?}");
         assert!(!move_into(&conn, cairo, people, &journal::new_batch()).unwrap());
+    }
+
+    #[test]
+    fn a_folder_move_between_drives_cut_short_as_its_originals_go_is_finished_by_the_next_run() {
+        let (conn, root, top, trips) = library("cut-leaving");
+        std::fs::create_dir_all(root.join("Trips/Cairo/Night")).unwrap();
+        std::fs::write(root.join("Trips/Cairo/Night/stars.jpg"), "stars").unwrap();
+        std::fs::create_dir(root.join("People")).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let people = folders::child_id(&conn, top, "People").unwrap().unwrap();
+        let cairo = folders::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        let pyramid = db::items::in_folder(&conn, cairo).unwrap()[0].id;
+        tags::add_item_tag(&conn, pyramid, "sunset").unwrap();
+        let batch = journal::new_batch();
+
+        relocate::as_if_across_drives();
+        let mut open = true;
+        crate::fs::just_before_taking_away(move |_| {
+            if std::mem::take(&mut open) {
+                panic!("the app closes here");
+            }
+        });
+        let cut = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            move_watched(&conn, cairo, people, &batch, &relocate::Unwatched)
+        }));
+        assert!(cut.is_err());
+        assert_eq!(folders::parent(&conn, cairo).unwrap(), Some(people));
+        walk::reconcile(&conn).unwrap();
+        assert_eq!(folders::child_id(&conn, trips, "Cairo").unwrap(), None);
+
+        assert_eq!(
+            move_watched(&conn, cairo, people, &batch, &relocate::Unwatched).unwrap(),
+            None
+        );
+        settles_to(&root.join("Trips"), &[]);
+        assert_eq!(
+            std::fs::read_to_string(root.join("People/Cairo/Night/stars.jpg")).unwrap(),
+            "stars"
+        );
+        assert!(root.join("People/Cairo/pyramid.jpg").is_file());
+        walk::reconcile(&conn).unwrap();
+        assert_eq!(folders::child_id(&conn, trips, "Cairo").unwrap(), None);
+        assert_eq!(
+            folders::child_id(&conn, people, "Cairo").unwrap(),
+            Some(cairo)
+        );
+        let tags: Vec<String> = tags::item_effective_tags(&conn, pyramid)
+            .unwrap()
+            .into_iter()
+            .map(|tag| tag.value)
+            .collect();
+        assert!(tags.iter().any(|value| value == "sunset"), "{tags:?}");
+        assert!(tags.iter().any(|value| value == "people"), "{tags:?}");
     }
 
     #[test]
