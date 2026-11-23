@@ -489,14 +489,15 @@ export function reasonText(reason: Reason): string {
 }
 
 /**
- * A row its undo let go of, the file gone from the bin or the index, or its way back in a removed
- * source: nothing is left to retry.
+ * A row its undo let go of, the file gone from the bin or the index, its way back in a removed
+ * source, or its way to the bin on a drive with none: nothing is left to retry.
  */
 export function letGo(row: Stayed) {
   return (
     row.at.kind === "recycleBin" ||
     row.at.kind === "forgotten" ||
-    row.reason.kind === "sourceRemoved"
+    row.reason.kind === "sourceRemoved" ||
+    row.reason.kind === "noBin"
   );
 }
 

@@ -649,6 +649,7 @@ mod tests {
     use crate::db::sources::SourceKind;
     use crate::db::{self, items as rows};
     use crate::fs::acts::Act;
+    use crate::fs::recycle::tests::{Fake, Stand, stand_in_as};
     use crate::fs::stayed::Whereabouts;
     use crate::fs::{settles_to, undo};
     use std::cell::{Cell, RefCell};
@@ -1113,6 +1114,46 @@ mod tests {
                 .is_some()
         );
         assert_eq!(journal::latest_batch(&conn).unwrap(), Some(batch));
+    }
+
+    #[test]
+    fn undo_of_a_copy_onto_a_drive_with_no_bin_leaves_it_and_the_next_reaches_the_act_before() {
+        let (conn, dir, lisbon) = library("undo-no-bin");
+        let mut fake = Fake::new(Stand::Recycles(dir.join("bin")));
+        fake.binless = vec![(dir.join("library/Trips"), "USB Drive (E:)".into())];
+        let bin = stand_in_as(fake);
+        let made = journal::new_batch();
+        crate::fs::folders::create(&conn, lisbon, "Porto", &made).unwrap();
+        write(&dir.join("Downloads/Alexandria/a.jpg"), "a");
+        let loose = write(&dir.join("Downloads/loose.jpg"), "l");
+        let batch = journal::new_batch();
+        let entries = [dir.join("Downloads/Alexandria"), loose];
+        run(&conn, &batch, lisbon, &entries, &Script::default()).unwrap();
+        let lisbon_dir = dir.join("library/Trips/Lisbon");
+
+        let first = undo::undo_last(&conn).unwrap().unwrap();
+        assert_eq!(first.batch.batch_id, batch);
+        assert_eq!((first.files_back, first.folders_back), (0, 0));
+        let no_bin = Reason::NoBin {
+            drive: "USB Drive (E:)".into(),
+        };
+        assert_eq!(first.stayed.len(), 3, "{:?}", first.stayed);
+        assert!(first.stayed.iter().all(|one| one.reason == no_bin));
+        assert!(
+            bin.asked.borrow().is_empty(),
+            "nothing is handed to the shell"
+        );
+        settles_to(
+            &lisbon_dir,
+            &["Alexandria", "Porto", "loose.jpg", "tram.jpg"],
+        );
+        assert!(lisbon_dir.join("Alexandria/a.jpg").is_file());
+        assert!(!undo::can_undo(&conn, &batch).unwrap());
+
+        let before = undo::undo_last(&conn).unwrap().unwrap();
+        assert_eq!(before.batch.batch_id, made, "the act before the copy");
+        settles_to(&lisbon_dir, &["Alexandria", "loose.jpg", "tram.jpg"]);
+        assert_eq!(undo::undo_last(&conn).unwrap(), None);
     }
 
     #[test]

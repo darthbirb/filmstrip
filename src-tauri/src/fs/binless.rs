@@ -163,7 +163,7 @@ mod tests {
     use crate::db::sources::{self, SourceKind};
     use crate::db::{self, journal};
     use crate::fs::recycle::tests::{Fake, Stand, stand_in_as};
-    use crate::fs::{settles_to, trash, walk};
+    use crate::fs::{settles_to, trash, undo, walk};
     use std::path::{Path, PathBuf};
     use std::rc::Rc;
 
@@ -525,5 +525,39 @@ mod tests {
             }
         );
         settles_to(&root.join("Stick/Lisbon"), &["fado.mov"]);
+    }
+
+    #[test]
+    fn undo_of_a_restore_onto_a_drive_with_no_bin_leaves_it_and_the_next_reaches_the_act_before() {
+        let (conn, root, _bin) = library("restore-onto");
+        let pyramid = id_of(&conn, &["Trips", "Cairo"], "pyramid.jpg");
+        let trashed = journal::new_batch();
+        trash::trash_items(&conn, &[pyramid], &trashed).unwrap();
+        trash::restore_items(
+            &conn,
+            &[pyramid],
+            Some(lisbon(&conn)),
+            &journal::new_batch(),
+        )
+        .unwrap();
+
+        let report = undo::undo_last(&conn).unwrap().unwrap();
+        assert_eq!(report.files_back, 0);
+        assert_eq!(
+            report
+                .stayed
+                .iter()
+                .map(|one| (one.id, &one.reason))
+                .collect::<Vec<_>>(),
+            [(
+                pyramid,
+                &Reason::NoBin {
+                    drive: "USB Drive (E:)".into()
+                }
+            )]
+        );
+        assert!(root.join("Stick/Lisbon/pyramid.jpg").is_file());
+        assert!(items::is_live(&conn, pyramid).unwrap());
+        assert_eq!(journal::latest_batch(&conn).unwrap(), Some(trashed));
     }
 }

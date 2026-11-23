@@ -1350,7 +1350,8 @@ arrive, and the originals stay as Explorer left them.
   the copy made once they are empty. Those folders are retired rather than forgotten, since the
   Trash still names them as where their files came from. A file the copy brought in that is
   gone from the index and the disk since is passed over: there is nothing left to send, and
-  failing on it would hold the copy's Undo, and every Undo before it, for good.
+  failing on it would hold the copy's Undo, and every Undo before it, for good. One on a drive
+  with no Recycle Bin stays where it is and lets the act go ("A drive with no Recycle Bin").
 - **Refused whole, before anything is queued**: a folder carried into itself or below itself, a
   drive that is away, and files that are all already where they would go. A mix copies the rest,
   and the banner names the ones already there.
@@ -1678,6 +1679,15 @@ drive, so the send could only ever refuse it; asking is the one way such a file 
   while the question waited goes with Undo, as any empty folder does. The foot counts the two
   apart, and is left as it was when no file went: the banner over the grid says it all, and
   Ctrl+Z still reaches the act before.
+- **An undo that would send a file to such a drive's bin lets the act go**, as one that finds a
+  file emptied from the bin does. Undoing a copy onto the drive, or a Restore to… into it, sends
+  the file to the Recycle Bin, which the drive has not got, so the row would fail every time and
+  hold every Ctrl+Z on it, and every act before it, for good. Its row leaves the journal and the
+  banner names it, still where it is, under the drive's reason, with no Retry; a folder the copy
+  made that still holds anything goes the same way. The copy is journalled all the same, rather
+  than left out with no Undo: its rows are what a copy the app's closing stops goes on from, and
+  are how it tidies a crash ("Bringing files in"), and a journal written before this keeps such
+  rows. Nothing is ever deleted outright to undo a copy; Delete asks for that, as above.
 - **Tests never delete outside their own folder.** The stand-in for the shell names folders of
   the test's own as drives with no bin, so what is deleted outright is a file the test wrote.
 

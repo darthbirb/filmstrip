@@ -12,6 +12,7 @@ use ts_rs::TS;
 use crate::db::sources::{self, SourceKind};
 use crate::db::{folders, in_transaction, items, journal, now, tags};
 use crate::error::{AppError, Reason, Result};
+use crate::fs::recycle::{Bin, Shell};
 use crate::fs::stayed::{self, Stayed};
 use crate::fs::{
     PASSING, binless, items as fs_items, noclobber, paths, relocate, sanitize, take_away, trash,
@@ -453,11 +454,15 @@ pub(super) fn unmake_copy(conn: &Connection, folder_id: i64) -> Result<()> {
         return Ok(());
     }
     let title = folders::title(conn, folder_id)?.unwrap_or_default();
-    let holds = || AppError::invalid(format!("{title} holds something now, so it stays"));
+    let dir = paths::folder_dir(conn, folder_id)?;
+    let holds = || match Shell.binless(&dir) {
+        Some(drive) => AppError::refused(Reason::NoBin { drive }),
+        None => AppError::invalid(format!("{title} holds something now, so it stays")),
+    };
     if folders::holds_anything(conn, folder_id)? {
         return Err(holds());
     }
-    match take_away(&paths::folder_dir(conn, folder_id)?) {
+    match take_away(&dir) {
         Ok(()) => {}
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
         Err(_) => return Err(holds()),

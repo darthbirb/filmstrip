@@ -240,6 +240,20 @@ test("a file whose way back was in a removed source is still where it is, with n
   expect(letGo(stays)).toBe(true);
 });
 
+test("a copy undone on a drive with no Recycle Bin is still where it is, with nothing to retry", () => {
+  const stays: Stayed = {
+    kind: "file",
+    id: 7,
+    name: "IMG_0412.jpg",
+    at: { kind: "folder", folderId: 6, path: ["Trips", "Cairo"] },
+    reason: { kind: "noBin", drive: "USB Drive (E:)" },
+  };
+
+  expect(stayedGroups([stays])[0]?.heading).toBe("Still in Cairo");
+  expect(reasonText(stays.reason)).toBe("USB Drive (E:) has no Recycle Bin");
+  expect(letGo(stays)).toBe(true);
+});
+
 test("a name field says where the name is taken, or why else it was refused", () => {
   const taken = { kind: "nameTaken", place: "Trips", name: "Cairo", folder: true } as const;
   expect(refusedName({ kind: "refused", message: "", reason: taken })).toBe(
