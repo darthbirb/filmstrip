@@ -16,9 +16,12 @@ const RESERVED: &[&str] = &[
 /// depends on depth, which is unknown here.
 const MAX_UNITS: usize = 255;
 
-/// The most an extension takes, so its stem always has room for a reserved
-/// name and its suffix.
-const MAX_EXT_UNITS: usize = MAX_UNITS - 1 - 5;
+/// The longest suffix `suffix_until_free` adds: a hyphen and a hyphenated uuid.
+const UNIQUE_SUFFIX_UNITS: usize = 37;
+
+/// The most an extension takes, so its stem keeps a character, even a surrogate pair, beside the
+/// longest suffix.
+const MAX_EXT_UNITS: usize = MAX_UNITS - 1 - UNIQUE_SUFFIX_UNITS - 2;
 
 fn units(text: &str) -> usize {
     text.encode_utf16().count()
@@ -75,29 +78,30 @@ pub fn file_name(raw: &str) -> String {
     }
 }
 
-/// Appends " (2)", " (3)"… before the extension until `taken` says it is free.
+/// Appends " (2)", " (3)"… before the extension until `taken` says it is free, cutting the stem
+/// so the name stays within the limit.
 pub fn suffix_until_free(base: &str, mut taken: impl FnMut(&str) -> bool) -> String {
     if !taken(base) {
         return base.to_string();
     }
     let (stem, ext) = match base.rsplit_once('.') {
-        Some((s, e)) if !s.is_empty() && !e.is_empty() => (s.to_string(), Some(e.to_string())),
-        _ => (base.to_string(), None),
+        Some((s, e)) if !s.is_empty() && !e.is_empty() && units(e) <= MAX_EXT_UNITS => (s, Some(e)),
+        _ => (base, None),
+    };
+    let with = |suffix: String| {
+        let tail = match ext {
+            Some(ext) => format!("{suffix}.{ext}"),
+            None => suffix,
+        };
+        format!("{}{tail}", cut(stem, MAX_UNITS - units(&tail)))
     };
     for n in 2..10_000 {
-        let suffix = match &ext {
-            Some(ext) => format!(" ({n}).{ext}"),
-            None => format!(" ({n})"),
-        };
-        let stem = cut(&stem, MAX_UNITS.saturating_sub(units(&suffix)));
-        let candidate = format!("{stem}{suffix}");
+        let candidate = with(format!(" ({n})"));
         if !taken(&candidate) {
             return candidate;
         }
     }
-    // Unreachable in practice — ten thousand siblings sharing a stem — but the
-    // caller still needs a name back.
-    format!("{stem}-{}", uuid::Uuid::new_v4())
+    with(format!("-{}", uuid::Uuid::new_v4()))
 }
 
 #[cfg(test)]
@@ -153,6 +157,16 @@ mod tests {
             emoji,
             format!("{}.mov", "\u{1F600}".repeat((MAX_UNITS - 4) / 2))
         );
+    }
+
+    #[test]
+    fn even_the_last_suffix_keeps_a_stem_and_the_limit() {
+        let base = format!("{}.{}", "\u{1F600}".repeat(19), "e".repeat(MAX_EXT_UNITS));
+        assert_eq!(file_name(&base), base);
+        let free = suffix_until_free(&base, |_| true);
+        assert!(free.starts_with('\u{1F600}'), "{free}");
+        assert!(free.ends_with(&format!(".{}", "e".repeat(MAX_EXT_UNITS))));
+        assert!(units(&free) <= MAX_UNITS);
     }
 
     #[test]

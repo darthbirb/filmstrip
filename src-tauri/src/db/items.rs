@@ -980,13 +980,19 @@ mod tests {
             "k.jpg",
             "\u{10428}.jpg",
             "\u{10400}.jpg",
+            "kız.jpg",
+            "kiz.jpg",
+            "5µm.jpg",
+            "5μm.jpg",
+            "ιος.jpg",
+            "ΙΟΣ.jpg",
         ] {
             upsert(&conn, &sample(1, root, name)).unwrap();
         }
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM item", [], |r| r.get(0))
             .unwrap();
-        assert_eq!(count, 6);
+        assert_eq!(count, 12);
     }
 
     #[test]

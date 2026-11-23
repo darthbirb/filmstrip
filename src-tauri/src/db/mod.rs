@@ -13,13 +13,14 @@ pub mod search;
 pub mod sources;
 pub mod suggest;
 pub mod tags;
+mod upcase;
 pub mod vocabulary;
 
 use std::cmp::Ordering;
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior};
+use rusqlite::{Connection, Transaction, TransactionBehavior};
 
 use crate::error::Result;
 
@@ -135,7 +136,7 @@ fn migrate_inner(conn: &mut Connection) -> Result<()> {
         tx.execute("INSERT INTO data_version (version) VALUES (?1)", [version])?;
         tx.commit()?;
     }
-    reindex_names(conn)
+    Ok(())
 }
 
 /// Registers `NAME_FOLD`, the comparison every folder title and file name is matched with.
@@ -148,44 +149,13 @@ pub(crate) fn name_collation(conn: &Connection) -> Result<()> {
 
 const NAME_FOLD: &str = "NAME_FOLD";
 
-/// Orders names as NTFS compares them: each character in the Basic Multilingual Plane through
-/// its simple uppercase mapping. Equal exactly when one directory cannot hold both.
+/// Orders names through NTFS's upcase table, unit by unit: equal only when NTFS calls them one
+/// name, so no two names a directory can hold side by side are ever matched together.
 /// DECISIONS.md "Names as NTFS compares them".
 fn compare_names(a: &str, b: &str) -> Ordering {
-    a.chars().map(upcase).cmp(b.chars().map(upcase))
-}
-
-fn upcase(c: char) -> char {
-    let mut upper = c.to_uppercase();
-    match (upper.next(), upper.next()) {
-        (Some(single), None) if u32::from(c) <= 0xFFFF && u32::from(single) <= 0xFFFF => single,
-        _ => c,
-    }
-}
-
-/// Rebuilds the indexes `NAME_FOLD` orders whenever the Unicode tables it reads have changed
-/// since they were built, as a new toolchain may.
-fn reindex_names(conn: &Connection) -> Result<()> {
-    let unicode = format!("{:?}", char::UNICODE_VERSION);
-    let built: Option<String> = conn
-        .query_row(
-            "SELECT value FROM setting WHERE key = 'name_fold_unicode'",
-            [],
-            |r| r.get(0),
-        )
-        .optional()?;
-    if built.as_deref() == Some(unicode.as_str()) {
-        return Ok(());
-    }
-    in_transaction(conn, |tx| {
-        tx.execute_batch(&format!("REINDEX {NAME_FOLD}"))?;
-        tx.execute(
-            "INSERT INTO setting (key, value) VALUES ('name_fold_unicode', ?1)
-             ON CONFLICT (key) DO UPDATE SET value = excluded.value",
-            [&unicode],
-        )?;
-        Ok(())
-    })
+    a.chars()
+        .map(upcase::upcase)
+        .cmp(b.chars().map(upcase::upcase))
 }
 
 /// Fold the write-ahead log back into the one file. A closed library is a
@@ -244,6 +214,7 @@ mod tests {
             ("ΑΘΗΝΑ", "αθηνα"),
             ("Москва", "МОСКВА"),
             ("a", "A"),
+            ("\u{1F80}", "\u{1F88}"),
         ] {
             assert_eq!(compare_names(a, b), Ordering::Equal, "{a} and {b}");
         }
@@ -251,31 +222,12 @@ mod tests {
             ("straße", "STRASSE"),
             ("\u{212A}", "k"),
             ("\u{10428}", "\u{10400}"),
+            ("kız", "kiz"),
+            ("5µm", "5μm"),
+            ("ιος", "ΙΟΣ"),
         ] {
             assert_ne!(compare_names(a, b), Ordering::Equal, "{a} and {b}");
         }
-    }
-
-    #[test]
-    fn a_change_of_unicode_tables_rebuilds_the_name_indexes() {
-        let mut conn = Connection::open_in_memory().unwrap();
-        migrate(&mut conn).unwrap();
-        conn.execute(
-            "UPDATE setting SET value = 'older' WHERE key = 'name_fold_unicode'",
-            [],
-        )
-        .unwrap();
-
-        migrate(&mut conn).unwrap();
-
-        let built: String = conn
-            .query_row(
-                "SELECT value FROM setting WHERE key = 'name_fold_unicode'",
-                [],
-                |r| r.get(0),
-            )
-            .unwrap();
-        assert_eq!(built, format!("{:?}", char::UNICODE_VERSION));
     }
 
     #[test]
