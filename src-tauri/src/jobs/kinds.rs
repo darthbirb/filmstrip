@@ -12,7 +12,7 @@ pub const SCRUB: &str = "scrub";
 pub const COPY_IN: &str = "copy_in";
 /// A zip written outside the library, which counts itself too.
 pub const EXPORT: &str = "export";
-/// Files or a folder moved between drives, which counts itself too.
+/// Files moved between drives, which count themselves too.
 pub const MOVE: &str = "move";
 /// The kinds that count themselves on a line of their own, never in the walk's.
 pub const OWN_LINES: [&str; 3] = [COPY_IN, EXPORT, MOVE];
@@ -70,18 +70,14 @@ pub struct ExportPayload {
     pub whole: u32,
 }
 
-/// What a move between drives carries, where, and the batch its journal rows go under: the same
-/// batch when it goes on after a restart, which passes over what already went. It carries files,
-/// or one folder with everything in it.
+/// What a move of files between drives carries, where, and the batch its journal rows go under:
+/// the same batch when it goes on after a restart, which passes over what already went.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MovePayload {
     pub batch_id: String,
     pub into: i64,
-    #[serde(default)]
     pub item_ids: Vec<i64>,
-    #[serde(default)]
-    pub folder_id: Option<i64>,
     /// Every file it carries, for its line while it waits.
     pub whole: u32,
 }

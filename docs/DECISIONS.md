@@ -1162,11 +1162,11 @@ it.
   walk, so the index follows the copy and no file loses its identity. Both removals take only
   what the copy read and wrote, each directory only once empty: a file someone put in either
   meanwhile stays.
-- **A move between drives is a job**, as a copy in is, since a card's worth of files copied
-  inside the command held the window and every other verb with no progress and no Cancel. The
-  command decides by the drive or share each path names: files moving on one drive are renamed at
-  once, as before, and a selection with any file going to another drive goes on the queue whole,
-  one batch and one undo. A drive mounted in a folder is judged the drive around it, so its move
+- **A move of files between drives is a job**, as a copy in is, since a card's worth of files
+  copied inside the command held the window and every other verb with no progress and no Cancel.
+  The command decides by the drive or share each path names: files moving on one drive are
+  renamed at once, as before, and a selection with any file going to another drive goes on the
+  queue whole, one batch and one undo. A drive mounted in a folder is judged the drive around it, so its move
   copies inside the command as it always did. The move has a line at the foot as a copy has,
   "Moving to Lisbon…", whose dismiss is Cancel Move, and ends with the Line and Undo for what went
   and the banner for what stayed.
@@ -1175,23 +1175,19 @@ it.
     selection. A folder the move is going into that goes meanwhile stops it, and the foot says
     why. A move on one drive, inside the command, keeps one turn for the whole selection, as it
     always did: it is quick, and a walk between its files would read it half done.
-  - **A folder goes in one turn**, its whole tree: a walk must never read it half copied, so the
-    other verbs wait for it, but the window does not. Cancel stops it between files and takes
-    away what it copied, so the folder stays where it was, whole. Its line counts the files the
-    index holds until the move starts, then the files on the disk, so the command never waits on
-    a walk of a slow card before it answers.
-  - **The index follows a folder's copy before its originals go.** Once the copy has its name the
-    folder's row moves to it, tags and all, and only then do the originals go, first renamed to
-    a hidden `.Trips.filmstrip-gone` a walk passes over. Taking away a card's worth of originals
-    can outlast the shutdown's grace; cut short, the next launch's walk sees no second folder, and
-    the resumed move finds the move in its batch and finishes taking away what the copy holds
-    whole, and only that. Anything else there takes the folder's name back for the next walk.
+  - **A folder still moves inside the command**, between drives too, in one turn for its whole
+    tree, each copy flushed before any original goes. On the queue, a folder whose originals were
+    still being taken away when the app closed came back as two folders, or as a hidden one the
+    index lost when the resumed move could not run: its drive away, the move cancelled or held
+    by a restore, the folder renamed first. A folder moved between drives is rarer than a card's
+    files, and the window waiting for it costs less than either.
   - **Copies arrive under a hidden part name and are named only once whole**, as a paste's do:
     `.Lisbon.filmstrip-part` beside the place, copied, checked and flushed, then renamed onto
     the name, refused if anything took it meanwhile. The app's closing stops the file in hand,
     `CopyFileExW` cancelled from its progress routine, rather than waiting out a film the
     shutdown's grace cannot cover; that file's part is taken away, so nothing is ever left at the
-    real name half written for the resumed move to be refused by. A part a crash left is cleared
+    real name half written for the resumed move to be refused by. A folder's copy inside the
+    command arrives the same way, its whole tree under one part. A part a crash left is cleared
     before the move goes on: what the copy would have written there, and only that, read from the
     part itself and never through a link in it, so nothing outside the part can go.
   - **A move the app's closing stops goes on at the next launch** under the same batch, passing

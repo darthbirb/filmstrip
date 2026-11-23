@@ -435,8 +435,7 @@ impl JobQueue {
     }
 
     /// Stops a move between drives: one still waiting is taken off the queue, one running stops
-    /// after the file in hand, and a folder stops where it was, whole. `false` when there was
-    /// nothing to stop.
+    /// after the file in hand. `false` when there was nothing to stop.
     pub fn cancel_move(&self, conn: &Connection, job_id: i64) -> Result<bool> {
         self.inner.cancel_move(conn, job_id)
     }
@@ -625,23 +624,7 @@ pub fn enqueue_move_items(conn: &Connection, item_ids: &[i64], into: i64) -> Res
             batch_id: crate::db::journal::new_batch(),
             into,
             item_ids: item_ids.to_vec(),
-            folder_id: None,
             whole: u32::try_from(item_ids.len()).unwrap_or(u32::MAX),
-        },
-    )
-}
-
-/// Queues a move of a folder, with everything in it, into another, and returns its job.
-pub fn enqueue_move_folder(conn: &Connection, folder_id: i64, into: i64) -> Result<i64> {
-    let whole = crate::db::items::live_under(conn, folder_id)?.len();
-    enqueue_move(
-        conn,
-        kinds::MovePayload {
-            batch_id: crate::db::journal::new_batch(),
-            into,
-            item_ids: Vec::new(),
-            folder_id: Some(folder_id),
-            whole: u32::try_from(whole).unwrap_or(u32::MAX),
         },
     )
 }
@@ -1159,78 +1142,6 @@ mod tests {
         let back = crate::fs::undo::undo_last(&conn).unwrap().unwrap();
         assert_eq!((back.batch.batch_id, back.files_back), (batch.batch_id, 2));
         assert!(dir.join("library/Trips/IMG_2.jpg").is_file());
-    }
-
-    #[test]
-    fn a_folder_moved_on_the_queue_ends_as_one_act_with_its_undo() {
-        let (conn, dir, trips, people, _) = library_to_move("move-folder");
-        let job = enqueue_move_folder(&conn, trips, people).unwrap();
-        let (said, heard) = mpsc::channel();
-        let queue = JobQueue::start(
-            dir.join("library.db"),
-            dir.join("thumbs"),
-            None,
-            Box::new(|_| {}),
-            Box::new(|_| {}),
-            Box::new(|_| {}),
-            Box::new(move |moved| {
-                let _ = said.send(moved.clone());
-            }),
-        );
-        let moved = heard.recv_timeout(Duration::from_secs(60)).unwrap();
-        queue.stop();
-
-        assert_eq!(
-            (moved.job_id, moved.whole, moved.cancelled),
-            (job, 2, false)
-        );
-        assert!(moved.refused.is_empty(), "{:?}", moved.refused);
-        let batch = moved.batch.unwrap();
-        assert!(
-            matches!(batch.act, crate::fs::acts::Act::MoveFolder { .. }),
-            "{:?}",
-            batch.act
-        );
-        assert!(dir.join("library/People/Trips/IMG_1.jpg").is_file());
-        crate::fs::undo::undo_batch(&conn, &batch.batch_id).unwrap();
-        assert!(dir.join("library/Trips/IMG_1.jpg").is_file());
-    }
-
-    #[test]
-    fn a_folder_that_cannot_go_ends_its_move_with_the_folder_as_its_one_row() {
-        let (conn, dir, trips, people, _) = library_to_move("move-folder-taken");
-        let job = enqueue_move_folder(&conn, trips, people).unwrap();
-        std::fs::create_dir_all(dir.join("library/People/Trips")).unwrap();
-        crate::fs::walk::reconcile(&conn).unwrap();
-        let (said, heard) = mpsc::channel();
-        let queue = JobQueue::start(
-            dir.join("library.db"),
-            dir.join("thumbs"),
-            None,
-            Box::new(|_| {}),
-            Box::new(|_| {}),
-            Box::new(|_| {}),
-            Box::new(move |moved| {
-                let _ = said.send(moved.clone());
-            }),
-        );
-        let moved = heard.recv_timeout(Duration::from_secs(60)).unwrap();
-        queue.stop();
-
-        assert_eq!((moved.job_id, moved.batch), (job, None));
-        assert_eq!(moved.refused.len(), 1);
-        assert_eq!(
-            (moved.refused[0].id, moved.refused[0].reason.clone()),
-            (
-                trips,
-                Reason::NameTaken {
-                    place: "People".into(),
-                    name: "Trips".into(),
-                    folder: true
-                }
-            )
-        );
-        assert!(dir.join("library/Trips/IMG_1.jpg").is_file());
     }
 
     #[test]

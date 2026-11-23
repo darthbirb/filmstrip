@@ -234,48 +234,20 @@ pub async fn rename_folder(
     .await
 }
 
-/// What came of moving a folder: moved, with the batch that undoes it or nothing when it was
-/// already there, or a move between drives started as a job.
-#[derive(Debug, Clone, Serialize, TS)]
-#[serde(tag = "kind", rename_all = "camelCase")]
-#[ts(export)]
-pub enum FolderMoved {
-    Done {
-        batch: Option<Batch>,
-    },
-    Started {
-        #[serde(rename = "jobId")]
-        job_id: i64,
-    },
-}
-
-/// A folder moved into another with everything in it. Between drives it is a job, refused before
-/// it is queued as a move on one drive is refused. DECISIONS.md "Undo".
+/// A folder moved into another with everything in it; the batch that undoes it, or nothing when it
+/// was already there.
 #[tauri::command]
 pub async fn move_folder(
     state: State<'_, AppState>,
     folder_id: i64,
     parent_id: i64,
-) -> Result<FolderMoved> {
+) -> Result<Option<Batch>> {
     run(&state, move |conn| {
-        start_folder_move(conn, folder_id, parent_id)
+        let batch_id = journal::new_batch();
+        let moved = fs_folders::move_into(conn, folder_id, parent_id, &batch_id)?;
+        described(conn, moved, &batch_id)
     })
     .await
-}
-
-pub fn start_folder_move(conn: &Connection, folder_id: i64, parent_id: i64) -> Result<FolderMoved> {
-    if fs_folders::crosses_drives(conn, folder_id, parent_id)? {
-        if !fs_folders::check_move(conn, folder_id, parent_id)? {
-            return Ok(FolderMoved::Done { batch: None });
-        }
-        let job_id = jobs::enqueue_move_folder(conn, folder_id, parent_id)?;
-        return Ok(FolderMoved::Started { job_id });
-    }
-    let batch_id = journal::new_batch();
-    let moved = fs_folders::move_into(conn, folder_id, parent_id, &batch_id)?;
-    Ok(FolderMoved::Done {
-        batch: described(conn, moved, &batch_id)?,
-    })
 }
 
 /// The batch an act wrote, described, or nothing when the act changed nothing.
@@ -590,7 +562,7 @@ pub async fn cancel_copy(state: State<'_, AppState>, job_id: i64) -> Result<bool
 }
 
 /// Stops a move between drives after the file in hand; what went stays, as one batch with its
-/// Undo, and a folder stays where it was, whole.
+/// Undo.
 #[tauri::command]
 pub async fn cancel_move(state: State<'_, AppState>, job_id: i64) -> Result<bool> {
     let conn = crate::db::open(&state.db)?;

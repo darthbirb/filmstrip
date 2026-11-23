@@ -10,8 +10,8 @@ use crate::db::{self, items, journal};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::export as fs_export;
 use crate::fs::paste::{self, Halt};
-use crate::fs::stayed::{self, Stayed};
-use crate::fs::{folders as fs_folders, items as fs_items, paths, relocate, walk};
+use crate::fs::stayed::Stayed;
+use crate::fs::{items as fs_items, paths, relocate, walk};
 use crate::jobs::kinds::{
     self, CopyPayload, ExportPayload, FolderPayload, ItemPayload, MovePayload,
 };
@@ -120,39 +120,22 @@ fn move_across(
         cancelled: false,
         stopped: None,
     };
-    let halted = match payload.folder_id {
-        Some(folder_id) => {
-            match fs_folders::move_watched(
-                conn,
-                folder_id,
-                payload.into,
-                &payload.batch_id,
-                &control,
-            ) {
-                Ok(halted) => halted,
-                Err(err) => {
-                    ended.refused.push(stayed::folder(conn, folder_id, &err)?);
-                    None
-                }
-            }
+    let halted = match fs_items::move_watched(
+        conn,
+        &payload.item_ids,
+        payload.into,
+        &payload.batch_id,
+        &control,
+    ) {
+        Ok(outcome) => {
+            ended.refused = outcome.report.refused;
+            ended.stopped = outcome.stopped;
+            outcome.halted
         }
-        None => match fs_items::move_watched(
-            conn,
-            &payload.item_ids,
-            payload.into,
-            &payload.batch_id,
-            &control,
-        ) {
-            Ok(outcome) => {
-                ended.refused = outcome.report.refused;
-                ended.stopped = outcome.stopped;
-                outcome.halted
-            }
-            Err(err) => {
-                ended.stopped = Some(Reason::of(&err));
-                None
-            }
-        },
+        Err(err) => {
+            ended.stopped = Some(Reason::of(&err));
+            None
+        }
     };
     drop(control);
     if halted == Some(Halt::Stop) {

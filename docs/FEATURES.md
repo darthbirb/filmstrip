@@ -47,7 +47,7 @@ drawn. **Not started** — neither.
 | Read one folder again | Built | `read_folder_again`, its row's menu; ggallery walked only whole sources |
 | A folder's own details | Built | `folder_detail`, the band under a folder's header |
 | Create a folder | Built | `create_folder`, New Folder on a folder's and a source's menu, a row already in its name field |
-| Move a folder | Built | `move_folder`, across drives too, as a job with its line and Cancel (`cancel_move`); Move to… on its menu, its own branch not a choice |
+| Move a folder | Built | `move_folder`, across drives too; Move to… on its menu, its own branch not a choice |
 | Delete a folder, choosing what happens to what is inside | Built | `delete_folder`, `folder_file_count`; asks in a banner, and Settings › Sources keeps the answer |
 | Rename a folder, on disk | Built | `rename_folder`, in its tree row, a name already there said under it |
 | A folder's cover | Built | `folder_cover_choices`, `set_folder_cover`, the pencil on the band's cover, which takes only a live picture at or below the folder; the first picture stands in while none is chosen |

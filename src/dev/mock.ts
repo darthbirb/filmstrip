@@ -1812,13 +1812,13 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     const to = parentId as number;
     if (!found) return invalid("a source's own folder sits inside nothing");
     const { node, parent } = found;
-    if (parent === to) return { kind: "done", batch: null };
+    if (parent === to) return null;
     if (crumbs(to).folders.some((crumb) => crumb.id === node.id))
       return invalid("a folder cannot go inside itself");
     if (folderTaken(to, node.title)) return refusedName(to, node.title, true);
     detach(node);
     attach(node, to);
-    return { kind: "done", batch: record([{ op: "moveFolder", node, from: parent, to }]) };
+    return record([{ op: "moveFolder", node, from: parent, to }]);
   },
   move_items: ({ itemIds, folderId }): ItemsMoved => {
     const to = folderId as number;

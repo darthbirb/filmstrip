@@ -82,7 +82,7 @@ fn move_each(
             outcome.stopped = Some(Reason::FolderGone { name });
             break;
         }
-        match move_one(conn, item_id, folder_id, Some(batch_id), &InHand(control)) {
+        match move_one(conn, item_id, folder_id, Some(batch_id), control) {
             Ok(Went::Moved) => outcome.report.moved += 1,
             Ok(Went::There) => {}
             Ok(Went::Halted(halt)) => {
@@ -115,16 +115,6 @@ pub fn cross_drives(conn: &Connection, item_ids: &[i64], folder_id: i64) -> Resu
         }
     }
     Ok(false)
-}
-
-/// The file in hand's own halts, its count of the files within it left out: a move counts files.
-struct InHand<'a, C>(&'a C);
-
-impl<C: Control> Control for InHand<'_, C> {
-    fn halt(&self) -> Option<Halt> {
-        self.0.halt()
-    }
-    fn progress(&self, _done: u32, _whole: u32) {}
 }
 
 enum Went {

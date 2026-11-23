@@ -334,19 +334,6 @@ pub fn record_folder_move(
     record(conn, batch_id, FOLDER_MOVE, &forward, &inverse)
 }
 
-/// Where a batch moved a folder from, once that move is in the index.
-pub fn folder_moved_from(conn: &Connection, batch_id: &str, folder_id: i64) -> Result<Option<i64>> {
-    Ok(conn
-        .query_row(
-            "SELECT json_extract(forward, '$.fromParentId') FROM journal
-              WHERE batch_id = ?1 AND op = ?2 AND json_extract(forward, '$.folderId') = ?3
-              ORDER BY id DESC LIMIT 1",
-            params![batch_id, FOLDER_MOVE, folder_id],
-            |r| r.get(0),
-        )
-        .optional()?)
-}
-
 pub fn record_item_move(
     conn: &Connection,
     batch_id: &str,

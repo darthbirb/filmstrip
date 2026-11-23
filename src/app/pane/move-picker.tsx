@@ -3,7 +3,6 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 
 import type { FolderEntry } from "../../ipc/bindings/FolderEntry";
 import type { Moved } from "../../ipc/bindings/Moved";
-import type { Stayed } from "../../ipc/bindings/Stayed";
 import {
   type AppError,
   listFolders,
@@ -285,13 +284,13 @@ export async function moveFiles(itemIds: number[], to: Into) {
  */
 export async function moveFolderTo(
   folder: MovingFolder,
-  to: Into,
+  to: FolderEntry,
   from: { folderId: number; path: string[] },
 ) {
   try {
-    const moved = await moveFolder(folder.id, to.id);
+    const batch = await moveFolder(folder.id, to.id);
     remember(to);
-    if (moved.kind === "done" && moved.batch) afterAct(moved.batch);
+    if (batch) afterAct(batch);
     showReport(null);
   } catch (error) {
     const { reason } = (error ?? {}) as AppError;
@@ -308,9 +307,8 @@ export async function moveFolderTo(
 }
 
 /**
- * How a move between drives ended: the Line with Undo for what went, and the banner for what
- * stayed, with Retry. A folder stays whole or goes whole, so its banner has the folder as its one
- * row. One that stopped on its own says why at the foot. DECISIONS.md "Undo".
+ * How a move of files between drives ended: the Line with Undo for what went, and the banner for
+ * what stayed, with Retry. One that stopped on its own says why at the foot. DECISIONS.md "Undo".
  */
 export async function afterMoved(moved: Moved) {
   await libraryChanged();
@@ -318,20 +316,17 @@ export async function afterMoved(moved: Moved) {
   const into = { id: moved.folderId, title: to };
   const [only] = refused;
   if (only) {
-    const folder = only.kind === "folder" ? only : null;
-    const went = folder ? 0 : (batch?.files ?? 0);
-    const one = folder !== null || (went === 0 && refused.length === 1);
+    const went = batch?.files ?? 0;
+    const one = went === 0 && refused.length === 1;
     showReport({
-      sentence: movedBannerLine(went, folder ? 1 : whole, to, one ? only.name : undefined),
+      sentence: movedBannerLine(went, whole, to, one ? only.name : undefined),
       rows: refused,
       heading: "Not Moved",
-      retry: folder
-        ? () => void moveFolderTo({ id: folder.id, name: folder.name }, into, placeOf(folder))
-        : () =>
-            void moveFiles(
-              refused.map((row) => row.id),
-              into,
-            ),
+      retry: () =>
+        void moveFiles(
+          refused.map((row) => row.id),
+          into,
+        ),
     });
   }
   if (stopped) {
@@ -345,13 +340,6 @@ export async function afterMoved(moved: Moved) {
   if (!batch) return;
   if (moved.cancelled) afterAct(batch, 0, moveStoppedLine(batch, whole, to));
   else afterAct(batch, refused.length);
-}
-
-/** The folder a row stayed in, as a folder's move names where it was. */
-function placeOf(row: Stayed) {
-  return row.at.kind === "folder"
-    ? { folderId: row.at.folderId, path: row.at.path }
-    : { folderId: row.id, path: [row.name] };
 }
 
 /** Hears how each move between drives ended. */

@@ -106,29 +106,6 @@ test("a move that left files where they were lists them, and Retry moves them ag
   setNews(null);
 });
 
-test("a folder that could not go is the move's one row, and Retry moves it again", async () => {
-  showReport(null);
-  const trips: Stayed = {
-    kind: "folder",
-    id: 4,
-    name: "Trips",
-    at: { kind: "folder", folderId: 1, path: ["Pictures"] },
-    reason: { kind: "inUse" },
-  };
-  await afterMoved({ ...ended, batch: null, refused: [trips] });
-  expect(getReport()?.sentence).toBe("Trips could not go to People");
-  expect(getReport()?.rows).toEqual([trips]);
-
-  await recording(async (calls) => {
-    getReport()?.retry?.();
-    await expect
-      .poll(() => calls.find(([cmd]) => cmd === "move_folder")?.[1])
-      .toEqual({ folderId: 4, parentId: 5 });
-  });
-  showReport(null);
-  setNews(null);
-});
-
 test("a move that stopped on its own says why, with what went and its Undo", async () => {
   setNews(null);
   const stopped = { kind: "folderGone", name: "People" } as const;
