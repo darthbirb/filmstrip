@@ -1081,6 +1081,21 @@ mod tests {
     }
 
     #[test]
+    fn a_renamed_source_is_found_by_its_new_title_only() {
+        let l = library();
+        let archive = sources::list(&l.conn)
+            .unwrap()
+            .into_iter()
+            .find(|s| s.title == "Archive")
+            .unwrap();
+        sources::rename(&l.conn, archive.id, "Vault").unwrap();
+        assert_eq!(found(&l.conn, "vault"), ["old_portrait.jpg"]);
+        assert!(found(&l.conn, "archive").is_empty());
+        assert_eq!(found_folders(&l.conn, "vault"), ["Vault"]);
+        assert!(found_folders(&l.conn, "archive").is_empty());
+    }
+
+    #[test]
     fn a_folder_matches_what_it_carries_itself() {
         let l = library();
         assert_eq!(found_folders(&l.conn, "instagram:@ana"), ["Ana"]);
