@@ -87,6 +87,30 @@ under a new directory can be recognised and reunited, keeping identity. Until ha
 this is a known gap, not a choice. A rename made through the app has no such problem: the app
 moves the directory and records the move in one step.
 
+## Names as NTFS compares them
+
+A directory cannot hold two names NTFS calls one, and a walk pairs what it finds on disk with
+the rows it has by name, so folder titles and file names are matched as NTFS matches them.
+SQLite's `NOCASE` folds ASCII only: `Ägypten` renamed to `ägypten` in Explorer read as one
+folder gone and another arrived, and its files came back as new items without their tags.
+
+The comparison is `NAME_FOLD`, a collation the app registers on every connection
+(`db::compare_names`). Each character in the Basic Multilingual Plane goes through its simple
+uppercase mapping, as NTFS's own upcase table maps each UTF-16 unit. A character whose
+uppercase is several characters, such as `ß`, and one outside that plane are left as they are,
+as NTFS leaves them. Folding less is the safe side to err on: a name folded too far would have
+a walk take a second file on disk for the first, where one folded too little only brings the
+old gap back for that character.
+
+The two indexes that keep names unique are built with it, so a lookup reads the index rather
+than every row in the folder. A stored folded key would do the same, at the cost of every write
+keeping it. An index must never see its collation's order change, so both are rebuilt whenever
+the Unicode tables Rust's standard library carries change (`setting.name_fold_unicode`).
+
+Lengths are counted as NTFS counts them: 255 UTF-16 units a component, not 255 bytes. A cut
+falls between characters, never inside one or between a surrogate pair's halves, and a file
+name loses the end of its stem, never its extension (`fs::sanitize`).
+
 ## A walk only judges what it read
 
 A walk retires whatever it did not find, so it may only judge what it actually read.

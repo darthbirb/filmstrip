@@ -19,10 +19,12 @@ const BUSY_TRIES: u32 = 50;
 const BUSY_WAIT: Duration = Duration::from_millis(100);
 
 fn read_only(path: &Path) -> Result<Connection> {
-    Ok(Connection::open_with_flags(
+    let conn = Connection::open_with_flags(
         path,
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
-    )?)
+    )?;
+    crate::db::name_collation(&conn)?;
+    Ok(conn)
 }
 
 /// Copies the index whole into a new file at `to`, in one step that reads it as of one moment, so

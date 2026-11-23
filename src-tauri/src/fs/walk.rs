@@ -732,6 +732,35 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn a_case_only_rename_of_a_non_ascii_folder_keeps_its_row_and_its_files_tags() {
+        let (conn, root) = library("case-only");
+        write(&root.join("Ägypten/nile.jpg"), "a");
+        reconcile(&conn).unwrap();
+        let top = folders::source_root_folder(&conn, 1).unwrap();
+        let egypt = folders::child_id(&conn, top, "Ägypten").unwrap().unwrap();
+        let nile: i64 = conn
+            .query_row("SELECT id FROM item", [], |r| r.get(0))
+            .unwrap();
+        db::tags::add_item_tag(&conn, nile, "river").unwrap();
+
+        std::fs::rename(root.join("Ägypten"), root.join("ägypten")).unwrap();
+        let report = reconcile(&conn).unwrap();
+
+        assert_eq!((report.folders_retired, report.items_retired), (0, 0));
+        assert_eq!(
+            folders::child_id(&conn, top, "ägypten").unwrap(),
+            Some(egypt)
+        );
+        assert_eq!(live_items(&conn), [("nile.jpg".to_string(), egypt)]);
+        let tags: Vec<String> = db::tags::item_effective_tags(&conn, nile)
+            .unwrap()
+            .into_iter()
+            .map(|tag| tag.value)
+            .collect();
+        assert!(tags.contains(&"river".to_string()), "{tags:?}");
+    }
+
+    #[test]
     fn litter_and_hidden_directories_are_not_library_content() {
         let (conn, root) = library("litter");
         write(&root.join("Thumbs.db"), "x");

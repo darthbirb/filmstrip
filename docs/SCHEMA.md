@@ -29,7 +29,7 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 | `folder_tag` | Terms on a folder, added by its title or by hand. |
 | `item_tag` | Tags an item carries itself. |
 | `item_effective_tag` | Everything an item carries once inheritance is resolved. |
-| `setting` | Key-value pairs: `undo_floor`, the newest journal row a restore kept; `recycling`, each send to the Recycle Bin that has not settled: the library file, its item and act, and once its second name is made the file's identity and names, until the send is recorded or a launch settles it. |
+| `setting` | Key-value pairs: `undo_floor`, the newest journal row a restore kept; `name_fold_unicode`, the Unicode version the name indexes were built under; `recycling`, each send to the Recycle Bin that has not settled: the library file, its item and act, and once its second name is made the file's identity and names, until the send is recorded or a launch settles it. |
 | `journal` | Every change the app made on disk, and every set tagged at once, with what reverses it, grouped into batches. |
 | `job` | Background work: waiting, running, or failed with its error. |
 | `destination_key` | A digit, `0` to `9`, bound to a folder that a press moves files into. |
@@ -56,10 +56,14 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 
 ## Uniqueness
 
-- One live folder per parent and title, compared case-insensitively. SQLite folds ASCII only,
-  so `Ä` and `ä` are two titles.
+- One live folder per parent and title, compared as NTFS compares names, by `NAME_FOLD`: a
+  collation the app registers on every connection, folding each character in the Basic
+  Multilingual Plane through its simple uppercase mapping. `Ä` and `ä` are one title; `ß` and
+  `SS` are two. Migration 13 moved this index and the item one below from `NOCASE`, which folds
+  ASCII only. `setting.name_fold_unicode` names the Unicode version both were built under, and
+  a launch under another rebuilds them.
 - One root folder per source.
-- One item per folder and `disk_name`, compared case-insensitively, among items not in the trash.
+- One item per folder and `disk_name`, compared by `NAME_FOLD`, among items not in the trash.
   A retired item keeps its name; a trashed one gives it up.
 - `item.uuid` is unique. It is identity and the thumbnail cache key — never a location.
 - `source.root` is unique, and the application also refuses a root that sits inside another

@@ -15,10 +15,11 @@ pub mod suggest;
 pub mod tags;
 pub mod vocabulary;
 
+use std::cmp::Ordering;
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use rusqlite::{Connection, Transaction, TransactionBehavior};
+use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior};
 
 use crate::error::Result;
 
@@ -36,6 +37,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (10, include_str!("migrations/010_frame.sql")),
     (11, include_str!("migrations/011_expired.sql")),
     (12, include_str!("migrations/012_recycle_bin.sql")),
+    (13, include_str!("migrations/013_name_fold.sql")),
 ];
 
 type Rewrite = fn(&Connection) -> Result<()>;
@@ -53,6 +55,7 @@ pub fn latest_schema() -> i64 {
 /// beside any number of readers.
 pub fn open(path: &Path) -> Result<Connection> {
     let conn = Connection::open(path)?;
+    name_collation(&conn)?;
     conn.busy_timeout(Duration::from_secs(20))?;
     // Returns the mode it ended up in, so it has to be queried rather than set.
     let _: String = conn.query_row("PRAGMA journal_mode=WAL", [], |r| r.get(0))?;
@@ -87,6 +90,7 @@ pub fn in_transaction<T>(
 /// **Foreign keys are off for the duration, and restored on every exit path.**
 /// DEVELOPMENT.md "Gotchas".
 pub fn migrate(conn: &mut Connection) -> Result<()> {
+    name_collation(conn)?;
     conn.pragma_update(None, "foreign_keys", "OFF")?;
     let result = migrate_inner(conn);
     // Not pragma_update: its name check can read the file, and so mask the migration's error.
@@ -131,7 +135,57 @@ fn migrate_inner(conn: &mut Connection) -> Result<()> {
         tx.execute("INSERT INTO data_version (version) VALUES (?1)", [version])?;
         tx.commit()?;
     }
+    reindex_names(conn)
+}
+
+/// Registers `NAME_FOLD`, the comparison every folder title and file name is matched with.
+/// **Every connection that reads or writes `folder` or `item` needs it**, or SQLite refuses the
+/// statement: `open` and `migrate` register it. SCHEMA.md "Uniqueness".
+pub(crate) fn name_collation(conn: &Connection) -> Result<()> {
+    conn.create_collation(NAME_FOLD, compare_names)?;
     Ok(())
+}
+
+const NAME_FOLD: &str = "NAME_FOLD";
+
+/// Orders names as NTFS compares them: each character in the Basic Multilingual Plane through
+/// its simple uppercase mapping. Equal exactly when one directory cannot hold both.
+/// DECISIONS.md "Names as NTFS compares them".
+fn compare_names(a: &str, b: &str) -> Ordering {
+    a.chars().map(upcase).cmp(b.chars().map(upcase))
+}
+
+fn upcase(c: char) -> char {
+    let mut upper = c.to_uppercase();
+    match (upper.next(), upper.next()) {
+        (Some(single), None) if u32::from(c) <= 0xFFFF && u32::from(single) <= 0xFFFF => single,
+        _ => c,
+    }
+}
+
+/// Rebuilds the indexes `NAME_FOLD` orders whenever the Unicode tables it reads have changed
+/// since they were built, as a new toolchain may.
+fn reindex_names(conn: &Connection) -> Result<()> {
+    let unicode = format!("{:?}", char::UNICODE_VERSION);
+    let built: Option<String> = conn
+        .query_row(
+            "SELECT value FROM setting WHERE key = 'name_fold_unicode'",
+            [],
+            |r| r.get(0),
+        )
+        .optional()?;
+    if built.as_deref() == Some(unicode.as_str()) {
+        return Ok(());
+    }
+    in_transaction(conn, |tx| {
+        tx.execute_batch(&format!("REINDEX {NAME_FOLD}"))?;
+        tx.execute(
+            "INSERT INTO setting (key, value) VALUES ('name_fold_unicode', ?1)
+             ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+            [&unicode],
+        )?;
+        Ok(())
+    })
 }
 
 /// Fold the write-ahead log back into the one file. A closed library is a
@@ -182,6 +236,47 @@ pub(crate) fn hold_write_lock(path: &Path, waiting: &mut Connection) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn names_compare_as_ntfs_compares_them() {
+        for (a, b) in [
+            ("Ägypten", "ägypten"),
+            ("ΑΘΗΝΑ", "αθηνα"),
+            ("Москва", "МОСКВА"),
+            ("a", "A"),
+        ] {
+            assert_eq!(compare_names(a, b), Ordering::Equal, "{a} and {b}");
+        }
+        for (a, b) in [
+            ("straße", "STRASSE"),
+            ("\u{212A}", "k"),
+            ("\u{10428}", "\u{10400}"),
+        ] {
+            assert_ne!(compare_names(a, b), Ordering::Equal, "{a} and {b}");
+        }
+    }
+
+    #[test]
+    fn a_change_of_unicode_tables_rebuilds_the_name_indexes() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        migrate(&mut conn).unwrap();
+        conn.execute(
+            "UPDATE setting SET value = 'older' WHERE key = 'name_fold_unicode'",
+            [],
+        )
+        .unwrap();
+
+        migrate(&mut conn).unwrap();
+
+        let built: String = conn
+            .query_row(
+                "SELECT value FROM setting WHERE key = 'name_fold_unicode'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(built, format!("{:?}", char::UNICODE_VERSION));
+    }
 
     #[test]
     fn migrating_twice_changes_nothing() {
