@@ -1166,10 +1166,10 @@ it.
   copied inside the command held the window and every other verb with no progress and no Cancel.
   The command decides by the drive or share each path names: files moving on one drive are
   renamed at once, as before, and a selection with any file going to another drive goes on the
-  queue whole, one batch and one undo. A drive mounted in a folder is judged the drive around it, so its move
-  copies inside the command as it always did. The move has a line at the foot as a copy has,
-  "Moving to Lisbon…", whose dismiss is Cancel Move, and ends with the Line and Undo for what went
-  and the banner for what stayed.
+  queue whole, one batch and one undo. A drive mounted in a folder is judged the drive around it,
+  so its move copies inside the command as it always did. The move has a line at the foot as a
+  copy has, "Moving to Lisbon…", whose dismiss is Cancel Move, and ends with the Line and Undo for
+  what went and the banner for what stayed.
   - **Files go one to a turn**, each moved whole or left where it was, so Cancel finishes the file
     in hand and starts no other, and a walk or another verb waits for one file, never the
     selection. A folder the move is going into that goes meanwhile stops it, and the foot says
@@ -1188,8 +1188,9 @@ it.
     shutdown's grace cannot cover; that file's part is taken away, so nothing is ever left at the
     real name half written for the resumed move to be refused by. A folder's copy inside the
     command arrives the same way, its whole tree under one part. A part a crash left is cleared
-    before the move goes on: what the copy would have written there, and only that, read from the
-    part itself and never through a link in it, so nothing outside the part can go.
+    before the move goes on, or as the move waiting after it is cancelled: what the copy would
+    have written there, and only that, read from the part itself and never through a link in it,
+    so nothing outside the part can go.
   - **A move the app's closing stops goes on at the next launch** under the same batch, passing
     over what already went. Until it ends its batch is no act: Ctrl+Z passes over it and its Undo
     is refused, as a copy's is ("Bringing files in"). Restoring the index cancels it first, as

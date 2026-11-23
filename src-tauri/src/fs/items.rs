@@ -99,6 +99,23 @@ fn move_each(
     Ok(outcome)
 }
 
+/// Clears the part each of these files that has not gone into `folder_id` has there, left by a
+/// move a crash cut short that will not run again.
+pub fn clear_parts(conn: &Connection, item_ids: &[i64], folder_id: i64) -> Result<()> {
+    let _turn = super::turn();
+    let dir = paths::folder_dir(conn, folder_id)?;
+    for &item_id in item_ids {
+        let Some(file) = items::file_of(conn, item_id)? else {
+            continue;
+        };
+        if file.folder_id != folder_id {
+            let from = paths::item_path(conn, file.folder_id, &file.disk_name)?;
+            relocate::clear_part_of(&from, &dir.join(&file.disk_name));
+        }
+    }
+    Ok(())
+}
+
 /// Whether moving these items into `folder_id` copies any of them between drives.
 pub fn cross_drives(conn: &Connection, item_ids: &[i64], folder_id: i64) -> Result<bool> {
     let dir = paths::folder_dir(conn, folder_id)?;

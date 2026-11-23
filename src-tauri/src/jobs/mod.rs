@@ -1172,6 +1172,24 @@ mod tests {
         );
     }
 
+    #[test]
+    fn cancel_on_a_move_waiting_after_a_crash_clears_the_part_its_killed_run_left() {
+        let (conn, dir, _, people, ids) = library_to_move("move-cancel-part");
+        let job = enqueue_move_items(&conn, &ids, people).unwrap();
+        let into = dir.join("library/People");
+        std::fs::write(into.join(".IMG_2.jpg.filmstrip-part"), "half").unwrap();
+        std::fs::write(into.join(".IMG_9.jpg.filmstrip-part"), "theirs").unwrap();
+
+        let (said, heard) = mpsc::channel();
+        let inner = hearing_moves(&dir, said);
+        assert!(inner.cancel_move(&conn, job).unwrap());
+        assert!(heard.try_recv().unwrap().cancelled);
+        assert!(!into.join(".IMG_2.jpg.filmstrip-part").exists());
+        assert!(into.join(".IMG_9.jpg.filmstrip-part").is_file());
+        assert!(dir.join("library/Trips/IMG_2.jpg").is_file());
+        assert!(!into.join("IMG_2.jpg").exists());
+    }
+
     /// Starting the queue on a fresh library walks it and thumbnails its pictures, off this thread.
     #[test]
     fn a_walk_indexes_a_library_and_its_pictures_get_thumbnails() {

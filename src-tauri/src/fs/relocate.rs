@@ -135,6 +135,12 @@ fn part_beside(to: &Path) -> PathBuf {
 /// Within a file name's 255, with room for the part's own dot and suffix.
 const PART_NAME_KEPT: usize = 200;
 
+/// Takes away the part a move of `from` to `to` that a crash cut short left, for a move that will
+/// not run again.
+pub fn clear_part_of(from: &Path, to: &Path) {
+    clear_part(from, &part_beside(to));
+}
+
 /// Takes away a part of `from` that a copy the app's closing or a crash cut short left: each file
 /// and folder in it that mirrors one in `from`, deepest first, folders once empty. It walks the
 /// part itself and never follows nor removes a link there, so nothing outside the part can go.

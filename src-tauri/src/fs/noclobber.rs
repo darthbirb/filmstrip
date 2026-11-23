@@ -27,34 +27,9 @@ pub fn rename(from: &Path, to: &Path) -> io::Result<()> {
     std::fs::remove_file(from)
 }
 
-/// Copies the file `from` to a new file `to`, or fails without touching `to` when it is taken.
-#[cfg(windows)]
-pub fn copy(from: &Path, to: &Path) -> io::Result<()> {
-    use windows_sys::Win32::Storage::FileSystem::CopyFileW;
-
-    arriving(to);
-    let (from, to) = (verbatim(from)?, verbatim(to)?);
-    // SAFETY: both are NUL-terminated wide strings that outlive the call.
-    if unsafe { CopyFileW(from.as_ptr(), to.as_ptr(), 1) } == 0 {
-        return Err(io::Error::last_os_error());
-    }
-    Ok(())
-}
-
-#[cfg(not(windows))]
-pub fn copy(from: &Path, to: &Path) -> io::Result<()> {
-    arriving(to);
-    let mut source = std::fs::File::open(from)?;
-    let mut target = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(to)?;
-    io::copy(&mut source, &mut target).map(|_| ())
-}
-
-/// Copies the file `from` to a new file `to`, as `copy` does, asking `stop` as each part of it is
-/// written: `Ok(false)` once it says so, and then nothing of `to` is left. `to` is a copy's own
-/// part, which nobody else takes, so it runs no test's last-moment arrival.
+/// Copies the file `from` to a new file `to`, or fails without touching `to` when it is taken,
+/// asking `stop` as each part of it is written: `Ok(false)` once it says so, and then nothing of
+/// `to` is left. `to` is a copy's own part, so it runs no test's last-moment arrival.
 #[cfg(windows)]
 pub fn copy_unless(from: &Path, to: &Path, stop: &dyn Fn() -> bool) -> io::Result<bool> {
     use windows_sys::Win32::Foundation::{ERROR_REQUEST_ABORTED, HANDLE};
@@ -213,17 +188,18 @@ mod tests {
     }
 
     #[test]
-    fn a_copy_onto_a_name_that_appeared_just_before_it_is_refused_and_theirs_kept() {
+    fn a_copy_onto_a_name_taken_is_refused_and_theirs_kept() {
         let dir = scratch("copy");
         std::fs::write(dir.join("IMG_1.jpg"), "ours").unwrap();
-        copy(&dir.join("IMG_1.jpg"), &dir.join("IMG_2.jpg")).unwrap();
+        assert!(copy_unless(&dir.join("IMG_1.jpg"), &dir.join("IMG_2.jpg"), &|| false).unwrap());
         assert_eq!(
             std::fs::read_to_string(dir.join("IMG_2.jpg")).unwrap(),
             "ours"
         );
 
-        just_before_the_next(|to| std::fs::write(to, "theirs").unwrap());
-        let err = copy(&dir.join("IMG_1.jpg"), &dir.join("IMG_3.jpg")).unwrap_err();
+        std::fs::write(dir.join("IMG_3.jpg"), "theirs").unwrap();
+        let err =
+            copy_unless(&dir.join("IMG_1.jpg"), &dir.join("IMG_3.jpg"), &|| false).unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::AlreadyExists);
         assert_eq!(
             std::fs::read_to_string(dir.join("IMG_3.jpg")).unwrap(),

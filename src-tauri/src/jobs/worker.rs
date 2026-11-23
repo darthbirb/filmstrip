@@ -146,21 +146,24 @@ fn move_across(
     Ok(Done::Finished)
 }
 
-/// A move taken off the queue as it waited: it ends as one cancelled while running does, with
-/// what a run before a restart moved, if any did.
+/// A move taken off the queue as it waited: the part a crash left of it is cleared, and it ends as
+/// one cancelled while running does, with what a run before a restart moved, if any did.
 pub fn moved_waiting(
     inner: &QueueInner,
     conn: &Connection,
     job_id: i64,
     payload: &MovePayload,
 ) -> Result<()> {
+    // Its job is already gone, so its line ends even when the tidy cannot.
+    let cleared = fs_items::clear_parts(conn, &payload.item_ids, payload.into);
     let ended = Ended {
         whole: payload.whole,
         refused: Vec::new(),
         cancelled: true,
         stopped: None,
     };
-    announce_move(inner, conn, job_id, payload, ended)
+    announce_move(inner, conn, job_id, payload, ended)?;
+    cleared
 }
 
 fn announce_move(
