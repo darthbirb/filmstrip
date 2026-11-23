@@ -29,7 +29,7 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 | `folder_tag` | Terms on a folder, added by its title or by hand. |
 | `item_tag` | Tags an item carries itself. |
 | `item_effective_tag` | Everything an item carries once inheritance is resolved. |
-| `setting` | Key-value pairs: `undo_floor`, the newest journal row a restore kept; `recycling`, the library files whose sends to the Recycle Bin have not settled, each until its send does or a launch settles it. |
+| `setting` | Key-value pairs: `undo_floor`, the newest journal row a restore kept; `recycling`, each send to the Recycle Bin that has not settled: the library file, its item and act, and once its second name is made the file's identity and names, until the send is recorded or a launch settles it. |
 | `journal` | Every change the app made on disk, and every set tagged at once, with what reverses it, grouped into batches. |
 | `job` | Background work: waiting, running, or failed with its error. |
 | `destination_key` | A digit, `0` to `9`, bound to a folder that a press moves files into. |

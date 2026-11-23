@@ -10,9 +10,10 @@ use ts_rs::TS;
 
 use crate::db::items::{ItemFile, ItemRow};
 use crate::db::journal::{Forgot, ItemRestored};
-use crate::db::{folders, in_transaction, items, journal, now, recycling, sources, tags};
+use crate::db::recycling::{self, Sending};
+use crate::db::{folders, in_transaction, items, journal, now, sources, tags};
 use crate::error::{AppError, Reason, Result};
-use crate::fs::recycle::{self, Bin, Sent, Shell};
+use crate::fs::recycle::{self, Bin, Binned, Sent, Shell};
 use crate::fs::stayed::{self, Stayed};
 use crate::fs::{paths, relocate};
 
@@ -108,46 +109,102 @@ pub(super) fn trash_unjournalled(
     if let Some(drive) = Shell.binless(&from) {
         return Err(AppError::refused(Reason::NoBin { drive }));
     }
-    recycling::add(conn, &from)?;
-    let sent = recycle::send(&Shell, &from)?;
-    recycling::settled(conn, &from)?;
+    recycling::add(conn, &Sending::new(&from, item_id, batch_id))?;
+    let sent = recycle::send(&Shell, &from, |itself, before| {
+        recycling::holding(conn, &from, itself, before)
+            .map_err(|err| std::io::Error::other(err.to_string()))
+    })?;
     let binned = match sent {
         Sent::Recycled(binned) => binned,
         Sent::Gone => {
+            recycling::settled(conn, &from)?;
             return Err(AppError::refused(Reason::NotOnDisk {
                 name: file.disk_name,
             }));
         }
-        Sent::Refused => return Err(AppError::refused(Reason::BinRefused)),
+        Sent::Refused => {
+            recycling::settled(conn, &from)?;
+            return Err(AppError::refused(Reason::BinRefused));
+        }
     };
 
-    let recorded = in_transaction(conn, |tx| {
-        items::send_to_trash(tx, item_id)?;
-        items::set_binned(tx, item_id, &binned.path.to_string_lossy(), &binned.file)?;
-        if let Some(batch_id) = batch_id {
-            journal::record_item_trash(tx, batch_id, item_id)?;
+    let recorded = in_transaction(conn, |tx| record_send(tx, item_id, &binned, batch_id));
+    if recorded.is_err() {
+        if relocate::relocate(&binned.path, &from).is_ok() {
+            let_go(&binned.path);
+            if recycle::settle_beside(&from).is_ok() {
+                recycling::settled(conn, &from)?;
+            }
         }
-        Ok(())
-    });
-    if recorded.is_err() && relocate::relocate(&binned.path, &from).is_ok() {
-        let_go(&binned.path);
+        return recorded;
     }
-    recorded
+    match recycle::release(&from, &binned.file) {
+        Ok(()) => recycling::settled(conn, &from)?,
+        Err(err) => eprintln!("recycle: {} was not settled: {err}", from.display()),
+    }
+    Ok(())
 }
 
-/// Settles what each send from a library folder left beside its file when the app stopped during
-/// it, once that folder can be reached. DECISIONS.md "Sending to the Recycle Bin".
+/// Records an item as in the Trash, where the bin keeps its file.
+fn record_send(
+    conn: &Connection,
+    item_id: i64,
+    binned: &Binned,
+    batch_id: Option<&str>,
+) -> Result<()> {
+    items::send_to_trash(conn, item_id)?;
+    items::set_binned(conn, item_id, &binned.path.to_string_lossy(), &binned.file)?;
+    if let Some(batch_id) = batch_id {
+        journal::record_item_trash(conn, batch_id, item_id)?;
+    }
+    Ok(())
+}
+
+/// Settles each send from a library folder the app stopped during, once that folder can be
+/// reached: one the bin had taken is recorded as in the Trash, tags and all, as the send would
+/// have recorded it. DECISIONS.md "Sending to the Recycle Bin".
 pub fn settle_unfinished_send(conn: &Connection) -> Result<()> {
-    for file in recycling::unsettled(conn)? {
-        if !file.parent().is_some_and(Path::is_dir) {
+    for sending in recycling::unsettled(conn)? {
+        if !sending.file.parent().is_some_and(Path::is_dir) {
             continue;
         }
-        match recycle::settle_beside(&file) {
-            Ok(()) => recycling::settled(conn, &file)?,
-            Err(err) => eprintln!("recycle: {} was not settled: {err}", file.display()),
+        match settle_send(conn, &sending) {
+            Ok(()) => recycling::settled(conn, &sending.file)?,
+            Err(err) => eprintln!("recycle: {} was not settled: {err}", sending.file.display()),
         }
     }
     Ok(())
+}
+
+fn settle_send(conn: &Connection, sending: &Sending) -> Result<()> {
+    let Some(itself) = sending.itself.as_deref() else {
+        return Ok(recycle::settle_beside(&sending.file)?);
+    };
+    let recorded = items::binned(conn, sending.item_id)?.is_some_and(|(_, file)| file == itself);
+    if !recorded {
+        match recycle::found_in_bin(&Shell, &sending.file, itself, &sending.before) {
+            Some(binned) if still_at(conn, sending)? => {
+                let batch_id = sending.batch_id.as_deref();
+                in_transaction(conn, |tx| {
+                    record_send(tx, sending.item_id, &binned, batch_id)
+                })?;
+            }
+            _ => return Ok(recycle::settle_beside(&sending.file)?),
+        }
+    }
+    Ok(recycle::release(&sending.file, itself)?)
+}
+
+/// Whether the mark's item is still the live row at the path it sent from, and not another file
+/// given its id since.
+fn still_at(conn: &Connection, sending: &Sending) -> Result<bool> {
+    if !items::is_live(conn, sending.item_id)? {
+        return Ok(false);
+    }
+    let Some(file) = items::file_of(conn, sending.item_id)? else {
+        return Ok(false);
+    };
+    Ok(paths::item_path(conn, file.folder_id, &file.disk_name)? == sending.file)
 }
 
 /// Where a trashed item's file is now.
@@ -445,6 +502,8 @@ mod tests {
     use crate::db::{self, journal};
     use crate::fs::recycle::tests::{Fake, Stand, stand_in, stand_in_as};
     use crate::fs::{acts, undo, walk};
+    use std::cell::RefCell;
+    use std::rc::Rc;
 
     /// Trips/Cairo holding pyramid.jpg and sphinx.jpg, walked into a real file.
     fn library(name: &str) -> (Connection, PathBuf, i64) {
@@ -1287,11 +1346,16 @@ mod tests {
         assert_eq!(std::fs::read_to_string(&elsewhere).unwrap(), "p");
     }
 
+    fn files(sendings: Vec<Sending>) -> Vec<PathBuf> {
+        sendings.into_iter().map(|sending| sending.file).collect()
+    }
+
     #[test]
     fn a_send_the_app_stopped_during_is_settled_at_launch_and_the_file_is_back() {
-        let (conn, root, _) = library("send-cut-short");
+        let (conn, root, cairo) = library("send-cut-short");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
         let place = root.join("Trips/Cairo/sphinx.jpg");
-        recycling::add(&conn, &place).unwrap();
+        recycling::add(&conn, &Sending::new(&place, sphinx, None)).unwrap();
         std::fs::rename(&place, hold_of(&place)).unwrap();
 
         settle_unfinished_send(&conn).unwrap();
@@ -1299,17 +1363,182 @@ mod tests {
         assert_eq!(std::fs::read_to_string(&place).unwrap(), "s");
         assert!(!hold_of(&place).exists());
         assert!(recycling::unsettled(&conn).unwrap().is_empty());
+        assert!(items::is_live(&conn, sphinx).unwrap());
+    }
+
+    /// Sends pyramid.jpg under `batch` to a bin that takes it, and the app stops before the shell
+    /// returns. The bin it took it into, from then on.
+    fn stopped_during_send(conn: &Connection, cairo: i64, batch: &str) -> Rc<Fake> {
+        let dir = stand_in().dir().unwrap().to_path_buf();
+        stand_in_as(Fake::new(Stand::Stops(dir.clone())));
+        let pyramid = id_of(conn, cairo, "pyramid.jpg");
+        let stopped = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            trash_items(conn, &[pyramid], batch)
+        }));
+        assert!(stopped.is_err());
+        stand_in_as(Fake::new(Stand::Recycles(dir)))
+    }
+
+    #[test]
+    fn a_send_the_app_stopped_during_once_the_bin_took_the_file_is_in_the_trash_at_launch() {
+        let (conn, root, cairo) = library("send-stopped-in-bin");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let batch = journal::new_batch();
+        let bin = stopped_during_send(&conn, cairo, &batch);
+        assert!(items::is_live(&conn, pyramid).unwrap());
+
+        settle_unfinished_send(&conn).unwrap();
+
+        assert!(items::is_trashed(&conn, pyramid).unwrap());
+        let binned = bin_file(&conn, pyramid);
+        assert!(binned.starts_with(bin.dir().unwrap()));
+        assert_eq!(std::fs::read_to_string(&binned).unwrap(), "p");
+        cairo_holds(&root, &["sphinx.jpg"]);
+        assert!(recycling::unsettled(&conn).unwrap().is_empty());
+        let kept = tags::item_effective_tags(&conn, pyramid).unwrap();
+        assert!(kept.iter().any(|tag| tag.value == "cairo"));
+
+        assert_eq!(look_in_bin(&conn).unwrap(), Looked::default());
+        walk::reconcile(&conn).unwrap();
+        assert!(items::is_trashed(&conn, pyramid).unwrap());
+        undo::undo_batch(&conn, &batch).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap(),
+            "p"
+        );
+        assert!(items::is_live(&conn, pyramid).unwrap());
+    }
+
+    #[test]
+    fn a_mark_whose_item_is_now_another_file_records_nothing_and_the_file_comes_back() {
+        let (conn, root, cairo) = library("send-stopped-reused");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        stopped_during_send(&conn, cairo, &journal::new_batch());
+        let mut sending = recycling::unsettled(&conn).unwrap().remove(0);
+        sending.item_id = sphinx;
+        recycling::add(&conn, &sending).unwrap();
+
+        settle_unfinished_send(&conn).unwrap();
+
+        assert!(items::is_live(&conn, sphinx).unwrap());
+        assert_eq!(items::binned(&conn, sphinx).unwrap(), None);
+        assert_eq!(
+            std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap(),
+            "p"
+        );
+        cairo_holds(&root, &["pyramid.jpg", "sphinx.jpg"]);
+        assert!(recycling::unsettled(&conn).unwrap().is_empty());
+    }
+
+    fn refuse_to_trash(conn: &Connection) {
+        conn.execute_batch(
+            "CREATE TEMP TRIGGER refuse_trash BEFORE UPDATE OF trashed_at ON item
+             BEGIN SELECT RAISE(ABORT, 'refused'); END;",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn a_send_the_index_cannot_record_puts_the_file_back_and_leaves_nothing_beside_it() {
+        let (conn, root, cairo) = library("send-unrecorded");
+        let bin = stand_in();
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        refuse_to_trash(&conn);
+
+        let report = trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+
+        assert_eq!(report.trashed, 0);
+        assert_eq!(
+            std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap(),
+            "p"
+        );
+        cairo_holds(&root, &["pyramid.jpg", "sphinx.jpg"]);
+        assert!(items::is_live(&conn, pyramid).unwrap());
+        assert!(recycling::unsettled(&conn).unwrap().is_empty());
+        assert_eq!(bin.let_go.borrow().len(), 1);
+        crate::fs::settles_to(bin.dir().unwrap(), &[]);
+    }
+
+    #[test]
+    fn a_send_the_index_cannot_record_nor_put_back_is_in_the_trash_at_the_next_launch() {
+        let (conn, root, cairo) = library("send-unrecorded-taken");
+        let dir = stand_in().dir().unwrap().to_path_buf();
+        stand_in_as(Fake::new(Stand::Occupied(dir.clone(), RefCell::default())));
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let place = root.join("Trips/Cairo/pyramid.jpg");
+        refuse_to_trash(&conn);
+
+        let report = trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+
+        assert_eq!(report.trashed, 0);
+        assert_eq!(std::fs::read_to_string(&place).unwrap(), "theirs");
+        assert!(items::is_live(&conn, pyramid).unwrap());
+        assert_eq!(
+            files(recycling::unsettled(&conn).unwrap()),
+            std::slice::from_ref(&place)
+        );
+
+        conn.execute_batch("DROP TRIGGER temp.refuse_trash")
+            .unwrap();
+        let bin = stand_in_as(Fake::new(Stand::Recycles(dir)));
+        settle_unfinished_send(&conn).unwrap();
+
+        assert!(items::is_trashed(&conn, pyramid).unwrap());
+        let binned = bin_file(&conn, pyramid);
+        assert!(binned.starts_with(bin.dir().unwrap()));
+        assert_eq!(std::fs::read_to_string(&binned).unwrap(), "p");
+        assert_eq!(std::fs::read_to_string(&place).unwrap(), "theirs");
+        cairo_holds(&root, &["pyramid.jpg", "sphinx.jpg"]);
+        assert!(recycling::unsettled(&conn).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_send_the_app_stopped_during_after_it_was_recorded_only_lets_go_of_the_second_name() {
+        let (conn, root, cairo) = library("send-stopped-recorded");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+        let place = root.join("Trips/Cairo/pyramid.jpg");
+        let binned = bin_file(&conn, pyramid);
+        let itself = recycle::file_at(&binned).unwrap();
+        std::fs::hard_link(&binned, hold_of(&place)).unwrap();
+        recycling::add(&conn, &Sending::new(&place, pyramid, None)).unwrap();
+        recycling::holding(&conn, &place, &itself, &[]).unwrap();
+
+        settle_unfinished_send(&conn).unwrap();
+
+        cairo_holds(&root, &["sphinx.jpg"]);
+        assert_eq!(bin_file(&conn, pyramid), binned);
+        assert_eq!(std::fs::read_to_string(&binned).unwrap(), "p");
+        assert!(recycling::unsettled(&conn).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_send_the_app_stopped_during_before_the_shell_was_asked_leaves_the_file_where_it_was() {
+        let (conn, root, cairo) = library("send-stopped-before");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let place = root.join("Trips/Cairo/pyramid.jpg");
+        std::fs::hard_link(&place, hold_of(&place)).unwrap();
+        let itself = recycle::file_at(&place).unwrap();
+        recycling::add(&conn, &Sending::new(&place, pyramid, None)).unwrap();
+        recycling::holding(&conn, &place, &itself, &[]).unwrap();
+
+        settle_unfinished_send(&conn).unwrap();
+
+        cairo_holds(&root, &["pyramid.jpg", "sphinx.jpg"]);
+        assert!(items::is_live(&conn, pyramid).unwrap());
+        assert!(recycling::unsettled(&conn).unwrap().is_empty());
     }
 
     #[test]
     fn a_send_cut_short_in_a_folder_that_is_away_waits_for_it() {
-        let (conn, root, _) = library("send-away");
+        let (conn, root, cairo) = library("send-away");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
         let away = root.join("Away/sphinx.jpg");
-        recycling::add(&conn, &away).unwrap();
+        recycling::add(&conn, &Sending::new(&away, sphinx, None)).unwrap();
 
         settle_unfinished_send(&conn).unwrap();
 
-        assert_eq!(recycling::unsettled(&conn).unwrap(), [away]);
+        assert_eq!(files(recycling::unsettled(&conn).unwrap()), [away]);
     }
 
     #[test]
@@ -1324,7 +1553,7 @@ mod tests {
         assert_eq!(report.trashed, 0);
         assert_eq!(std::fs::read_to_string(&place).unwrap(), "s");
         assert_eq!(
-            recycling::unsettled(&conn).unwrap(),
+            files(recycling::unsettled(&conn).unwrap()),
             std::slice::from_ref(&place)
         );
         std::fs::remove_file(hold_of(&place)).unwrap();
