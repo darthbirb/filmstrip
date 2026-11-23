@@ -160,7 +160,7 @@ pub fn trashed_count(conn: &Connection, id: i64) -> Result<i64> {
 /// carries the same words, so navigation and Settings never disagree.
 pub fn rename(conn: &Connection, id: i64, title: &str) -> Result<()> {
     let title = title.trim();
-    if title.is_empty() {
+    if title.is_empty() || get(conn, id)?.is_some_and(|source| source.title == title) {
         return Ok(());
     }
     conn.execute(
@@ -168,12 +168,8 @@ pub fn rename(conn: &Connection, id: i64, title: &str) -> Result<()> {
         params![id, title],
     )?;
     let root = folders::source_root_folder(conn, id)?;
-    conn.execute(
-        "UPDATE folder SET title = ?2 WHERE id = ?1",
-        params![root, title],
-    )?;
-    crate::db::tags::sync_title_tag(conn, root, title)?;
-    Ok(())
+    folders::set_title(conn, root, title)?;
+    crate::db::tags::rebuild_subtree(conn, root)
 }
 
 /// Moves a source between the tree and the Sorting Box. Nothing on disk moves.
