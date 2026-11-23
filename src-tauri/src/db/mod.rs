@@ -13,8 +13,10 @@ pub mod search;
 pub mod sources;
 pub mod suggest;
 pub mod tags;
+mod upcase;
 pub mod vocabulary;
 
+use std::cmp::Ordering;
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -36,6 +38,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (10, include_str!("migrations/010_frame.sql")),
     (11, include_str!("migrations/011_expired.sql")),
     (12, include_str!("migrations/012_recycle_bin.sql")),
+    (13, include_str!("migrations/013_name_fold.sql")),
 ];
 
 type Rewrite = fn(&Connection) -> Result<()>;
@@ -53,6 +56,7 @@ pub fn latest_schema() -> i64 {
 /// beside any number of readers.
 pub fn open(path: &Path) -> Result<Connection> {
     let conn = Connection::open(path)?;
+    name_collation(&conn)?;
     conn.busy_timeout(Duration::from_secs(20))?;
     // Returns the mode it ended up in, so it has to be queried rather than set.
     let _: String = conn.query_row("PRAGMA journal_mode=WAL", [], |r| r.get(0))?;
@@ -87,6 +91,7 @@ pub fn in_transaction<T>(
 /// **Foreign keys are off for the duration, and restored on every exit path.**
 /// DEVELOPMENT.md "Gotchas".
 pub fn migrate(conn: &mut Connection) -> Result<()> {
+    name_collation(conn)?;
     conn.pragma_update(None, "foreign_keys", "OFF")?;
     let result = migrate_inner(conn);
     // Not pragma_update: its name check can read the file, and so mask the migration's error.
@@ -132,6 +137,25 @@ fn migrate_inner(conn: &mut Connection) -> Result<()> {
         tx.commit()?;
     }
     Ok(())
+}
+
+/// Registers `NAME_FOLD`, the comparison every folder title and file name is matched with.
+/// **Every connection that reads or writes `folder` or `item` needs it**, or SQLite refuses the
+/// statement: `open` and `migrate` register it. SCHEMA.md "Uniqueness".
+pub(crate) fn name_collation(conn: &Connection) -> Result<()> {
+    conn.create_collation(NAME_FOLD, compare_names)?;
+    Ok(())
+}
+
+const NAME_FOLD: &str = "NAME_FOLD";
+
+/// Orders names through NTFS's upcase table, unit by unit: equal only when NTFS calls them one
+/// name, so no two names a directory can hold side by side are ever matched together.
+/// DECISIONS.md "Names as NTFS compares them".
+fn compare_names(a: &str, b: &str) -> Ordering {
+    a.chars()
+        .map(upcase::upcase)
+        .cmp(b.chars().map(upcase::upcase))
 }
 
 /// Fold the write-ahead log back into the one file. A closed library is a
@@ -182,6 +206,29 @@ pub(crate) fn hold_write_lock(path: &Path, waiting: &mut Connection) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn names_compare_as_ntfs_compares_them() {
+        for (a, b) in [
+            ("Ägypten", "ägypten"),
+            ("ΑΘΗΝΑ", "αθηνα"),
+            ("Москва", "МОСКВА"),
+            ("a", "A"),
+            ("\u{1F80}", "\u{1F88}"),
+        ] {
+            assert_eq!(compare_names(a, b), Ordering::Equal, "{a} and {b}");
+        }
+        for (a, b) in [
+            ("straße", "STRASSE"),
+            ("\u{212A}", "k"),
+            ("\u{10428}", "\u{10400}"),
+            ("kız", "kiz"),
+            ("5µm", "5μm"),
+            ("ιος", "ΙΟΣ"),
+        ] {
+            assert_ne!(compare_names(a, b), Ordering::Equal, "{a} and {b}");
+        }
+    }
 
     #[test]
     fn migrating_twice_changes_nothing() {

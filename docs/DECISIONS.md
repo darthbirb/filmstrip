@@ -87,6 +87,34 @@ under a new directory can be recognised and reunited, keeping identity. Until ha
 this is a known gap, not a choice. A rename made through the app has no such problem: the app
 moves the directory and records the move in one step.
 
+## Names as NTFS compares them
+
+A directory cannot hold two names NTFS calls one, and a walk pairs what it finds on disk with
+the rows it has by name, so folder titles and file names are matched as NTFS matches them.
+SQLite's `NOCASE` folds ASCII only: `Ägypten` renamed to `ägypten` in Explorer read as one
+folder gone and another arrived, and its files came back as new items without their tags.
+
+The comparison is `NAME_FOLD`, a collation the app registers on every connection
+(`db::compare_names`). It maps each UTF-16 unit through a fixed table in source
+(`db::upcase`), taken once from Windows' own `RtlUpcaseUnicodeChar`. Only pairs that NTFS
+refused to hold side by side in one directory were kept, and a test proves it again for every
+pair. Unicode's own case mappings fold far more than NTFS does: `kız` and `kiz`, `5µm` and
+`5μm`, `ιος` and `ΙΟΣ` sit side by side on disk. A fold that called them one name would have a
+walk take one file for the other, and that loses identity. So the table errs toward folding
+less: a pair it misses only brings the old gap back for that character.
+
+The table is data, never derived at runtime from the toolchain's or the system's Unicode
+tables. A unique index must never see its collation's order change under it. If the table
+ever changes, that change is a numbered migration that rebuilds the two indexes built with it.
+
+Those two indexes keep names unique, so a lookup reads the index rather than every row in the
+folder. A stored folded key would do the same, at the cost of every write keeping it.
+
+Lengths are counted as NTFS counts them: 255 UTF-16 units a component, not 255 bytes. A cut
+falls between characters, never inside one or between a surrogate pair's halves. A file name
+loses the end of its stem, never its extension, and a suffix that makes a name unique cuts the
+stem to fit (`fs::sanitize`).
+
 ## A walk only judges what it read
 
 A walk retires whatever it did not find, so it may only judge what it actually read.

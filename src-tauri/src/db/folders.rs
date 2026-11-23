@@ -103,7 +103,7 @@ pub fn child_id(conn: &Connection, parent_id: i64, title: &str) -> Result<Option
     Ok(conn
         .query_row(
             "SELECT id FROM folder
-              WHERE parent_id = ?1 AND title = ?2 COLLATE NOCASE AND deleted_at IS NULL",
+              WHERE parent_id = ?1 AND title = ?2 COLLATE NAME_FOLD AND deleted_at IS NULL",
             params![parent_id, title],
             |r| r.get(0),
         )
@@ -509,7 +509,7 @@ pub fn retired_child(conn: &Connection, parent_id: i64, title: &str) -> Result<O
     Ok(conn
         .query_row(
             "SELECT id FROM folder
-              WHERE parent_id = ?1 AND title = ?2 COLLATE NOCASE AND deleted_at IS NOT NULL
+              WHERE parent_id = ?1 AND title = ?2 COLLATE NAME_FOLD AND deleted_at IS NOT NULL
               ORDER BY deleted_at DESC, id DESC LIMIT 1",
             params![parent_id, title],
             |r| r.get(0),

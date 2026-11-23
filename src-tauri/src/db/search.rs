@@ -263,7 +263,7 @@ pub(crate) fn resolve_path(conn: &Connection, path: &str) -> Result<Vec<i64>> {
     };
     let mut stmt = conn.prepare(
         "SELECT id FROM folder
-          WHERE parent_id IS NULL AND deleted_at IS NULL AND title = ?1 COLLATE NOCASE",
+          WHERE parent_id IS NULL AND deleted_at IS NULL AND title = ?1 COLLATE NAME_FOLD",
     )?;
     let mut here: Vec<i64> = stmt
         .query_map(params![source], |r| r.get(0))?

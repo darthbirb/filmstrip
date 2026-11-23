@@ -56,10 +56,14 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 
 ## Uniqueness
 
-- One live folder per parent and title, compared case-insensitively. SQLite folds ASCII only,
-  so `Ä` and `ä` are two titles.
+- One live folder per parent and title, compared as NTFS compares names, by `NAME_FOLD`. The
+  app registers this collation on every connection. It upcases each UTF-16 unit through the
+  fixed table in `db::upcase`, which holds only the pairs NTFS folds. `Ä` and `ä` are one title;
+  `ı` and `I`, and `ß` and `SS`, are two. Migration 13 moved this index and the item one below
+  from `NOCASE`, which folds ASCII only. A change to the table is a new migration that rebuilds
+  both.
 - One root folder per source.
-- One item per folder and `disk_name`, compared case-insensitively, among items not in the trash.
+- One item per folder and `disk_name`, compared by `NAME_FOLD`, among items not in the trash.
   A retired item keeps its name; a trashed one gives it up.
 - `item.uuid` is unique. It is identity and the thumbnail cache key — never a location.
 - `source.root` is unique, and the application also refuses a root that sits inside another

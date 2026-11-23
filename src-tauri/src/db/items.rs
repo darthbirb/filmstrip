@@ -58,7 +58,7 @@ pub fn existing_by_disk_name(
         .query_row(
             "SELECT id, uuid, size_bytes, mtime, deleted_at
                FROM item
-              WHERE folder_id = ?1 AND disk_name = ?2 COLLATE NOCASE AND trashed_at IS NULL",
+              WHERE folder_id = ?1 AND disk_name = ?2 COLLATE NAME_FOLD AND trashed_at IS NULL",
             params![folder_id, disk_name],
             |r| {
                 let deleted: Option<i64> = r.get(4)?;
@@ -384,11 +384,13 @@ pub fn set_folder(conn: &Connection, id: i64, folder_id: i64, disk_name: &str) -
     Ok(())
 }
 
-/// Records a rename; the caller renames the file. The extension follows the name.
+/// Records a rename; the caller renames the file. The extension, and the kind it says, follow
+/// the name.
 pub fn set_name(conn: &Connection, id: i64, disk_name: &str) -> Result<()> {
+    let ext = crate::fs::paths::extension_of(disk_name);
     conn.execute(
-        "UPDATE item SET disk_name = ?1, ext = ?2 WHERE id = ?3",
-        params![disk_name, crate::fs::paths::extension_of(disk_name), id],
+        "UPDATE item SET disk_name = ?1, ext = ?2, kind = ?3 WHERE id = ?4",
+        params![disk_name, ext, crate::fs::walk::kind_of(&ext), id],
     )?;
     crate::db::search::index_item(conn, id)
 }
@@ -433,7 +435,7 @@ pub fn retire_trashed(conn: &Connection, id: i64, at: i64) -> Result<()> {
             AND NOT EXISTS (
                 SELECT 1 FROM item other
                  WHERE other.folder_id = item.folder_id AND other.id <> item.id
-                   AND other.disk_name = item.disk_name COLLATE NOCASE
+                   AND other.disk_name = item.disk_name COLLATE NAME_FOLD
                    AND other.trashed_at IS NULL)",
         params![id, at],
     )?;
@@ -946,6 +948,89 @@ mod tests {
             })
             .unwrap();
         assert!(deleted.is_none(), "it is not retired any more");
+    }
+
+    #[test]
+    fn a_name_differing_only_in_non_ascii_case_is_the_same_file() {
+        let (conn, root) = library();
+        let id = upsert(&conn, &sample(1, root, "Ägypten.jpg")).unwrap();
+
+        let found = existing_by_disk_name(&conn, root, "ägypten.JPG").unwrap();
+        assert_eq!(found.map(|row| row.id), Some(id));
+        assert_eq!(upsert(&conn, &sample(1, root, "ÄGYPTEN.jpg")).unwrap(), id);
+
+        let mut twin = sample(1, root, "ägypten.jpg");
+        twin.uuid = "a-twin".into();
+        let refused = conn.execute(
+            "INSERT INTO item (uuid, source_id, folder_id, disk_name, ext, size_bytes, mtime, kind,
+                               added_at)
+             VALUES (?1, 1, ?2, ?3, 'jpg', 1, 1, 'image', 0)",
+            params![twin.uuid, root, twin.disk_name],
+        );
+        assert!(refused.is_err(), "one directory cannot hold both");
+    }
+
+    #[test]
+    fn names_ntfs_holds_apart_stay_apart() {
+        let (conn, root) = library();
+        for name in [
+            "straße.jpg",
+            "STRASSE.jpg",
+            "\u{212A}.jpg",
+            "k.jpg",
+            "\u{10428}.jpg",
+            "\u{10400}.jpg",
+            "kız.jpg",
+            "kiz.jpg",
+            "5µm.jpg",
+            "5μm.jpg",
+            "ιος.jpg",
+            "ΙΟΣ.jpg",
+        ] {
+            upsert(&conn, &sample(1, root, name)).unwrap();
+        }
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM item", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 12);
+    }
+
+    #[test]
+    fn a_name_is_found_through_its_index() {
+        let (conn, root) = library();
+        let plan: Vec<String> = conn
+            .prepare(
+                "EXPLAIN QUERY PLAN SELECT id FROM item
+                  WHERE folder_id = ?1 AND disk_name = ?2 COLLATE NAME_FOLD AND trashed_at IS NULL",
+            )
+            .unwrap()
+            .query_map(params![root, "a.jpg"], |r| r.get(3))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert!(
+            plan.iter()
+                .any(|step| step.contains("idx_item_disk (folder_id=? AND disk_name=?)")),
+            "{plan:?}"
+        );
+    }
+
+    #[test]
+    fn a_rename_to_another_kind_reads_as_that_kind() {
+        let (conn, root) = library();
+        let mut clip = sample(1, root, "clip.mov");
+        clip.ext = "mov".into();
+        clip.kind = "video".into();
+        let id = upsert(&conn, &clip).unwrap();
+
+        set_name(&conn, id, "clip.jpg").unwrap();
+
+        let (ext, kind): (String, String) = conn
+            .query_row("SELECT ext, kind FROM item WHERE id = ?1", [id], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!((ext.as_str(), kind.as_str()), ("jpg", "image"));
     }
 
     #[test]
