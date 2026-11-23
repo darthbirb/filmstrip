@@ -81,15 +81,20 @@ fn reverse_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
             continue;
         }
         // What failed stays in the journal, or it could never be tried again; a file emptied from
-        // the Recycle Bin never could be.
+        // the Recycle Bin, or bound for one on a drive with none, never could be.
         match reverse(conn, entry) {
             Ok(()) => journal::drop_entry(conn, entry.id)?,
             Err(err) if tagging(entry) => return Err(err),
             Err(err) => {
                 let one = stayed_of(conn, entry, &err)?;
-                if matches!(one.reason, Reason::GoneFromBin { .. }) {
+                if matches!(
+                    one.reason,
+                    Reason::GoneFromBin { .. } | Reason::NoBin { .. }
+                ) {
                     journal::drop_entry(conn, entry.id)?;
-                    gone += 1;
+                    let (files, folders) = acts::count(conn, std::slice::from_ref(entry))?;
+                    gone += files;
+                    folders_gone += folders;
                 }
                 stayed.push(one);
             }

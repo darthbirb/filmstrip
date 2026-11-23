@@ -27,7 +27,10 @@ trash.
 Files copied in Explorer are pasted into a folder or the Sorting Box, and files dragged from
 Explorer are dropped on one. Either way they are **copied in, never moved**, under their own names,
 a folder with its tree; a name already taken there is reported and left out. The copy runs in the
-background with a Cancel, and one Undo sends everything it brought in to the trash.
+background with a Cancel, and one Undo sends everything it brought in to the trash. On a drive
+with no Recycle Bin, a USB stick, an SD card or a network share, there is no trash to send it to:
+the Undo leaves it where it is, the banner names the drive, and the next Ctrl+Z undoes the act
+before. Restore to… into a folder on such a drive is undone the same way.
 
 A folder's branch, or any checked files, can be **exported as one zip**. Windows' save dialog says
 where, and the files keep their own names or are named from their folders and when each was

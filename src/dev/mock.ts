@@ -577,11 +577,17 @@ function takeBack(at: number): UndoReport {
       case "deleteFolder":
         attach(step.node, step.parent);
         break;
-      case "restore":
+      case "restore": {
+        const drive = binlessFolders.get(step.item.folderId);
+        if (drive) {
+          stayed.push(stayedIn(step.item, { kind: "noBin", drive }));
+          break;
+        }
         toTrash(step.item);
         step.item.folderId = step.left;
         trashed.set(step.item.id, step.went);
         break;
+      }
       case "tag":
         for (const item of step.items) {
           const own = ITEM_TAGS.get(item.id) ?? [];
@@ -601,9 +607,12 @@ function takeBack(at: number): UndoReport {
       case "retag":
         putWords(step.before);
         break;
-      case "copy":
-        toTrash(step.item);
+      case "copy": {
+        const drive = binless.get(step.item.id);
+        if (drive) stayed.push(stayedIn(step.item, { kind: "noBin", drive }));
+        else toTrash(step.item);
         break;
+      }
       case "copyFolder":
         detach(step.node);
         break;
@@ -1247,6 +1256,8 @@ function copyIn(folderId: number, paths: readonly string[]): CopyStart {
         continue;
       }
       ITEMS[folderId] = [...(ITEMS[folderId] ?? []), item];
+      const drive = binlessFolders.get(folderId);
+      if (drive) binless.set(item.id, drive);
       recount();
       steps.push({ op: "copy", item, into: folderId });
     }
@@ -1560,6 +1571,8 @@ export function emptyOutside(itemIds: readonly number[]) {
 
 /** Files on a drive with no Recycle Bin, by the drive's name. `?no-bin` puts Cairo's on one. */
 const binless = new Map<number, string>();
+/** Folders on such a drive, so what is copied or restored into them is on it too. */
+const binlessFolders = new Map<number, string>();
 /** Files that would not go when deleted for good, as one open in another app. */
 const undeletable = new Set<number>();
 /** Files deleted for good, which only a test's reset brings back. */
@@ -1582,6 +1595,7 @@ export function resetBin() {
   binRefuses = new Set();
   emptiedOutside.clear();
   binless.clear();
+  binlessFolders.clear();
   undeletable.clear();
   for (const item of goneForGood) ITEMS[item.folderId] = [...(ITEMS[item.folderId] ?? []), item];
   goneForGood = [];
@@ -1596,6 +1610,7 @@ if (backupsWanted().has("no-bin")) {
     (ITEMS[6] ?? []).map((item) => item.id),
     "USB Drive (E:)",
   );
+  binlessFolders.set(6, "USB Drive (E:)");
 }
 
 /** Which of these files are on drives with no Recycle Bin, under each drive. */
