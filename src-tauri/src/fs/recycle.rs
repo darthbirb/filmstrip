@@ -46,10 +46,14 @@ pub enum Sent {
     Refused,
 }
 
-/// Sends a file to the Recycle Bin. A second name made beside it first outlives whatever the shell
-/// does, and the names it gains say what that was: one in the bin, recycled; none, given its name
-/// back and refused. DECISIONS.md "Sending to the Recycle Bin".
-pub fn send(bin: &dyn Bin, file: &Path) -> io::Result<Sent> {
+/// Sends a file to the Recycle Bin, held under a second name, kept until [`release`] once it is
+/// recycled; `holding` is told the file and its names before the shell is asked.
+/// DECISIONS.md "Sending to the Recycle Bin".
+pub fn send(
+    bin: &dyn Bin,
+    file: &Path,
+    holding: impl FnOnce(&str, &[PathBuf]) -> io::Result<()>,
+) -> io::Result<Sent> {
     let hold = hold_of(file);
     settle(file, &hold)?;
     match std::fs::symlink_metadata(file) {
@@ -65,24 +69,62 @@ pub fn send(bin: &dyn Bin, file: &Path) -> io::Result<Sent> {
         drop_hold(file, &hold)?;
         return Ok(Sent::Refused);
     };
+    if let Err(err) = holding(&itself.key(), &before) {
+        drop_hold(file, &hold)?;
+        return Err(err);
+    }
     let _ = bin.take(file);
     if std::fs::symlink_metadata(file).is_ok() {
         drop_hold(file, &hold)?;
         return Ok(Sent::Refused);
     }
-    let gained = |name: &PathBuf| !before.contains(name) && bin.holds(name);
-    if let Some(binned) = names_of(&hold)
-        .ok()
-        .and_then(|names| names.into_iter().find(gained))
-    {
-        std::fs::remove_file(&hold)?;
+    if let Some(binned) = gained(bin, &hold, &before) {
         return Ok(Sent::Recycled(Binned {
-            path: plain(&binned),
+            path: binned,
             file: itself.key(),
         }));
     }
     noclobber::rename(&hold, file)?;
     Ok(Sent::Refused)
+}
+
+/// The name the second name's file gained in the bin since it had only `before`.
+fn gained(bin: &dyn Bin, hold: &Path, before: &[PathBuf]) -> Option<PathBuf> {
+    names_of(hold)
+        .ok()?
+        .into_iter()
+        .find(|name| !before.contains(name) && bin.holds(name))
+        .map(|name| plain(&name))
+}
+
+/// Where the bin put `file` when a send was cut short after the shell took it: a name its second
+/// name gained there since it had only `before`, while it is still the file `itself` and not
+/// still at its own path.
+pub fn found_in_bin(
+    bin: &dyn Bin,
+    file: &Path,
+    itself: &str,
+    before: &[PathBuf],
+) -> Option<Binned> {
+    let hold = hold_of(file);
+    if file_at(file).as_deref() == Some(itself) || identity(&hold).ok()?.key() != itself {
+        return None;
+    }
+    gained(bin, &hold, before).map(|path| Binned {
+        path,
+        file: itself.to_owned(),
+    })
+}
+
+/// Removes the second name a recycled file kept, once its send is recorded: only while it is
+/// still the file `itself` with a name besides. Any other is settled as a cut-short send's is.
+pub fn release(file: &Path, itself: &str) -> io::Result<()> {
+    let hold = hold_of(file);
+    match identity(&hold) {
+        Err(_) => Ok(()),
+        Ok(found) if found.key() == itself && found.links >= 2 => std::fs::remove_file(&hold),
+        Ok(_) => settle(file, &hold),
+    }
 }
 
 /// Deletes for good the file the bin keeps as `binned`, then the bin's record of it: only a name
@@ -688,6 +730,11 @@ pub(crate) mod tests {
         Relinks(PathBuf),
         /// Deletes it outright, while something else gives its second name one more name here.
         DeletesWhileLinked(PathBuf),
+        /// Moves it as [`Stand::Recycles`] does, and the app stops before the shell returns.
+        Stops(PathBuf),
+        /// Moves it as [`Stand::Recycles`] does, and another file takes its name before the send
+        /// returns.
+        Occupied(PathBuf, RefCell<Option<PathBuf>>),
     }
 
     pub(crate) struct Fake {
@@ -715,7 +762,10 @@ pub(crate) mod tests {
         /// The folder it recycles into, as a bin of its own.
         pub(crate) fn dir(&self) -> Option<&Path> {
             match &self.stand {
-                Stand::Recycles(bin) | Stand::Relinks(bin) => Some(bin),
+                Stand::Recycles(bin)
+                | Stand::Relinks(bin)
+                | Stand::Stops(bin)
+                | Stand::Occupied(bin, _) => Some(bin),
                 _ => None,
             }
         }
@@ -758,11 +808,27 @@ pub(crate) mod tests {
                     std::fs::remove_file(file)?;
                     std::fs::hard_link(hold_of(file), outside)
                 }
+                Stand::Stops(bin) => {
+                    std::fs::create_dir_all(bin)?;
+                    std::fs::rename(file, binned_name(bin, file))?;
+                    panic!("the app stopped");
+                }
+                Stand::Occupied(bin, taken) => {
+                    std::fs::create_dir_all(bin)?;
+                    std::fs::rename(file, binned_name(bin, file))?;
+                    *taken.borrow_mut() = Some(file.to_path_buf());
+                    Ok(())
+                }
             }
         }
 
         fn holds(&self, name: &Path) -> bool {
-            let (Stand::Recycles(bin) | Stand::Relinks(bin)) = &self.stand else {
+            if let Stand::Occupied(_, taken) = &self.stand
+                && let Some(file) = taken.borrow_mut().take()
+            {
+                std::fs::write(file, "theirs").unwrap();
+            }
+            let Some(bin) = self.dir() else {
                 return false;
             };
             plain_lower(name).starts_with(plain_lower(bin))
@@ -785,6 +851,15 @@ pub(crate) mod tests {
     fn plain_lower(path: &Path) -> PathBuf {
         let text = path.to_string_lossy().to_lowercase();
         PathBuf::from(text.strip_prefix(r"\\?\").unwrap_or(&text))
+    }
+
+    /// A send with nothing to mark, its second name let go as soon as the bin has the file.
+    fn send(bin: &dyn Bin, file: &Path) -> io::Result<Sent> {
+        let sent = super::send(bin, file, |_, _| Ok(()))?;
+        if let Sent::Recycled(binned) = &sent {
+            release(file, &binned.file)?;
+        }
+        Ok(sent)
     }
 
     fn recycled(sent: Sent) -> bool {
@@ -1060,6 +1135,101 @@ pub(crate) mod tests {
             std::fs::read_to_string(dir.join("bin/one.jpg")).unwrap(),
             "one"
         );
+    }
+
+    #[test]
+    fn a_recycled_file_keeps_its_second_name_until_its_send_is_released() {
+        let dir = scratch("kept");
+        let file = one_with_names(&dir, 0);
+        let bin = Fake::new(Stand::Recycles(dir.join("bin")));
+        let told = RefCell::new(None);
+
+        let Sent::Recycled(binned) = super::send(&bin, &file, |itself, before| {
+            *told.borrow_mut() = Some((itself.to_owned(), before.to_vec()));
+            Ok(())
+        })
+        .unwrap() else {
+            panic!("not recycled");
+        };
+        let (itself, before) = told.into_inner().unwrap();
+        assert_eq!(itself, binned.file);
+        assert_eq!(before.len(), 2);
+        settles_to(&dir.join("trash"), &[".one.jpg.recycling"]);
+
+        release(&file, &binned.file).unwrap();
+        settles_to(&dir.join("trash"), &[]);
+        assert_eq!(identity(&binned.path).unwrap().links, 1);
+    }
+
+    #[test]
+    fn a_send_whose_names_cannot_be_kept_never_asks_the_shell() {
+        let dir = scratch("unkept");
+        let file = one_with_names(&dir, 0);
+        let bin = Fake::new(Stand::Recycles(dir.join("bin")));
+
+        let sent = super::send(&bin, &file, |_, _| Err(io::Error::other("no room")));
+        assert!(sent.is_err());
+        assert!(bin.asked.borrow().is_empty());
+        settles_to(&dir.join("trash"), &["one.jpg"]);
+        assert_eq!(identity(&file).unwrap().links, 1);
+    }
+
+    /// `trash/one.jpg` held under its second name, with every name it has then.
+    fn one_held(dir: &Path) -> (PathBuf, String, Vec<PathBuf>) {
+        let file = dir.join("trash/one.jpg");
+        std::fs::hard_link(&file, hold_of(&file)).unwrap();
+        let before = names_of(&hold_of(&file)).unwrap();
+        (file.clone(), identity(&file).unwrap().key(), before)
+    }
+
+    #[test]
+    fn a_send_cut_short_once_the_bin_took_the_file_finds_it_by_the_name_it_gained_there() {
+        let dir = scratch("cut-after-take");
+        std::fs::write(dir.join("trash/one.jpg"), "one").unwrap();
+        let (file, itself, before) = one_held(&dir);
+        let bin = Fake::new(Stand::Recycles(dir.join("bin")));
+        assert!(found_in_bin(&bin, &file, &itself, &before).is_none());
+
+        bin.take(&file).unwrap();
+
+        let found = found_in_bin(&bin, &file, &itself, &before).unwrap();
+        assert_eq!(found.path, dir.join("bin/one.jpg"));
+        assert_eq!(found.file, itself);
+        assert!(found_in_bin(&bin, &file, "another", &before).is_none());
+        std::fs::write(&file, "theirs").unwrap();
+        assert_eq!(found_in_bin(&bin, &file, &itself, &before), Some(found));
+        std::fs::remove_file(&file).unwrap();
+        release(&file, &itself).unwrap();
+        settles_to(&dir.join("trash"), &[]);
+    }
+
+    #[test]
+    fn a_send_cut_short_finds_nothing_by_a_name_the_file_had_in_the_bin_before() {
+        let dir = scratch("cut-in-bin-already");
+        std::fs::write(dir.join("trash/one.jpg"), "one").unwrap();
+        std::fs::create_dir_all(dir.join("bin")).unwrap();
+        std::fs::hard_link(dir.join("trash/one.jpg"), dir.join("bin/$Rold.jpg")).unwrap();
+        let (file, itself, before) = one_held(&dir);
+        let bin = Fake::new(Stand::Deletes);
+        bin.take(&file).unwrap();
+
+        let looked = Fake::new(Stand::Recycles(dir.join("bin")));
+        assert!(found_in_bin(&looked, &file, &itself, &before).is_none());
+        settle_beside(&file).unwrap();
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
+        settles_to(&dir.join("trash"), &["one.jpg"]);
+    }
+
+    #[test]
+    fn releasing_a_second_name_that_is_the_last_of_its_file_puts_it_back() {
+        let dir = scratch("release-lone");
+        std::fs::write(dir.join("trash/one.jpg"), "one").unwrap();
+        let (file, itself, _) = one_held(&dir);
+        std::fs::remove_file(&file).unwrap();
+
+        release(&file, &itself).unwrap();
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
+        settles_to(&dir.join("trash"), &["one.jpg"]);
     }
 
     #[test]
