@@ -27,29 +27,71 @@ pub fn rename(from: &Path, to: &Path) -> io::Result<()> {
     std::fs::remove_file(from)
 }
 
-/// Copies the file `from` to a new file `to`, or fails without touching `to` when it is taken.
+/// Copies the file `from` to a new file `to`, or fails without touching `to` when it is taken,
+/// asking `stop` as each part of it is written: `Ok(false)` once it says so, and then nothing of
+/// `to` is left. `to` is a copy's own part, so it runs no test's last-moment arrival.
 #[cfg(windows)]
-pub fn copy(from: &Path, to: &Path) -> io::Result<()> {
-    use windows_sys::Win32::Storage::FileSystem::CopyFileW;
+pub fn copy_unless(from: &Path, to: &Path, stop: &dyn Fn() -> bool) -> io::Result<bool> {
+    use windows_sys::Win32::Foundation::{ERROR_REQUEST_ABORTED, HANDLE};
+    use windows_sys::Win32::Storage::FileSystem::{
+        COPY_FILE_FAIL_IF_EXISTS, CopyFileExW, PROGRESS_CANCEL, PROGRESS_CONTINUE,
+    };
 
-    arriving(to);
-    let (from, to) = (verbatim(from)?, verbatim(to)?);
-    // SAFETY: both are NUL-terminated wide strings that outlive the call.
-    if unsafe { CopyFileW(from.as_ptr(), to.as_ptr(), 1) } == 0 {
-        return Err(io::Error::last_os_error());
+    unsafe extern "system" fn asked(
+        _total: i64,
+        _done: i64,
+        _stream: i64,
+        _stream_done: i64,
+        _number: u32,
+        _reason: u32,
+        _from: HANDLE,
+        _to: HANDLE,
+        data: *const core::ffi::c_void,
+    ) -> u32 {
+        // SAFETY: `data` is the `&dyn Fn` below, alive for the whole of the call that passes it.
+        let stop = unsafe { &*data.cast::<&dyn Fn() -> bool>() };
+        if stop() {
+            PROGRESS_CANCEL
+        } else {
+            PROGRESS_CONTINUE
+        }
     }
-    Ok(())
+
+    let (from, to) = (verbatim(from)?, verbatim(to)?);
+    let data: *const &dyn Fn() -> bool = &stop;
+    // SAFETY: both paths are NUL-terminated wide strings, and `data` points at `stop`; all three
+    // outlive the call, which runs `asked` on this thread only.
+    let copied = unsafe {
+        CopyFileExW(
+            from.as_ptr(),
+            to.as_ptr(),
+            Some(asked),
+            data.cast(),
+            std::ptr::null_mut(),
+            COPY_FILE_FAIL_IF_EXISTS,
+        )
+    };
+    if copied != 0 {
+        return Ok(true);
+    }
+    let err = io::Error::last_os_error();
+    if err.raw_os_error() == Some(ERROR_REQUEST_ABORTED as i32) {
+        return Ok(false);
+    }
+    Err(err)
 }
 
 #[cfg(not(windows))]
-pub fn copy(from: &Path, to: &Path) -> io::Result<()> {
-    arriving(to);
+pub fn copy_unless(from: &Path, to: &Path, stop: &dyn Fn() -> bool) -> io::Result<bool> {
+    if stop() {
+        return Ok(false);
+    }
     let mut source = std::fs::File::open(from)?;
     let mut target = std::fs::OpenOptions::new()
         .write(true)
         .create_new(true)
         .open(to)?;
-    io::copy(&mut source, &mut target).map(|_| ())
+    io::copy(&mut source, &mut target).map(|_| true)
 }
 
 /// Makes the directory `to`, or fails when anything is there already.
@@ -146,17 +188,18 @@ mod tests {
     }
 
     #[test]
-    fn a_copy_onto_a_name_that_appeared_just_before_it_is_refused_and_theirs_kept() {
+    fn a_copy_onto_a_name_taken_is_refused_and_theirs_kept() {
         let dir = scratch("copy");
         std::fs::write(dir.join("IMG_1.jpg"), "ours").unwrap();
-        copy(&dir.join("IMG_1.jpg"), &dir.join("IMG_2.jpg")).unwrap();
+        assert!(copy_unless(&dir.join("IMG_1.jpg"), &dir.join("IMG_2.jpg"), &|| false).unwrap());
         assert_eq!(
             std::fs::read_to_string(dir.join("IMG_2.jpg")).unwrap(),
             "ours"
         );
 
-        just_before_the_next(|to| std::fs::write(to, "theirs").unwrap());
-        let err = copy(&dir.join("IMG_1.jpg"), &dir.join("IMG_3.jpg")).unwrap_err();
+        std::fs::write(dir.join("IMG_3.jpg"), "theirs").unwrap();
+        let err =
+            copy_unless(&dir.join("IMG_1.jpg"), &dir.join("IMG_3.jpg"), &|| false).unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::AlreadyExists);
         assert_eq!(
             std::fs::read_to_string(dir.join("IMG_3.jpg")).unwrap(),

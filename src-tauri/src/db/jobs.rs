@@ -6,7 +6,7 @@ use ts_rs::TS;
 
 use crate::db::{begin, now};
 use crate::error::Result;
-use crate::jobs::kinds::{COPY_IN, EXPORT, WALKS};
+use crate::jobs::kinds::{COPY_IN, OWN_LINES, WALKS};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QueuedJob {
@@ -109,7 +109,7 @@ pub fn release(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
-/// Takes a copy or an export off the queue while it waits, and returns its payload; nothing when
+/// Takes a copy, a move or an export off the queue while it waits, and returns its payload; nothing when
 /// it is running or gone.
 pub fn cancel_pending(conn: &Connection, id: i64, kind: &str) -> Result<Option<String>> {
     Ok(conn
@@ -146,12 +146,14 @@ pub fn take_all(conn: &Connection, kind: &str) -> Result<Vec<String>> {
     Ok(rows)
 }
 
-/// The walk's work and what it queues: a copy and an export count themselves.
+/// The walk's work and what it queues: a copy, a move and an export count themselves.
 pub fn counts(conn: &Connection) -> Result<Counts> {
     let mut counts = Counts::default();
-    let mut stmt = conn
-        .prepare("SELECT status, COUNT(*) FROM job WHERE kind NOT IN (?1, ?2) GROUP BY status")?;
-    let rows = stmt.query_map([COPY_IN, EXPORT], |r| {
+    let mut stmt = conn.prepare(
+        "SELECT status, COUNT(*) FROM job
+          WHERE kind NOT IN (SELECT value FROM json_each(?1)) GROUP BY status",
+    )?;
+    let rows = stmt.query_map([serde_json::to_string(&OWN_LINES)?], |r| {
         Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?))
     })?;
     for row in rows {

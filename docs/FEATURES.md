@@ -65,7 +65,7 @@ drawn. **Not started** — neither.
 | Favourite an item | Built | `set_item_favorite` |
 | Reveal, open, copy the file | Built | the pane's bar |
 | Sort by key and direction, random order held steady | Built | `folder_items`, `sorting_items` and `search` take the order; the grid's header chooses it per kind of place |
-| Move items between folders | Built | `move_items`, Move to… on the pane's bar and a file's menu; a name already taken is reported, never changed |
+| Move items between folders | Built | `move_items`, Move to… on the pane's bar and a file's menu; a name already taken is reported, never changed; between drives a job with its line and Cancel, `cancel_move`: DECISIONS.md "Undo" |
 | Delete items to the trash | Built | `trash_items`, Delete on the pane's bar and a file's menu, sending each file to the Windows Recycle Bin on its own drive through `fs::recycle`; one the bin will not take stays where it was, said at the foot; undo takes an item back out of the bin |
 | Rename a file, on disk | Built | `rename_item`, the pane's Name row; not in ggallery; a name already taken is refused |
 | Paste files in, and take an OS drop | Built | `paste_files`, `drop_files`: Paste on a folder's, a source's and the Sorting Box's menus, on the rows and on the grid's ground, Ctrl+V, and a drop from Explorer on a row or a folder's grid, the tree scrolling near its edges; a copy as a job with Cancel, a name taken refused, never changed; undo sends what came in to the Trash |

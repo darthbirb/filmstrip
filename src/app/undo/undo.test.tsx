@@ -37,7 +37,7 @@ beforeEach(async () => {
 async function moveTrips() {
   const ids = (await folderItems(4)).map((item) => item.id);
   const moved = await moveItems(ids, 5);
-  if (!moved.batch) throw new Error("the mock moved nothing");
+  if (moved.kind !== "done" || !moved.batch) throw new Error("the mock moved nothing");
   afterAct(moved.batch);
 }
 

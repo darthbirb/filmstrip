@@ -8,6 +8,8 @@ use ts_rs::TS;
 
 use crate::db::{folders, in_transaction, items, journal, tags};
 use crate::error::{AppError, Reason, Result};
+use crate::fs::paste::Halt;
+use crate::fs::relocate::{Control, Unwatched};
 use crate::fs::stayed::{self, Stayed};
 use crate::fs::{paths, relocate, sanitize};
 
@@ -29,15 +31,113 @@ pub fn move_items(
     batch_id: &str,
 ) -> Result<MoveReport> {
     let _turn = super::turn();
-    let mut report = MoveReport::default();
+    let outcome = move_each(conn, item_ids, folder_id, batch_id, &Unwatched, false)?;
+    match outcome.stopped {
+        Some(reason) => Err(AppError::refused(reason)),
+        None => Ok(outcome.report),
+    }
+}
+
+/// How a watched move ended: what went and what stayed, and why it ended before the last file.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct MoveOutcome {
+    pub report: MoveReport,
+    pub halted: Option<Halt>,
+    /// Why it stopped before the end, when something other than a halt stopped it.
+    pub stopped: Option<Reason>,
+}
+
+/// `move_items`, one file to a turn, answering to `control` between files and to Stop within the
+/// one in hand: a file is either moved whole or left where it was. Run again under the same batch,
+/// what already went is passed over.
+pub fn move_watched(
+    conn: &Connection,
+    item_ids: &[i64],
+    folder_id: i64,
+    batch_id: &str,
+    control: &impl Control,
+) -> Result<MoveOutcome> {
+    move_each(conn, item_ids, folder_id, batch_id, control, true)
+}
+
+fn move_each(
+    conn: &Connection,
+    item_ids: &[i64],
+    folder_id: i64,
+    batch_id: &str,
+    control: &impl Control,
+    turn_each: bool,
+) -> Result<MoveOutcome> {
+    let whole = u32::try_from(item_ids.len()).unwrap_or(u32::MAX);
+    let mut outcome = MoveOutcome::default();
+    control.progress(0, whole);
+    for (done, &item_id) in (1..).zip(item_ids) {
+        if let Some(halt) = control.halt() {
+            outcome.halted = Some(halt);
+            break;
+        }
+        let _turn = turn_each.then(super::turn);
+        if !folders::is_live(conn, folder_id)? {
+            let name = crate::fs::acts::name(conn, folder_id)?;
+            outcome.stopped = Some(Reason::FolderGone { name });
+            break;
+        }
+        match move_one(conn, item_id, folder_id, Some(batch_id), control) {
+            Ok(Went::Moved) => outcome.report.moved += 1,
+            Ok(Went::There) => {}
+            Ok(Went::Halted(halt)) => {
+                outcome.halted = Some(halt);
+                break;
+            }
+            Err(err) => outcome
+                .report
+                .refused
+                .push(stayed::file(conn, item_id, &err)?),
+        }
+        control.progress(done, whole);
+    }
+    Ok(outcome)
+}
+
+/// Clears the part each of these files that has not gone into `folder_id` has there, left by a
+/// move a crash cut short that will not run again.
+pub fn clear_parts(conn: &Connection, item_ids: &[i64], folder_id: i64) -> Result<()> {
+    let _turn = super::turn();
+    let dir = paths::folder_dir(conn, folder_id)?;
     for &item_id in item_ids {
-        match move_unjournalled(conn, item_id, folder_id, Some(batch_id)) {
-            Ok(true) => report.moved += 1,
-            Ok(false) => {}
-            Err(err) => report.refused.push(stayed::file(conn, item_id, &err)?),
+        let Some(file) = items::file_of(conn, item_id)? else {
+            continue;
+        };
+        if file.folder_id != folder_id {
+            let from = paths::item_path(conn, file.folder_id, &file.disk_name)?;
+            relocate::clear_part_of(&from, &dir.join(&file.disk_name));
         }
     }
-    Ok(report)
+    Ok(())
+}
+
+/// Whether moving these items into `folder_id` copies any of them between drives.
+pub fn cross_drives(conn: &Connection, item_ids: &[i64], folder_id: i64) -> Result<bool> {
+    let dir = paths::folder_dir(conn, folder_id)?;
+    let mut seen = std::collections::HashSet::new();
+    for &item_id in item_ids {
+        let Some(file) = items::file_of(conn, item_id)? else {
+            continue;
+        };
+        if file.folder_id != folder_id
+            && seen.insert(file.folder_id)
+            && relocate::crosses_drives(&paths::folder_dir(conn, file.folder_id)?, &dir)
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+enum Went {
+    Moved,
+    There,
+    Halted(Halt),
 }
 
 /// The move itself, which undo also uses to put an item back without journalling it again.
@@ -48,6 +148,17 @@ pub(super) fn move_unjournalled(
     folder_id: i64,
     batch_id: Option<&str>,
 ) -> Result<bool> {
+    let went = move_one(conn, item_id, folder_id, batch_id, &Unwatched)?;
+    Ok(matches!(went, Went::Moved))
+}
+
+fn move_one(
+    conn: &Connection,
+    item_id: i64,
+    folder_id: i64,
+    batch_id: Option<&str>,
+    control: &impl Control,
+) -> Result<Went> {
     if !items::is_live(conn, item_id)? {
         return Err(AppError::invalid("that file is no longer in the index"));
     }
@@ -57,7 +168,7 @@ pub(super) fn move_unjournalled(
     let file = items::file_of(conn, item_id)?
         .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
     if file.folder_id == folder_id {
-        return Ok(false);
+        return Ok(Went::There);
     }
 
     let taken = || {
@@ -76,7 +187,11 @@ pub(super) fn move_unjournalled(
     }
     let from = paths::item_path(conn, file.folder_id, &file.disk_name)?;
     let to = paths::folder_dir(conn, folder_id)?.join(&file.disk_name);
-    relocate::relocate(&from, &to).map_err(relocate::taken_as(taken))?;
+    if let Some(halt) =
+        relocate::relocate_watched(&from, &to, control).map_err(relocate::taken_as(taken))?
+    {
+        return Ok(Went::Halted(halt));
+    }
 
     let recorded = in_transaction(conn, |tx| {
         // A retired row holding the name describes a file that is gone; the arriving one takes it.
@@ -88,7 +203,7 @@ pub(super) fn move_unjournalled(
         if let Some(batch_id) = batch_id {
             journal::record_item_move(tx, batch_id, item_id, file.folder_id, folder_id)?;
         }
-        Ok(true)
+        Ok(Went::Moved)
     });
     if recorded.is_err() {
         let _ = relocate::relocate(&to, &from);
@@ -376,6 +491,80 @@ mod tests {
         assert_eq!(theirs, "theirs");
         let ours = std::fs::read_to_string(root.join("Trips/Cairo/giza.jpg")).unwrap();
         assert_eq!(ours, "p");
+    }
+
+    /// Cancels once `after` files are settled, keeping every count it was given.
+    struct CancelAfter {
+        after: u32,
+        said: std::cell::RefCell<Vec<(u32, u32)>>,
+    }
+
+    impl Control for CancelAfter {
+        fn halt(&self) -> Option<Halt> {
+            let done = self.said.borrow().last().map_or(0, |(done, _)| *done);
+            (done >= self.after).then_some(Halt::Cancel)
+        }
+        fn progress(&self, done: u32, whole: u32) {
+            self.said.borrow_mut().push((done, whole));
+        }
+    }
+
+    #[test]
+    fn a_move_cancelled_between_files_leaves_each_whole_in_one_place_and_undo_takes_back_what_went()
+    {
+        let (conn, root, cairo, _) = library("cancelled");
+        let trips = folders::parent(&conn, cairo).unwrap().unwrap();
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        let batch = journal::new_batch();
+        let control = CancelAfter {
+            after: 1,
+            said: std::cell::RefCell::new(Vec::new()),
+        };
+
+        let outcome = move_watched(&conn, &[pyramid, sphinx], trips, &batch, &control).unwrap();
+        assert_eq!(outcome.halted, Some(Halt::Cancel));
+        assert_eq!((outcome.report.moved, outcome.report.refused.len()), (1, 0));
+        assert_eq!(control.said.take(), [(0, 2), (1, 2)]);
+        let whole_in = |dir: &str, name: &str, bytes: &str| {
+            assert_eq!(
+                std::fs::read_to_string(root.join(dir).join(name)).unwrap(),
+                bytes
+            );
+        };
+        whole_in("Trips", "pyramid.jpg", "p");
+        assert!(!root.join("Trips/Cairo/pyramid.jpg").exists());
+        whole_in("Trips/Cairo", "sphinx.jpg", "s");
+        assert!(!root.join("Trips/sphinx.jpg").exists());
+
+        let back = crate::fs::undo::undo_batch(&conn, &batch).unwrap();
+        assert_eq!((back.files_back, back.stayed.len()), (1, 0));
+        whole_in("Trips/Cairo", "pyramid.jpg", "p");
+    }
+
+    #[test]
+    fn a_move_whose_folder_went_meanwhile_stops_and_says_why() {
+        let (conn, root, cairo, people) = library("folder-gone");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        folders::retire_subtree_at(&conn, people, crate::db::now()).unwrap();
+
+        let outcome =
+            move_watched(&conn, &[pyramid], people, &journal::new_batch(), &Unwatched).unwrap();
+        assert_eq!(
+            outcome.stopped,
+            Some(Reason::FolderGone {
+                name: "People".into()
+            })
+        );
+        assert_eq!(outcome.report.moved, 0);
+        assert!(root.join("Trips/Cairo/pyramid.jpg").is_file());
+    }
+
+    #[test]
+    fn a_move_on_one_drive_crosses_none() {
+        let (conn, _, cairo, people) = library("one-drive");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        assert!(!cross_drives(&conn, &[pyramid], people).unwrap());
     }
 
     #[test]

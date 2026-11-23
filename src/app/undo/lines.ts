@@ -223,6 +223,14 @@ function retagUndone(change: Change, fileCount: number, folderCount: number) {
   return what ? `${was} is back on ${what}.` : `${was} is back.`;
 }
 
+/**
+ * The line at the foot after a move between drives that was stopped: what went, counted against
+ * what it carried.
+ */
+export function moveStoppedLine(batch: Batch, whole: number, to: string): string {
+  return `Moved ${formatCount(batch.files)} of ${files(whole)} to ${to}.`;
+}
+
 /** The banner's sentence for a move that finished in part, or not at all. */
 export function movedBannerLine(moved: number, whole: number, to: string, one?: string) {
   if (moved > 0) return `${formatCount(moved)} of ${files(whole)} moved to ${to}`;

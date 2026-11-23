@@ -12,14 +12,20 @@ pub const SCRUB: &str = "scrub";
 pub const COPY_IN: &str = "copy_in";
 /// A zip written outside the library, which counts itself too.
 pub const EXPORT: &str = "export";
+/// Files moved between drives, which count themselves too.
+pub const MOVE: &str = "move";
+/// The kinds that count themselves on a line of their own, never in the walk's.
+pub const OWN_LINES: [&str; 3] = [COPY_IN, EXPORT, MOVE];
+/// The kinds that write a batch as they run, which is no act until they end.
+pub const ACTS: [&str; 2] = [COPY_IN, MOVE];
 
 /// The kinds that walk the disk. Only one runs at a time: each retires what it did not see, so a
 /// second walk alongside would retire what the first had just found.
 pub const WALKS: [&str; 2] = [INDEX, INDEX_FOLDER];
 
 pub const PRIORITY_INDEX: i64 = 100;
-/// A copy or an export was asked for and is watched while it runs, so it starts before any
-/// thumbnail.
+/// A copy, a move or an export was asked for and is watched while it runs, so it starts before
+/// any thumbnail.
 pub const PRIORITY_COPY: i64 = 50;
 pub const PRIORITY_THUMB: i64 = 20;
 pub const PRIORITY_SCRUB: i64 = 1;
@@ -61,5 +67,17 @@ pub struct ExportPayload {
     pub naming: crate::fs::export::Naming,
     pub dest: String,
     pub part: String,
+    pub whole: u32,
+}
+
+/// What a move of files between drives carries, where, and the batch its journal rows go under:
+/// the same batch when it goes on after a restart, which passes over what already went.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MovePayload {
+    pub batch_id: String,
+    pub into: i64,
+    pub item_ids: Vec<i64>,
+    /// Every file it carries, for its line while it waits.
     pub whole: u32,
 }

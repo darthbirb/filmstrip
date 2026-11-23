@@ -341,11 +341,8 @@ fn free(used: &mut HashSet<String>, name: &str) -> String {
     name
 }
 
-/// What the export answers to while it runs: being stopped, and saying how far it has got.
-pub trait Control {
-    fn halt(&self) -> Option<Halt>;
-    fn progress(&self, done: u32, whole: u32);
-}
+/// What the export answers to while it runs, as a move between drives does.
+pub use crate::fs::relocate::Control;
 
 /// How an export ended.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]

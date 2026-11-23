@@ -141,6 +141,8 @@ export const dropFiles = (folderId: number, paths: string[]) =>
 
 export const cancelCopy = (jobId: number) => invoke<boolean>("cancel_copy", { jobId });
 
+export const cancelMove = (jobId: number) => invoke<boolean>("cancel_move", { jobId });
+
 export const exportPlan = (scope: Scope) => invoke<Plan>("export_plan", { scope });
 
 export const pickExportZip = (name: string, dir: string | null) =>

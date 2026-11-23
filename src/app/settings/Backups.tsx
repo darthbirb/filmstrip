@@ -174,7 +174,11 @@ export function Backups() {
           Restore the index from <Term>{when}</Term>? Tags, labels, notes, statuses, covers,
           favourites, keys and the undo journal go back to then.
           <Forgotten forgets={forgets} /> The index as it is now is kept as a backup first.
-          {stopping(progress?.copies.length ?? 0, progress?.exports.length ?? 0)}
+          {stopping(
+            progress?.copies.length ?? 0,
+            progress?.moves.length ?? 0,
+            progress?.exports.length ?? 0,
+          )}
         </RowQuestion>
       );
     }
@@ -327,13 +331,16 @@ function Forgotten({ forgets }: { forgets: Forgets | "unknown" | null }) {
 }
 
 /** What a restore stops first, said on its question while it runs. */
-function stopping(copies: number, exports: number) {
-  const what = [
+function stopping(copies: number, moves: number, exports: number) {
+  const parts = [
     ...(copies > 0 ? [copies === 1 ? "the copy" : "the copies"] : []),
+    ...(moves > 0 ? [moves === 1 ? "the move" : "the moves"] : []),
     ...(exports > 0 ? [exports === 1 ? "the export" : "the exports"] : []),
-  ].join(" and ");
+  ];
+  const what =
+    parts.length > 2 ? `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}` : parts.join(" and ");
   if (!what) return "";
-  const one = copies + exports === 1;
+  const one = copies + moves + exports === 1;
   return ` ${what.charAt(0).toUpperCase()}${what.slice(1)} running now ${one ? "is" : "are"} stopped first, as Cancel would stop ${one ? "it" : "them"}.`;
 }
 

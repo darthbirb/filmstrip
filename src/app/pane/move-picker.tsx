@@ -1,6 +1,8 @@
+import { listen } from "@tauri-apps/api/event";
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import type { FolderEntry } from "../../ipc/bindings/FolderEntry";
+import type { Moved } from "../../ipc/bindings/Moved";
 import {
   type AppError,
   listFolders,
@@ -11,9 +13,10 @@ import {
 import type { MenuAnchor } from "../../ui/Menu";
 import { Picker, type PickerRow, type PickerSection } from "../../ui/Picker";
 import { libraryChanged } from "../library";
+import { setNews } from "../navigation/foot-slot";
 import { refreshIndex, useIndex } from "../navigation/index-store";
 import { getPreferences, RECENT, updatePreferences, usePreferences } from "../preferences";
-import { movedBannerLine } from "../undo/lines";
+import { movedBannerLine, moveStoppedLine, reasonText } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
 import { restoreFiles } from "./restore";
@@ -235,14 +238,19 @@ function ancestors(folders: FolderEntry[], id: number) {
   return up;
 }
 
+/** Where a move goes: a folder, named as navigation names it. */
+type Into = Pick<FolderEntry, "id" | "title">;
+
 /**
  * Moves the files and says what happened: the line at the foot for what went, the banner over
- * the grid for what did not; and hands back the report. DECISIONS.md "Undo".
+ * the grid for what did not; and hands back the report. A move between drives is a job, which
+ * says so when it ends, and hands back only that it started. DECISIONS.md "Undo".
  */
-export async function moveFiles(itemIds: number[], to: Pick<FolderEntry, "id" | "title">) {
+export async function moveFiles(itemIds: number[], to: Into) {
   const moved = await moveItems(itemIds, to.id).catch(() => null);
   if (!moved) return null;
   remember(to);
+  if (moved.kind === "started") return "started" as const;
   const { batch, report } = moved;
   if (batch) afterAct(batch, report.refused.length);
   const whole = report.moved + report.refused.length;
@@ -296,6 +304,49 @@ export async function moveFolderTo(
     });
   }
   await libraryChanged();
+}
+
+/**
+ * How a move of files between drives ended: the Line with Undo for what went, and the banner for
+ * what stayed, with Retry. One that stopped on its own says why at the foot. DECISIONS.md "Undo".
+ */
+export async function afterMoved(moved: Moved) {
+  await libraryChanged();
+  const { batch, refused, whole, to, stopped } = moved;
+  const into = { id: moved.folderId, title: to };
+  const [only] = refused;
+  if (only) {
+    const went = batch?.files ?? 0;
+    const one = went === 0 && refused.length === 1;
+    showReport({
+      sentence: movedBannerLine(went, whole, to, one ? only.name : undefined),
+      rows: refused,
+      heading: "Not Moved",
+      retry: () =>
+        void moveFiles(
+          refused.map((row) => row.id),
+          into,
+        ),
+    });
+  }
+  if (stopped) {
+    const why = `${reasonText(stopped)}.`;
+    if (batch) afterAct(batch, 0, `${moveStoppedLine(batch, whole, to)} ${why}`);
+    else if (only) setNews({ kind: "keyRefused", line: why });
+    else setNews({ kind: "keyRefused", line: `${movedBannerLine(0, whole, to)}.`, detail: why });
+    return;
+  }
+  // With nothing moved, the banner turns the line round and the foot says nothing.
+  if (!batch) return;
+  if (moved.cancelled) afterAct(batch, 0, moveStoppedLine(batch, whole, to));
+  else afterAct(batch, refused.length);
+}
+
+/** Hears how each move between drives ended. */
+export async function watchMoves() {
+  await listen<Moved>("move-done", ({ payload }) => void afterMoved(payload)).catch(
+    () => undefined,
+  );
 }
 
 /** The picker's Recent: the newest place first, files and folders alike. */

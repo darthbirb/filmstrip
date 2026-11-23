@@ -26,6 +26,7 @@ use crate::media::ffmpeg::Ffmpeg;
 pub const PROGRESS_EVENT: &str = "job-progress";
 pub const COPIED_EVENT: &str = "copy-done";
 pub const EXPORTED_EVENT: &str = "export-done";
+pub const MOVED_EVENT: &str = "move-done";
 
 const TICK: Duration = Duration::from_millis(500);
 const IDLE: Duration = Duration::from_millis(150);
@@ -59,6 +60,8 @@ pub struct Progress {
     pub copies: Vec<Copying>,
     /// Each export running or waiting to, oldest first.
     pub exports: Vec<Exporting>,
+    /// Each move between drives running or waiting to, oldest first.
+    pub moves: Vec<Moving>,
 }
 
 /// A copy in progress: where it is going, and how many of the files it carries are settled.
@@ -84,6 +87,37 @@ pub struct Copied {
     /// What came in, as one batch; nothing when nothing did.
     pub batch: Option<Batch>,
     /// Every file the copy carried, those that stayed out included.
+    pub whole: u32,
+    pub refused: Vec<Stayed>,
+    pub cancelled: bool,
+    /// Why it stopped before the end, when something other than Cancel stopped it.
+    pub stopped: Option<Reason>,
+}
+
+/// A move between drives in progress: where it is going, and how many of the files it carries are
+/// settled.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Moving {
+    pub job_id: i64,
+    pub folder_id: i64,
+    pub to: String,
+    pub done: u32,
+    pub whole: u32,
+}
+
+/// How a move between drives ended, as the line at the foot and the banner say it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Moved {
+    pub job_id: i64,
+    pub folder_id: i64,
+    pub to: String,
+    /// What went, as one batch; nothing when nothing did.
+    pub batch: Option<Batch>,
+    /// Every file the move carried, those that stayed included.
     pub whole: u32,
     pub refused: Vec<Stayed>,
     pub cancelled: bool,
@@ -124,6 +158,7 @@ pub struct Exported {
 pub type Report = Box<dyn Fn(&Progress) + Send + Sync>;
 pub type Announce = Box<dyn Fn(&Copied) + Send + Sync>;
 pub type AnnounceExport = Box<dyn Fn(&Exported) + Send + Sync>;
+pub type AnnounceMove = Box<dyn Fn(&Moved) + Send + Sync>;
 
 pub struct QueueInner {
     db_path: PathBuf,
@@ -141,8 +176,10 @@ pub struct QueueInner {
     report: Report,
     announce: Announce,
     exported: AnnounceExport,
+    moved: AnnounceMove,
     copies: Mutex<BTreeMap<i64, Copying>>,
     exports: Mutex<BTreeMap<i64, Exporting>>,
+    moves: Mutex<BTreeMap<i64, Moving>>,
     cancelled: Mutex<HashSet<i64>>,
 }
 
@@ -154,6 +191,7 @@ impl QueueInner {
         report: Report,
         announce: Announce,
         exported: AnnounceExport,
+        moved: AnnounceMove,
     ) -> QueueInner {
         QueueInner {
             db_path,
@@ -167,8 +205,10 @@ impl QueueInner {
             report,
             announce,
             exported,
+            moved,
             copies: Mutex::new(BTreeMap::new()),
             exports: Mutex::new(BTreeMap::new()),
+            moves: Mutex::new(BTreeMap::new()),
             cancelled: Mutex::new(HashSet::new()),
         }
     }
@@ -190,6 +230,7 @@ impl QueueInner {
             completed: self.completed.load(Ordering::Relaxed),
             copies: copies(conn, &lock(&self.copies))?,
             exports: exports(conn, &lock(&self.exports))?,
+            moves: moves(conn, &lock(&self.moves))?,
         })
     }
 }
@@ -202,6 +243,19 @@ impl QueueInner {
             return Ok(true);
         }
         if !lock(&self.copies).contains_key(&job_id) {
+            return Ok(false);
+        }
+        lock(&self.cancelled).insert(job_id);
+        Ok(true)
+    }
+
+    fn cancel_move(&self, conn: &Connection, job_id: i64) -> Result<bool> {
+        if let Some(payload) = table::cancel_pending(conn, job_id, kinds::MOVE)? {
+            let payload: kinds::MovePayload = serde_json::from_str(&payload)?;
+            worker::moved_waiting(self, conn, job_id, &payload)?;
+            return Ok(true);
+        }
+        if !lock(&self.moves).contains_key(&job_id) {
             return Ok(false);
         }
         lock(&self.cancelled).insert(job_id);
@@ -308,6 +362,28 @@ fn copies(conn: &Connection, running: &BTreeMap<i64, Copying>) -> Result<Vec<Cop
     Ok(copies)
 }
 
+/// Each move running, and each waiting its turn at none of its files settled, oldest first.
+fn moves(conn: &Connection, running: &BTreeMap<i64, Moving>) -> Result<Vec<Moving>> {
+    let mut moves: Vec<Moving> = running.values().cloned().collect();
+    for (job_id, payload) in table::waiting(conn, kinds::MOVE)? {
+        if running.contains_key(&job_id) {
+            continue;
+        }
+        let Ok(payload) = serde_json::from_str::<kinds::MovePayload>(&payload) else {
+            continue;
+        };
+        moves.push(Moving {
+            job_id,
+            folder_id: payload.into,
+            to: crate::fs::acts::name(conn, payload.into).unwrap_or_default(),
+            done: 0,
+            whole: payload.whole,
+        });
+    }
+    moves.sort_by_key(|one| one.job_id);
+    Ok(moves)
+}
+
 /// A poisoned lock still holds what it held: one panicking copy must not stop the others' lines.
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
@@ -327,9 +403,10 @@ impl JobQueue {
         report: Report,
         announce: Announce,
         exported: AnnounceExport,
+        moved: AnnounceMove,
     ) -> JobQueue {
         let inner = Arc::new(QueueInner::new(
-            db_path, thumbs, ffmpeg, report, announce, exported,
+            db_path, thumbs, ffmpeg, report, announce, exported, moved,
         ));
         let workers = std::thread::available_parallelism()
             .map_or(MIN_WORKERS, |cores| cores.get().saturating_sub(1))
@@ -357,13 +434,19 @@ impl JobQueue {
         self.inner.cancel_copy(conn, job_id)
     }
 
+    /// Stops a move between drives: one still waiting is taken off the queue, one running stops
+    /// after the file in hand. `false` when there was nothing to stop.
+    pub fn cancel_move(&self, conn: &Connection, job_id: i64) -> Result<bool> {
+        self.inner.cancel_move(conn, job_id)
+    }
+
     /// Stops an export, waiting or running, and leaves nothing of it behind. `false` when there
     /// was nothing to stop.
     pub fn cancel_export(&self, conn: &Connection, job_id: i64) -> Result<bool> {
         self.inner.cancel_export(conn, job_id)
     }
 
-    /// Stops the queue for as long as the hold is kept: each copy and export is cancelled as its
+    /// Stops the queue for as long as the hold is kept: each copy, move and export is cancelled as its
     /// Cancel would, a walk stops before its next directory, and the hold waits for every job in
     /// flight to end. Nothing starts again until it is dropped.
     pub fn hold(&self) -> Result<Hold<'_>> {
@@ -377,6 +460,9 @@ impl JobQueue {
         }
         for export in &progress.exports {
             inner.cancel_export(&conn, export.job_id)?;
+        }
+        for moving in &progress.moves {
+            inner.cancel_move(&conn, moving.job_id)?;
         }
         hold._gate = Some(inner.gate.write().unwrap_or_else(PoisonError::into_inner));
         Ok(hold)
@@ -530,6 +616,28 @@ pub fn enqueue_copy(conn: &Connection, folder_id: i64, paths: &[PathBuf]) -> Res
     )
 }
 
+/// Queues a move of files into a folder under a batch of its own, and returns the job that runs it.
+pub fn enqueue_move_items(conn: &Connection, item_ids: &[i64], into: i64) -> Result<i64> {
+    enqueue_move(
+        conn,
+        kinds::MovePayload {
+            batch_id: crate::db::journal::new_batch(),
+            into,
+            item_ids: item_ids.to_vec(),
+            whole: u32::try_from(item_ids.len()).unwrap_or(u32::MAX),
+        },
+    )
+}
+
+fn enqueue_move(conn: &Connection, payload: kinds::MovePayload) -> Result<i64> {
+    table::enqueue(
+        conn,
+        kinds::MOVE,
+        &serde_json::to_string(&payload)?,
+        kinds::PRIORITY_COPY,
+    )
+}
+
 /// Queues an export of a scope into a zip at `dest`, and returns the job that writes it.
 pub fn enqueue_export(
     conn: &Connection,
@@ -627,6 +735,7 @@ mod tests {
                 let _ = said.send(copied.clone());
             }),
             Box::new(|_| {}),
+            Box::new(|_| {}),
         );
         let copied = heard.recv_timeout(Duration::from_secs(60)).unwrap();
         let deadline = Instant::now() + Duration::from_secs(10);
@@ -680,6 +789,7 @@ mod tests {
             Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),
+            Box::new(|_| {}),
         );
         assert_eq!(
             inner.progress(&conn).unwrap().copies,
@@ -709,6 +819,7 @@ mod tests {
             Box::new(move |copied| {
                 let _ = said.send(copied.clone());
             }),
+            Box::new(|_| {}),
             Box::new(|_| {}),
         );
         let copied = heard.recv_timeout(Duration::from_secs(60)).unwrap();
@@ -749,6 +860,7 @@ mod tests {
             Box::new(move |exported| {
                 let _ = said.send(exported.clone());
             }),
+            Box::new(|_| {}),
         )
     }
 
@@ -785,6 +897,7 @@ mod tests {
             Box::new(move |exported| {
                 let _ = said.send(exported.clone());
             }),
+            Box::new(|_| {}),
         );
         let exported = heard.recv_timeout(Duration::from_secs(60)).unwrap();
         let deadline = Instant::now() + Duration::from_secs(10);
@@ -897,6 +1010,7 @@ mod tests {
                 let _ = said.send(copied.clone());
             }),
             Box::new(|_| {}),
+            Box::new(|_| {}),
         );
         assert!(inner.cancel_copy(&conn, job).unwrap());
         let copied = heard.try_recv().expect("its line ends with what came in");
@@ -928,11 +1042,152 @@ mod tests {
                 let _ = said.send(copied.clone());
             }),
             Box::new(|_| {}),
+            Box::new(|_| {}),
         );
         let _ = inner.cancel_copy(&conn, job);
         let copied = heard.try_recv().expect("its line ends");
         assert_eq!((copied.job_id, copied.cancelled), (job, true));
         assert!(inner.progress(&conn).unwrap().copies.is_empty());
+    }
+
+    /// Trips holding IMG_1.jpg and IMG_2.jpg, and People empty.
+    fn library_to_move(name: &str) -> (Connection, PathBuf, i64, i64, [i64; 2]) {
+        let (conn, dir, trips) = library_to_export(name);
+        std::fs::create_dir_all(dir.join("library/People")).unwrap();
+        crate::fs::walk::reconcile(&conn).unwrap();
+        let root = crate::db::folders::source_root_folder(&conn, 1).unwrap();
+        let people = crate::db::folders::child_id(&conn, root, "People")
+            .unwrap()
+            .unwrap();
+        let id = |name: &str| {
+            crate::db::items::existing_by_disk_name(&conn, trips, name)
+                .unwrap()
+                .unwrap()
+                .id
+        };
+        let ids = [id("IMG_1.jpg"), id("IMG_2.jpg")];
+        (conn, dir, trips, people, ids)
+    }
+
+    fn hearing_moves(dir: &Path, said: mpsc::Sender<Moved>) -> QueueInner {
+        QueueInner::new(
+            dir.join("library.db"),
+            dir.join("thumbs"),
+            None,
+            Box::new(|_| {}),
+            Box::new(|_| {}),
+            Box::new(|_| {}),
+            Box::new(move |moved| {
+                let _ = said.send(moved.clone());
+            }),
+        )
+    }
+
+    #[test]
+    fn a_move_runs_off_this_thread_and_ends_by_saying_what_went_as_one_batch() {
+        let (conn, dir, _, people, ids) = library_to_move("move");
+        let job = enqueue_move_items(&conn, &ids, people).unwrap();
+        let (said, heard) = mpsc::channel();
+        assert_eq!(
+            hearing_moves(&dir, said.clone())
+                .progress(&conn)
+                .unwrap()
+                .moves,
+            [Moving {
+                job_id: job,
+                folder_id: people,
+                to: "People".into(),
+                done: 0,
+                whole: 2,
+            }],
+            "waiting its turn, at none settled"
+        );
+        assert_eq!(
+            table::counts(&conn).unwrap().pending,
+            0,
+            "the walk's line counts no move"
+        );
+
+        let queue = JobQueue::start(
+            dir.join("library.db"),
+            dir.join("thumbs"),
+            None,
+            Box::new(|_| {}),
+            Box::new(|_| {}),
+            Box::new(|_| {}),
+            Box::new(move |moved| {
+                let _ = said.send(moved.clone());
+            }),
+        );
+        let moved = heard.recv_timeout(Duration::from_secs(60)).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while !queue.progress().unwrap().moves.is_empty() && Instant::now() < deadline {
+            std::thread::sleep(IDLE);
+        }
+        assert!(queue.progress().unwrap().moves.is_empty(), "its line goes");
+        queue.stop();
+
+        assert_eq!((moved.job_id, moved.to.as_str()), (job, "People"));
+        assert_eq!((moved.whole, moved.cancelled), (2, false));
+        assert!(moved.refused.is_empty(), "{:?}", moved.refused);
+        let batch = moved.batch.unwrap();
+        assert_eq!(batch.files, 2);
+        assert!(dir.join("library/People/IMG_1.jpg").is_file());
+        assert!(!dir.join("library/Trips/IMG_1.jpg").exists());
+        assert!(
+            !queue.cancel_move(&conn, job).unwrap(),
+            "nothing is left to stop"
+        );
+
+        let back = crate::fs::undo::undo_last(&conn).unwrap().unwrap();
+        assert_eq!((back.batch.batch_id, back.files_back), (batch.batch_id, 2));
+        assert!(dir.join("library/Trips/IMG_2.jpg").is_file());
+    }
+
+    #[test]
+    fn a_move_waiting_after_a_crash_is_no_act_until_it_ends_and_cancel_ends_it_with_what_went() {
+        let (conn, dir, trips, people, ids) = library_to_move("move-cancel-waiting");
+        let job = enqueue_move_items(&conn, &ids, people).unwrap();
+        let payload: kinds::MovePayload =
+            serde_json::from_str(&table::waiting(&conn, kinds::MOVE).unwrap()[0].1).unwrap();
+        let batch = payload.batch_id.clone();
+        crate::fs::items::move_items(&conn, &ids[..1], people, &batch).unwrap();
+        assert_eq!(crate::db::journal::latest_batch(&conn).unwrap(), None);
+        assert!(crate::fs::undo::undo_batch(&conn, &batch).is_err());
+
+        let (said, heard) = mpsc::channel();
+        let inner = hearing_moves(&dir, said);
+        assert!(inner.cancel_move(&conn, job).unwrap());
+        let moved = heard.try_recv().expect("its line ends with what went");
+        assert!(moved.cancelled);
+        assert_eq!((moved.job_id, moved.whole), (job, 2));
+        assert_eq!(moved.batch.map(|batch| batch.files), Some(1));
+        assert!(inner.progress(&conn).unwrap().moves.is_empty());
+
+        let back = crate::fs::undo::undo_last(&conn).unwrap().unwrap();
+        assert_eq!((back.batch.batch_id, back.files_back), (batch, 1));
+        assert_eq!(
+            crate::db::items::folder_of(&conn, ids[0]).unwrap(),
+            Some(trips)
+        );
+    }
+
+    #[test]
+    fn cancel_on_a_move_waiting_after_a_crash_clears_the_part_its_killed_run_left() {
+        let (conn, dir, _, people, ids) = library_to_move("move-cancel-part");
+        let job = enqueue_move_items(&conn, &ids, people).unwrap();
+        let into = dir.join("library/People");
+        std::fs::write(into.join(".IMG_2.jpg.filmstrip-part"), "half").unwrap();
+        std::fs::write(into.join(".IMG_9.jpg.filmstrip-part"), "theirs").unwrap();
+
+        let (said, heard) = mpsc::channel();
+        let inner = hearing_moves(&dir, said);
+        assert!(inner.cancel_move(&conn, job).unwrap());
+        assert!(heard.try_recv().unwrap().cancelled);
+        assert!(!into.join(".IMG_2.jpg.filmstrip-part").exists());
+        assert!(into.join(".IMG_9.jpg.filmstrip-part").is_file());
+        assert!(dir.join("library/Trips/IMG_2.jpg").is_file());
+        assert!(!into.join("IMG_2.jpg").exists());
     }
 
     /// Starting the queue on a fresh library walks it and thumbnails its pictures, off this thread.
@@ -957,6 +1212,7 @@ mod tests {
             Box::new(move |progress| {
                 let _ = sent.send(progress.clone());
             }),
+            Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),
         );
@@ -1001,6 +1257,7 @@ mod tests {
             db_path,
             dir.join("thumbs"),
             None,
+            Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),
@@ -1061,6 +1318,7 @@ mod tests {
             Box::new(move |progress| {
                 let _ = sent.send(progress.clone());
             }),
+            Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),
         );

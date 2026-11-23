@@ -3,6 +3,7 @@ import type { Batch } from "./Batch";
 import type { MoveReport } from "./MoveReport";
 
 /**
- * What a move of files did, and the batch that undoes it when anything went.
+ * What a move of files did, and the batch that undoes it when anything went; or a move between
+ * drives started as a job.
  */
-export type ItemsMoved = { batch: Batch | null, report: MoveReport, };
+export type ItemsMoved = { "kind": "done", batch: Batch | null, report: MoveReport, } | { "kind": "started", jobId: number, };

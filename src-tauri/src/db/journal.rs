@@ -10,7 +10,7 @@ use ts_rs::TS;
 
 use crate::db::now;
 use crate::error::Result;
-use crate::jobs::kinds::COPY_IN;
+use crate::jobs::kinds::ACTS;
 
 pub const FOLDER_CREATE: &str = "folder_create";
 pub const FOLDER_RENAME: &str = "folder_rename";
@@ -454,17 +454,19 @@ pub fn drop_entry(conn: &Connection, entry_id: i64) -> Result<()> {
 }
 
 /// The batch written last, whenever that was, or nothing when there is nothing left to undo. A
-/// copy still waiting or running is passed over: its batch is not an act until the copy has ended.
+/// copy or a move still waiting or running is passed over: its batch is not an act until it has
+/// ended.
 pub fn latest_batch(conn: &Connection) -> Result<Option<String>> {
     Ok(conn
         .query_row(
             "SELECT batch_id FROM journal
               WHERE batch_id NOT IN (SELECT json_extract(payload, '$.batchId') FROM job
-                                      WHERE kind = ?1 AND status IN ('pending', 'running')
+                                      WHERE kind IN (SELECT value FROM json_each(?1))
+                                        AND status IN ('pending', 'running')
                                         AND json_extract(payload, '$.batchId') IS NOT NULL)
                 AND id > ?2
               ORDER BY id DESC LIMIT 1",
-            params![COPY_IN, floor(conn)?],
+            params![serde_json::to_string(&ACTS)?, floor(conn)?],
             |r| r.get(0),
         )
         .optional()?)
@@ -504,13 +506,14 @@ pub fn below_floor(conn: &Connection, batch_id: &str) -> Result<bool> {
     )?)
 }
 
-/// Whether a copy still waiting or running writes under this batch.
-pub fn copying(conn: &Connection, batch_id: &str) -> Result<bool> {
+/// Whether a copy or a move still waiting or running writes under this batch.
+pub fn unended(conn: &Connection, batch_id: &str) -> Result<bool> {
     Ok(conn.query_row(
         "SELECT EXISTS(SELECT 1 FROM job
-                        WHERE kind = ?1 AND status IN ('pending', 'running')
+                        WHERE kind IN (SELECT value FROM json_each(?1))
+                          AND status IN ('pending', 'running')
                           AND json_extract(payload, '$.batchId') = ?2)",
-        params![COPY_IN, batch_id],
+        params![serde_json::to_string(&ACTS)?, batch_id],
         |r| r.get(0),
     )?)
 }
