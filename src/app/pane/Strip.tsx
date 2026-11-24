@@ -10,13 +10,15 @@ import {
 } from "react";
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
-import { useContextMenu } from "../../ui/Menu";
+import { autoPopoverOpen, useContextMenu } from "../../ui/Menu";
 import { StepButton } from "../../ui/StepButton";
 import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
 import { useGridItems } from "../grid/useGridItems";
 import { itemMenu } from "../menus/item-menu";
 import type { Place } from "../place";
+import { getFullScreen } from "./full-screen";
 import { showInPane, usePaneItem, usePaneOrigin, usePaneSet } from "./pane-store";
+import { focusPicture } from "./picture-focus";
 
 /** A frame for each item in the place the shown one was chosen in, stepped through in order. */
 export function Strip() {
@@ -74,18 +76,37 @@ function Track({ items, current, from }: TrackProps) {
     refocus.current = false;
   });
 
+  const moves: Record<string, number> = {
+    ArrowLeft: index - 1,
+    ArrowRight: index + 1,
+    Home: 0,
+    End: items.length - 1,
+  };
+
   const onKeyDown = (event: KeyboardEvent) => {
-    const moves: Record<string, number> = {
-      ArrowLeft: index - 1,
-      ArrowRight: index + 1,
-      Home: 0,
-      End: items.length - 1,
-    };
     const target = moves[event.key];
     if (target === undefined) return;
     event.preventDefault();
     show(target, true);
   };
+
+  // The same keys from anywhere else in the pane, or anywhere in full screen, when one file is shown.
+  // They take the focus to the picture, as the strip keeps it on its frame. DECISIONS.md "The pane".
+  const fromElsewhere = useRef<(event: globalThis.KeyboardEvent) => void>(() => undefined);
+  fromElsewhere.current = (event) => {
+    const target = moves[event.key];
+    const item = target === undefined ? undefined : items[target];
+    if (!item || index < 0 || target === index || inPane.size !== 1) return;
+    if (event.defaultPrevented || !stepsFrom(event, scroller.current)) return;
+    event.preventDefault();
+    showInPane(item.id, from);
+    focusPicture(item.id);
+  };
+  useEffect(() => {
+    const onKey = (event: globalThis.KeyboardEvent) => fromElsewhere.current(event);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const frames: ReactElement[] = [];
   if (step > 0) {
@@ -188,6 +209,21 @@ function Track({ items, current, from }: TrackProps) {
       />
     </div>
   );
+}
+
+/**
+ * Whether a key is the pane's to step with: its strip is in sight, the focus is in the pane or the
+ * pane is full screen, and no field, menu, dialog or modifier has the key.
+ */
+function stepsFrom(event: globalThis.KeyboardEvent, strip: HTMLElement | null) {
+  if (!strip || strip.closest("[inert]")) return false;
+  if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return false;
+  const target = event.target instanceof Element ? event.target : null;
+  if (target?.closest("input, textarea, select, [contenteditable], [role=menu], [popover]")) {
+    return false;
+  }
+  if (autoPopoverOpen() || document.querySelector("dialog[open]")) return false;
+  return getFullScreen() || target?.closest('[aria-label="Pane"]') != null;
 }
 
 /** The track's scroll and width, and the frame and gap sizes the stylesheet gives, in pixels. */

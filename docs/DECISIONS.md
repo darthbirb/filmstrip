@@ -746,6 +746,16 @@ tenth stays, lowered to the fitted scale for a picture too large to fit above it
 otherwise jump on its first notch. At fit there is no zoom furniture; off fit, one plate states the
 scale and is the way back. A video does not zoom: its controls and its track already own the picture.
 
+**Left and Right step through the strip's place wherever the focus is in the pane, and anywhere in
+full screen; Home and End go to its first and last**, settled on 24 November 2026. Every viewer
+steps this way, and the strip alone answering, eight Tab presses from the picture, read as keys that
+did nothing. A field, an open menu or list, a dialog and the video's track keep the keys first, and
+so does a zoomed picture holding the focus: its arrows pan, and back at fit they step again. A step
+taken from anywhere but the strip puts the focus on the new picture, since the bar and the picture
+it was on go with the file; from the strip it stays on the frame. However full screen is entered,
+the focus goes to the picture, so the first press steps. Several files in the pane do not step, as
+the strip only stands on the first of them and a step would put the set down.
+
 **Nothing stands in while the original loads.** A thumbnail under it showed for a split second
 as a low copy of the picture, first small and then at the picture's size, and only when the
 original was not already cached. An original the window cannot draw is stood in for by its

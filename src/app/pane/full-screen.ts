@@ -1,6 +1,8 @@
 import { useEffect, useSyncExternalStore } from "react";
 
 import { autoPopoverOpen } from "../../ui/Menu";
+import { getPaneItem, getPaneSet } from "./pane-store";
+import { focusPicture } from "./picture-focus";
 
 // Full screen is a state of the pane, not a place you navigate to: leaving puts the pane back in
 // whatever state it was in, docked or folded. DECISIONS.md "The pane".
@@ -11,9 +13,12 @@ export function getFullScreen() {
   return full;
 }
 
+/** Entering puts the focus on the picture, whichever way it was entered, so the arrows step at once. */
 export function setFullScreen(next: boolean) {
   if (full === next) return;
   full = next;
+  const shown = getPaneItem();
+  if (full && shown !== null && getPaneSet().length === 1) focusPicture(shown);
   for (const listener of listeners) listener();
 }
 
