@@ -290,10 +290,10 @@ pub fn in_folder(conn: &Connection, folder_id: i64) -> Result<Vec<ItemRow>> {
     Ok(rows)
 }
 
-/// The live ids directly in a folder, or when `deep` everywhere beneath it too, in
-/// [`branch_query`]'s order, without reading the rest of each row.
-pub fn branch_ids(conn: &Connection, folder_id: i64, deep: bool) -> Result<Vec<i64>> {
-    let mut stmt = conn.prepare(&branch_query("i.id", deep))?;
+/// The live ids at or below a folder, in [`branch_query`]'s order, without reading the rest of
+/// each row.
+pub fn branch_ids(conn: &Connection, folder_id: i64) -> Result<Vec<i64>> {
+    let mut stmt = conn.prepare(&branch_query("i.id", true))?;
     let ids = stmt
         .query_map(params![folder_id], |r| r.get(0))?
         .collect::<rusqlite::Result<_>>()?;
@@ -1152,9 +1152,8 @@ mod tests {
         upsert(&conn, &sample(1, gone, "lost.jpg")).unwrap();
         folders::trash_subtree(&conn, gone).unwrap();
 
-        assert_eq!(branch_ids(&conn, trips, false).unwrap(), [map, ticket]);
         assert_eq!(
-            branch_ids(&conn, trips, true).unwrap(),
+            branch_ids(&conn, trips).unwrap(),
             [map, nile, pyramid, ticket, ticket_too],
             "by name whatever the case, a shared name by id, nothing retired or gone"
         );
@@ -1163,7 +1162,7 @@ mod tests {
             .into_iter()
             .map(|row| row.id)
             .collect();
-        assert_eq!(rows, branch_ids(&conn, trips, false).unwrap());
+        assert_eq!(rows, [map, ticket]);
         let files: Vec<(i64, i64)> = branch_files(&conn, trips)
             .unwrap()
             .into_iter()
@@ -1188,8 +1187,8 @@ mod tests {
         folders::create(&conn, empty, "Also empty").unwrap();
         upsert(&conn, &sample(1, root, "beside.jpg")).unwrap();
 
-        assert!(branch_ids(&conn, empty, false).unwrap().is_empty());
-        assert!(branch_ids(&conn, empty, true).unwrap().is_empty());
+        assert!(in_folder(&conn, empty).unwrap().is_empty());
+        assert!(branch_ids(&conn, empty).unwrap().is_empty());
     }
 
     #[test]
@@ -1207,7 +1206,7 @@ mod tests {
         let a = upsert(&conn, &sample(away.id, root, "a.jpg")).unwrap();
         let b = upsert(&conn, &sample(away.id, scans, "b.jpg")).unwrap();
 
-        assert_eq!(branch_ids(&conn, root, true).unwrap(), [a, b]);
+        assert_eq!(branch_ids(&conn, root).unwrap(), [a, b]);
     }
 
     #[test]
@@ -1656,7 +1655,7 @@ mod tests {
             let top = forty_thousand_deep(&conn, root);
 
             let started = std::time::Instant::now();
-            let ids = branch_ids(&conn, top, true).unwrap();
+            let ids = branch_ids(&conn, top).unwrap();
             let took = started.elapsed();
 
             assert_eq!(ids.len(), 40_000);

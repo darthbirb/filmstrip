@@ -2158,8 +2158,6 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     })),
   ],
   folder_items: ({ folderId, sort }) => sorted(ITEMS[folderId as number] ?? [], sort),
-  folder_item_ids: ({ folderId, deep }) =>
-    (deep ? branch(folderId as number) : (ITEMS[folderId as number] ?? [])).map((item) => item.id),
   folder_branch_files: ({ folderId }): BranchFile[] =>
     branch(folderId as number).map(({ id, folderId, sizeBytes, favorite }) => ({
       id,

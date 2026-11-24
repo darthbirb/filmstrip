@@ -140,7 +140,6 @@ pub fn run() {
             commands::folder_children,
             commands::list_folders,
             commands::folder_items,
-            commands::folder_item_ids,
             commands::folder_branch_files,
             commands::sorting_items,
             commands::trash_listing,
