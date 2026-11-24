@@ -754,18 +754,16 @@ fn leave_several(conn: &Connection, ids: &[i64], folders: &[i64]) -> Result<()> 
                        SELECT entry_id FROM journal_subject
                         WHERE folder_id IN (SELECT value FROM json_each(?5)))",
     )?;
+    let (ids, folders) = (serde_json::to_string(ids)?, serde_json::to_string(folders)?);
     let several: Vec<(i64, String, String)> = stmt
-        .query_map(
-            params![
-                serde_json::to_string(ids)?,
-                ITEMS_TAG,
-                ITEMS_UNTAG,
-                RETAG,
-                serde_json::to_string(folders)?
-            ],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-        )?
+        .query_map(params![ids, ITEMS_TAG, ITEMS_UNTAG, RETAG, folders], |r| {
+            Ok((r.get(0)?, r.get(1)?, r.get(2)?))
+        })?
         .collect::<rusqlite::Result<_>>()?;
+    let mut rewrite =
+        conn.prepare_cached("UPDATE journal SET forward = ?2, inverse = ?2 WHERE id = ?1")?;
+    let mut remove = conn.prepare_cached("DELETE FROM journal WHERE id = ?1")?;
+    let mut rewritten = Vec::new();
     for (row, op, inverse) in several {
         let left = match op.as_str() {
             ITEMS_TAG => {
@@ -790,13 +788,23 @@ fn leave_several(conn: &Connection, ids: &[i64], folders: &[i64]) -> Result<()> 
             }
         };
         match left.transpose()? {
-            Some(json) => conn.execute(
-                "UPDATE journal SET forward = ?2, inverse = ?2 WHERE id = ?1",
-                params![row, json],
-            )?,
-            None => conn.execute("DELETE FROM journal WHERE id = ?1", params![row])?,
-        };
+            Some(json) => {
+                rewrite.execute(params![row, json])?;
+                rewritten.push(row);
+            }
+            None => {
+                remove.execute(params![row])?;
+            }
+        }
     }
+    // No trigger follows a rewrite of `inverse`: the subjects it took out go here.
+    conn.execute(
+        "DELETE FROM journal_subject
+          WHERE entry_id IN (SELECT value FROM json_each(?1))
+            AND (item_id IN (SELECT value FROM json_each(?2))
+                 OR folder_id IN (SELECT value FROM json_each(?3)))",
+        params![serde_json::to_string(&rewritten)?, ids, folders],
+    )?;
     Ok(())
 }
 
@@ -974,6 +982,7 @@ mod tests {
         assert_eq!(retagged.item_uses, [using(6)]);
         let marks: Vec<Option<Gone>> = batch(&conn, &renamed).unwrap().iter().map(gone).collect();
         assert_eq!(marks, [None, Some(pyramid)]);
+        assert_subjects_whole(&conn);
     }
 
     #[test]
@@ -1086,6 +1095,7 @@ mod tests {
             marks,
             [removed(7, "sphinx.jpg"), None, removed(5, "pyramid.jpg")]
         );
+        assert_subjects_whole(&conn);
     }
 
     #[test]
@@ -1211,6 +1221,7 @@ mod tests {
             }),
             "removing its own source too says so, and keeps the places named before"
         );
+        assert_subjects_whole(&conn);
     }
 
     fn about(conn: &Connection, column: &str, id: i64) -> Vec<String> {
@@ -1223,6 +1234,46 @@ mod tests {
         .unwrap()
         .collect::<rusqlite::Result<_>>()
         .unwrap()
+    }
+
+    /// Every subject read again from the journal as it stands, beside the ones kept.
+    fn assert_subjects_whole(conn: &Connection) {
+        let read = |sql: &str| -> Vec<(i64, Option<i64>, Option<i64>)> {
+            conn.prepare(sql)
+                .unwrap()
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+                .unwrap()
+                .collect::<rusqlite::Result<_>>()
+                .unwrap()
+        };
+        let kept = read(
+            "SELECT entry_id, item_id, folder_id FROM journal_subject
+              ORDER BY entry_id, item_id, folder_id",
+        );
+        let derived = read(&format!(
+            "SELECT * FROM (
+                 SELECT j.id, json_extract(j.inverse, '$.itemId') AS item, NULL AS folder
+                   FROM journal j WHERE j.op IN ({one_file})
+               UNION ALL
+                 SELECT j.id, NULL, json_extract(j.inverse, '$.folderId')
+                   FROM journal j WHERE j.op IN ({one_folder})
+               UNION ALL
+                 SELECT j.id, e.value, NULL FROM journal j, json_each(j.inverse, '$.itemIds') e
+                  WHERE j.op = 'items_tag'
+               UNION ALL
+                 SELECT j.id, json_extract(e.value, '$.itemId'), NULL
+                   FROM journal j, json_each(j.inverse, '$.items') e WHERE j.op = 'items_untag'
+               UNION ALL
+                 SELECT j.id, json_extract(e.value, '$.itemId'), NULL
+                   FROM journal j, json_each(j.inverse, '$.itemUses') e WHERE j.op = 'retag'
+               UNION ALL
+                 SELECT j.id, NULL, json_extract(e.value, '$.folderId')
+                   FROM journal j, json_each(j.inverse, '$.folderUses') e WHERE j.op = 'retag'
+             ) ORDER BY 1, 2, 3",
+            one_file = quoted(&ONE_FILE),
+            one_folder = quoted(&ONE_FOLDER),
+        ));
+        assert_eq!(kept, derived);
     }
 
     #[test]
@@ -1287,6 +1338,7 @@ mod tests {
             drop_entry(&conn, entry.id).unwrap();
         }
         assert_eq!(about(&conn, "item_id", 5), [ITEMS_TAG]);
+        assert_subjects_whole(&conn);
         let orphaned: i64 = conn
             .query_row(
                 "SELECT COUNT(*) FROM journal_subject
@@ -1359,6 +1411,7 @@ mod tests {
         for id in [1, 2, 3] {
             assert!(about(&conn, "item_id", id).is_empty(), "{id}");
         }
+        assert_subjects_whole(&conn);
     }
 
     #[test]

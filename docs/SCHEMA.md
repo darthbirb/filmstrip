@@ -31,7 +31,7 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 | `item_effective_tag` | Everything an item carries once inheritance is resolved. |
 | `setting` | Key-value pairs: `undo_floor`, the newest journal row a restore kept; `recycling`, each send to the Recycle Bin that has not settled: the library file, its item and act, and once its second name is made the file's identity and names, until the send is recorded or a launch settles it. |
 | `journal` | Every change the app made on disk, and every set tagged at once, with what reverses it, grouped into batches. |
-| `journal_subject` | Each file and folder a `journal` row is about, one row each, kept by triggers on `journal`. |
+| `journal_subject` | Each file and folder a `journal` row is about, one row each, written and removed with it by triggers on `journal`. |
 | `job` | Background work: waiting, running, or failed with its error. |
 | `destination_key` | A digit, `0` to `9`, bound to a folder that a press moves files into. |
 | `item_fts` | Each item's name and every tag it carries, tokenised for a bare word. |
@@ -172,8 +172,10 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   several as above, so an undo passes over it to the act before. A `folder_delete` row left alone in its
   batch by the last of them is deleted too; one whose batch never held a file stays.
 - Migration 14 added `journal_subject` and filled it from every row already written. Triggers on
-  `journal` keep it: a row inserted gains one subject per file or folder it is about, one whose
-  `op` or `inverse` is updated has them read again, and one deleted takes them with it. A row
+  `journal` keep it: a row inserted gains one subject per file or folder it is about, and one
+  deleted takes them with it. No trigger follows an update: marking a row `gone` leaves its
+  subjects as they are, and taking ids out of a row about several deletes their subjects in the
+  same statements (`journal::leave_several`). A row
   about one file names it by `itemId`, one about one folder by `folderId`; `items_tag` names
   each of `itemIds`, `items_untag` each `itemId` of `items`, and `retag` each `itemId` of
   `itemUses` and each `folderId` of `folderUses`. The folders a row names only as a place, a

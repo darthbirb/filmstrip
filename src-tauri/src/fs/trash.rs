@@ -2,6 +2,7 @@
 //! back. Sending one there is journalled, so it can be undone.
 //! DECISIONS.md "The Trash is the Recycle Bin".
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
@@ -245,20 +246,58 @@ pub(super) enum Found {
 /// Looks for a trashed item's file by the file itself: in the bin where it went, or back where it
 /// came from. One the bin has no record of is gone, as a file the app's own trash folder held is.
 pub(super) fn find(conn: &Connection, item_id: i64, file: &ItemFile) -> Result<Found> {
-    let Some((binned, itself)) = items::binned(conn, item_id)? else {
-        return Ok(Found::Gone);
-    };
-    let binned = PathBuf::from(binned);
-    if recycle::file_at(&binned).as_deref() == Some(itself.as_str()) {
-        return Ok(Found::Bin(binned));
-    }
-    let home = paths::item_path(conn, file.folder_id, &file.disk_name)?;
-    if recycle::file_at(&home).as_deref() == Some(itself.as_str()) {
-        return Ok(Found::Back);
-    }
-    match recycle::volume_serial(&binned) {
-        Some(volume) if volume == recycle::serial_of(&itself) => Ok(Found::Gone),
-        _ => Ok(Found::Away),
+    find_in(conn, items::binned(conn, item_id)?, file)
+}
+
+/// As [`find`], for a file whose place in the bin was already read.
+pub(super) fn find_in(
+    conn: &Connection,
+    binned: Option<(String, String)>,
+    file: &ItemFile,
+) -> Result<Found> {
+    Looking::default().find(conn, binned, file)
+}
+
+/// What a look at many trashed files reads once rather than per file: each folder's directory and
+/// each bin directory's volume.
+#[derive(Default)]
+struct Looking {
+    dirs: HashMap<i64, PathBuf>,
+    volumes: HashMap<PathBuf, Option<String>>,
+}
+
+impl Looking {
+    fn find(
+        &mut self,
+        conn: &Connection,
+        binned: Option<(String, String)>,
+        file: &ItemFile,
+    ) -> Result<Found> {
+        let Some((binned, itself)) = binned else {
+            return Ok(Found::Gone);
+        };
+        let binned = PathBuf::from(binned);
+        if recycle::file_at(&binned).as_deref() == Some(itself.as_str()) {
+            return Ok(Found::Bin(binned));
+        }
+        let dir = match self.dirs.get(&file.folder_id) {
+            Some(dir) => dir,
+            None => {
+                let dir = paths::folder_dir(conn, file.folder_id)?;
+                self.dirs.entry(file.folder_id).or_insert(dir)
+            }
+        };
+        if recycle::file_at(&dir.join(&file.disk_name)).as_deref() == Some(itself.as_str()) {
+            return Ok(Found::Back);
+        }
+        let volume = self
+            .volumes
+            .entry(binned.parent().map(Path::to_path_buf).unwrap_or_default())
+            .or_insert_with(|| recycle::volume_serial(&binned));
+        match volume {
+            Some(volume) if volume == recycle::serial_of(&itself) => Ok(Found::Gone),
+            _ => Ok(Found::Away),
+        }
     }
 }
 
@@ -285,13 +324,9 @@ pub(super) fn leave(conn: &Connection, id: i64) -> Result<()> {
 }
 
 /// Takes many files gone from the Recycle Bin out of the Trash and the journal at once.
-fn leave_all(conn: &Connection, ids: &[i64]) -> Result<()> {
+pub(super) fn leave_all(conn: &Connection, ids: &[i64]) -> Result<()> {
     journal::drop_items(conn, ids)?;
-    let at = now();
-    for &id in ids {
-        items::retire_trashed(conn, id, at)?;
-    }
-    Ok(())
+    items::retire_all_trashed(conn, ids, now())
 }
 
 /// What looking in the Recycle Bin found: rows retired for files emptied from it outside the app,
@@ -308,12 +343,14 @@ pub struct Looked {
 /// back at its path, it is restored. Only what changed is looked at again, under the disk's turn.
 /// DECISIONS.md "The Trash is the Recycle Bin".
 pub fn look_in_bin(conn: &Connection) -> Result<Looked> {
+    let mut looking = Looking::default();
     let mut changed = Vec::new();
-    for (row, _) in items::in_trash(conn)? {
-        if let Some(file) = items::file_of(conn, row.id)?
-            && matches!(find(conn, row.id, &file)?, Found::Gone | Found::Back)
-        {
-            changed.push(row.id);
+    for one in items::in_bin(conn, None)? {
+        if matches!(
+            looking.find(conn, one.binned, &one.file)?,
+            Found::Gone | Found::Back
+        ) {
+            changed.push(one.id);
         }
     }
     if changed.is_empty() {
@@ -324,18 +361,13 @@ pub fn look_in_bin(conn: &Connection) -> Result<Looked> {
         then();
     }
     let _turn = super::turn();
+    let mut looking = Looking::default();
     let (mut gone, mut back) = (Vec::new(), Vec::new());
-    for id in changed {
-        if !items::is_trashed(conn, id)? {
-            continue;
-        }
-        let Some(file) = items::file_of(conn, id)? else {
-            continue;
-        };
-        match find(conn, id, &file)? {
+    for one in items::in_bin(conn, Some(&changed))? {
+        match looking.find(conn, one.binned, &one.file)? {
             Found::Bin(_) | Found::Away => {}
-            Found::Gone => gone.push(id),
-            Found::Back => back.push((id, file)),
+            Found::Gone => gone.push(one.id),
+            Found::Back => back.push((one.id, one.file)),
         }
     }
     if !gone.is_empty() {

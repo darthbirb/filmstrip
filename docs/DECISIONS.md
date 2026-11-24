@@ -1187,8 +1187,13 @@ it.
 - **The journal is found by what it is about, never read whole** (#220). Each row's files and
   folders are kept in `journal_subject` beside it, indexed, so letting go of a file emptied from
   the bin reads the few rows about it, not every row's JSON: emptying 10,000 files against a
-  journal of 200,000 rows was 10,000 scans of all of it inside the disk's turn. Triggers keep the
-  table, so no path that writes, rewrites or drops a row can leave it behind. The bounds, each
+  journal of 200,000 rows was 10,000 scans of all of it inside the disk's turn. Triggers add a
+  row's subjects as it is written and take them as it goes, so no path that writes or drops a row
+  can leave them behind. An update has no trigger: rewriting every subject of thousands of tag rows
+  to take one file out of each cost more than the rest of letting go together, so the one rewrite
+  that takes files out of rows deletes just their subjects. The look and Empty Trash… read each
+  folder's directory and each bin's volume once, not per file, and Empty Trash… lets go of what it
+  deleted 200 files to a transaction, under the turn of the last of them. The bounds, each
   with its timing test against a journal of 200,000 rows: 10,000 files let go of the journal at
   once well inside a second; a look in the bin that finds 10,000 emptied inside five seconds;
   Empty Trash… of 10,000 inside ten, one turn of the disk per file as it always was.
@@ -1580,7 +1585,9 @@ the way back; a single file is never purged from the app, as Explorer's bin can 
   Trash… asks again for what is left.
 - **The row retires and the journal lets it go.** A deleted file's row retires where it was, as
   the Trash retires one emptied outside the app, and every journal row about it alone goes in the
-  same transaction, its id leaving every row about several (SCHEMA.md "The undo journal"). Nothing
+  same transaction, its id leaving every row about several (SCHEMA.md "The undo journal"). The
+  rows of up to 200 deleted files go in one transaction, under the disk's turn, once the last of
+  them is deleted, each only while it is still in the Trash under the name it was deleted from. Nothing
   of the act is journalled, so Ctrl+Z skips the emptied files and undoes the act before them; an
   earlier move or rename of a file now gone never sticks an undo. A folder deleted with its files
   goes from the journal with the last of them, so Ctrl+Z never makes it again empty; one deleted

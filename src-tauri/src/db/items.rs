@@ -428,7 +428,12 @@ pub fn forget(conn: &Connection, id: i64, why: Forgot) -> Result<()> {
 /// Takes a trashed item out of the Trash for good, its file gone from the Recycle Bin: retired
 /// where it was, keeping its tags and its name, or forgotten where another row has that name now.
 pub fn retire_trashed(conn: &Connection, id: i64, at: i64) -> Result<()> {
-    let retired = conn.execute(
+    retire_all_trashed(conn, &[id], at)
+}
+
+/// As [`retire_trashed`], for many items, one at a time in order and indexed for search at once.
+pub fn retire_all_trashed(conn: &Connection, ids: &[i64], at: i64) -> Result<()> {
+    let mut retire = conn.prepare_cached(
         "UPDATE item SET trashed_at = NULL, bin_path = NULL, bin_file = NULL,
                          deleted_at = COALESCE(deleted_at, ?2)
           WHERE id = ?1
@@ -437,12 +442,62 @@ pub fn retire_trashed(conn: &Connection, id: i64, at: i64) -> Result<()> {
                  WHERE other.folder_id = item.folder_id AND other.id <> item.id
                    AND other.disk_name = item.disk_name COLLATE NAME_FOLD
                    AND other.trashed_at IS NULL)",
-        params![id, at],
     )?;
-    if retired == 0 {
-        return forget(conn, id, Forgot::EmptiedFromBin);
+    let mut retired = Vec::with_capacity(ids.len());
+    for &id in ids {
+        if retire.execute(params![id, at])? == 0 {
+            forget(conn, id, Forgot::EmptiedFromBin)?;
+        } else {
+            retired.push(id);
+        }
     }
-    crate::db::search::index_item(conn, id)
+    crate::db::search::index_items(conn, &retired)
+}
+
+/// A trashed item's file, and where the bin keeps it when that is recorded, as [`binned`] reads it.
+pub struct InBin {
+    pub id: i64,
+    pub file: ItemFile,
+    pub binned: Option<(String, String)>,
+    pub size_bytes: i64,
+}
+
+/// Every trashed item, or only those of `ids` still trashed, read at once.
+pub fn in_bin(conn: &Connection, ids: Option<&[i64]>) -> Result<Vec<InBin>> {
+    const COLUMNS: &str =
+        "id, folder_id, disk_name, uuid, kind, duration_ms, bin_path, bin_file, size_bytes";
+    let mut stmt = match ids {
+        None => conn.prepare_cached(&format!(
+            "SELECT {COLUMNS} FROM item WHERE trashed_at IS NOT NULL"
+        ))?,
+        Some(_) => conn.prepare_cached(&format!(
+            "SELECT {COLUMNS} FROM item
+              WHERE id IN (SELECT value FROM json_each(?1)) AND trashed_at IS NOT NULL"
+        ))?,
+    };
+    let ids = ids.map(serde_json::to_string).transpose()?;
+    let rows = stmt
+        .query_map(rusqlite::params_from_iter(ids), |r| {
+            let file = ItemFile {
+                folder_id: r.get(1)?,
+                disk_name: r.get(2)?,
+                uuid: r.get(3)?,
+                kind: r.get(4)?,
+                duration_ms: r.get(5)?,
+            };
+            let binned = match (r.get(6)?, r.get(7)?) {
+                (Some(path), Some(itself)) => Some((path, itself)),
+                _ => None,
+            };
+            Ok(InBin {
+                id: r.get(0)?,
+                file,
+                binned,
+                size_bytes: r.get(8)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(rows)
 }
 
 /// Retires an item whose file is gone. It keeps its name, so the file coming back is the same item.

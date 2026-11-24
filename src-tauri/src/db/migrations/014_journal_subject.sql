@@ -1,8 +1,9 @@
 -- Never edited once shipped; later changes are new numbered files.
 -- docs/SCHEMA.md "The undo journal" describes this table and the rules it keeps.
 
--- Each file and folder a journal row names as what it is about, one row each, kept by the
--- triggers below from the row's `inverse`.
+-- Each file and folder a journal row names as what it is about, one row each, written and
+-- removed with the row by the triggers below. A rewrite of `inverse` that takes a file or folder
+-- out of a row deletes its subject here itself.
 CREATE TABLE journal_subject (
   entry_id  INTEGER NOT NULL,
   item_id   INTEGER,
@@ -40,33 +41,6 @@ END;
 
 CREATE TRIGGER journal_subject_delete AFTER DELETE ON journal BEGIN
   DELETE FROM journal_subject WHERE entry_id = OLD.id;
-END;
-
-CREATE TRIGGER journal_subject_update AFTER UPDATE OF op, inverse ON journal BEGIN
-  DELETE FROM journal_subject WHERE entry_id = OLD.id;
-  INSERT INTO journal_subject (entry_id, item_id, folder_id)
-  SELECT NEW.id, s.item_id, s.folder_id FROM (
-      SELECT json_extract(NEW.inverse, '$.itemId') AS item_id, NULL AS folder_id
-       WHERE NEW.op IN ('item_move', 'item_trash', 'item_rename', 'item_restore', 'item_copy')
-    UNION ALL
-      SELECT NULL, json_extract(NEW.inverse, '$.folderId')
-       WHERE NEW.op IN ('folder_create', 'folder_rename', 'folder_move', 'folder_delete',
-                        'folder_copy')
-    UNION ALL
-      SELECT e.value, NULL FROM json_each(NEW.inverse, '$.itemIds') e
-       WHERE NEW.op = 'items_tag'
-    UNION ALL
-      SELECT json_extract(e.value, '$.itemId'), NULL FROM json_each(NEW.inverse, '$.items') e
-       WHERE NEW.op = 'items_untag'
-    UNION ALL
-      SELECT json_extract(e.value, '$.itemId'), NULL FROM json_each(NEW.inverse, '$.itemUses') e
-       WHERE NEW.op = 'retag'
-    UNION ALL
-      SELECT NULL, json_extract(e.value, '$.folderId')
-        FROM json_each(NEW.inverse, '$.folderUses') e
-       WHERE NEW.op = 'retag'
-  ) s
-  WHERE s.item_id IS NOT NULL OR s.folder_id IS NOT NULL;
 END;
 
 INSERT INTO journal_subject (entry_id, item_id, folder_id)
