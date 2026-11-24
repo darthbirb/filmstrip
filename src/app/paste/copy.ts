@@ -9,8 +9,9 @@ import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import type { Stayed } from "../../ipc/bindings/Stayed";
 import { dropFiles, pasteFiles } from "../../ipc/commands";
 import type { MenuAnchor } from "../../ui/Menu";
-import { libraryChanged } from "../library";
+import { libraryChanged, RELOAD_WINDOW_MS } from "../library";
 import { type FootNews, sayOnce, setNews } from "../navigation/foot-slot";
+import { refreshIndex } from "../navigation/index-store";
 import { actLine, copiedBannerLine, copyCancelledLine, reasonText } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
@@ -121,17 +122,22 @@ export async function afterCopied(copied: Copied) {
 }
 
 /**
- * Follows each copy and each move between drives: the grid reads its folder again as files land,
- * and hears how a copy ended.
+ * Follows each copy and each move between drives: navigation counts again at most once a window
+ * as files land, and hears how a copy ended. The grid follows the same reports itself.
  */
 export async function watchCopies() {
   const seen = new Map<number, number>();
+  let recount: ReturnType<typeof setTimeout> | undefined;
   await listen<Progress>("job-progress", ({ payload }) => {
     const lines = [...payload.copies, ...payload.moves];
     const moved = lines.some((one) => seen.get(one.jobId) !== one.done);
     seen.clear();
     for (const one of lines) seen.set(one.jobId, one.done);
-    if (moved) void libraryChanged();
+    if (moved && recount === undefined)
+      recount = setTimeout(() => {
+        recount = undefined;
+        void refreshIndex().catch(() => undefined);
+      }, RELOAD_WINDOW_MS);
   }).catch(() => undefined);
   await listen<Copied>("copy-done", ({ payload }) => void afterCopied(payload)).catch(
     () => undefined,

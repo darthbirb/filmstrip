@@ -5,13 +5,10 @@ import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import type { Progress } from "../../ipc/bindings/Progress";
 import { itemsDetail } from "../../ipc/commands";
-import { whenLibraryChanges } from "../library";
+import { RELOAD_WINDOW_MS, whenLibraryChanges } from "../library";
 import { type Place, placeKey } from "../place";
 import { placeItems } from "./place-items";
 import { useSort } from "./sort";
-
-/** The longest background work keeps a place waiting to be read again. DECISIONS.md "The grid". */
-export const RELOAD_WINDOW_MS = 1000;
 
 /** What making a thumbnail changes on a row. */
 type Patch = Pick<ItemRow, "thumb" | "scrub" | "width" | "height" | "durationMs">;
@@ -44,6 +41,7 @@ export function useGridItems(place: Place | null) {
     let newestListing = 0;
     let landedListing = 0;
     const pending = new Map<number, { at: number; patch: Patch }>();
+    let listed = new Set<number>();
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     const load = () => {
@@ -54,6 +52,7 @@ export function useGridItems(place: Place | null) {
       const land = (rows: ItemRow[]) => {
         if (!live || at !== newestListing) return;
         landedListing = at;
+        listed = new Set(rows.map((row) => row.id));
         const later = new Map<number, Patch>();
         for (const [id, held] of pending) if (held.at > at) later.set(id, held.patch);
         pending.clear();
@@ -66,7 +65,10 @@ export function useGridItems(place: Place | null) {
       if (timer === undefined) timer = setTimeout(load, RELOAD_WINDOW_MS);
     };
 
-    const refresh = (ids: number[]) => {
+    const refresh = (made: number[]) => {
+      const settled = newestListing === landedListing;
+      const ids = settled ? made.filter((id) => listed.has(id)) : made;
+      if (ids.length === 0) return;
       const at = ++asked;
       itemsDetail(ids).then(
         (details) => {
@@ -104,7 +106,7 @@ export function useGridItems(place: Place | null) {
  * Whether a report says files may have come, gone or moved: a walk under way or just ended, a
  * copy or a move moving on, or the queue starting or settling. Thumbnails alone never do.
  */
-export function mayHaveMoved(now: Progress | null | undefined, before: Progress | null) {
+function mayHaveMoved(now: Progress | null | undefined, before: Progress | null) {
   if (!now) return true;
   if (now.phase === "walking") return true;
   if (!before) return now.copies.length > 0 || now.moves.length > 0;

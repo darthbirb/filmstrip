@@ -441,8 +441,9 @@ had. Each report names the items whose thumbnails or scrub frames were made sinc
 the grid reads only those and lays what changed over their tiles. A report reads the whole place
 again only when files may have come, gone or moved: while a walk runs or after one ends, as a
 copy or a move goes on, and when the queue starts or settles. Those reads wait out a window of a
-second, so however often the reports come, the place is read at most once in it; an act of the
-app's own still reads at once. A patched tile keeps its place, even when the capture date its
+second, so however often the reports come, the place is read at most once in it, and
+navigation counts a copy's or a move's files again on a window of its own; an act of the app's
+own, a copy or a move ending among them, still reads at once. A patched tile keeps its place, even when the capture date its
 thumbnail read would sort it elsewhere, until the queue settles and the place is read again,
 so the grid does not reshuffle under the pointer while thumbnails arrive.
 
@@ -452,7 +453,8 @@ the last listing that landed is dropped too; one asked after a listing still on 
 over that listing when it lands.
 
 **Whether a thumbnail is made is read from the index**, never from the disk: `item.thumbed` and
-`item.scrubbed`, set by the job that makes each and checked against the cache by every walk, so
+`item.scrubbed`, set by the job that makes each and checked against the cache by every walk,
+for videos too while ffmpeg is missing, so
 listing a place does not look for 40,000 files twice over.
 
 **Empty is several different facts, and each says its own**, drawn on 15 September 2026 and built

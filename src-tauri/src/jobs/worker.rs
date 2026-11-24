@@ -400,9 +400,9 @@ fn walked_once(inner: &QueueInner) {
 
 /// Every picture, and every video once ffmpeg is at hand, not yet read or missing its thumbnail;
 /// and every video read since, with its thumbnail, still missing its scrub frames. The index is
-/// told what the cache holds of each.
+/// told what the cache holds of every picture and video, ffmpeg or not.
 fn queue_thumbs(inner: &QueueInner, conn: &mut Connection) -> Result<()> {
-    let media = items::live_media(conn, inner.ffmpeg.is_some())?;
+    let media = items::live_media(conn, true)?;
     let tx = db::begin(conn)?;
     for one in media {
         let cached = |rel: String| inner.thumbs.join(rel).is_file();
@@ -413,6 +413,9 @@ fn queue_thumbs(inner: &QueueInner, conn: &mut Connection) -> Result<()> {
         }
         if scrubbed != one.scrubbed {
             items::set_scrubbed(&tx, one.id, scrubbed)?;
+        }
+        if one.video && inner.ffmpeg.is_none() {
+            continue;
         }
         if !one.read || !thumbed {
             enqueue_thumb(&tx, one.id)?;
@@ -651,6 +654,40 @@ mod tests {
             (false, false),
             "its cache was cleared"
         );
+    }
+
+    #[test]
+    fn without_ffmpeg_a_walk_still_tells_the_index_what_the_cache_holds_of_each_video() {
+        let dir = scratch("walk-records-cache-no-ffmpeg");
+        let inner = QueueInner::new(
+            dir.join("library.db"),
+            dir.join("thumbs"),
+            None,
+            Box::new(|_| {}),
+            Box::new(|_| {}),
+            Box::new(|_| {}),
+            Box::new(|_| {}),
+        );
+        let (mut conn, ids) = library(&dir, &["lost.mp4", "kept.mp4"]);
+        let [(lost, _), (kept, kept_uuid)] = ids.as_slice() else {
+            unreachable!()
+        };
+        for id in [lost, kept] {
+            items::record_media(&conn, *id, &length(Some(12_000))).unwrap();
+        }
+        items::set_thumbed(&conn, *lost, true).unwrap();
+        items::set_scrubbed(&conn, *lost, true).unwrap();
+        made(&inner, paths::thumb_rel(kept_uuid));
+        made(&inner, paths::frames_rel(kept_uuid));
+
+        queue_thumbs(&inner, &mut conn).unwrap();
+        assert_eq!(
+            cached(&conn, *lost),
+            (false, false),
+            "its cache was cleared"
+        );
+        assert_eq!(cached(&conn, *kept), (true, true));
+        assert!(queued(&conn).is_empty(), "videos wait for ffmpeg");
     }
 
     #[test]

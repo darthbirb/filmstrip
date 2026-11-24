@@ -914,6 +914,7 @@ pub struct LiveMedia {
     pub id: i64,
     pub uuid: String,
     pub read: bool,
+    pub video: bool,
     /// A video with a length, which gets scrub frames.
     pub scrubs: bool,
     pub thumbed: bool,
@@ -923,8 +924,8 @@ pub struct LiveMedia {
 /// Every live picture, and every live video too when `videos` is set.
 pub fn live_media(conn: &Connection, videos: bool) -> Result<Vec<LiveMedia>> {
     let mut stmt = conn.prepare(
-        "SELECT id, uuid, probed_at IS NOT NULL, kind = 'video' AND COALESCE(duration_ms, 0) > 0,
-                thumbed, scrubbed
+        "SELECT id, uuid, probed_at IS NOT NULL, kind = 'video',
+                kind = 'video' AND COALESCE(duration_ms, 0) > 0, thumbed, scrubbed
            FROM item
           WHERE deleted_at IS NULL AND (kind = 'image' OR (?1 AND kind = 'video'))
           ORDER BY id",
@@ -935,9 +936,10 @@ pub fn live_media(conn: &Connection, videos: bool) -> Result<Vec<LiveMedia>> {
                 id: r.get(0)?,
                 uuid: r.get(1)?,
                 read: r.get(2)?,
-                scrubs: r.get(3)?,
-                thumbed: r.get(4)?,
-                scrubbed: r.get(5)?,
+                video: r.get(3)?,
+                scrubs: r.get(4)?,
+                thumbed: r.get(5)?,
+                scrubbed: r.get(6)?,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;

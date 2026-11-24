@@ -7,13 +7,13 @@ import { render } from "vitest-browser-react";
 import { withoutGlyphs } from "../../dev/words";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import type { Progress } from "../../ipc/bindings/Progress";
-import { libraryChanged } from "../library";
+import { libraryChanged, RELOAD_WINDOW_MS } from "../library";
 import { getFullScreen, setFullScreen } from "../pane/full-screen";
 import { getPaneItem, showInPane } from "../pane/pane-store";
+import { watchCopies } from "../paste/copy";
 import { setPlace } from "../place";
 import { updatePreferences } from "../preferences";
 import { Grid } from "./Grid";
-import { RELOAD_WINDOW_MS } from "./useGridItems";
 
 const SHAPES = [
   [900, 600],
@@ -253,6 +253,62 @@ test("a walk under way reads the place again at most once a window, however ofte
     if (n > 0) expect(at - (reads[n - 1] ?? 0)).toBeGreaterThanOrEqual(RELOAD_WINDOW_MS - 20);
 });
 
+test("a copy landing files reads the place again at most once a window", async () => {
+  const listed: number[] = [];
+  mockIPC(
+    (cmd) => {
+      if (cmd !== "folder_items") return undefined;
+      listed.push(performance.now());
+      return rows(4);
+    },
+    { shouldMockEvents: true },
+  );
+  await watchCopies();
+  await renderGrid("justified");
+  await expect.poll(() => listed.length).toBe(1);
+
+  for (let done = 1; done <= 20; done++) {
+    const copies = [{ jobId: 7, folderId: 1, to: "Pictures", done, whole: 40 }];
+    await emit("job-progress", { ...QUIET, copies });
+    await pause(RELOAD_WINDOW_MS / 10);
+  }
+  await expect.poll(() => listed.length, { timeout: RELOAD_WINDOW_MS * 2 }).toBeGreaterThan(1);
+  await pause(RELOAD_WINDOW_MS * 1.5);
+  const reads = listed.slice(1);
+  expect(reads.length).toBeLessThan(5);
+  for (const [n, at] of reads.entries())
+    if (n > 0) expect(at - (reads[n - 1] ?? 0)).toBeGreaterThanOrEqual(RELOAD_WINDOW_MS - 20);
+});
+
+test("a thumbnail patched while a listing is on its way stays when that listing lands", async () => {
+  let answer: (rows: ItemRow[]) => void = () => undefined;
+  let listings = 0;
+  mockIPC(
+    (cmd) => {
+      if (cmd === "items_detail") return [{ ...rows(4)[1], thumb: "C:/thumbs/item-1.webp" }];
+      if (cmd !== "folder_items") return undefined;
+      listings += 1;
+      if (listings === 1) return rows(4);
+      return new Promise<ItemRow[]>((resolve) => {
+        answer = resolve;
+      });
+    },
+    { shouldMockEvents: true },
+  );
+  await renderGrid("justified");
+  await expect.poll(() => tiles().length).toBe(4);
+  const picture = () => document.querySelector('[title="item-1.png"] img');
+
+  void libraryChanged();
+  await expect.poll(() => listings).toBe(2);
+  await emit("job-progress", { ...QUIET, thumbed: [2] });
+  await expect.poll(picture).not.toBeNull();
+
+  answer(rows(4));
+  for (let frame = 0; frame < 3; frame++) await new Promise(requestAnimationFrame);
+  expect(picture()).not.toBeNull();
+});
+
 test("thumbnails made patch their tiles, and nothing else is read again", async () => {
   const sent: string[] = [];
   const asked: unknown[] = [];
@@ -277,7 +333,7 @@ test("thumbnails made patch their tiles, and nothing else is read again", async 
     await emit("job-progress", { ...QUIET, completed: tick, thumbed: tick === 1 ? [2, 9] : [] });
   await expect.poll(picture).not.toBeNull();
   expect(document.querySelectorAll("figure img")).toHaveLength(1);
-  expect(asked).toEqual([{ itemIds: [2, 9] }]);
+  expect(asked, "only the ids this place shows").toEqual([{ itemIds: [2] }]);
   await pause(RELOAD_WINDOW_MS * 1.5);
   expect(sent.filter((cmd) => cmd === "folder_items")).toHaveLength(1);
 });
