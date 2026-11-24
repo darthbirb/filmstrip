@@ -369,27 +369,97 @@ pub fn rebuild_item(conn: &Connection, item_id: i64) -> Result<()> {
     search::index_item(conn, item_id)
 }
 
-/// Recomputes every live item at or below a folder — what a folder's tags
-/// changing means for the items under it.
+/// Recomputes every live item at or below a folder — what a folder's tags changing means for the
+/// items under it — as `rebuild_item` resolves one, in one pass for the whole subtree: each
+/// folder's ancestry once, then only the rows that differ from it are taken away or added.
 pub fn rebuild_subtree(conn: &Connection, folder_id: i64) -> Result<()> {
-    let mut stmt = conn.prepare(
-        "WITH RECURSIVE subtree(id) AS (
-             SELECT ?1
-           UNION ALL
-             SELECT f.id FROM folder f JOIN subtree s ON f.parent_id = s.id
-         )
-         SELECT i.id FROM item i JOIN subtree s ON i.folder_id = s.id
-          WHERE i.deleted_at IS NULL",
-    )?;
-    let ids: Vec<i64> = stmt
-        .query_map(params![folder_id], |r| r.get(0))?
-        .collect::<rusqlite::Result<_>>()?;
-    drop(stmt);
-
-    for id in ids {
-        rebuild_item(conn, id)?;
-    }
-    Ok(())
+    atomically(conn, || {
+        let ids: Vec<i64> = {
+            let mut stmt = conn.prepare(
+                "WITH RECURSIVE subtree(id) AS (
+                     SELECT ?1
+                   UNION ALL
+                     SELECT f.id FROM folder f JOIN subtree s ON f.parent_id = s.id
+                 )
+                 SELECT i.id FROM item i JOIN subtree s ON i.folder_id = s.id
+                  WHERE i.deleted_at IS NULL",
+            )?;
+            stmt.query_map(params![folder_id], |r| r.get(0))?
+                .collect::<rusqlite::Result<_>>()?
+        };
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let items = serde_json::to_string(&ids)?;
+        conn.execute_batch(
+            "CREATE TEMP TABLE IF NOT EXISTS subtree_reach (
+               folder_id INTEGER NOT NULL,
+               tag_id    INTEGER NOT NULL,
+               origin_id INTEGER NOT NULL,
+               PRIMARY KEY (folder_id, tag_id)
+             ) WITHOUT ROWID;
+             DELETE FROM temp.subtree_reach;",
+        )?;
+        conn.execute(
+            "WITH RECURSIVE
+               subtree(id) AS (
+                   SELECT ?1
+                 UNION ALL
+                   SELECT f.id FROM folder f JOIN subtree s ON f.parent_id = s.id
+               ),
+               up(folder_id, id, depth) AS (
+                   SELECT id, id, 0 FROM subtree
+                 UNION ALL
+                   SELECT up.folder_id, f.parent_id, up.depth + 1
+                     FROM up JOIN folder f ON f.id = up.id
+                    WHERE f.parent_id IS NOT NULL
+               ),
+               held AS (
+                   SELECT up.folder_id, ft.tag_id, ft.folder_id AS origin_id,
+                          ROW_NUMBER() OVER (
+                              PARTITION BY up.folder_id,
+                                           CASE WHEN t.key IS NULL THEN 't' || t.id
+                                                ELSE 'k' || t.key END
+                              ORDER BY up.depth, ft.rowid) AS n
+                     FROM up JOIN folder_tag ft ON ft.folder_id = up.id
+                     JOIN tag t ON t.id = ft.tag_id
+               )
+             INSERT INTO temp.subtree_reach (folder_id, tag_id, origin_id)
+             SELECT folder_id, tag_id, origin_id FROM held WHERE n = 1",
+            params![folder_id],
+        )?;
+        conn.execute(
+            "DELETE FROM item_effective_tag WHERE rowid IN (
+               SELECT e.rowid FROM json_each(?1) j
+                 CROSS JOIN item i ON i.id = j.value
+                 CROSS JOIN item_effective_tag e ON e.item_id = i.id
+                 LEFT JOIN temp.subtree_reach r ON r.folder_id = i.folder_id AND r.tag_id = e.tag_id
+                WHERE CASE WHEN r.tag_id IS NULL
+                           THEN e.origin_id IS NOT NULL
+                                OR NOT EXISTS (SELECT 1 FROM item_tag it
+                                                WHERE it.item_id = e.item_id
+                                                  AND it.tag_id = e.tag_id)
+                           ELSE e.origin_id IS NOT r.origin_id END)",
+            params![items],
+        )?;
+        conn.execute(
+            "INSERT INTO item_effective_tag (item_id, tag_id, origin_id)
+             SELECT i.id, r.tag_id, r.origin_id
+               FROM temp.subtree_reach r CROSS JOIN item i ON i.folder_id = r.folder_id
+              WHERE i.deleted_at IS NULL
+                AND NOT EXISTS (SELECT 1 FROM item_effective_tag e
+                                 WHERE e.item_id = i.id AND e.tag_id = r.tag_id)",
+            [],
+        )?;
+        conn.execute(
+            "INSERT OR IGNORE INTO item_effective_tag (item_id, tag_id, origin_id)
+             SELECT item_id, tag_id, NULL FROM item_tag
+              WHERE item_id IN (SELECT value FROM json_each(?1))",
+            params![items],
+        )?;
+        conn.execute("DELETE FROM temp.subtree_reach", [])?;
+        search::index_items(conn, &ids)
+    })
 }
 
 /// A tag or a label something carries: its own, or one a folder above it holds, which says whose.
@@ -1836,5 +1906,161 @@ mod tests {
         );
         assert_eq!((report.files_back, report.stayed.len()), (1, 0));
         assert_eq!(journal::latest_batch(&conn).unwrap(), Some(added));
+    }
+
+    type Carried = (Vec<(i64, i64, Option<i64>)>, Vec<(i64, String, String)>);
+
+    fn carried_and_indexed(conn: &Connection) -> Carried {
+        let mut carried = conn
+            .prepare(
+                "SELECT item_id, tag_id, origin_id FROM item_effective_tag ORDER BY item_id, tag_id",
+            )
+            .unwrap();
+        let mut indexed = conn
+            .prepare("SELECT rowid, name, tags FROM item_fts ORDER BY rowid")
+            .unwrap();
+        (
+            carried
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+                .unwrap()
+                .collect::<rusqlite::Result<_>>()
+                .unwrap(),
+            indexed
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+                .unwrap()
+                .collect::<rusqlite::Result<_>>()
+                .unwrap(),
+        )
+    }
+
+    /// What each live file carries and is indexed by, resolved one file at a time.
+    fn one_by_one(conn: &Connection) -> Carried {
+        let live: Vec<i64> = conn
+            .prepare("SELECT id FROM item WHERE deleted_at IS NULL")
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        for id in live {
+            rebuild_item(conn, id).unwrap();
+        }
+        carried_and_indexed(conn)
+    }
+
+    #[test]
+    fn a_branch_rebuilt_at_once_carries_what_each_file_rebuilt_alone_does() {
+        let (conn, root) = library();
+        let trips = folders::create(&conn, root, "Trips").unwrap();
+        let egypt = folders::create(&conn, trips, "Egypt").unwrap();
+        let cairo = folders::create(&conn, egypt, "Cairo").unwrap();
+        let night = folders::create(&conn, root, "Night").unwrap();
+        let gone = folders::create(&conn, egypt, "Gone").unwrap();
+        add_folder_tag(&conn, trips, "travel").unwrap();
+        add_folder_tag(&conn, cairo, "travel").unwrap();
+        set_folder_label(&conn, trips, "Location", "Abroad").unwrap();
+        set_folder_label(&conn, cairo, "Season", "Winter").unwrap();
+        set_folder_label(&conn, night, "Location", "Cairo").unwrap();
+        folders::set_parent(&conn, night, cairo).unwrap();
+        item(&conn, trips, "ticket.jpg");
+        let sphinx = item(&conn, cairo, "sphinx.jpg");
+        let lamp = item(&conn, night, "lamp.jpg");
+        item(&conn, egypt, "pyramid.jpg");
+        item(&conn, gone, "lost.jpg");
+        let home = item(&conn, root, "home.jpg");
+        let trashed = item(&conn, cairo, "blurry.jpg");
+        add_item_tag(&conn, sphinx, "travel").unwrap();
+        add_item_tag(&conn, lamp, "glow").unwrap();
+        add_item_tag(&conn, home, "travel").unwrap();
+        items::send_to_trash(&conn, trashed).unwrap();
+        conn.execute("UPDATE folder SET deleted_at = 1 WHERE id = ?1", [gone])
+            .unwrap();
+
+        let travel = get_or_create_tag(&conn, None, "travel").unwrap();
+        let glow = get_or_create_tag(&conn, None, "glow").unwrap();
+        let alike = |after: &str| {
+            assert_eq!(carried_and_indexed(&conn), one_by_one(&conn), "{after}");
+        };
+        add_folder_tag(&conn, egypt, "Summer").unwrap();
+        alike("a tag added");
+        set_folder_label(&conn, cairo, "Season", "Spring").unwrap();
+        alike("a label's value changed");
+        remove_folder_tag(&conn, cairo, travel).unwrap();
+        alike("a nearer holder gone, a farther one gives it");
+        add_folder_tag(&conn, night, "glow").unwrap();
+        alike("a file's own tag now given by its folder");
+        remove_folder_tag(&conn, trips, travel).unwrap();
+        alike("a folder's tag gone, a file's own left");
+        remove_folder_tag(&conn, night, glow).unwrap();
+        alike("a folder's tag gone, the file's own back");
+        set_folder_label(&conn, trips, "Location", "Away").unwrap();
+        add_folder_tag(&conn, trips, "travel").unwrap();
+        let at_once = carried_and_indexed(&conn);
+        assert_eq!(at_once, one_by_one(&conn));
+
+        conn.execute_batch("DELETE FROM item_effective_tag; DELETE FROM item_fts;")
+            .unwrap();
+        rebuild_subtree(&conn, root).unwrap();
+        let from_nothing = carried_and_indexed(&conn);
+        assert_eq!(from_nothing, one_by_one(&conn));
+        assert!(
+            from_nothing.0.iter().all(|(id, ..)| *id != trashed),
+            "a file in the Trash is not rebuilt"
+        );
+        let live = |(carried, indexed): Carried| -> Carried {
+            (
+                carried
+                    .into_iter()
+                    .filter(|(id, ..)| *id != trashed)
+                    .collect(),
+                indexed
+                    .into_iter()
+                    .filter(|(id, ..)| *id != trashed)
+                    .collect(),
+            )
+        };
+        assert_eq!(from_nothing, live(at_once));
+    }
+
+    mod timing {
+        use super::*;
+
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn a_tag_reaches_a_hundred_thousand_files_below_a_folder_inside_five_seconds() {
+            let (conn, root) = library();
+            let trips = folders::create(&conn, root, "Trips").unwrap();
+            for year in 0..10 {
+                let parent = folders::create(&conn, trips, &format!("{}", 2010 + year)).unwrap();
+                for month in 0..10 {
+                    let folder = folders::create(&conn, parent, &format!("month {month}")).unwrap();
+                    conn.execute(
+                        "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 1000)
+                         INSERT INTO item (uuid, source_id, folder_id, disk_name, ext, size_bytes,
+                                           mtime, kind, added_at)
+                         SELECT ?1 || '-' || i, 1, ?1, 'IMG_' || i || '.jpg', 'jpg', 1, i, 'image', 1
+                           FROM n",
+                        [folder],
+                    )
+                    .unwrap();
+                }
+            }
+            rebuild_subtree(&conn, trips).unwrap();
+
+            let started = std::time::Instant::now();
+            add_folder_tag(&conn, trips, "summer").unwrap();
+            let took = started.elapsed();
+
+            let summer = get_or_create_tag(&conn, None, "summer").unwrap();
+            let carrying: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM item_effective_tag WHERE tag_id = ?1",
+                    [summer],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(carrying, 100_000);
+            assert!(took < std::time::Duration::from_secs(5), "took {took:?}");
+        }
     }
 }
