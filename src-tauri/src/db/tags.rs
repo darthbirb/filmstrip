@@ -371,29 +371,34 @@ pub fn rebuild_item(conn: &Connection, item_id: i64) -> Result<()> {
 
 /// Recomputes every live item at or below a folder — what a folder's tags changing means for the
 /// items under it — as `rebuild_item` resolves one, in one pass for the whole subtree: each
-/// folder's ancestry once, joined to the items in it.
+/// folder's ancestry once, then only the rows that differ from it are taken away or added.
 pub fn rebuild_subtree(conn: &Connection, folder_id: i64) -> Result<()> {
-    let ids: Vec<i64> = {
-        let mut stmt = conn.prepare(
-            "WITH RECURSIVE subtree(id) AS (
-                 SELECT ?1
-               UNION ALL
-                 SELECT f.id FROM folder f JOIN subtree s ON f.parent_id = s.id
-             )
-             SELECT i.id FROM item i JOIN subtree s ON i.folder_id = s.id
-              WHERE i.deleted_at IS NULL",
-        )?;
-        stmt.query_map(params![folder_id], |r| r.get(0))?
-            .collect::<rusqlite::Result<_>>()?
-    };
-    if ids.is_empty() {
-        return Ok(());
-    }
-    let items = serde_json::to_string(&ids)?;
     atomically(conn, || {
-        conn.execute(
-            "DELETE FROM item_effective_tag WHERE item_id IN (SELECT value FROM json_each(?1))",
-            params![items],
+        let ids: Vec<i64> = {
+            let mut stmt = conn.prepare(
+                "WITH RECURSIVE subtree(id) AS (
+                     SELECT ?1
+                   UNION ALL
+                     SELECT f.id FROM folder f JOIN subtree s ON f.parent_id = s.id
+                 )
+                 SELECT i.id FROM item i JOIN subtree s ON i.folder_id = s.id
+                  WHERE i.deleted_at IS NULL",
+            )?;
+            stmt.query_map(params![folder_id], |r| r.get(0))?
+                .collect::<rusqlite::Result<_>>()?
+        };
+        if ids.is_empty() {
+            return Ok(());
+        }
+        let items = serde_json::to_string(&ids)?;
+        conn.execute_batch(
+            "CREATE TEMP TABLE IF NOT EXISTS subtree_reach (
+               folder_id INTEGER NOT NULL,
+               tag_id    INTEGER NOT NULL,
+               origin_id INTEGER NOT NULL,
+               PRIMARY KEY (folder_id, tag_id)
+             ) WITHOUT ROWID;
+             DELETE FROM temp.subtree_reach;",
         )?;
         conn.execute(
             "WITH RECURSIVE
@@ -419,11 +424,32 @@ pub fn rebuild_subtree(conn: &Connection, folder_id: i64) -> Result<()> {
                      FROM up JOIN folder_tag ft ON ft.folder_id = up.id
                      JOIN tag t ON t.id = ft.tag_id
                )
-             INSERT INTO item_effective_tag (item_id, tag_id, origin_id)
-             SELECT i.id, h.tag_id, h.origin_id
-               FROM held h JOIN item i ON i.folder_id = h.folder_id
-              WHERE h.n = 1 AND i.deleted_at IS NULL",
+             INSERT INTO temp.subtree_reach (folder_id, tag_id, origin_id)
+             SELECT folder_id, tag_id, origin_id FROM held WHERE n = 1",
             params![folder_id],
+        )?;
+        conn.execute(
+            "DELETE FROM item_effective_tag WHERE rowid IN (
+               SELECT e.rowid FROM json_each(?1) j
+                 CROSS JOIN item i ON i.id = j.value
+                 CROSS JOIN item_effective_tag e ON e.item_id = i.id
+                 LEFT JOIN temp.subtree_reach r ON r.folder_id = i.folder_id AND r.tag_id = e.tag_id
+                WHERE CASE WHEN r.tag_id IS NULL
+                           THEN e.origin_id IS NOT NULL
+                                OR NOT EXISTS (SELECT 1 FROM item_tag it
+                                                WHERE it.item_id = e.item_id
+                                                  AND it.tag_id = e.tag_id)
+                           ELSE e.origin_id IS NOT r.origin_id END)",
+            params![items],
+        )?;
+        conn.execute(
+            "INSERT INTO item_effective_tag (item_id, tag_id, origin_id)
+             SELECT i.id, r.tag_id, r.origin_id
+               FROM temp.subtree_reach r CROSS JOIN item i ON i.folder_id = r.folder_id
+              WHERE i.deleted_at IS NULL
+                AND NOT EXISTS (SELECT 1 FROM item_effective_tag e
+                                 WHERE e.item_id = i.id AND e.tag_id = r.tag_id)",
+            [],
         )?;
         conn.execute(
             "INSERT OR IGNORE INTO item_effective_tag (item_id, tag_id, origin_id)
@@ -431,6 +457,7 @@ pub fn rebuild_subtree(conn: &Connection, folder_id: i64) -> Result<()> {
               WHERE item_id IN (SELECT value FROM json_each(?1))",
             params![items],
         )?;
+        conn.execute("DELETE FROM temp.subtree_reach", [])?;
         search::index_items(conn, &ids)
     })
 }
@@ -1949,9 +1976,25 @@ mod tests {
         conn.execute("UPDATE folder SET deleted_at = 1 WHERE id = ?1", [gone])
             .unwrap();
 
+        let travel = get_or_create_tag(&conn, None, "travel").unwrap();
+        let glow = get_or_create_tag(&conn, None, "glow").unwrap();
+        let alike = |after: &str| {
+            assert_eq!(carried_and_indexed(&conn), one_by_one(&conn), "{after}");
+        };
         add_folder_tag(&conn, egypt, "Summer").unwrap();
+        alike("a tag added");
         set_folder_label(&conn, cairo, "Season", "Spring").unwrap();
+        alike("a label's value changed");
+        remove_folder_tag(&conn, cairo, travel).unwrap();
+        alike("a nearer holder gone, a farther one gives it");
+        add_folder_tag(&conn, night, "glow").unwrap();
+        alike("a file's own tag now given by its folder");
+        remove_folder_tag(&conn, trips, travel).unwrap();
+        alike("a folder's tag gone, a file's own left");
+        remove_folder_tag(&conn, night, glow).unwrap();
+        alike("a folder's tag gone, the file's own back");
         set_folder_label(&conn, trips, "Location", "Away").unwrap();
+        add_folder_tag(&conn, trips, "travel").unwrap();
         let at_once = carried_and_indexed(&conn);
         assert_eq!(at_once, one_by_one(&conn));
 
