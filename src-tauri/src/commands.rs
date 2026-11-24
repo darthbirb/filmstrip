@@ -1646,16 +1646,14 @@ pub fn with_thumbnails(mut rows: Vec<ItemRow>, thumbs: &Path) -> Vec<ItemRow> {
     rows
 }
 
-/// A row's thumbnail, and a video's scrub frames, each once it has been made.
+/// A row's thumbnail, and a video's scrub frames, each once the index records it made.
 fn with_cached(row: &mut ItemRow, thumbs: &Path) {
-    row.thumb = thumb_of(&row.uuid, thumbs);
-    row.scrub = (row.kind == "video")
-        .then(|| thumbs.join(paths::frames_rel(&row.uuid)))
-        .filter(|path| path.is_file())
-        .map(|path| Scrub {
-            path: path.to_string_lossy().into_owned(),
-            frames: scrub::FRAMES,
-        });
+    let cached = |rel: String| thumbs.join(rel).to_string_lossy().into_owned();
+    row.thumb = row.thumbed.then(|| cached(paths::thumb_rel(&row.uuid)));
+    row.scrub = (row.kind == "video" && row.scrubbed).then(|| Scrub {
+        path: cached(paths::frames_rel(&row.uuid)),
+        frames: scrub::FRAMES,
+    });
 }
 
 fn thumb_of(uuid: &str, thumbs: &Path) -> Option<String> {
@@ -2415,41 +2413,8 @@ mod tests {
         assert!(coverage.own.is_empty(), "{:?}", coverage.own);
     }
 
-    #[test]
-    fn a_row_carries_its_thumbnail_only_once_one_has_been_made() {
-        let thumbs = scratch("thumbnails").join("thumbs");
-        let row = |uuid: &str| ItemRow {
-            id: 1,
-            uuid: uuid.into(),
-            folder_id: 1,
-            disk_name: "a.jpg".into(),
-            ext: "jpg".into(),
-            kind: "image".into(),
-            size_bytes: 1,
-            mtime: 0,
-            width: None,
-            height: None,
-            duration_ms: None,
-            favorite: false,
-            thumb: None,
-            scrub: None,
-        };
-        let made = thumbs.join(paths::thumb_rel("abcdef12"));
-        std::fs::create_dir_all(made.parent().unwrap()).unwrap();
-        std::fs::write(&made, "webp").unwrap();
-
-        let rows = with_thumbnails(vec![row("abcdef12"), row("99887766")], &thumbs);
-        assert_eq!(
-            rows[0].thumb.as_deref(),
-            Some(made.to_string_lossy().as_ref())
-        );
-        assert_eq!(rows[1].thumb, None);
-    }
-
-    #[test]
-    fn a_video_row_carries_its_scrub_frames_only_once_they_have_been_made() {
-        let thumbs = scratch("scrub-frames").join("thumbs");
-        let row = |uuid: &str, kind: &str| ItemRow {
+    fn cached_row(uuid: &str, kind: &str, thumbed: bool, scrubbed: bool) -> ItemRow {
+        ItemRow {
             id: 1,
             uuid: uuid.into(),
             folder_id: 1,
@@ -2464,18 +2429,45 @@ mod tests {
             favorite: false,
             thumb: None,
             scrub: None,
-        };
-        for uuid in ["abcdef12", "a1b2c3d4"] {
-            let made = thumbs.join(paths::frames_rel(uuid));
-            std::fs::create_dir_all(made.parent().unwrap()).unwrap();
-            std::fs::write(&made, "webp").unwrap();
+            thumbed,
+            scrubbed,
         }
+    }
+
+    #[test]
+    fn a_row_carries_its_thumbnail_as_the_index_records_it_without_looking_in_the_cache() {
+        let thumbs = scratch("thumbnails").join("thumbs");
+        let unrecorded = thumbs.join(paths::thumb_rel("99887766"));
+        std::fs::create_dir_all(unrecorded.parent().unwrap()).unwrap();
+        std::fs::write(&unrecorded, "webp").unwrap();
 
         let rows = with_thumbnails(
             vec![
-                row("abcdef12", "video"),
-                row("99887766", "video"),
-                row("a1b2c3d4", "image"),
+                cached_row("abcdef12", "image", true, false),
+                cached_row("99887766", "image", false, false),
+            ],
+            &thumbs,
+        );
+        let recorded = thumbs.join(paths::thumb_rel("abcdef12"));
+        assert_eq!(
+            rows[0].thumb.as_deref(),
+            Some(recorded.to_string_lossy().as_ref())
+        );
+        assert_eq!(rows[1].thumb, None);
+    }
+
+    #[test]
+    fn a_video_row_carries_its_scrub_frames_as_the_index_records_them() {
+        let thumbs = scratch("scrub-frames").join("thumbs");
+        let unrecorded = thumbs.join(paths::frames_rel("99887766"));
+        std::fs::create_dir_all(unrecorded.parent().unwrap()).unwrap();
+        std::fs::write(&unrecorded, "webp").unwrap();
+
+        let rows = with_thumbnails(
+            vec![
+                cached_row("abcdef12", "video", true, true),
+                cached_row("99887766", "video", true, false),
+                cached_row("a1b2c3d4", "image", true, true),
             ],
             &thumbs,
         );
@@ -2487,7 +2479,7 @@ mod tests {
                 frames: scrub::FRAMES,
             })
         );
-        assert_eq!(rows[1].scrub, None, "not made yet");
+        assert_eq!(rows[1].scrub, None, "not recorded yet");
         assert_eq!(rows[2].scrub, None, "only a video scrubs");
     }
 
@@ -2661,5 +2653,56 @@ mod tests {
             }
         }
         out
+    }
+
+    mod timing {
+        use super::*;
+
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn forty_thousand_in_one_folder_are_listed_with_their_thumbnails_well_inside_a_second() {
+            let base = scratch("timing-listing");
+            let library = base.join("library");
+            std::fs::create_dir_all(&library).unwrap();
+            let thumbs = base.join("thumbs");
+            let conn = conn();
+            let source = sources::add(&conn, &library, "Library", SourceKind::Library).unwrap();
+            let root: i64 = conn
+                .query_row(
+                    "SELECT id FROM folder WHERE source_id = ?1 AND parent_id IS NULL",
+                    [source.id],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            conn.execute(
+                "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 40000)
+                 INSERT INTO item (uuid, source_id, folder_id, disk_name, ext, size_bytes, mtime,
+                                   kind, added_at, duration_ms, thumbed, scrubbed)
+                 SELECT printf('%08x', i), ?1, ?2, i || '.jpg', 'jpg', 1000, i,
+                        CASE WHEN i % 10 = 0 THEN 'video' ELSE 'image' END, 1,
+                        CASE WHEN i % 10 = 0 THEN 12000 END, i % 2, i % 10 = 0
+                   FROM n",
+                rusqlite::params![source.id, root],
+            )
+            .unwrap();
+
+            let started = std::time::Instant::now();
+            let rows = with_thumbnails(
+                items::in_folder_sorted(&conn, root, &Sort::default()).unwrap(),
+                &thumbs,
+            );
+            let took = started.elapsed();
+
+            assert_eq!(rows.len(), 40_000);
+            assert_eq!(
+                rows.iter().filter(|row| row.thumb.is_some()).count(),
+                20_000
+            );
+            assert_eq!(rows.iter().filter(|row| row.scrub.is_some()).count(), 4_000);
+            assert!(
+                took < std::time::Duration::from_millis(500),
+                "took {took:?}"
+            );
+        }
     }
 }

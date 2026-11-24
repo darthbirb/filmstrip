@@ -2414,6 +2414,8 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     copies: [],
     exports: [...exporting.values()],
     moves: [...moving.values()],
+    walks: 0,
+    thumbed: [],
   }),
   index_failures: () => [],
   retry_failed_jobs: () => 0,

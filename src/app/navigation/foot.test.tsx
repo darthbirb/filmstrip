@@ -81,6 +81,8 @@ const IDLE: Progress = {
   copies: [],
   exports: [],
   moves: [],
+  walks: 0,
+  thumbed: [],
 };
 
 /** Answers as the app would, over these sources and totals. */

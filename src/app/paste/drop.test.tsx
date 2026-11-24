@@ -7,6 +7,7 @@ import { recording } from "../../dev/recording";
 import type { Progress } from "../../ipc/bindings/Progress";
 import { undoLast } from "../../ipc/commands";
 import { Grid } from "../grid/Grid";
+import { RELOAD_WINDOW_MS } from "../library";
 import { Foot } from "../navigation/Foot";
 import { setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex } from "../navigation/index-store";
@@ -217,6 +218,8 @@ test("a copy under way has its own line at the foot, and its dismiss cancels it"
     copies: [{ jobId: 7, folderId: 5, to: "People", done: 108, whole: 1200 }],
     exports: [],
     moves: [],
+    walks: 0,
+    thumbed: [],
   };
   await emit("job-progress", progress);
   await expect.element(page.getByText("Copying to People…")).toBeVisible();
@@ -231,4 +234,39 @@ test("a copy under way has its own line at the foot, and its dismiss cancels it"
   });
   await emit("job-progress", { ...progress, copies: [] });
   await expect.poll(() => document.body.textContent).not.toContain("Copying to People");
+});
+
+test("a copy's reports recount navigation once, a window after they start", async () => {
+  await renderAll();
+  const progress: Progress = {
+    phase: "working",
+    pending: 0,
+    running: 1,
+    failed: 0,
+    completed: 0,
+    copies: [],
+    exports: [],
+    moves: [],
+    walks: 0,
+    thumbed: [],
+  };
+  const copying = (done: number) => [{ jobId: 9, folderId: 5, to: "People", done, whole: 40 }];
+  const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  // The copy in the test before may still have its recount due.
+  await pause(RELOAD_WINDOW_MS);
+
+  await recording(async (calls) => {
+    const recounts = () => calls.filter(([cmd]) => cmd === "library_totals").length;
+    const started = performance.now();
+    for (let done = 1; done <= 5; done++) {
+      await emit("job-progress", { ...progress, copies: copying(done) });
+      await pause(RELOAD_WINDOW_MS / 10);
+    }
+    expect(recounts()).toBe(0);
+    await expect.poll(recounts, { timeout: RELOAD_WINDOW_MS * 2 }).toBe(1);
+    expect(performance.now() - started).toBeGreaterThanOrEqual(RELOAD_WINDOW_MS - 20);
+    await pause(RELOAD_WINDOW_MS / 2);
+    expect(recounts()).toBe(1);
+  });
+  await emit("job-progress", { ...progress, phase: "idle", running: 0 });
 });
