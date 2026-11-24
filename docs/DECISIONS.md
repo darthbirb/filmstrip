@@ -158,8 +158,8 @@ missing in one short transaction, so a library of 100,000 files never keeps an a
 100,000 lookups. A thumbnail or scrub frames already waiting are not queued again; one being made
 may have read the file before it changed, so it does not count. A source that cannot be reached
 has nothing queued, and a job whose file, or whose source, went away while it waited ends without
-a failure: the walk after the drive is back queues it again. An unplugged drive never fills the
-failure list.
+a failure: the next walk retires a file deleted meanwhile, and queues one on a drive that comes
+back. An unplugged drive, or files deleted in Explorer, never fill the failure list.
 
 **Every transaction that may write takes the write lock as it begins**, through `db::begin` or
 `db::in_transaction`, and `tags::atomically` does the same when no transaction is open. Idle

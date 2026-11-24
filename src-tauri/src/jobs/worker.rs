@@ -463,7 +463,7 @@ fn thumb(inner: &QueueInner, conn: &Connection, payload: ItemPayload) -> Result<
         return Ok(());
     };
     let made = make_thumb(inner, conn, &file);
-    let Some(learned) = unless_away(conn, payload.item_id, made)? else {
+    let Some(learned) = unless_away(conn, payload.item_id, &file, made)? else {
         return Ok(());
     };
     record(conn, payload.item_id, &file.kind, &learned)?;
@@ -484,16 +484,22 @@ fn make_thumb(inner: &QueueInner, conn: &Connection, file: &items::ItemFile) -> 
     }
 }
 
-/// A file that could not be read because it or its source went away is not a failure: the walk
-/// after it comes back queues it again.
-fn unless_away<T>(conn: &Connection, item_id: i64, made: Result<T>) -> Result<Option<T>> {
-    match made {
-        Ok(made) => Ok(Some(made)),
-        Err(err) => match items::live_root(conn, item_id)? {
-            Some(root) if Path::new(&root).is_dir() => Err(err),
-            _ => Ok(None),
-        },
-    }
+/// A file that could not be read because it or its source went away is not a failure: the next
+/// walk retires it, or queues it again once its drive is back.
+fn unless_away<T>(
+    conn: &Connection,
+    item_id: i64,
+    file: &items::ItemFile,
+    made: Result<T>,
+) -> Result<Option<T>> {
+    let err = match made {
+        Ok(made) => return Ok(Some(made)),
+        Err(err) => err,
+    };
+    let root_here = items::live_root(conn, item_id)?.is_some_and(|root| Path::new(&root).is_dir());
+    let file_here = root_here
+        && paths::item_path(conn, file.folder_id, &file.disk_name).is_ok_and(|path| path.is_file());
+    if file_here { Err(err) } else { Ok(None) }
 }
 
 /// Records what a thumbnail's read taught, and queues a video's scrub frames after it.
@@ -518,7 +524,7 @@ fn scrub(inner: &QueueInner, conn: &Connection, payload: ItemPayload) -> Result<
         let out = inner.thumbs.join(paths::frames_rel(&file.uuid));
         scrub::make(ffmpeg_of(inner)?, &source, length, &out)
     });
-    if unless_away(conn, payload.item_id, made)?.is_none() {
+    if unless_away(conn, payload.item_id, &file, made)?.is_none() {
         return Ok(());
     }
     items::set_scrubbed(conn, payload.item_id, true)?;
@@ -830,6 +836,35 @@ mod tests {
         assert!(thumb(&inner, &conn, ItemPayload { item_id: ids[0].0 }).is_ok());
         let removed = ItemPayload { item_id: 9_999 };
         assert!(thumb(&inner, &conn, removed).is_ok());
+    }
+
+    #[test]
+    fn a_job_whose_file_was_deleted_before_a_walk_noticed_is_not_a_failure() {
+        let dir = scratch("job-file-deleted");
+        let inner = queue_in(&dir);
+        let (conn, ids) = library(&dir, &["deleted.png", "clip.mp4"]);
+        let [(deleted, _), (clip, _)] = ids.as_slice() else {
+            unreachable!()
+        };
+        items::record_media(&conn, *clip, &length(Some(12_000))).unwrap();
+        let read_at = |id: i64| -> Option<i64> {
+            conn.query_row("SELECT probed_at FROM item WHERE id = ?1", [id], |r| {
+                r.get(0)
+            })
+            .unwrap()
+        };
+        let clip_read = read_at(*clip);
+        std::fs::remove_file(dir.join("library/deleted.png")).unwrap();
+        std::fs::remove_file(dir.join("library/clip.mp4")).unwrap();
+
+        assert!(thumb(&inner, &conn, ItemPayload { item_id: *deleted }).is_ok());
+        assert!(scrub(&inner, &conn, ItemPayload { item_id: *clip }).is_ok());
+        assert!(items::is_live(&conn, *deleted).unwrap(), "no walk ran");
+        assert_eq!(read_at(*deleted), None, "nothing was recorded");
+        assert_eq!(read_at(*clip), clip_read);
+        assert_eq!(cached(&conn, *deleted), (false, false));
+        assert_eq!(cached(&conn, *clip), (false, false));
+        assert!(queued(&conn).is_empty());
     }
 
     #[test]
