@@ -319,6 +319,10 @@ pub fn look_in_bin(conn: &Connection) -> Result<Looked> {
     if changed.is_empty() {
         return Ok(Looked::default());
     }
+    #[cfg(test)]
+    if let Some(then) = BETWEEN_LOOKS.with(|hook| hook.borrow_mut().take()) {
+        then();
+    }
     let _turn = super::turn();
     let (mut gone, mut back) = (Vec::new(), Vec::new());
     for id in changed {
@@ -334,7 +338,9 @@ pub fn look_in_bin(conn: &Connection) -> Result<Looked> {
             Found::Back => back.push((id, file)),
         }
     }
-    in_transaction(conn, |tx| leave_all(tx, &gone))?;
+    if !gone.is_empty() {
+        in_transaction(conn, |tx| leave_all(tx, &gone))?;
+    }
     let mut looked = Looked {
         retired: u32::try_from(gone.len()).unwrap_or(u32::MAX),
         restored: 0,
@@ -347,6 +353,19 @@ pub fn look_in_bin(conn: &Connection) -> Result<Looked> {
         }
     }
     Ok(looked)
+}
+
+#[cfg(test)]
+thread_local! {
+    static BETWEEN_LOOKS: std::cell::RefCell<Option<Box<dyn FnOnce()>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Runs `then` once on this thread's next look in the bin that found something to change, after
+/// its first look and before it takes the disk's turn: where a test changes the bin meanwhile.
+#[cfg(test)]
+fn just_before_looking_again(then: impl FnOnce() + 'static) {
+    BETWEEN_LOOKS.with(|hook| *hook.borrow_mut() = Some(Box::new(then)));
 }
 
 /// What restoring several items did: how many came back, and each one that did not, with why.
@@ -1070,6 +1089,51 @@ mod tests {
 
         assert_eq!(looked, Ok(Looked::default()));
         assert!(items::is_trashed(&conn, pyramid).unwrap());
+    }
+
+    /// Pyramid trashed under its own batch, its file moved aside in the bin so a look finds it
+    /// gone; the batch, and where the file was and is.
+    fn aside_in_bin(conn: &Connection, cairo: i64) -> (i64, String, PathBuf, PathBuf) {
+        let pyramid = id_of(conn, cairo, "pyramid.jpg");
+        let batch = journal::new_batch();
+        trash_items(conn, &[pyramid], &batch).unwrap();
+        let binned = bin_file(conn, pyramid);
+        let aside = binned.with_file_name("aside");
+        std::fs::rename(&binned, &aside).unwrap();
+        (pyramid, batch, binned, aside)
+    }
+
+    #[test]
+    fn a_file_back_in_the_bin_by_the_time_the_look_takes_the_turn_stays_in_the_trash() {
+        let (conn, _, cairo) = library("look-again-in-bin");
+        let (pyramid, batch, binned, aside) = aside_in_bin(&conn, cairo);
+        just_before_looking_again(move || std::fs::rename(aside, binned).unwrap());
+
+        assert_eq!(look_in_bin(&conn).unwrap(), Looked::default());
+
+        assert!(items::is_trashed(&conn, pyramid).unwrap());
+        assert!(!journal::batch(&conn, &batch).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_file_restored_while_the_look_waited_for_the_turn_stays_restored_with_its_undo() {
+        let (conn, root, cairo) = library("look-again-restored");
+        let (pyramid, _, binned, aside) = aside_in_bin(&conn, cairo);
+        let path = root.parent().unwrap().join("library.db");
+        let restored = journal::new_batch();
+        let restoring = restored.clone();
+        just_before_looking_again(move || {
+            std::fs::rename(aside, binned).unwrap();
+            let conn = db::open(&path).unwrap();
+            let report = restore_items(&conn, &[pyramid], None, &restoring).unwrap();
+            assert_eq!(report.restored, 1);
+        });
+
+        assert_eq!(look_in_bin(&conn).unwrap(), Looked::default());
+
+        assert!(items::is_live(&conn, pyramid).unwrap());
+        cairo_holds(&root, &["pyramid.jpg", "sphinx.jpg"]);
+        assert!(!journal::batch(&conn, &restored).unwrap().is_empty());
     }
 
     #[test]

@@ -1299,6 +1299,22 @@ mod tests {
     }
 
     #[test]
+    fn a_row_of_every_op_about_one_file_or_one_folder_is_indexed_by_it() {
+        let conn = conn();
+        for op in ONE_FILE {
+            let about = serde_json::json!({ "itemId": 5 });
+            record(&conn, &new_batch(), op, &about, &about).unwrap();
+        }
+        for op in ONE_FOLDER {
+            let about = serde_json::json!({ "folderId": 9 });
+            record(&conn, &new_batch(), op, &about, &about).unwrap();
+        }
+
+        assert_eq!(about(&conn, "item_id", 5), ONE_FILE);
+        assert_eq!(about(&conn, "folder_id", 9), ONE_FOLDER);
+    }
+
+    #[test]
     fn many_files_dropped_at_once_leave_the_journal_as_one_at_a_time_would() {
         let conn = conn();
         let both_gone = new_batch();

@@ -178,7 +178,9 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   each of `itemIds`, `items_untag` each `itemId` of `items`, and `retag` each `itemId` of
   `itemUses` and each `folderId` of `folderUses`. The folders a row names only as a place, a
   move's way back among them, are not its subjects. Forgetting and dropping files find their rows
-  through it, and `journal::drop_items` drops many files in one set of statements.
+  through it, and `journal::drop_items` drops many files in one set of statements. Of the folder
+  subjects only `retag`'s are read so far; a one-folder row's are kept for
+  `journal::forget_source`, which still reads the journal's JSON, and for pruning (#264).
 - Undo never reaches a row at or below `setting.undo_floor`, which a restore sets to the newest
   row the restored journal holds.
 
