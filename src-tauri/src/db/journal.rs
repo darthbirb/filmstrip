@@ -601,7 +601,8 @@ pub fn forget_item(conn: &Connection, gone: &Gone) -> Result<()> {
         &format!(
             "UPDATE journal SET forward = json_set(forward, '$.gone', {mark}),
                                 inverse = json_set(inverse, '$.gone', {mark})
-              WHERE op IN ({}) AND json_extract(inverse, '$.itemId') = ?1
+              WHERE id IN (SELECT entry_id FROM journal_subject WHERE item_id = ?1)
+                AND op IN ({})
                 AND (json_type(inverse, '$.gone') IS NULL
                      OR json_extract(inverse, '$.gone.why.kind') = 'placeRemoved')",
             quoted(&ONE_FILE),
@@ -708,30 +709,35 @@ fn mark_removed(
 /// its batch, and its id from every row about several, so an undo passes over it.
 /// SCHEMA.md "The undo journal".
 pub fn drop_item(conn: &Connection, item_id: i64) -> Result<()> {
-    let one_file = quoted(&ONE_FILE);
+    drop_items(conn, &[item_id])
+}
+
+/// Drops many emptied files from the journal at once, as [`drop_item`] drops one.
+pub fn drop_items(conn: &Connection, item_ids: &[i64]) -> Result<()> {
+    if item_ids.is_empty() {
+        return Ok(());
+    }
+    let ids = serde_json::to_string(item_ids)?;
+    let about = format!(
+        "op IN ({}) AND id IN (SELECT entry_id FROM journal_subject
+                                 WHERE item_id IN (SELECT value FROM json_each(?1)))",
+        quoted(&ONE_FILE)
+    );
     let batches: Vec<String> = conn
         .prepare(&format!(
-            "SELECT DISTINCT batch_id FROM journal
-              WHERE op IN ({one_file}) AND json_extract(inverse, '$.itemId') = ?1"
+            "SELECT DISTINCT batch_id FROM journal WHERE {about}"
         ))?
-        .query_map(params![item_id], |row| row.get(0))?
+        .query_map(params![ids], |row| row.get(0))?
         .collect::<rusqlite::Result<_>>()?;
+    conn.execute(&format!("DELETE FROM journal WHERE {about}"), params![ids])?;
     conn.execute(
-        &format!(
-            "DELETE FROM journal
-              WHERE op IN ({one_file}) AND json_extract(inverse, '$.itemId') = ?1"
-        ),
-        params![item_id],
+        "DELETE FROM journal
+          WHERE op = ?2 AND batch_id IN (SELECT value FROM json_each(?1))
+            AND NOT EXISTS (SELECT 1 FROM journal other
+                             WHERE other.batch_id = journal.batch_id AND other.op <> ?2)",
+        params![serde_json::to_string(&batches)?, FOLDER_DELETE],
     )?;
-    for batch in &batches {
-        conn.execute(
-            "DELETE FROM journal
-              WHERE batch_id = ?1 AND op = ?2
-                AND NOT EXISTS (SELECT 1 FROM journal WHERE batch_id = ?1 AND op <> ?2)",
-            params![batch, FOLDER_DELETE],
-        )?;
-    }
-    leave_several(conn, &[item_id], &[])
+    leave_several(conn, item_ids, &[])
 }
 
 /// Takes files' and folders' ids out of every row about several, a tag's row left about none
@@ -741,17 +747,12 @@ fn leave_several(conn: &Connection, ids: &[i64], folders: &[i64]) -> Result<()> 
     let folders_leaving: HashSet<i64> = folders.iter().copied().collect();
     let mut stmt = conn.prepare(
         "SELECT id, op, inverse FROM journal
-          WHERE (op = ?2 AND EXISTS(SELECT 1 FROM json_each(inverse, '$.itemIds')
-                                     WHERE value IN (SELECT value FROM json_each(?1))))
-             OR (op = ?3 AND EXISTS(SELECT 1 FROM json_each(inverse, '$.items')
-                                     WHERE json_extract(value, '$.itemId')
-                                           IN (SELECT value FROM json_each(?1))))
-             OR (op = ?4 AND EXISTS(SELECT 1 FROM json_each(inverse, '$.itemUses')
-                                     WHERE json_extract(value, '$.itemId')
-                                           IN (SELECT value FROM json_each(?1))))
-             OR (op = ?4 AND EXISTS(SELECT 1 FROM json_each(inverse, '$.folderUses')
-                                     WHERE json_extract(value, '$.folderId')
-                                           IN (SELECT value FROM json_each(?5))))",
+          WHERE op IN (?2, ?3, ?4)
+            AND id IN (SELECT entry_id FROM journal_subject
+                        WHERE item_id IN (SELECT value FROM json_each(?1))
+                       UNION
+                       SELECT entry_id FROM journal_subject
+                        WHERE folder_id IN (SELECT value FROM json_each(?5)))",
     )?;
     let several: Vec<(i64, String, String)> = stmt
         .query_map(
@@ -802,6 +803,49 @@ fn leave_several(conn: &Connection, ids: &[i64], folders: &[i64]) -> Result<()> 
 /// The file a row is about, when the index has forgotten it since.
 pub fn gone(entry: &Entry) -> Option<Gone> {
     serde_json::from_value(entry.inverse.get("gone")?.clone()).ok()
+}
+
+/// A journal grown to 200,000 rows: each of `trashed` sent to the Trash, a hundred to an act that
+/// also deleted a folder, and the rest moves and tags of other files, every fiftieth row tagging
+/// ten of `trashed` among them.
+#[cfg(test)]
+pub(crate) fn grow_to_two_hundred_thousand(conn: &Connection, trashed: &[i64]) {
+    let tx = crate::db::begin(conn).unwrap();
+    let mut rows = 0;
+    for chunk in trashed.chunks(100) {
+        let batch = new_batch();
+        for &id in chunk {
+            record_item_trash(&tx, &batch, id).unwrap();
+        }
+        record_folder_delete(&tx, &batch, 1, 1).unwrap();
+        rows += chunk.len() + 1;
+    }
+    let mut other = 1_000_000_i64;
+    while rows < 200_000 {
+        let batch = new_batch();
+        if rows % 50 == 0 && !trashed.is_empty() {
+            let from = rows % trashed.len();
+            let mut item_ids: Vec<i64> = trashed
+                .iter()
+                .cycle()
+                .skip(from)
+                .take(10)
+                .copied()
+                .collect();
+            item_ids.extend(other..other + 10);
+            let tagged = ItemsTagged {
+                tag_id: 1,
+                value: "dusk".into(),
+                item_ids,
+            };
+            record_items_tag(&tx, &batch, &tagged).unwrap();
+        } else {
+            record_item_move(&tx, &batch, other, 1, 2).unwrap();
+        }
+        other += 1;
+        rows += 1;
+    }
+    tx.commit().unwrap();
 }
 
 fn quoted(ops: &[&str]) -> String {
@@ -1169,6 +1213,138 @@ mod tests {
         );
     }
 
+    fn about(conn: &Connection, column: &str, id: i64) -> Vec<String> {
+        conn.prepare(&format!(
+            "SELECT j.op FROM journal_subject s JOIN journal j ON j.id = s.entry_id
+              WHERE s.{column} = ?1 ORDER BY j.id"
+        ))
+        .unwrap()
+        .query_map(params![id], |r| r.get(0))
+        .unwrap()
+        .collect::<rusqlite::Result<_>>()
+        .unwrap()
+    }
+
+    #[test]
+    fn every_file_and_folder_a_row_is_about_is_indexed_and_follows_the_row() {
+        let conn = conn();
+        let moved = new_batch();
+        record_item_move(&conn, &moved, 5, 30, 31).unwrap();
+        record_folder_rename(&conn, &new_batch(), 40, "Cairo", "Giza").unwrap();
+        let tagged = ItemsTagged {
+            tag_id: 1,
+            value: "dusk".into(),
+            item_ids: vec![5, 6],
+        };
+        record_items_tag(&conn, &new_batch(), &tagged).unwrap();
+        let untag = |item_id| Untagged {
+            item_id,
+            added_at: 1,
+        };
+        let untagged = ItemsUntagged {
+            tag_id: 1,
+            value: "dusk".into(),
+            items: vec![untag(6), untag(7)],
+        };
+        record_items_untag(&conn, &new_batch(), &untagged).unwrap();
+        let retagged = Retagged {
+            change: Change::DeleteTag { tag: "dusk".into() },
+            files: 1,
+            folders: 1,
+            reworded: vec![],
+            made: vec![],
+            removed: vec![],
+            folder_uses: vec![FolderUse {
+                folder_id: 41,
+                rowid: 1,
+                source: "manual".into(),
+                from: 1,
+                to: None,
+            }],
+            item_uses: vec![ItemUse {
+                item_id: 8,
+                rowid: 1,
+                added_at: 1,
+                from: 1,
+                to: None,
+            }],
+        };
+        record_retag(&conn, &new_batch(), &retagged).unwrap();
+
+        assert_eq!(about(&conn, "item_id", 5), [ITEM_MOVE, ITEMS_TAG]);
+        assert_eq!(about(&conn, "item_id", 6), [ITEMS_TAG, ITEMS_UNTAG]);
+        assert_eq!(about(&conn, "item_id", 7), [ITEMS_UNTAG]);
+        assert_eq!(about(&conn, "item_id", 8), [RETAG]);
+        assert_eq!(about(&conn, "folder_id", 40), [FOLDER_RENAME]);
+        assert_eq!(about(&conn, "folder_id", 41), [RETAG]);
+        assert!(about(&conn, "folder_id", 30).is_empty());
+
+        forget_item(&conn, &Gone::file(6, "b.jpg".into(), 3, Forgot::NotOnDisk)).unwrap();
+        assert!(about(&conn, "item_id", 6).is_empty());
+        assert_eq!(about(&conn, "item_id", 7), [ITEMS_UNTAG]);
+
+        for entry in batch(&conn, &moved).unwrap() {
+            drop_entry(&conn, entry.id).unwrap();
+        }
+        assert_eq!(about(&conn, "item_id", 5), [ITEMS_TAG]);
+        let orphaned: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM journal_subject
+                  WHERE entry_id NOT IN (SELECT id FROM journal)",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(orphaned, 0);
+    }
+
+    #[test]
+    fn many_files_dropped_at_once_leave_the_journal_as_one_at_a_time_would() {
+        let conn = conn();
+        let both_gone = new_batch();
+        record_item_trash(&conn, &both_gone, 1).unwrap();
+        record_item_trash(&conn, &both_gone, 2).unwrap();
+        record_folder_delete(&conn, &both_gone, 50, 9).unwrap();
+        let one_stays = new_batch();
+        record_item_trash(&conn, &one_stays, 3).unwrap();
+        record_item_trash(&conn, &one_stays, 4).unwrap();
+        record_folder_delete(&conn, &one_stays, 51, 9).unwrap();
+        let no_file = new_batch();
+        record_folder_delete(&conn, &no_file, 52, 9).unwrap();
+        let tag = |item_ids| ItemsTagged {
+            tag_id: 1,
+            value: "dusk".into(),
+            item_ids,
+        };
+        let some_tagged = new_batch();
+        record_items_tag(&conn, &some_tagged, &tag(vec![1, 3, 4])).unwrap();
+        let all_tagged = new_batch();
+        record_items_tag(&conn, &all_tagged, &tag(vec![1, 2])).unwrap();
+        let renamed = new_batch();
+        record_item_rename(&conn, &renamed, 1, "a.jpg", "b.jpg").unwrap();
+
+        drop_items(&conn, &[1, 2, 3]).unwrap();
+
+        let ops = |batch_id: &str| -> Vec<String> {
+            batch(&conn, batch_id)
+                .unwrap()
+                .into_iter()
+                .map(|entry| entry.op)
+                .collect()
+        };
+        assert!(ops(&both_gone).is_empty());
+        assert_eq!(ops(&one_stays), [FOLDER_DELETE, ITEM_TRASH]);
+        assert_eq!(ops(&no_file), [FOLDER_DELETE]);
+        let left: ItemsTagged =
+            serde_json::from_value(batch(&conn, &some_tagged).unwrap()[0].inverse.clone()).unwrap();
+        assert_eq!(left.item_ids, [4]);
+        assert!(ops(&all_tagged).is_empty());
+        assert!(ops(&renamed).is_empty());
+        for id in [1, 2, 3] {
+            assert!(about(&conn, "item_id", id).is_empty(), "{id}");
+        }
+    }
+
     #[test]
     fn a_mark_written_before_marks_said_why_reads_as_emptied_from_the_bin() {
         let old: Gone =
@@ -1198,6 +1374,28 @@ mod tests {
 
     mod timing {
         use super::*;
+
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn ten_thousand_files_leave_a_journal_of_two_hundred_thousand_rows_well_inside_a_second() {
+            let conn = conn();
+            let trashed: Vec<i64> = (1..=10_000).collect();
+            grow_to_two_hundred_thousand(&conn, &trashed);
+
+            let started = std::time::Instant::now();
+            drop_items(&conn, &trashed).unwrap();
+            let took = started.elapsed();
+
+            let left: i64 = conn
+                .query_row(
+                    "SELECT COUNT(*) FROM journal_subject WHERE item_id <= 10000",
+                    [],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            assert_eq!(left, 0);
+            assert!(took < std::time::Duration::from_secs(1), "took {took:?}");
+        }
 
         #[test]
         #[ignore = "timing: runs alone, one test at a time"]

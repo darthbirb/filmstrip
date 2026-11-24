@@ -1184,6 +1184,14 @@ it.
 - **One change to the disk at a time.** A walk that read a directory while a verb renamed it would
   find the old name gone and retire everything under it. So the walk takes a turn per source and
   a verb waits for the turn, which bounds the wait by one source's walk, never the whole pass.
+- **The journal is found by what it is about, never read whole** (#220). Each row's files and
+  folders are kept in `journal_subject` beside it, indexed, so letting go of a file emptied from
+  the bin reads the few rows about it, not every row's JSON: emptying 10,000 files against a
+  journal of 200,000 rows was 10,000 scans of all of it inside the disk's turn. Triggers keep the
+  table, so no path that writes, rewrites or drops a row can leave it behind. The bounds, each
+  with its timing test against a journal of 200,000 rows: 10,000 files let go of the journal at
+  once well inside a second; a look in the bin that finds 10,000 emptied inside five seconds;
+  Empty Trash… of 10,000 inside ten, one turn of the disk per file as it always was.
 - **A move between drives is a copy, checked, and only then the original's removal.** ggallery
   renamed, which cannot cross from one drive to another. A copy cut short is removed and the
   original stays whole; an original that will not go once its copy is whole is left for the next
@@ -1475,7 +1483,12 @@ waits, where Explorer can see it too.
   shell's record of it, `$I…` beside it, is removed too, so Explorer's bin stops listing a file it
   no longer holds, as the shell's own restore does. Only a record inside the bin whose file has
   gone is ever removed.
-- **The Trash looks in the bin at launch and whenever it opens.** Each trashed file is looked for
+- **The Trash looks in the bin at launch and whenever it opens.** At launch the window asks once
+  it has opened, never before it is built, since a look reads every trashed file on disk and a
+  Trash of thousands kept the window from appearing for seconds (#220). The look reads without the
+  disk's turn, and takes it only once it found something to change, looking at each of those
+  files again under it before writing, so a Trash whose files are all still in the bin never holds
+  up a verb. Each trashed file is looked for
   by its identity, at its name in the bin and then at its own path. Still in the bin, it stays.
   Back at its path, put back from Explorer, it is restored in the index, tags and all, as if
   Restore had done it; a row a walk made for it meanwhile, under the name it took back, is

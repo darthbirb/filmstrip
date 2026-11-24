@@ -5,7 +5,7 @@ import { App } from "./app/App";
 import { suppressBrowserMenu } from "./app/browser-menu";
 import { watchExports } from "./app/export/export";
 import { startIndex } from "./app/navigation/index-store";
-import { watchTrashOpening } from "./app/navigation/look-in-bin";
+import { settleTrash, watchTrashOpening } from "./app/navigation/look-in-bin";
 import { watchWork } from "./app/navigation/work-store";
 import { watchMoves } from "./app/pane/move-picker";
 import { watchClipboard } from "./app/paste/clipboard";
@@ -24,6 +24,7 @@ void watchWork();
 void watchCopies();
 void watchMoves();
 void watchExports();
+void settleTrash();
 watchTrashOpening();
 watchClipboard();
 

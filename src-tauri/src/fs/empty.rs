@@ -613,4 +613,48 @@ mod tests {
         assert!(!items::is_trashed(&lib.conn, c).unwrap());
         assert!(items::is_trashed(&lib.conn, b).unwrap());
     }
+
+    mod timing {
+        use super::*;
+
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn ten_thousand_files_empty_against_a_journal_of_two_hundred_thousand_inside_ten_seconds() {
+            let lib = library("timing", &[]);
+            std::fs::create_dir_all(lib.bin_dir()).unwrap();
+            let tx = db::begin(&lib.conn).unwrap();
+            let trashed: Vec<i64> = (0..10_000_i64)
+                .map(|n| {
+                    let binned = lib.bin_dir().join(format!("$R{n}.jpg"));
+                    std::fs::write(&binned, "x").unwrap();
+                    tx.execute(
+                        "INSERT INTO item (uuid, source_id, folder_id, disk_name, ext, size_bytes,
+                                           mtime, kind, added_at, deleted_at, trashed_at,
+                                           bin_path, bin_file)
+                         VALUES ('t' || ?1, 1, ?2, ?1 || '.jpg', 'jpg', 1, 1, 'image', 1, 2, 2,
+                                 ?3, ?4)",
+                        rusqlite::params![
+                            n,
+                            lib.cairo,
+                            binned.to_string_lossy(),
+                            recycle::file_at(&binned).unwrap()
+                        ],
+                    )
+                    .unwrap();
+                    tx.last_insert_rowid()
+                })
+                .collect();
+            tx.commit().unwrap();
+            journal::grow_to_two_hundred_thousand(&lib.conn, &trashed);
+            let asked = lib.asked();
+
+            let started = std::time::Instant::now();
+            let emptied = lib.empty(&asked);
+            let took = started.elapsed();
+
+            assert_eq!(emptied.deleted, 10_000);
+            assert!(to_empty(&lib.conn).unwrap().files.is_empty());
+            assert!(took < std::time::Duration::from_secs(10), "took {took:?}");
+        }
+    }
 }

@@ -281,8 +281,17 @@ pub(super) fn put_back(conn: &Connection, item_id: i64, file: &ItemFile) -> Resu
 /// Takes a file gone from the Recycle Bin out of the Trash and out of the journal, so an undo
 /// passes over it. SCHEMA.md "The undo journal".
 pub(super) fn leave(conn: &Connection, id: i64) -> Result<()> {
-    journal::drop_item(conn, id)?;
-    items::retire_trashed(conn, id, now())
+    leave_all(conn, &[id])
+}
+
+/// Takes many files gone from the Recycle Bin out of the Trash and the journal at once.
+fn leave_all(conn: &Connection, ids: &[i64]) -> Result<()> {
+    journal::drop_items(conn, ids)?;
+    let at = now();
+    for &id in ids {
+        items::retire_trashed(conn, id, at)?;
+    }
+    Ok(())
 }
 
 /// What looking in the Recycle Bin found: rows retired for files emptied from it outside the app,
@@ -295,29 +304,46 @@ pub struct Looked {
     pub restored: u32,
 }
 
-/// Looks for each trashed item's file in the Recycle Bin, at launch and as the Trash opens: gone
-/// from the bin, its row leaves the Trash and the journal; back at its path, it is restored in the
-/// index. One on a drive that is away waits. Artboards › The Trash in the Recycle Bin.
+/// Looks for each trashed file in the Recycle Bin: gone, its row leaves the Trash and the journal;
+/// back at its path, it is restored. Only what changed is looked at again, under the disk's turn.
+/// DECISIONS.md "The Trash is the Recycle Bin".
 pub fn look_in_bin(conn: &Connection) -> Result<Looked> {
-    let _turn = super::turn();
-    let mut looked = Looked::default();
+    let mut changed = Vec::new();
     for (row, _) in items::in_trash(conn)? {
-        let Some(file) = items::file_of(conn, row.id)? else {
+        if let Some(file) = items::file_of(conn, row.id)?
+            && matches!(find(conn, row.id, &file)?, Found::Gone | Found::Back)
+        {
+            changed.push(row.id);
+        }
+    }
+    if changed.is_empty() {
+        return Ok(Looked::default());
+    }
+    let _turn = super::turn();
+    let (mut gone, mut back) = (Vec::new(), Vec::new());
+    for id in changed {
+        if !items::is_trashed(conn, id)? {
+            continue;
+        }
+        let Some(file) = items::file_of(conn, id)? else {
             continue;
         };
-        match find(conn, row.id, &file)? {
+        match find(conn, id, &file)? {
             Found::Bin(_) | Found::Away => {}
-            Found::Gone => {
-                in_transaction(conn, |tx| leave(tx, row.id))?;
-                looked.retired += 1;
-            }
-            Found::Back => {
-                if in_transaction(conn, |tx| put_back(tx, row.id, &file))? {
-                    looked.restored += 1;
-                } else {
-                    looked.retired += 1;
-                }
-            }
+            Found::Gone => gone.push(id),
+            Found::Back => back.push((id, file)),
+        }
+    }
+    in_transaction(conn, |tx| leave_all(tx, &gone))?;
+    let mut looked = Looked {
+        retired: u32::try_from(gone.len()).unwrap_or(u32::MAX),
+        restored: 0,
+    };
+    for (id, file) in &back {
+        if in_transaction(conn, |tx| put_back(tx, *id, file))? {
+            looked.restored += 1;
+        } else {
+            looked.retired += 1;
         }
     }
     Ok(looked)
@@ -1026,6 +1052,27 @@ mod tests {
     }
 
     #[test]
+    fn looking_in_the_bin_waits_for_no_turn_of_the_disk_while_every_file_is_still_there() {
+        let (conn, root, cairo) = library("look-no-turn");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+        let path = root.parent().unwrap().join("library.db");
+        let (sent, looked) = std::sync::mpsc::channel();
+
+        let turn = crate::fs::turn();
+        let looking = std::thread::spawn(move || {
+            let conn = db::open(&path).unwrap();
+            sent.send(look_in_bin(&conn).unwrap()).unwrap();
+        });
+        let looked = looked.recv_timeout(std::time::Duration::from_secs(10));
+        drop(turn);
+        looking.join().unwrap();
+
+        assert_eq!(looked, Ok(Looked::default()));
+        assert!(items::is_trashed(&conn, pyramid).unwrap());
+    }
+
+    #[test]
     fn a_file_put_back_from_explorer_after_a_walk_took_it_in_is_the_item_it_was() {
         let (conn, root, cairo) = library("look-after-walk");
         let sphinx = id_of(&conn, cairo, "sphinx.jpg");
@@ -1651,5 +1698,48 @@ mod tests {
         );
         assert!(!items::is_trashed(&conn, sphinx).unwrap());
         assert!(stand_in().asked.borrow().is_empty());
+    }
+
+    mod timing {
+        use super::*;
+
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn ten_thousand_files_emptied_outside_the_app_leave_the_trash_inside_five_seconds() {
+            let (conn, root, cairo) = library("timing-look");
+            let bin = root.parent().unwrap().join("bin");
+            std::fs::create_dir_all(&bin).unwrap();
+            let serial = recycle::volume_serial(&bin).unwrap();
+            let tx = db::begin(&conn).unwrap();
+            let trashed: Vec<i64> = (0..10_000_i64)
+                .map(|n| {
+                    tx.execute(
+                        "INSERT INTO item (uuid, source_id, folder_id, disk_name, ext, size_bytes,
+                                           mtime, kind, added_at, deleted_at, trashed_at,
+                                           bin_path, bin_file)
+                         VALUES ('t' || ?1, 1, ?2, ?1 || '.jpg', 'jpg', 1, 1, 'image', 1, 2, 2,
+                                 ?3, ?4)",
+                        rusqlite::params![
+                            n,
+                            cairo,
+                            bin.join(format!("$R{n}.jpg")).to_string_lossy(),
+                            format!("{serial}-{n:x}")
+                        ],
+                    )
+                    .unwrap();
+                    tx.last_insert_rowid()
+                })
+                .collect();
+            tx.commit().unwrap();
+            journal::grow_to_two_hundred_thousand(&conn, &trashed);
+
+            let started = std::time::Instant::now();
+            let looked = look_in_bin(&conn).unwrap();
+            let took = started.elapsed();
+
+            assert_eq!(looked.retired, 10_000);
+            assert!(listing(&conn).unwrap().is_empty());
+            assert!(took < std::time::Duration::from_secs(5), "took {took:?}");
+        }
     }
 }
