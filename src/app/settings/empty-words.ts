@@ -50,3 +50,13 @@ export function skippedLine({ deleted, gone, kept }: Emptied) {
   ].filter((part): part is string => typeof part === "string");
   return parts.length === 0 ? lead : `${lead} ${parts.join(", and ")}.`;
 }
+
+/** The banner's sentence over the files that stayed: what went, counted, or turned round when none did. */
+export function emptiedBannerLine({ deleted, gone, kept, stayed }: Emptied) {
+  const whole = deleted + gone + kept;
+  if (deleted > 0)
+    return `${formatCount(deleted)} of ${files(whole)} ${deleted === 1 ? "was" : "were"} deleted for good`;
+  const [first] = stayed;
+  const what = kept === 1 && first ? first.name : `The ${files(kept)}`;
+  return `${what} could not be deleted for good`;
+}

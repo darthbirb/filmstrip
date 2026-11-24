@@ -126,6 +126,14 @@ pub(super) fn trash_unjournalled(
             recycling::settled(conn, &from)?;
             return Err(AppError::refused(Reason::BinRefused));
         }
+        Sent::TooLong => {
+            recycling::settled(conn, &from)?;
+            return Err(AppError::refused(Reason::PathTooLong));
+        }
+        Sent::Unheld(code) => {
+            recycling::settled(conn, &from)?;
+            return Err(AppError::refused(unheld(&from, code)));
+        }
     };
 
     let recorded = in_transaction(conn, |tx| record_send(tx, item_id, &binned, batch_id));
@@ -143,6 +151,21 @@ pub(super) fn trash_unjournalled(
         Err(err) => eprintln!("recycle: {} was not settled: {err}", from.display()),
     }
     Ok(())
+}
+
+/// Why a file could not be held for its send: the file's own reason when the disk gave one, as
+/// another app holding it, and otherwise its drive, which cannot give it a second name.
+fn unheld(file: &Path, code: Option<i32>) -> Reason {
+    let err = code.map_or_else(
+        || std::io::ErrorKind::Unsupported.into(),
+        std::io::Error::from_raw_os_error,
+    );
+    match Reason::of_io(&err) {
+        Reason::Other { .. } => Reason::NoHardLinks {
+            drive: recycle::drive_of(file),
+        },
+        own => own,
+    }
 }
 
 /// Records an item as in the Trash, where the bin keeps its file.
@@ -487,7 +510,7 @@ fn place_name(conn: &Connection, folder_id: i64) -> String {
 }
 
 /// The title of the source a folder is in.
-fn source_title(conn: &Connection, folder_id: i64) -> String {
+pub(super) fn source_title(conn: &Connection, folder_id: i64) -> String {
     folders::location(conn, folder_id)
         .ok()
         .and_then(|location| sources::get(conn, location.source_id).ok().flatten())
@@ -837,6 +860,52 @@ mod tests {
             );
             assert!(items::is_live(&conn, sphinx).unwrap());
             assert_eq!(journal::latest_batch(&conn).unwrap(), None);
+            assert!(recycling::unsettled(&conn).unwrap().is_empty());
+            cairo_holds(&root, &["pyramid.jpg", "sphinx.jpg"]);
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_file_whose_path_is_too_long_for_the_shell_stays_and_says_so() {
+        let (conn, root, cairo) = library("too-long");
+        let room = 262 - root.join("Trips/Cairo").as_os_str().len() - 1;
+        let long = format!("{}.jpg", "l".repeat(room - 4));
+        std::fs::write(root.join("Trips/Cairo").join(&long), "l").unwrap();
+        walk::reconcile(&conn).unwrap();
+        let id = id_of(&conn, cairo, &long);
+        let bin = stand_in();
+
+        let report = trash_items(&conn, &[id], &journal::new_batch()).unwrap();
+
+        assert_eq!(report.trashed, 0);
+        assert_eq!(report.refused[0].reason, Reason::PathTooLong);
+        assert!(still_in_cairo(&report.refused[0].at));
+        assert!(bin.asked.borrow().is_empty());
+        assert!(items::is_live(&conn, id).unwrap());
+        assert!(recycling::unsettled(&conn).unwrap().is_empty());
+        cairo_holds(&root, &[long.as_str(), "pyramid.jpg", "sphinx.jpg"]);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_file_its_drive_cannot_give_a_second_name_stays_naming_the_drive() {
+        for (code, why) in [(1, None), (32, Some(Reason::InUse))] {
+            let (conn, root, cairo) = library(&format!("unlinkable-{code}"));
+            let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+            let bin = stand_in();
+            recycle::links_fail(code);
+
+            let report = trash_items(&conn, &[sphinx], &journal::new_batch()).unwrap();
+
+            let drive = Reason::NoHardLinks {
+                drive: recycle::drive_of(&root),
+            };
+            assert_eq!(report.trashed, 0);
+            assert_eq!(report.refused[0].reason, why.unwrap_or(drive), "{code}");
+            assert!(still_in_cairo(&report.refused[0].at));
+            assert!(bin.asked.borrow().is_empty());
+            assert!(items::is_live(&conn, sphinx).unwrap());
             assert!(recycling::unsettled(&conn).unwrap().is_empty());
             cairo_holds(&root, &["pyramid.jpg", "sphinx.jpg"]);
         }

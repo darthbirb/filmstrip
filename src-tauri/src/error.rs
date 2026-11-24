@@ -82,6 +82,12 @@ pub enum Reason {
     NoBin {
         drive: String,
     },
+    /// Its path is longer than the shell takes, so it was never sent to the Recycle Bin.
+    PathTooLong,
+    /// Its drive could not give it the second name a send holds it by, so it was never sent.
+    NoHardLinks {
+        drive: String,
+    },
     /// Anything else, in the words it came with.
     Other {
         message: String,
@@ -112,6 +118,8 @@ impl fmt::Display for Reason {
             Reason::GoneFromBin { name, .. } => write!(f, "{name} is no longer in the Recycle Bin"),
             Reason::BinRefused => f.write_str("the Recycle Bin would not take it"),
             Reason::NoBin { drive } => write!(f, "{drive} has no Recycle Bin"),
+            Reason::PathTooLong => f.write_str("its path is too long for the Recycle Bin"),
+            Reason::NoHardLinks { drive } => write!(f, "{drive} cannot give it a hard link"),
             Reason::Other { message } => f.write_str(message),
         }
     }
@@ -134,7 +142,7 @@ impl Reason {
         }
     }
 
-    fn of_io(err: &std::io::Error) -> Reason {
+    pub fn of_io(err: &std::io::Error) -> Reason {
         // Windows' sharing and lock violations: another program holds the file open.
         match err.raw_os_error() {
             Some(32 | 33) => Reason::InUse,

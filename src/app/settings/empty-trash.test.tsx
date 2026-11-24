@@ -18,6 +18,8 @@ import { formatBytes } from "../../lib/format";
 import { Foot } from "../navigation/Foot";
 import { getNews, setNews } from "../navigation/foot-slot";
 import { loadIndex, refreshIndex, resetIndex } from "../navigation/index-store";
+import { ReportBanner } from "../undo/ReportBanner";
+import { getReport, showReport } from "../undo/report-store";
 import { Settings } from "./Settings";
 import { getEmptying } from "./settings-store";
 
@@ -29,6 +31,7 @@ beforeEach(async () => {
   resetBin();
   while (await undoLast()) {}
   setNews(null);
+  showReport(null);
   resetIndex();
   await loadIndex();
 });
@@ -137,6 +140,38 @@ test("files skipped are counted in a band, with Show in Trash for the one that s
   await expect.element(screen.getByText(line)).toBeInTheDocument();
   await expect.element(screen.getByRole("button", { name: "Show in Trash" })).toBeInTheDocument();
   expect((await trashListing()).map((one) => one.id)).toEqual([kept]);
+
+  const report = getReport();
+  expect(report?.sentence).toBe("1 of 3 files was deleted for good");
+  expect(report?.rows.map((row) => [row.id, row.at.kind, row.reason.kind])).toEqual([
+    [kept, "trash", "inUse"],
+  ]);
+});
+
+test("the files that stayed are listed in the banner, each with why and Show in Trash", async () => {
+  const ids = await cairo(2);
+  await trashed(ids);
+  refuseDeleting(ids);
+  const [first] = await trashListing();
+  if (!first) throw new Error("the Trash holds files");
+  const screen = await render(
+    <>
+      <ReportBanner />
+      <Settings open onClose={() => undefined} section="trash" />
+    </>,
+  );
+  await screen.getByRole("button", { name: "Empty Trash…" }).click();
+  await screen.getByRole("button", { name: "Empty Trash", exact: true }).click();
+  await emptied();
+
+  await expect
+    .element(screen.getByText("The 2 files could not be deleted for good"))
+    .toBeInTheDocument();
+  await expect.element(screen.getByText("Still in the Trash")).toBeInTheDocument();
+  expect(screen.getByText("Open in another app").elements()).toHaveLength(2);
+  await expect
+    .element(screen.getByRole("button", { name: `Show ${first.diskName} in Trash` }))
+    .toBeInTheDocument();
 });
 
 test("a file deleted while the question waits is not counted, and stays", async () => {

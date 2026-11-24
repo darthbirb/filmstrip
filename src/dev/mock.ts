@@ -1703,7 +1703,7 @@ function dropFromJournal(item: ItemRow) {
 
 /** Deletes for good the files counted still in the Trash, one at a time, as the Rust side does. */
 function emptyTrash(counted: readonly Counted[]): Promise<Emptied> {
-  const emptied: Emptied = { deleted: 0, bytes: 0, gone: 0, kept: 0, firstKept: null };
+  const emptied: Emptied = { deleted: 0, bytes: 0, gone: 0, kept: 0, stayed: [] };
   return new Promise((resolve) => {
     let at = 0;
     const step = () => {
@@ -1720,7 +1720,13 @@ function emptyTrash(counted: readonly Counted[]): Promise<Emptied> {
           emptied.gone += 1;
         } else if (undeletable.has(item.id)) {
           emptied.kept += 1;
-          emptied.firstKept ??= item.id;
+          emptied.stayed.push({
+            kind: "file",
+            id: item.id,
+            name: item.diskName,
+            at: { kind: "trash" },
+            reason: { kind: "inUse" },
+          });
         } else {
           dropFromJournal(item);
           retireGone(item);

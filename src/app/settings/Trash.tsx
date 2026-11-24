@@ -12,8 +12,10 @@ import { RowQuestion } from "../../ui/TermTable";
 import { libraryChanged } from "../library";
 import { setNews } from "../navigation/foot-slot";
 import { useIndex } from "../navigation/index-store";
+import { showReport } from "../undo/report-store";
 import { whyFailed } from "./backup-words";
 import {
+  emptiedBannerLine,
   emptiedLine,
   emptyingLine,
   emptyQuestion,
@@ -132,8 +134,10 @@ async function emptyAll(counted: Counted[]) {
     await libraryChanged();
     const whole = emptied.deleted + emptied.gone + emptied.kept;
     if (whole === 0) return;
+    const [first] = emptied.stayed;
     if (whole === emptied.deleted) setNews({ kind: "said", line: emptiedLine(emptied) });
-    else setNews({ kind: "skipped", line: skippedLine(emptied), first: emptied.firstKept });
+    else setNews({ kind: "skipped", line: skippedLine(emptied), first: first?.id ?? null });
+    showReport(first ? { sentence: emptiedBannerLine(emptied), rows: emptied.stayed } : null);
   } catch (error) {
     await libraryChanged();
     setNews({
