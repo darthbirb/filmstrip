@@ -50,17 +50,12 @@ pub(crate) fn escape_like(s: &str) -> String {
 }
 
 /// One bound JSON array however many ids there are, never a `?` each. DECISIONS.md "Search".
-fn in_list(column: &str, ids: &[i64], sql: &mut Sql) -> String {
+fn in_list(column: &str, ids: &[i64], sql: &mut Sql) -> Result<String> {
     if ids.is_empty() {
-        return NOTHING.into();
+        return Ok(NOTHING.into());
     }
-    sql.bind(id_array(ids));
-    format!("({column} IN (SELECT value FROM json_each(?)))")
-}
-
-fn id_array(ids: &[i64]) -> String {
-    let ids: Vec<String> = ids.iter().map(i64::to_string).collect();
-    format!("[{}]", ids.join(","))
+    sql.bind(serde_json::to_string(ids)?);
+    Ok(format!("({column} IN (SELECT value FROM json_each(?)))"))
 }
 
 /// Whether the query asks for the Trash anywhere, negated or not: only then may a trashed file
@@ -140,7 +135,7 @@ fn item_term(conn: &Connection, term: &Term, sql: &mut Sql) -> Result<String> {
             } else {
                 subtrees(conn, &folders, true)?
             };
-            in_list("i.folder_id", &ids, sql)
+            in_list("i.folder_id", &ids, sql)?
         }
         Term::Tag { .. } | Term::Label { .. } | Term::AnyLabel { .. } => {
             let predicate = tag_row(term, sql).unwrap_or_else(|| NOTHING.into());
@@ -189,15 +184,15 @@ fn item_term(conn: &Connection, term: &Term, sql: &mut Sql) -> Result<String> {
             let wip = || status_subtrees(conn, "wip");
             let complete = || status_subtrees(conn, "complete");
             match status {
-                StatusValue::Wip => in_list("i.folder_id", &wip()?, sql),
-                StatusValue::Complete => in_list("i.folder_id", &complete()?, sql),
+                StatusValue::Wip => in_list("i.folder_id", &wip()?, sql)?,
+                StatusValue::Complete => in_list("i.folder_id", &complete()?, sql)?,
                 StatusValue::None => {
                     let mut held = wip()?;
                     held.extend(complete()?);
                     if held.is_empty() {
                         "(1 = 1)".into()
                     } else {
-                        format!("(NOT {})", in_list("i.folder_id", &held, sql))
+                        format!("(NOT {})", in_list("i.folder_id", &held, sql)?)
                     }
                 }
             }
@@ -297,7 +292,9 @@ fn subtrees(conn: &Connection, roots: &[i64], with_roots: bool) -> Result<Vec<i6
          SELECT DISTINCT id FROM subtree WHERE ?2 OR id <> root",
     )?;
     Ok(stmt
-        .query_map(params![id_array(roots), with_roots], |r| r.get(0))?
+        .query_map(params![serde_json::to_string(roots)?, with_roots], |r| {
+            r.get(0)
+        })?
         .collect::<rusqlite::Result<_>>()?)
 }
 
@@ -375,7 +372,7 @@ pub fn folders(conn: &Connection, expr: &Expr) -> Result<Vec<FolderMatch>> {
         other => vec![other],
     };
     let ids: Vec<i64> = rows.iter().map(|(id, _)| *id).collect();
-    let ids = id_array(&ids);
+    let ids = serde_json::to_string(&ids)?;
     let mut places = places(conn, &ids)?;
     let counts = counts(conn, &ids)?;
     let mut covers = covers(conn, &ids)?;
@@ -509,9 +506,9 @@ fn folder_term(conn: &Connection, term: &Term, sql: &mut Sql) -> Result<String> 
         Term::Path { path, exact } => {
             let named = resolve_path(conn, path)?;
             if *exact {
-                in_list("f.parent_id", &named, sql)
+                in_list("f.parent_id", &named, sql)?
             } else {
-                in_list("f.id", &subtrees(conn, &named, false)?, sql)
+                in_list("f.id", &subtrees(conn, &named, false)?, sql)?
             }
         }
         Term::Tag { .. } | Term::Label { .. } | Term::AnyLabel { .. } => {
@@ -550,7 +547,7 @@ fn folder_term(conn: &Connection, term: &Term, sql: &mut Sql) -> Result<String> 
             let roots: Vec<i64> = stmt
                 .query_map([], |r| r.get(0))?
                 .collect::<rusqlite::Result<_>>()?;
-            in_list("f.id", &subtrees(conn, &roots, true)?, sql)
+            in_list("f.id", &subtrees(conn, &roots, true)?, sql)?
         }
         _ => NOTHING.into(),
     })

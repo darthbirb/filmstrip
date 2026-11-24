@@ -1174,8 +1174,8 @@ and a trashed one where it came from, keeping the Trash's verbs.
 
 **A search describes all its folders at once.** Each folder's path, counts, cover and what it
 matched come from one statement per kind for the whole result, and every list of ids is bound as
-one JSON array read through `json_each`, never one `?` per id: a word twenty thousand folders
-carry was six queries a folder, and SQLite refuses more than 32,766 `?`s in one statement.
+one JSON array read through `json_each`, never one `?` per id, since SQLite refuses more than
+32,766 `?`s in one statement.
 
 **Results come trashed first, then in the order chosen for searches**, as "Sorting a place"
 says. A trashed file is found only when the query names the Trash; the drawing's Trash
