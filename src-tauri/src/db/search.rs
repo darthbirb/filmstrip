@@ -1,17 +1,17 @@
 //! A query's tree as SQL, run for the files and the folders it finds; and the text index a bare
 //! word is matched against, kept as rows change. SCHEMA.md "Query language".
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 use rusqlite::types::Value;
-use rusqlite::{Connection, OptionalExtension, ToSql, params, params_from_iter};
+use rusqlite::{Connection, ToSql, params};
 use serde::Serialize;
 use ts_rs::TS;
 
 use crate::db::fold;
 use crate::db::folders::Crumb;
 use crate::db::items::{self, ItemRow, Sort};
-use crate::error::Result;
+use crate::error::{AppError, Result};
 use crate::media::probe::days_from_civil;
 use crate::query::{Expr, IsFlag, LabelMatch, StatusValue, Term, split_path_segments};
 
@@ -49,14 +49,18 @@ pub(crate) fn escape_like(s: &str) -> String {
     out
 }
 
+/// One bound JSON array however many ids there are, never a `?` each. DECISIONS.md "Search".
 fn in_list(column: &str, ids: &[i64], sql: &mut Sql) -> String {
     if ids.is_empty() {
         return NOTHING.into();
     }
-    for id in ids {
-        sql.bind(*id);
-    }
-    format!("({column} IN ({}))", vec!["?"; ids.len()].join(","))
+    sql.bind(id_array(ids));
+    format!("({column} IN (SELECT value FROM json_each(?)))")
+}
+
+fn id_array(ids: &[i64]) -> String {
+    let ids: Vec<String> = ids.iter().map(i64::to_string).collect();
+    format!("[{}]", ids.join(","))
 }
 
 /// Whether the query asks for the Trash anywhere, negated or not: only then may a trashed file
@@ -280,26 +284,21 @@ pub(crate) fn resolve_path(conn: &Connection, path: &str) -> Result<Vec<i64>> {
 
 /// Every live folder at or below these, or only below them.
 fn subtrees(conn: &Connection, roots: &[i64], with_roots: bool) -> Result<Vec<i64>> {
+    if roots.is_empty() {
+        return Ok(Vec::new());
+    }
     let mut stmt = conn.prepare(
-        "WITH RECURSIVE subtree(id) AS (
-             SELECT ?1
+        "WITH RECURSIVE subtree(root, id) AS (
+             SELECT value, value FROM json_each(?1)
            UNION ALL
-             SELECT f.id FROM folder f JOIN subtree s ON f.parent_id = s.id
+             SELECT s.root, f.id FROM folder f JOIN subtree s ON f.parent_id = s.id
               WHERE f.deleted_at IS NULL
          )
-         SELECT id FROM subtree",
+         SELECT DISTINCT id FROM subtree WHERE ?2 OR id <> root",
     )?;
-    let mut all = Vec::new();
-    let mut seen = HashSet::new();
-    for root in roots {
-        for id in stmt.query_map(params![root], |r| r.get::<_, i64>(0))? {
-            let id = id?;
-            if (with_roots || id != *root) && seen.insert(id) {
-                all.push(id);
-            }
-        }
-    }
-    Ok(all)
+    Ok(stmt
+        .query_map(params![id_array(roots), with_roots], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?)
 }
 
 /// The folders carrying a status themselves, with everything below them.
@@ -367,26 +366,121 @@ pub fn folders(conn: &Connection, expr: &Expr) -> Result<Vec<FolderMatch>> {
         .collect::<rusqlite::Result<_>>()?;
     drop(stmt);
 
+    if rows.is_empty() {
+        return Ok(Vec::new());
+    }
+
     let conjuncts: Vec<&Expr> = match expr {
         Expr::And(parts) => parts.iter().collect(),
         other => vec![other],
     };
-    let mut matches = Vec::with_capacity(rows.len());
-    for (id, title) in rows {
-        let source_id = crate::db::folders::location(conn, id)?.source_id;
-        matches.push(FolderMatch {
-            id,
-            source_id,
-            matched: matched(conn, &conjuncts, id, &title)?,
-            title,
-            path: crate::db::folders::ancestry(conn, id)?,
-            count: live_count(conn, id)?,
-            own_count: crate::db::folders::own_count(conn, id)?,
-            cover: None,
-            cover_uuid: crate::db::details::cover(conn, id)?.map(|(_, uuid)| uuid),
-        });
+    let ids: Vec<i64> = rows.iter().map(|(id, _)| *id).collect();
+    let ids = id_array(&ids);
+    let mut places = places(conn, &ids)?;
+    let counts = counts(conn, &ids)?;
+    let mut covers = covers(conn, &ids)?;
+    let mut said = matched(conn, &conjuncts, &ids)?;
+    rows.into_iter()
+        .map(|(id, title)| {
+            let (source_id, path) = places.remove(&id).unwrap_or_default();
+            let source_id = source_id.ok_or_else(|| {
+                AppError::invalid(format!("folder {id} has no source in its ancestry"))
+            })?;
+            let (count, own_count) = counts.get(&id).copied().unwrap_or_default();
+            Ok(FolderMatch {
+                id,
+                source_id,
+                matched: match said.remove(&id) {
+                    Some((Some(key), value, _)) => Matched::Label { key, value },
+                    Some((None, value, source)) if source != "title" => Matched::Tag { value },
+                    _ => Matched::Name {
+                        value: title.clone(),
+                    },
+                },
+                title,
+                path,
+                count,
+                own_count,
+                cover: None,
+                cover_uuid: covers.remove(&id),
+            })
+        })
+        .collect()
+}
+
+/// A folder's source, unless none is in its ancestry, and its crumbs.
+type Place = (Option<i64>, Vec<Crumb>);
+
+/// Each folder's source, and the crumbs from that source's own folder down to it, as
+/// `folders::location` and `folders::ancestry` give them for one.
+fn places(conn: &Connection, ids: &str) -> Result<HashMap<i64, Place>> {
+    let mut stmt = conn.prepare(
+        "WITH RECURSIVE up(folder_id, id, title, parent_id, source_id, depth) AS (
+             SELECT id, id, title, parent_id, source_id, 0 FROM folder
+              WHERE id IN (SELECT value FROM json_each(?1))
+           UNION ALL
+             SELECT up.folder_id, f.id, f.title, f.parent_id, f.source_id, up.depth + 1
+               FROM up JOIN folder f ON f.id = up.parent_id
+         )
+         SELECT up.folder_id, up.id, COALESCE(s.title, up.title), up.source_id
+           FROM up LEFT JOIN source s ON up.parent_id IS NULL AND s.id = up.source_id
+          ORDER BY up.folder_id, up.depth DESC",
+    )?;
+    let mut places: HashMap<i64, Place> = HashMap::new();
+    let rows = stmt.query_map(params![ids], |r| {
+        Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
+    })?;
+    for row in rows {
+        let (folder_id, id, title, source_id): (i64, i64, String, Option<i64>) = row?;
+        let (source, path) = places.entry(folder_id).or_default();
+        if source.is_none() {
+            *source = source_id;
+        }
+        path.push(Crumb { id, title });
     }
-    Ok(matches)
+    Ok(places)
+}
+
+/// Every live folder at or below each of these, and how far below.
+const BELOW: &str = "WITH RECURSIVE below(root, id, depth) AS (
+         SELECT value, value, 0 FROM json_each(?1)
+       UNION ALL
+         SELECT b.root, f.id, b.depth + 1 FROM below b JOIN folder f ON f.parent_id = b.id
+          WHERE f.deleted_at IS NULL
+     )";
+
+/// The live files at or below each folder, and those directly in it.
+fn counts(conn: &Connection, ids: &str) -> Result<HashMap<i64, (i64, i64)>> {
+    let mut stmt = conn.prepare(&format!(
+        "{BELOW}
+         SELECT b.root, COUNT(i.id), COUNT(CASE WHEN b.depth = 0 THEN i.id END)
+           FROM below b LEFT JOIN item i ON i.folder_id = b.id AND i.deleted_at IS NULL
+          GROUP BY b.root"
+    ))?;
+    Ok(stmt
+        .query_map(params![ids], |r| Ok((r.get(0)?, (r.get(1)?, r.get(2)?))))?
+        .collect::<rusqlite::Result<_>>()?)
+}
+
+/// The file that stands for each folder, as `details::cover` chooses it for one.
+fn covers(conn: &Connection, ids: &str) -> Result<HashMap<i64, String>> {
+    let mut stmt = conn.prepare(&format!(
+        "{BELOW}
+         SELECT root, uuid FROM (
+           SELECT b.root, i.uuid,
+                  ROW_NUMBER() OVER (
+                      PARTITION BY b.root
+                      ORDER BY i.id = r.cover_item_id DESC, b.depth, i.disk_name COLLATE NOCASE
+                  ) AS n
+             FROM below b
+             JOIN item i ON i.folder_id = b.id
+             JOIN folder r ON r.id = b.root
+            WHERE i.deleted_at IS NULL AND i.kind IN ('image', 'video')
+         ) WHERE n = 1"
+    ))?;
+    Ok(stmt
+        .query_map(params![ids], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?)
 }
 
 fn folder_condition(conn: &Connection, expr: &Expr, sql: &mut Sql) -> Result<String> {
@@ -470,11 +564,14 @@ fn owns(predicate: &str) -> String {
     )
 }
 
-/// The tag that explains a folder's match: a label before a tag before its name. A folder found
-/// by anything else is said by its name.
-fn matched(conn: &Connection, conjuncts: &[&Expr], folder_id: i64, title: &str) -> Result<Matched> {
+/// A tag's key, value and source.
+type Said = (Option<String>, String, String);
+
+/// The key, value and source of the tag that explains each folder's match: a label before a tag
+/// before its name. A folder with none is said by its name.
+fn matched(conn: &Connection, conjuncts: &[&Expr], ids: &str) -> Result<HashMap<i64, Said>> {
     let mut sql = Sql::new();
-    sql.bind(folder_id);
+    sql.bind(ids.to_owned());
     let clauses: Vec<String> = conjuncts
         .iter()
         .filter_map(|part| match part {
@@ -482,41 +579,26 @@ fn matched(conn: &Connection, conjuncts: &[&Expr], folder_id: i64, title: &str) 
             _ => None,
         })
         .collect();
-    let named = || Matched::Name {
-        value: title.to_owned(),
-    };
     if clauses.is_empty() {
-        return Ok(named());
+        return Ok(HashMap::new());
     }
-    let found: Option<(Option<String>, String, String)> = conn
-        .query_row(
-            &format!(
-                "SELECT t.key, t.value, ft.source FROM folder_tag ft JOIN tag t ON t.id = ft.tag_id
-                  WHERE ft.folder_id = ? AND ({})
-                  ORDER BY t.key IS NULL, ft.source = 'title', t.id LIMIT 1",
-                clauses.join(" OR ")
-            ),
-            sql.bound().as_slice(),
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-        )
-        .optional()?;
-    Ok(match found {
-        Some((Some(key), value, _)) => Matched::Label { key, value },
-        Some((None, value, source)) if source != "title" => Matched::Tag { value },
-        _ => named(),
-    })
-}
-
-fn live_count(conn: &Connection, folder_id: i64) -> Result<i64> {
-    let ids = subtrees(conn, &[folder_id], true)?;
-    Ok(conn.query_row(
-        &format!(
-            "SELECT COUNT(*) FROM item WHERE deleted_at IS NULL AND folder_id IN ({})",
-            vec!["?"; ids.len()].join(",")
-        ),
-        params_from_iter(ids),
-        |r| r.get(0),
-    )?)
+    let mut stmt = conn.prepare(&format!(
+        "SELECT folder_id, key, value, source FROM (
+           SELECT ft.folder_id, t.key, t.value, ft.source,
+                  ROW_NUMBER() OVER (
+                      PARTITION BY ft.folder_id
+                      ORDER BY t.key IS NULL, ft.source = 'title', t.id
+                  ) AS n
+             FROM folder_tag ft JOIN tag t ON t.id = ft.tag_id
+            WHERE ft.folder_id IN (SELECT value FROM json_each(?)) AND ({})
+         ) WHERE n = 1",
+        clauses.join(" OR ")
+    ))?;
+    Ok(stmt
+        .query_map(sql.bound().as_slice(), |r| {
+            Ok((r.get(0)?, (r.get(1)?, r.get(2)?, r.get(3)?)))
+        })?
+        .collect::<rusqlite::Result<_>>()?)
 }
 
 // The text index.
@@ -568,7 +650,10 @@ pub fn index_folder(conn: &Connection, folder_id: i64) -> Result<()> {
 mod tests {
     //! One library, every kind of term run against its real rows.
 
+    use std::collections::HashSet;
     use std::path::Path;
+
+    use rusqlite::OptionalExtension;
 
     use super::*;
     use crate::db::items::{NewItem, SortDir, SortKey};
@@ -1271,5 +1356,168 @@ mod tests {
             folder_ids(&conn, &label_term("nickname", "the \"real\" ana")),
             [nick]
         );
+    }
+
+    /// What explained one folder's match, asked of that folder alone.
+    fn matched_alone(conn: &Connection, conjuncts: &[&Expr], id: i64, title: &str) -> Matched {
+        let mut sql = Sql::new();
+        sql.bind(id);
+        let clauses: Vec<String> = conjuncts
+            .iter()
+            .filter_map(|part| match part {
+                Expr::Term(term) => tag_row(term, &mut sql),
+                _ => None,
+            })
+            .collect();
+        let found: Option<(Option<String>, String, String)> = if clauses.is_empty() {
+            None
+        } else {
+            conn.query_row(
+                &format!(
+                    "SELECT t.key, t.value, ft.source FROM folder_tag ft JOIN tag t ON t.id = ft.tag_id
+                      WHERE ft.folder_id = ? AND ({})
+                      ORDER BY t.key IS NULL, ft.source = 'title', t.id LIMIT 1",
+                    clauses.join(" OR ")
+                ),
+                sql.bound().as_slice(),
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .optional()
+            .unwrap()
+        };
+        match found {
+            Some((Some(key), value, _)) => Matched::Label { key, value },
+            Some((None, value, source)) if source != "title" => Matched::Tag { value },
+            _ => Matched::Name {
+                value: title.to_owned(),
+            },
+        }
+    }
+
+    /// The folders a query finds, each described one folder at a time.
+    fn one_by_one(conn: &Connection, expr: &Expr) -> Vec<FolderMatch> {
+        let conjuncts: Vec<&Expr> = match expr {
+            Expr::And(parts) => parts.iter().collect(),
+            other => vec![other],
+        };
+        folders(conn, expr)
+            .unwrap()
+            .into_iter()
+            .map(|found| FolderMatch {
+                id: found.id,
+                source_id: folders::location(conn, found.id).unwrap().source_id,
+                matched: matched_alone(conn, &conjuncts, found.id, &found.title),
+                path: folders::ancestry(conn, found.id).unwrap(),
+                count: folders::subtree_count(conn, found.id).unwrap(),
+                own_count: folders::own_count(conn, found.id).unwrap(),
+                cover: None,
+                cover_uuid: crate::db::details::cover(conn, found.id)
+                    .unwrap()
+                    .map(|(_, uuid)| uuid),
+                title: found.title,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn folders_described_at_once_match_each_described_alone() {
+        let l = library();
+        let lib = 1;
+        let day = folders::create(&l.conn, l.ana, "Day One").unwrap();
+        file(&l.conn, lib, day, "dunes.jpg", plain(MB, 2024));
+        file(&l.conn, lib, day, "camel.png", plain(MB, 2024));
+        let gone = folders::create(&l.conn, l.people, "Gone").unwrap();
+        file(&l.conn, lib, gone, "lost.jpg", plain(MB, 2024));
+        l.conn
+            .execute("UPDATE folder SET deleted_at = 1 WHERE id = ?1", [gone])
+            .unwrap();
+        tags::add_folder_tag(&l.conn, l.lisbon, "beach").unwrap();
+        tags::set_folder_label(&l.conn, l.lisbon, "instagram", "@lisboa").unwrap();
+        conn_cover(&l.conn, l.people, l.view);
+        conn_cover(&l.conn, l.bob, l.sunset);
+
+        for query in [
+            "beach",
+            "people",
+            "ana",
+            "tag:beach",
+            "instagram:*",
+            ":@ana",
+            "path:Library",
+            "path:Library beach",
+            "status:wip or status:complete",
+            "lisbon or ana or bob",
+            "is:sorting",
+            "-tag:beach",
+        ] {
+            let expr = parse(query).unwrap();
+            let at_once = folders(&l.conn, &expr).unwrap();
+            assert!(!at_once.is_empty(), "{query}");
+            assert_eq!(at_once, one_by_one(&l.conn, &expr), "{query}");
+        }
+    }
+
+    #[test]
+    fn a_search_through_more_folders_than_sqlite_takes_variables_still_answers() {
+        let conn = open();
+        let (lib, root) = source(&conn, "D:/library", "Library", SourceKind::Library);
+        let big = folders::create(&conn, root, "Big").unwrap();
+        conn.execute(
+            "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 33000)
+             INSERT INTO folder (title, parent_id, created_at) SELECT 'day ' || i, ?1, 0 FROM n",
+            [big],
+        )
+        .unwrap();
+        conn.execute("UPDATE folder SET status = 'wip' WHERE id = ?1", [big])
+            .unwrap();
+        let last: i64 = conn
+            .query_row("SELECT MAX(id) FROM folder", [], |r| r.get(0))
+            .unwrap();
+        file(&conn, lib, big, "first.jpg", plain(MB, 2020));
+        file(&conn, lib, last, "last.jpg", plain(MB, 2021));
+
+        assert_eq!(found(&conn, "path:Library/Big"), ["last.jpg", "first.jpg"]);
+        assert_eq!(found(&conn, "status:wip"), ["last.jpg", "first.jpg"]);
+        assert!(found(&conn, "status:none").is_empty());
+        let below = folders(&conn, &parse("path:Library/Big").unwrap()).unwrap();
+        assert_eq!(below.len(), 33_000);
+        let big = folders(&conn, &parse("path:=Library").unwrap()).unwrap();
+        assert_eq!((big[0].count, big[0].own_count), (2, 1));
+    }
+
+    mod timing {
+        use super::*;
+
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn a_word_twenty_thousand_folders_carry_is_answered_inside_two_seconds() {
+            let conn = open();
+            let (lib, root) = source(&conn, "D:/library", "Library", SourceKind::Library);
+            let trips = folders::create(&conn, root, "Trips").unwrap();
+            tags::add_folder_tag(&conn, trips, "trip").unwrap();
+            conn.execute_batch(&format!(
+                "WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 20000)
+                 INSERT INTO folder (title, parent_id, created_at)
+                 SELECT 'day ' || i, {trips}, 0 FROM n;
+                 INSERT INTO folder_tag (folder_id, tag_id, source)
+                 SELECT f.id, t.id, 'manual' FROM folder f, tag t
+                  WHERE f.parent_id = {trips} AND t.key IS NULL AND t.value = 'trip';
+                 INSERT INTO item (uuid, source_id, folder_id, disk_name, ext, size_bytes, mtime,
+                                   kind, added_at)
+                 SELECT f.id || '-' || n.i, {lib}, f.id, 'IMG_' || n.i || '.jpg', 'jpg', 1, n.i,
+                        'image', 1
+                   FROM folder f, (SELECT 1 AS i UNION ALL SELECT 2) n
+                  WHERE f.parent_id = {trips};"
+            ))
+            .unwrap();
+
+            let started = std::time::Instant::now();
+            let found = folders(&conn, &parse("trip").unwrap()).unwrap();
+            let took = started.elapsed();
+
+            assert_eq!(found.len(), 20_001);
+            assert!(found.iter().all(|folder| folder.cover_uuid.is_some()));
+            assert!(took < std::time::Duration::from_secs(2), "took {took:?}");
+        }
     }
 }
