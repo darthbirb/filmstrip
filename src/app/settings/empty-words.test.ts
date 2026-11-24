@@ -1,7 +1,15 @@
 import { expect, test } from "vitest";
 
+import type { Stayed } from "../../ipc/bindings/Stayed";
 import { formatBytes } from "../../lib/format";
-import { emptiedLine, emptyingLine, emptyQuestion, type Said, skippedLine } from "./empty-words";
+import {
+  emptiedBannerLine,
+  emptiedLine,
+  emptyingLine,
+  emptyQuestion,
+  type Said,
+  skippedLine,
+} from "./empty-words";
 
 // Artboards › The Trash in the Recycle Bin.
 
@@ -23,18 +31,44 @@ test("the head counts as it goes", () => {
   expect(emptyingLine(120, 312)).toBe("Emptying · 120 of 312 files");
 });
 
+const stayed = (name: string): Stayed => ({
+  kind: "file",
+  id: 7,
+  name,
+  at: { kind: "trash" },
+  reason: { kind: "inUse" },
+});
+
 test("the foot says what went, and what was skipped and why", () => {
-  const none = { gone: 0, kept: 0, firstKept: null };
+  const none = { gone: 0, kept: 0, stayed: [] };
   expect(emptiedLine({ deleted: 312, bytes: 18_400_000_000, ...none })).toBe(
     `Emptied the Trash: 312 files, ${formatBytes(18_400_000_000)}, deleted for good.`,
   );
-  expect(skippedLine({ deleted: 309, bytes: 0, gone: 2, kept: 1, firstKept: 7 })).toBe(
+  const one = [stayed("a.jpg")];
+  expect(skippedLine({ deleted: 309, bytes: 0, gone: 2, kept: 1, stayed: one })).toBe(
     "Emptied 309 of 312 files for good. 2 were no longer in the Recycle Bin, and 1 would not go and stays in the Trash.",
   );
-  expect(skippedLine({ deleted: 4, bytes: 0, gone: 1, kept: 0, firstKept: null })).toBe(
+  expect(skippedLine({ deleted: 4, bytes: 0, gone: 1, kept: 0, stayed: [] })).toBe(
     "Emptied 4 of 5 files for good. 1 was no longer in the Recycle Bin.",
   );
-  expect(skippedLine({ deleted: 0, bytes: 0, gone: 0, kept: 2, firstKept: 7 })).toBe(
+  expect(skippedLine({ deleted: 0, bytes: 0, gone: 0, kept: 2, stayed: one })).toBe(
     "Emptied none of the 2 files. 2 would not go and stay in the Trash.",
+  );
+});
+
+test("the banner over what stayed counts what went, or names what could not go", () => {
+  const one = [stayed("a.jpg")];
+  expect(emptiedBannerLine({ deleted: 309, bytes: 0, gone: 2, kept: 1, stayed: one })).toBe(
+    "309 of 312 files were deleted for good",
+  );
+  expect(emptiedBannerLine({ deleted: 1, bytes: 0, gone: 0, kept: 1, stayed: one })).toBe(
+    "1 of 2 files was deleted for good",
+  );
+  expect(emptiedBannerLine({ deleted: 0, bytes: 0, gone: 1, kept: 1, stayed: one })).toBe(
+    "a.jpg could not be deleted for good",
+  );
+  const two = [stayed("a.jpg"), stayed("b.jpg")];
+  expect(emptiedBannerLine({ deleted: 0, bytes: 0, gone: 0, kept: 2, stayed: two })).toBe(
+    "The 2 files could not be deleted for good",
   );
 });

@@ -8,8 +8,9 @@ use ts_rs::TS;
 
 use crate::db::in_transaction;
 use crate::db::items::{self, Tally};
-use crate::error::Result;
+use crate::error::{AppError, Reason, Result};
 use crate::fs::recycle::{self, Shell};
+use crate::fs::stayed::{self, Stayed};
 use crate::fs::trash::{self, Found};
 
 /// A file Empty Trash… counted, by its row and the name the bin kept it under as it asked.
@@ -45,8 +46,8 @@ pub fn to_empty(conn: &Connection) -> Result<ToEmpty> {
 }
 
 /// What emptying did with the files counted that were still in the Trash: those deleted and what
-/// they weighed, those no longer in the Recycle Bin, and those that would not go, which stay in
-/// the Trash, with the first of them to show there.
+/// they weighed, those no longer in the Recycle Bin, and those it could not finish, which stay in
+/// the Trash, each with why. `kept` counts them all, and `stayed` lists those it could name.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
@@ -55,26 +56,26 @@ pub struct Emptied {
     pub bytes: i64,
     pub gone: u32,
     pub kept: u32,
-    pub first_kept: Option<i64>,
+    pub stayed: Vec<Stayed>,
 }
 
 enum Outcome {
     Deleted(i64),
     Gone,
-    Kept,
+    Kept(AppError),
     /// Taken out of the Trash since it was counted, or sent there again under another name.
     NotCounted,
 }
 
 /// Deletes for good each file counted that is still in the Trash as it was counted, one turn of
-/// the disk per file, so a restore between two takes its file out of reach. `progress` hears how
-/// many of them are settled.
+/// the disk per file, so a restore between two takes its file out of reach. One it cannot finish
+/// stays, and the rest go on. `progress` hears how many of them are settled.
 pub fn empty(conn: &Connection, counted: &[Counted], progress: &dyn Fn(u32)) -> Result<Emptied> {
     let mut emptied = Emptied::default();
     for (at, one) in counted.iter().enumerate() {
         let outcome = {
             let _turn = super::turn();
-            empty_one(conn, one)?
+            empty_one(conn, one).unwrap_or_else(Outcome::Kept)
         };
         match outcome {
             Outcome::Deleted(bytes) => {
@@ -82,9 +83,12 @@ pub fn empty(conn: &Connection, counted: &[Counted], progress: &dyn Fn(u32)) -> 
                 emptied.bytes += bytes;
             }
             Outcome::Gone => emptied.gone += 1,
-            Outcome::Kept => {
+            Outcome::Kept(err) => {
                 emptied.kept += 1;
-                emptied.first_kept.get_or_insert(one.item_id);
+                match stayed::file(conn, one.item_id, &err) {
+                    Ok(row) => emptied.stayed.push(row),
+                    Err(unread) => eprintln!("empty: item {} stays: {err}; {unread}", one.item_id),
+                }
             }
             Outcome::NotCounted => {}
         }
@@ -113,8 +117,7 @@ fn empty_one(conn: &Connection, counted: &Counted) -> Result<Outcome> {
             };
             let bytes = items::size_of(conn, id)?.unwrap_or_default();
             if let Err(err) = recycle::purge(&Shell, &path, &itself) {
-                eprintln!("empty: {} stays in the Trash: {err}", path.display());
-                return Ok(Outcome::Kept);
+                return Ok(Outcome::Kept(err.into()));
             }
             // The file is gone whatever the index says now; a row left in the Trash is retired by
             // the next look in the bin.
@@ -131,7 +134,9 @@ fn empty_one(conn: &Connection, counted: &Counted) -> Result<Outcome> {
             in_transaction(conn, |tx| trash::put_back(tx, id, &file))?;
             Ok(Outcome::Gone)
         }
-        Found::Away => Ok(Outcome::Kept),
+        Found::Away => Ok(Outcome::Kept(AppError::refused(Reason::Offline {
+            source: trash::source_title(conn, file.folder_id),
+        }))),
     }
 }
 
@@ -304,7 +309,16 @@ mod tests {
         drop(open);
 
         assert_eq!((emptied.deleted, emptied.gone, emptied.kept), (2, 0, 1));
-        assert_eq!(emptied.first_kept, Some(b));
+        assert_eq!(
+            emptied.stayed,
+            [Stayed {
+                kind: stayed::Thing::File,
+                id: b,
+                name: "b.jpg".into(),
+                at: stayed::Whereabouts::Trash,
+                reason: Reason::InUse,
+            }]
+        );
         assert_eq!(std::fs::read_to_string(&held).unwrap(), "b.jpg");
         assert_eq!(
             lib.asked().files,
@@ -543,7 +557,60 @@ mod tests {
 
         let emptied = lib.empty(&lib.asked());
 
-        assert_eq!((emptied.kept, emptied.first_kept), (1, Some(a)));
+        assert_eq!(emptied.kept, 1);
+        assert_eq!(
+            (emptied.stayed[0].id, &emptied.stayed[0].reason),
+            (
+                a,
+                &Reason::Offline {
+                    source: "Library".into()
+                }
+            )
+        );
         assert!(items::is_trashed(&lib.conn, a).unwrap());
+    }
+
+    #[test]
+    fn a_file_the_index_fails_on_partway_stays_with_why_and_the_rest_are_still_emptied() {
+        let lib = library("index-fails", &["a.jpg", "b.jpg", "c.jpg"]);
+        let [a, b, c] = ["a.jpg", "b.jpg", "c.jpg"].map(|name| lib.id(name));
+        lib.delete(&["a.jpg", "b.jpg", "c.jpg"]);
+        let counted = [a, b, c].map(|id| Counted {
+            item_id: id,
+            bin_path: items::binned(&lib.conn, id).unwrap().map(|(path, _)| path),
+        });
+        let binned = [a, b, c].map(|id| lib.in_bin(id));
+        std::fs::remove_file(&binned[1]).unwrap();
+        lib.conn
+            .execute_batch(&format!(
+                "CREATE TEMP TRIGGER refuse_b BEFORE UPDATE ON item WHEN OLD.id = {b}
+                 BEGIN SELECT RAISE(ABORT, 'refused'); END;"
+            ))
+            .unwrap();
+        let heard = RefCell::new(Vec::new());
+
+        let emptied = empty(&lib.conn, &counted, &|done| heard.borrow_mut().push(done)).unwrap();
+
+        assert_eq!(
+            (emptied.deleted, emptied.bytes, emptied.gone, emptied.kept),
+            (2, 10, 0, 1)
+        );
+        assert_eq!(*heard.borrow(), [1, 2, 3]);
+        let [row] = emptied.stayed.as_slice() else {
+            panic!("{:?}", emptied.stayed);
+        };
+        assert_eq!((row.id, &row.name), (b, &"b.jpg".to_owned()));
+        assert_eq!(row.at, stayed::Whereabouts::Trash);
+        assert!(
+            matches!(row.reason, Reason::Other { .. }),
+            "{:?}",
+            row.reason
+        );
+        for file in [&binned[0], &binned[2]] {
+            assert!(std::fs::symlink_metadata(file).is_err());
+        }
+        assert!(!items::is_trashed(&lib.conn, a).unwrap());
+        assert!(!items::is_trashed(&lib.conn, c).unwrap());
+        assert!(items::is_trashed(&lib.conn, b).unwrap());
     }
 }

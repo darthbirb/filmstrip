@@ -483,6 +483,10 @@ export function reasonText(reason: Reason): string {
       return "The Recycle Bin would not take it";
     case "noBin":
       return `${reason.drive} has no Recycle Bin`;
+    case "pathTooLong":
+      return "Path too long for the Recycle Bin";
+    case "noHardLinks":
+      return `${reason.drive} has no hard links`;
     case "other":
       return reason.message.charAt(0).toUpperCase() + reason.message.slice(1);
   }

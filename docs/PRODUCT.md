@@ -57,7 +57,9 @@ says how many files the library has there and the space they take. Nothing else 
 Trash's.
 
 A file the Recycle Bin will not take, too large for it or on a drive whose bin is off, stays where
-it was, and the foot says so; nothing is deleted outright. In a set the rest go, with Undo.
+it was, and the foot says so; nothing is deleted outright. In a set the rest go, with Undo. One
+the app never hands to the bin stays the same way and the banner says why: a path too long for
+the Recycle Bin, or a drive without hard links, named, such as an exFAT disk.
 
 A drive with no Recycle Bin at all, a USB stick, an SD card or a network share, asks first, once
 for the whole selection: the drive, how many files and how much space, and that they go for good
@@ -81,7 +83,8 @@ many files and how much space, that only these go, and that Undo cannot bring th
 has the focus. Emptying counts in the section's head as it goes, and a file deleted meanwhile
 stays. The foot says when it is done, with no Undo: Ctrl+Z skips the emptied files and undoes
 the act before them. A file no longer in the bin, or one that would not go, is skipped and said;
-one that would not go stays in the Trash, for Show in Trash to find and Empty Trash… to ask again.
+one that would not go stays in the Trash, for Show in Trash to find and Empty Trash… to ask again,
+and the rest still go. The banner lists each one that stayed, with why.
 
 ## Tags and labels
 

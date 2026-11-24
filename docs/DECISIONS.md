@@ -1559,6 +1559,12 @@ the way back; a single file is never purged from the app, as Explorer's bin can 
   row retires; put back from Explorer, it is restored in the index; either way it was no longer in
   the Recycle Bin. One open in another app, on a drive that is away, or whose name in the bin is
   no longer its own stays in the Trash under its row, whole, and Empty Trash… asks again for it.
+- **One file that cannot be finished never stops the rest** (#219). Anything that fails for one
+  file, the disk or the index, keeps that file in the Trash with why, and the empty goes on to the
+  next, so a failure at file 3,000 of 10,000 still empties the other 9,999 and counts them. The
+  foot counts what went and what stayed, and the banner over the grid lists each that stayed,
+  under Still in the Trash, with its reason and Show in Trash; there is no Retry, since Empty
+  Trash… asks again for what is left.
 - **The row retires and the journal lets it go.** A deleted file's row retires where it was, as
   the Trash retires one emptied outside the app, and every journal row about it alone goes in the
   same transaction, its id leaving every row about several (SCHEMA.md "The undo journal"). Nothing
@@ -1623,8 +1629,17 @@ which the app never shows on its behalf.
   bin. DECISIONS.md "The Trash is the Recycle Bin".
 - **`SHFileOperationW`, not `IFileOperation`.** The newer interface can refuse an outright delete
   before it happens, but only through a COM sink the app would have to implement; the second name
-  gets the same promise from one flat call. The reason a file was refused is not told apart: all
-  three are the Recycle Bin refusing, and a send that fails on the disk is said in the log.
+  gets the same promise from one flat call. Why the bin refused a file is not told apart: too
+  large, the bin off, or a delete outright are all the Recycle Bin refusing, and a send that fails
+  on the disk is said in the log.
+- **What the shell is never asked is refused with its own reason** (#219). `SHFileOperationW`
+  takes no path of MAX_PATH or longer, so such a file is refused before its second name is made,
+  as a path too long for the Recycle Bin, rather than handed over to fail as the bin's refusal.
+  A file that cannot be given its second name, or whose names cannot be read, is refused naming
+  its drive, as Explorer names it, since the drive is what lacks hard links: a fixed exFAT or FAT
+  drive has a bin, but no way for the send to tell a recycle from a delete. When the disk says the
+  file itself is the cause, another app holding it or access denied, that reason is given instead.
+  Whether such a drive should send another way is left open; the reason says which it was.
 - **The second name is made in the file's own folder.** Delete hands `send` a file where it is,
   so its second name is made there, hidden by its dot from the walk, and nothing else would ever
   find it. Its mark joins the list in `setting.recycling` before the send and leaves only once

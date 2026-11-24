@@ -44,6 +44,11 @@ pub enum Sent {
     Gone,
     /// The bin could not take it, so it is where it was, or under its second name beside it.
     Refused,
+    /// Its path is too long for the shell to take, so it was never handed over.
+    TooLong,
+    /// It could not be given a second name, or that name's names could not be read, so it was
+    /// never handed over: the code the disk refused it with, when it gave one.
+    Unheld(Option<i32>),
 }
 
 /// Sends a file to the Recycle Bin, held under a second name, kept until [`release`] once it is
@@ -62,12 +67,18 @@ pub fn send(
         Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(Sent::Gone),
         Err(err) => return Err(err),
     }
-    if std::fs::hard_link(file, &hold).is_err() {
-        return Ok(Sent::Refused);
+    if too_long_for_shell(file) {
+        return Ok(Sent::TooLong);
     }
-    let (Ok(before), Ok(itself)) = (names_of(&hold), identity(&hold)) else {
-        drop_hold(file, &hold)?;
-        return Ok(Sent::Refused);
+    if let Err(err) = link(file, &hold) {
+        return Ok(Sent::Unheld(err.raw_os_error()));
+    }
+    let (before, itself) = match (names_of(&hold), identity(&hold)) {
+        (Ok(before), Ok(itself)) => (before, itself),
+        (Err(err), _) | (_, Err(err)) => {
+            drop_hold(file, &hold)?;
+            return Ok(Sent::Unheld(err.raw_os_error()));
+        }
     };
     if let Err(err) = holding(&itself.key(), &before) {
         drop_hold(file, &hold)?;
@@ -422,12 +433,29 @@ fn volume_of(path: &Path) -> io::Result<PathBuf> {
 #[cfg(test)]
 thread_local! {
     static UNREADABLE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static UNLINKABLE: std::cell::Cell<Option<i32>> = const { std::cell::Cell::new(None) };
 }
 
 /// Makes every file's names unreadable on this thread, as on a drive that cannot list them.
 #[cfg(test)]
 fn names_unreadable() {
     UNREADABLE.set(true);
+}
+
+/// Makes every second name fail on this thread with the disk's `code`, as on a drive without hard
+/// links, or for a file another app holds.
+#[cfg(test)]
+pub(crate) fn links_fail(code: i32) {
+    UNLINKABLE.set(Some(code));
+}
+
+/// Gives `file` the second name `hold`.
+fn link(file: &Path, hold: &Path) -> io::Result<()> {
+    #[cfg(test)]
+    if let Some(code) = UNLINKABLE.get() {
+        return Err(io::Error::from_raw_os_error(code));
+    }
+    std::fs::hard_link(file, hold)
 }
 
 /// Every full name the file at `path` has, on its volume, verbatim.
@@ -474,6 +502,59 @@ fn names_of(path: &Path) -> io::Result<Vec<PathBuf>> {
 #[cfg(unix)]
 fn names_of(_path: &Path) -> io::Result<Vec<PathBuf>> {
     Err(io::ErrorKind::Unsupported.into())
+}
+
+/// `file` as the shell is handed it: in full, and verbatim only on a share, since the shell takes
+/// no other verbatim path.
+#[cfg(windows)]
+fn shell_form(file: &Path) -> io::Result<Vec<u16>> {
+    use std::os::windows::ffi::OsStrExt;
+
+    let full = std::path::absolute(file)?;
+    let mut form: Vec<u16> = full.as_os_str().encode_wide().collect();
+    let wide = |text: &str| text.encode_utf16().collect::<Vec<u16>>();
+    if form.starts_with(&wide(r"\\?\")) && !form.starts_with(&wide(r"\\?\UNC\")) {
+        form.drain(..4);
+    }
+    Ok(form)
+}
+
+/// Whether `file`'s path is longer than the shell takes, MAX_PATH with its NUL.
+#[cfg(windows)]
+fn too_long_for_shell(file: &Path) -> bool {
+    use windows_sys::Win32::Foundation::MAX_PATH;
+
+    shell_form(file).is_ok_and(|form| form.len() >= MAX_PATH as usize)
+}
+
+#[cfg(not(windows))]
+fn too_long_for_shell(_file: &Path) -> bool {
+    false
+}
+
+/// The drive `path` is on, as Explorer names it, whatever its kind; its root when that cannot be
+/// read.
+pub fn drive_of(path: &Path) -> String {
+    #[cfg(windows)]
+    if let Some((root, kind)) = drive_at(path) {
+        return drive_name(&root, kind, volume_label(&root));
+    }
+    path.ancestors()
+        .last()
+        .unwrap_or(path)
+        .to_string_lossy()
+        .into_owned()
+}
+
+/// The root of the drive `path` is on, plain, and its kind, as `GetDriveTypeW` gives it.
+#[cfg(windows)]
+fn drive_at(path: &Path) -> Option<(PathBuf, u32)> {
+    use windows_sys::Win32::Storage::FileSystem::GetDriveTypeW;
+
+    let root = plain(&volume_of(path).ok()?);
+    // SAFETY: the root is NUL-terminated and outlives the call.
+    let kind = unsafe { GetDriveTypeW(wide(&root).as_ptr()) };
+    Some((root, kind))
 }
 
 /// The bin the app's verbs send to and take back from: the shell's [`RecycleBin`], and under test
@@ -524,7 +605,6 @@ pub struct RecycleBin;
 #[cfg(windows)]
 impl Bin for RecycleBin {
     fn take(&self, file: &Path) -> io::Result<()> {
-        use std::os::windows::ffi::OsStrExt;
         use windows_sys::Win32::UI::Shell::{
             FO_DELETE, FOF_ALLOWUNDO, FOF_NO_UI, SHFILEOPSTRUCTW, SHFileOperationW,
         };
@@ -539,13 +619,7 @@ impl Bin for RecycleBin {
             panic!("{} was handed to the real Recycle Bin", file.display());
         }
 
-        let full = std::path::absolute(file)?;
-        let mut from: Vec<u16> = full.as_os_str().encode_wide().collect();
-        // The shell takes no verbatim path, and its list ends in two NULs.
-        let wide = |text: &str| text.encode_utf16().collect::<Vec<u16>>();
-        if from.starts_with(&wide(r"\\?\")) && !from.starts_with(&wide(r"\\?\UNC\")) {
-            from.drain(..4);
-        }
+        let mut from = shell_form(file)?;
         from.extend([0, 0]);
         let mut op = SHFILEOPSTRUCTW {
             wFunc: FO_DELETE,
@@ -596,14 +670,11 @@ impl Bin for RecycleBin {
     /// Windows keeps a Recycle Bin on a fixed drive only: a removable one, a network share, a disc
     /// or a RAM disk has none. A drive whose kind cannot be read counts as having one.
     fn binless(&self, path: &Path) -> Option<String> {
-        use windows_sys::Win32::Storage::FileSystem::GetDriveTypeW;
         use windows_sys::Win32::System::WindowsProgramming::{
             DRIVE_CDROM, DRIVE_RAMDISK, DRIVE_REMOTE, DRIVE_REMOVABLE,
         };
 
-        let root = plain(&volume_of(path).ok()?);
-        // SAFETY: the root is NUL-terminated and outlives the call.
-        let kind = unsafe { GetDriveTypeW(wide(&root).as_ptr()) };
+        let (root, kind) = drive_at(path)?;
         matches!(
             kind,
             DRIVE_REMOVABLE | DRIVE_REMOTE | DRIVE_CDROM | DRIVE_RAMDISK
@@ -1055,11 +1126,68 @@ pub(crate) mod tests {
         let bin = Fake::new(Stand::Recycles(dir.join("bin")));
         names_unreadable();
 
-        assert_eq!(send(&bin, &file).unwrap(), Sent::Refused);
+        assert_eq!(send(&bin, &file).unwrap(), Sent::Unheld(None));
         assert!(bin.asked.borrow().is_empty());
         settles_to(&dir.join("trash"), &["one.jpg"]);
         assert_eq!(identity(&file).unwrap().links, 2);
         assert!(!dir.join("bin").exists());
+    }
+
+    #[test]
+    fn a_file_that_cannot_be_given_a_second_name_is_never_handed_to_the_shell_and_says_why() {
+        let dir = scratch("unlinkable");
+        let file = one_with_names(&dir, 0);
+        let bin = Fake::new(Stand::Recycles(dir.join("bin")));
+        links_fail(1);
+
+        assert_eq!(send(&bin, &file).unwrap(), Sent::Unheld(Some(1)));
+        assert!(bin.asked.borrow().is_empty());
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
+        settles_to(&dir.join("trash"), &["one.jpg"]);
+        assert_eq!(identity(&file).unwrap().links, 1);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_file_whose_path_is_past_max_path_is_never_handed_to_the_shell_and_is_too_long() {
+        let dir = scratch("too-long");
+        let trash = dir.join("trash");
+        for (room, sent) in [(259, None), (260, Some(Sent::TooLong))] {
+            let name = format!("{}.jpg", "a".repeat(room - trash.as_os_str().len() - 5));
+            let file = trash.join(&name);
+            assert_eq!(file.as_os_str().len(), room);
+            std::fs::write(&file, "one").unwrap();
+            let bin = Fake::new(Stand::Recycles(dir.join("bin")));
+
+            let got = send(&bin, &file).unwrap();
+
+            if let Some(sent) = sent {
+                assert_eq!(got, sent);
+                assert!(bin.asked.borrow().is_empty());
+                assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
+                settles_to(&trash, &[name.as_str()]);
+                assert_eq!(identity(&file).unwrap().links, 1);
+            } else {
+                assert!(recycled(got), "{room}");
+                settles_to(&trash, &[]);
+            }
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn any_drive_is_named_as_explorer_names_it() {
+        let dir = scratch("drive-of");
+        let root = volume_of(&dir).unwrap();
+        let letter = plain(&root)
+            .to_string_lossy()
+            .trim_end_matches('\\')
+            .to_owned();
+
+        let named = drive_of(&dir.join("trash/one.jpg"));
+
+        assert!(named.ends_with(&format!(" ({letter})")), "{named}");
+        assert_eq!(drive_of(&dir), named);
     }
 
     #[test]

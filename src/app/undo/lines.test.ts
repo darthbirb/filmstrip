@@ -122,6 +122,10 @@ test("each reason is said in the banner's own words", () => {
     "Emptied outside the app",
   );
   expect(reasonText({ kind: "binRefused" })).toBe("The Recycle Bin would not take it");
+  expect(reasonText({ kind: "pathTooLong" })).toBe("Path too long for the Recycle Bin");
+  expect(reasonText({ kind: "noHardLinks", drive: "Photos (F:)" })).toBe(
+    "Photos (F:) has no hard links",
+  );
   expect(reasonText({ kind: "sourceRemoved", source: "Phone" })).toBe("Phone was removed");
 });
 
