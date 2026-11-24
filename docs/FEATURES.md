@@ -53,7 +53,7 @@ drawn. **Not started** — neither.
 | A folder's cover | Built | `folder_cover_choices`, `set_folder_cover`, the pencil on the band's cover, which takes only a live picture at or below the folder; the first picture stands in while none is chosen |
 | A folder's status, notes, favourite | Built | favourite: `set_folder_favorite`, `favourite_places`, a group of its own in navigation and in the band; status: `set_folder_status`, the band's segmented group; notes: `set_folder_note`, written in the band |
 | A folder's labels and tags, inherited by everything under it | Built | `add_folder_tag`, `set_folder_label`, `remove_folder_tag` and their offers, the band's Add Tag… and Add Label…; one value per key, and a key given once down a branch, refused above a folder that holds it as below one; where a move, or undoing a delete, brings two together, the nearest folder's; items inherit labels, and never own one |
-| Every item id under a folder | Built | `folder_item_ids`, and `folder_branch_files` for the bar; Select Everything Inside on a folder's and a source's menu checks the whole branch, the bar counting the files below that the grid does not list |
+| Every item id under a folder | Built | `folder_branch_files`: Select Everything Inside on a folder's and a source's menu checks the whole branch, the bar counting the files below that the grid does not list |
 
 ## Items
 
@@ -114,7 +114,7 @@ drawn. **Not started** — neither.
 | Destination hotkeys | Built | `destination_keys`, `set_destination_key`, `remove_destination_key`; the digits 1 to 0, bound from a folder's menu or Settings, shown on its row, a press moving the set or the pane's file |
 | The trash as a place, in the Recycle Bin | Built | `trash_listing`, `library_totals`: newest first under a heading per day, each tile saying where it came from, counted on its row and header and in Settings › Trash. `look_in_bin` once the window has opened and as the Trash opens retires what was emptied from the bin outside the app, Ctrl+Z passing over it and the foot's line losing Undo for an act that left with it, and restores what was put back from Explorer. On a drive with no Recycle Bin, Delete asks first (`binless_items`, `binless_under`, `delete_for_good`): the rest of the selection goes to the bin with Undo, the asked files go outright with none, and a folder's Delete Files Permanently takes its files and then the folder |
 | Restore from the trash, or restore to another folder | Built | `restore_items`, journalled, taking the file out of the Recycle Bin; Restore and Restore to… on a trashed file's bar and menu, refused into the banner, a file emptied from the bin under Gone from the Recycle Bin |
-| Empty the library's files from the Recycle Bin, the one irreversible act | Built | `trash_to_empty`, `empty_trash`: Empty Trash… in Settings › Trash asks first, then deletes for good each file it counted, found again in the bin by what it is, and nothing else in the bin; one no longer there or that would not go is skipped and said at the foot, one it cannot finish never stops the rest, each that stayed is listed in the banner with why, and Ctrl+Z passes over what went |
+| Empty the library's files from the Recycle Bin, which cannot be undone | Built | `trash_to_empty`, `empty_trash`: Empty Trash… in Settings › Trash asks first, then deletes for good each file it counted, found again in the bin by what it is, and nothing else in the bin; one no longer there or that would not go is skipped and said at the foot, one it cannot finish never stops the rest, each that stayed is listed in the banner with why, and Ctrl+Z passes over what went |
 
 ## Export and undo
 
@@ -130,7 +130,7 @@ drawn. **Not started** — neither.
 | --- | --- | --- |
 | Three panels, splitters, folding, the rail | Built | |
 | The app's own window chrome | Built | |
-| Settings | Built, with Sources, Destination Keys, Tags and Backups in it | |
+| Settings | Built, with Appearance, Sources, Destination Keys, Tags, Backups and Trash in it | |
 | The app's own right-click menus | Built | on a tile, a set of checked tiles, a frame, the pane's picture, a folder and a source, every verb included |
 | A scrubber for very large folders | Backlogged | |
 | Compression review, duplicate detection, a storage screen | Not started | PRODUCT.md "Later" |

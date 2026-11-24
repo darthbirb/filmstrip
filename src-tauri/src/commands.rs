@@ -80,7 +80,7 @@ pub struct SourceSummary {
     pub item_count: i64,
     pub root_count: i64,
     pub total_bytes: i64,
-    /// Its files in the Trash, which go to the Recycle Bin when it is removed.
+    /// Its files in the Trash, which stay in the Recycle Bin when it is removed.
     pub trash_count: i64,
     /// Whether its own folder is a favourite place.
     pub favorite: bool,
@@ -755,16 +755,6 @@ pub async fn folder_branch_files(
     folder_id: i64,
 ) -> Result<Vec<items::BranchFile>> {
     run(&state, move |conn| items::branch_files(conn, folder_id)).await
-}
-
-/// A folder's own ids, or with `deep` its whole branch's, by name.
-#[tauri::command]
-pub async fn folder_item_ids(
-    state: State<'_, AppState>,
-    folder_id: i64,
-    deep: bool,
-) -> Result<Vec<i64>> {
-    run(&state, move |conn| items::branch_ids(conn, folder_id, deep)).await
 }
 
 #[tauri::command]
