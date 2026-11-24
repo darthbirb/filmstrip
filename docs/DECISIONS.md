@@ -103,6 +103,13 @@ pair. Unicode's own case mappings fold far more than NTFS does: `kız` and `kiz`
 walk take one file for the other, and that loses identity. So the table errs toward folding
 less: a pair it misses only brings the old gap back for that character.
 
+The table is the Windows 7-era upcase. It holds the pairs Unicode 5.1 added and none from later
+versions, which says Windows has kept it unchanged since, so every volume formatted from Windows
+7 on shares it. Each NTFS volume keeps the table it was formatted with, though: one formatted by
+an earlier Windows may fold fewer pairs, and could hold side by side two names the table calls
+one. That takes a Glagolitic, Coptic or similar letter differing only in case within one folder,
+rare enough to leave.
+
 The table is data, never derived at runtime from the toolchain's or the system's Unicode
 tables. A unique index must never see its collation's order change under it. If the table
 ever changes, that change is a numbered migration that rebuilds the two indexes built with it.
@@ -1186,7 +1193,8 @@ scope writes `is:trashed`, so the two meet only when someone types both.
 **Every change the app makes on disk is journalled and can be undone, across a restart**, ported
 from ggallery on 23 September 2026. It came before any verb that changes the disk, so none of
 them ever existed without a way back. On screen since 24 September 2026, as Artboards › Undo draws
-it.
+it. Two acts delete for good, and both ask first: Empty Trash…, and Delete on a drive with no bin
+(DECISIONS.md "The Trash is the Recycle Bin").
 
 - **The line has no timer.** An act ends with one line at the foot of navigation, in the slot the
   refusal band uses, and it stays until dismissed or replaced by the next news: a line gone
@@ -1581,9 +1589,10 @@ waits, where Explorer can see it too.
   folder of that name.
 - **`data\trash` is never touched.** A folder of that name from an earlier build is neither read,
   emptied nor deleted; the app no longer makes one.
-- **Emptying stays the one irreversible act**, as PRD.md "What must always hold" has it: Empty
-  Trash… deletes for good only what the library sent to the bin, and asks first (DECISIONS.md
-  "Emptying the Trash").
+- **Two acts cannot be undone, and both ask first**, as PRD.md "What must always hold" has it.
+  Empty Trash… deletes for good only what the library sent to the bin
+  (DECISIONS.md "Emptying the Trash"), and Delete on a drive with no bin only the files it asked
+  about (DECISIONS.md "A drive with no Recycle Bin").
 - **Tests never reach the real bin.** Every send goes through `fs::recycle::Shell`, which in a
   test build hands the file to a stand-in of the test's own thread, recycling into a folder under
   `target`; the real `RecycleBin` refuses to run in one.

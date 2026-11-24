@@ -187,9 +187,7 @@ struct Held {
 /// Reads the scope's files from the index, never the disk but for whether each source is here.
 pub fn gather(conn: &Connection, scope: &Scope) -> Result<Gathered> {
     let (ids, top) = match scope {
-        Scope::Branch { folder_id } => {
-            (items::branch_ids(conn, *folder_id, true)?, Some(*folder_id))
-        }
+        Scope::Branch { folder_id } => (items::branch_ids(conn, *folder_id)?, Some(*folder_id)),
         Scope::Files { item_ids } => (item_ids.clone(), None),
     };
     let mut places: HashMap<i64, Place> = HashMap::new();

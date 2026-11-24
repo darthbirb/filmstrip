@@ -17,8 +17,8 @@ and a keyboard, any display size and text scale.
 - **Looking comes first.** Browsing a folder, opening a picture and stepping through its
   neighbours is instant; nothing else may slow it down.
 - **The user's files are safe.** The app never overwrites, never loses a file halfway through a
-  move, and every change on disk can be undone, across a restart. The one irreversible act is
-  emptying the library's files from the Recycle Bin, and it asks.
+  move, and every change on disk can be undone, across a restart, but two, and both ask first:
+  emptying the library's files from the Recycle Bin, and Delete on a drive with no Recycle Bin.
 - **Folders stay real.** A folder is a directory and an item is a file under its own name;
   removing a source forgets the index and never the files (PRODUCT.md "Folders and sources").
 - **Local and private.** No account, no network service, no telemetry. The release is a
@@ -78,7 +78,7 @@ and the small verbs ggallery had.
   the app keeps no limits of its own (#192); this replaced the trash folder's limits and expiry
   (#69, #70)
 - A drive with no Recycle Bin asks before Delete removes anything for good (#193)
-- Emptying the library's files from the Recycle Bin, the one irreversible act (#194)
+- Emptying the library's files from the Recycle Bin, which asks first and cannot be undone (#194)
 
 ### M6 · Self-contained
 

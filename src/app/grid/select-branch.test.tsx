@@ -5,7 +5,7 @@ import { render } from "vitest-browser-react";
 import { recording } from "../../dev/recording";
 import type { FolderNode } from "../../ipc/bindings/FolderNode";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
-import { folderItemIds, folderItems, moveItems, undoLast } from "../../ipc/commands";
+import { folderBranchFiles, folderItems, moveItems, undoLast } from "../../ipc/commands";
 import { libraryChanged } from "../library";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { Navigation } from "../navigation/Navigation";
@@ -74,7 +74,7 @@ test("Select Everything Inside opens the folder and checks its whole branch, cou
 
   expect(where()).toBe("Pictures/Trips");
   await expect.element(count("5 Files")).toBeVisible();
-  const branch = await folderItemIds(4, true);
+  const branch = (await folderBranchFiles(4)).map((file) => file.id);
   expect(branch).toHaveLength(5);
   expect(getSelection().ids).toEqual(branch);
   // The grid still lists Trips' own two, and both are checked; Cairo's three are counted.

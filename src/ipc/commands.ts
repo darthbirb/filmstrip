@@ -208,9 +208,6 @@ export const removeDestinationKey = (key: string) =>
 export const folderItems = (folderId: number, sort: Sort = FIRST_SORT) =>
   invoke<ItemRow[]>("folder_items", { folderId, sort });
 
-export const folderItemIds = (folderId: number, deep: boolean) =>
-  invoke<number[]>("folder_item_ids", { folderId, deep });
-
 export const folderBranchFiles = (folderId: number) =>
   invoke<BranchFile[]>("folder_branch_files", { folderId });
 

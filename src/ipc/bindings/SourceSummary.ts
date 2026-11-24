@@ -14,7 +14,7 @@ reachable: boolean,
  */
 itemCount: number, rootCount: number, totalBytes: number, 
 /**
- * Its files in the Trash, which go to the Recycle Bin when it is removed.
+ * Its files in the Trash, which stay in the Recycle Bin when it is removed.
  */
 trashCount: number, 
 /**
