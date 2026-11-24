@@ -17,7 +17,10 @@ export function watchTrashOpening() {
   });
 }
 
-/** Looks in the bin, and has the library look again when that changed anything. */
+/**
+ * Looks in the bin, and has the library look again when that changed anything: once the window
+ * has opened, and each time the Trash opens.
+ */
 export async function settleTrash() {
   const looked = await lookInBin().catch(() => null);
   if (!looked || looked.retired + looked.restored === 0) return;

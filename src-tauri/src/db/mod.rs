@@ -39,6 +39,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (11, include_str!("migrations/011_expired.sql")),
     (12, include_str!("migrations/012_recycle_bin.sql")),
     (13, include_str!("migrations/013_name_fold.sql")),
+    (14, include_str!("migrations/014_journal_subject.sql")),
 ];
 
 type Rewrite = fn(&Connection) -> Result<()>;
@@ -353,6 +354,42 @@ mod tests {
         assert!(!items::is_trashed(&conn, id).unwrap());
         let kept = tags::item_effective_tags(&conn, id).unwrap();
         assert!(kept.iter().any(|tag| tag.value == "dusk"));
+    }
+
+    #[test]
+    fn migration_14_indexes_a_journal_written_before_it_so_an_emptied_file_still_leaves_it() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        name_collation(&conn).unwrap();
+        conn.execute_batch("CREATE TABLE schema_version (version INTEGER NOT NULL);")
+            .unwrap();
+        for (version, sql) in MIGRATIONS.iter().filter(|(version, _)| *version < 14) {
+            conn.execute_batch(sql).unwrap();
+            conn.execute("INSERT INTO schema_version VALUES (?1)", [version])
+                .unwrap();
+        }
+        let deleted = journal::new_batch();
+        journal::record_item_trash(&conn, &deleted, 5).unwrap();
+        journal::record_folder_delete(&conn, &deleted, 9, 1).unwrap();
+        let tagged = journal::new_batch();
+        let set = journal::ItemsTagged {
+            tag_id: 1,
+            value: "dusk".into(),
+            item_ids: vec![5, 6],
+        };
+        journal::record_items_tag(&conn, &tagged, &set).unwrap();
+
+        migrate(&mut conn).unwrap();
+        let indexed: i64 = conn
+            .query_row("SELECT COUNT(*) FROM journal_subject", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(indexed, 4);
+        journal::drop_item(&conn, 5).unwrap();
+
+        assert!(journal::batch(&conn, &deleted).unwrap().is_empty());
+        let left: journal::ItemsTagged =
+            serde_json::from_value(journal::batch(&conn, &tagged).unwrap()[0].inverse.clone())
+                .unwrap();
+        assert_eq!(left.item_ids, [6]);
     }
 
     #[test]

@@ -67,15 +67,26 @@ enum Outcome {
     NotCounted,
 }
 
+/// How many deleted files' rows leave the Trash and the journal in one transaction.
+const LEFT_AT_ONCE: usize = 200;
+
 /// Deletes for good each file counted that is still in the Trash as it was counted, one turn of
 /// the disk per file, so a restore between two takes its file out of reach. One it cannot finish
 /// stays, and the rest go on. `progress` hears how many of them are settled.
 pub fn empty(conn: &Connection, counted: &[Counted], progress: &dyn Fn(u32)) -> Result<Emptied> {
     let mut emptied = Emptied::default();
+    let mut deleted = Vec::new();
     for (at, one) in counted.iter().enumerate() {
         let outcome = {
             let _turn = super::turn();
-            empty_one(conn, one).unwrap_or_else(Outcome::Kept)
+            let outcome = empty_one(conn, one).unwrap_or_else(Outcome::Kept);
+            if let Outcome::Deleted(_) = outcome {
+                deleted.push(one.clone());
+            }
+            if deleted.len() >= LEFT_AT_ONCE || at + 1 == counted.len() {
+                leave(conn, &std::mem::take(&mut deleted));
+            }
+            outcome
         };
         match outcome {
             Outcome::Deleted(bytes) => {
@@ -97,45 +108,65 @@ pub fn empty(conn: &Connection, counted: &[Counted], progress: &dyn Fn(u32)) -> 
     Ok(emptied)
 }
 
+/// Takes the rows of files just deleted out of the Trash and the journal in one transaction, each
+/// still in the Trash under the name it was deleted from, under the caller's turn of the disk. A
+/// row left there is retired by the next look in the bin. DECISIONS.md "Emptying the Trash".
+fn leave(conn: &Connection, deleted: &[Counted]) {
+    if deleted.is_empty() {
+        return;
+    }
+    let left = (|| {
+        let ids: Vec<i64> = deleted.iter().map(|one| one.item_id).collect();
+        let still: Vec<i64> = items::in_bin(conn, Some(&ids))?
+            .into_iter()
+            .filter(|row| {
+                let path = row.binned.as_ref().map(|(path, _)| path);
+                deleted
+                    .iter()
+                    .any(|one| one.item_id == row.id && one.bin_path.as_ref() == path)
+            })
+            .map(|row| row.id)
+            .collect();
+        in_transaction(conn, |tx| trash::leave_all(tx, &still))
+    })();
+    if let Err(err) = left {
+        eprintln!(
+            "empty: {} files are gone, their rows not yet: {err}",
+            deleted.len()
+        );
+    }
+}
+
 /// Finds one counted file again by what it is, in the bin where it went, and deletes it there.
-/// The caller holds the disk's turn.
+/// The caller holds the disk's turn, and lets its row go with [`leave`].
 fn empty_one(conn: &Connection, counted: &Counted) -> Result<Outcome> {
     let id = counted.item_id;
-    let binned = items::binned(conn, id)?;
-    if !items::is_trashed(conn, id)?
-        || binned.as_ref().map(|(path, _)| path) != counted.bin_path.as_ref()
-    {
-        return Ok(Outcome::NotCounted);
-    }
-    let Some(file) = items::file_of(conn, id)? else {
+    let Some(row) = items::in_bin(conn, Some(&[id]))?.pop() else {
         return Ok(Outcome::NotCounted);
     };
-    match trash::find(conn, id, &file)? {
+    if row.binned.as_ref().map(|(path, _)| path) != counted.bin_path.as_ref() {
+        return Ok(Outcome::NotCounted);
+    }
+    match trash::find_in(conn, row.binned.clone(), &row.file)? {
         Found::Bin(path) => {
-            let Some((_, itself)) = binned else {
+            let Some((_, itself)) = row.binned else {
                 return Ok(Outcome::NotCounted);
             };
-            let bytes = items::size_of(conn, id)?.unwrap_or_default();
             if let Err(err) = recycle::purge(&Shell, &path, &itself) {
                 return Ok(Outcome::Kept(err.into()));
             }
-            // The file is gone whatever the index says now; a row left in the Trash is retired by
-            // the next look in the bin.
-            if let Err(err) = in_transaction(conn, |tx| trash::leave(tx, id)) {
-                eprintln!("empty: {} is gone, its row not yet: {err}", path.display());
-            }
-            Ok(Outcome::Deleted(bytes))
+            Ok(Outcome::Deleted(row.size_bytes))
         }
         Found::Gone => {
             in_transaction(conn, |tx| trash::leave(tx, id))?;
             Ok(Outcome::Gone)
         }
         Found::Back => {
-            in_transaction(conn, |tx| trash::put_back(tx, id, &file))?;
+            in_transaction(conn, |tx| trash::put_back(tx, id, &row.file))?;
             Ok(Outcome::Gone)
         }
         Found::Away => Ok(Outcome::Kept(AppError::refused(Reason::Offline {
-            source: trash::source_title(conn, file.folder_id),
+            source: trash::source_title(conn, row.file.folder_id),
         }))),
     }
 }
@@ -612,5 +643,65 @@ mod tests {
         assert!(!items::is_trashed(&lib.conn, a).unwrap());
         assert!(!items::is_trashed(&lib.conn, c).unwrap());
         assert!(items::is_trashed(&lib.conn, b).unwrap());
+    }
+
+    #[test]
+    fn more_files_than_leave_in_one_transaction_all_leave_the_trash_and_the_journal() {
+        let names: Vec<String> = (0..=LEFT_AT_ONCE).map(|n| format!("{n}.jpg")).collect();
+        let names: Vec<&str> = names.iter().map(String::as_str).collect();
+        let lib = library("batched", &names);
+        let deleted = lib.delete(&names);
+        let asked = lib.asked();
+
+        let emptied = lib.empty(&asked);
+
+        assert_eq!(emptied.deleted as usize, names.len());
+        assert!(lib.asked().files.is_empty());
+        assert!(journal::batch(&lib.conn, &deleted).unwrap().is_empty());
+        assert!(std::fs::read_dir(lib.bin_dir()).unwrap().next().is_none());
+    }
+
+    mod timing {
+        use super::*;
+
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn ten_thousand_files_empty_against_a_journal_of_two_hundred_thousand_inside_ten_seconds() {
+            let lib = library("timing", &[]);
+            std::fs::create_dir_all(lib.bin_dir()).unwrap();
+            let tx = db::begin(&lib.conn).unwrap();
+            let trashed: Vec<i64> = (0..10_000_i64)
+                .map(|n| {
+                    let binned = lib.bin_dir().join(format!("$R{n}.jpg"));
+                    std::fs::write(&binned, "x").unwrap();
+                    tx.execute(
+                        "INSERT INTO item (uuid, source_id, folder_id, disk_name, ext, size_bytes,
+                                           mtime, kind, added_at, deleted_at, trashed_at,
+                                           bin_path, bin_file)
+                         VALUES ('t' || ?1, 1, ?2, ?1 || '.jpg', 'jpg', 1, 1, 'image', 1, 2, 2,
+                                 ?3, ?4)",
+                        rusqlite::params![
+                            n,
+                            lib.cairo,
+                            binned.to_string_lossy(),
+                            recycle::file_at(&binned).unwrap()
+                        ],
+                    )
+                    .unwrap();
+                    tx.last_insert_rowid()
+                })
+                .collect();
+            tx.commit().unwrap();
+            journal::grow_to_two_hundred_thousand(&lib.conn, &trashed);
+            let asked = lib.asked();
+
+            let started = std::time::Instant::now();
+            let emptied = lib.empty(&asked);
+            let took = started.elapsed();
+
+            assert_eq!(emptied.deleted, 10_000);
+            assert!(to_empty(&lib.conn).unwrap().files.is_empty());
+            assert!(took < std::time::Duration::from_secs(10), "took {took:?}");
+        }
     }
 }

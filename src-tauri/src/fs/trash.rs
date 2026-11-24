@@ -2,6 +2,7 @@
 //! back. Sending one there is journalled, so it can be undone.
 //! DECISIONS.md "The Trash is the Recycle Bin".
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
@@ -245,20 +246,58 @@ pub(super) enum Found {
 /// Looks for a trashed item's file by the file itself: in the bin where it went, or back where it
 /// came from. One the bin has no record of is gone, as a file the app's own trash folder held is.
 pub(super) fn find(conn: &Connection, item_id: i64, file: &ItemFile) -> Result<Found> {
-    let Some((binned, itself)) = items::binned(conn, item_id)? else {
-        return Ok(Found::Gone);
-    };
-    let binned = PathBuf::from(binned);
-    if recycle::file_at(&binned).as_deref() == Some(itself.as_str()) {
-        return Ok(Found::Bin(binned));
-    }
-    let home = paths::item_path(conn, file.folder_id, &file.disk_name)?;
-    if recycle::file_at(&home).as_deref() == Some(itself.as_str()) {
-        return Ok(Found::Back);
-    }
-    match recycle::volume_serial(&binned) {
-        Some(volume) if volume == recycle::serial_of(&itself) => Ok(Found::Gone),
-        _ => Ok(Found::Away),
+    find_in(conn, items::binned(conn, item_id)?, file)
+}
+
+/// As [`find`], for a file whose place in the bin was already read.
+pub(super) fn find_in(
+    conn: &Connection,
+    binned: Option<(String, String)>,
+    file: &ItemFile,
+) -> Result<Found> {
+    Looking::default().find(conn, binned, file)
+}
+
+/// What a look at many trashed files reads once rather than per file: each folder's directory and
+/// each bin directory's volume.
+#[derive(Default)]
+struct Looking {
+    dirs: HashMap<i64, PathBuf>,
+    volumes: HashMap<PathBuf, Option<String>>,
+}
+
+impl Looking {
+    fn find(
+        &mut self,
+        conn: &Connection,
+        binned: Option<(String, String)>,
+        file: &ItemFile,
+    ) -> Result<Found> {
+        let Some((binned, itself)) = binned else {
+            return Ok(Found::Gone);
+        };
+        let binned = PathBuf::from(binned);
+        if recycle::file_at(&binned).as_deref() == Some(itself.as_str()) {
+            return Ok(Found::Bin(binned));
+        }
+        let dir = match self.dirs.get(&file.folder_id) {
+            Some(dir) => dir,
+            None => {
+                let dir = paths::folder_dir(conn, file.folder_id)?;
+                self.dirs.entry(file.folder_id).or_insert(dir)
+            }
+        };
+        if recycle::file_at(&dir.join(&file.disk_name)).as_deref() == Some(itself.as_str()) {
+            return Ok(Found::Back);
+        }
+        let volume = self
+            .volumes
+            .entry(binned.parent().map(Path::to_path_buf).unwrap_or_default())
+            .or_insert_with(|| recycle::volume_serial(&binned));
+        match volume {
+            Some(volume) if volume == recycle::serial_of(&itself) => Ok(Found::Gone),
+            _ => Ok(Found::Away),
+        }
     }
 }
 
@@ -281,8 +320,13 @@ pub(super) fn put_back(conn: &Connection, item_id: i64, file: &ItemFile) -> Resu
 /// Takes a file gone from the Recycle Bin out of the Trash and out of the journal, so an undo
 /// passes over it. SCHEMA.md "The undo journal".
 pub(super) fn leave(conn: &Connection, id: i64) -> Result<()> {
-    journal::drop_item(conn, id)?;
-    items::retire_trashed(conn, id, now())
+    leave_all(conn, &[id])
+}
+
+/// Takes many files gone from the Recycle Bin out of the Trash and the journal at once.
+pub(super) fn leave_all(conn: &Connection, ids: &[i64]) -> Result<()> {
+    journal::drop_items(conn, ids)?;
+    items::retire_all_trashed(conn, ids, now())
 }
 
 /// What looking in the Recycle Bin found: rows retired for files emptied from it outside the app,
@@ -295,32 +339,65 @@ pub struct Looked {
     pub restored: u32,
 }
 
-/// Looks for each trashed item's file in the Recycle Bin, at launch and as the Trash opens: gone
-/// from the bin, its row leaves the Trash and the journal; back at its path, it is restored in the
-/// index. One on a drive that is away waits. Artboards › The Trash in the Recycle Bin.
+/// Looks for each trashed file in the Recycle Bin: gone, its row leaves the Trash and the journal;
+/// back at its path, it is restored. Only what changed is looked at again, under the disk's turn.
+/// DECISIONS.md "The Trash is the Recycle Bin".
 pub fn look_in_bin(conn: &Connection) -> Result<Looked> {
+    let mut looking = Looking::default();
+    let mut changed = Vec::new();
+    for one in items::in_bin(conn, None)? {
+        if matches!(
+            looking.find(conn, one.binned, &one.file)?,
+            Found::Gone | Found::Back
+        ) {
+            changed.push(one.id);
+        }
+    }
+    if changed.is_empty() {
+        return Ok(Looked::default());
+    }
+    #[cfg(test)]
+    if let Some(then) = BETWEEN_LOOKS.with(|hook| hook.borrow_mut().take()) {
+        then();
+    }
     let _turn = super::turn();
-    let mut looked = Looked::default();
-    for (row, _) in items::in_trash(conn)? {
-        let Some(file) = items::file_of(conn, row.id)? else {
-            continue;
-        };
-        match find(conn, row.id, &file)? {
+    let mut looking = Looking::default();
+    let (mut gone, mut back) = (Vec::new(), Vec::new());
+    for one in items::in_bin(conn, Some(&changed))? {
+        match looking.find(conn, one.binned, &one.file)? {
             Found::Bin(_) | Found::Away => {}
-            Found::Gone => {
-                in_transaction(conn, |tx| leave(tx, row.id))?;
-                looked.retired += 1;
-            }
-            Found::Back => {
-                if in_transaction(conn, |tx| put_back(tx, row.id, &file))? {
-                    looked.restored += 1;
-                } else {
-                    looked.retired += 1;
-                }
-            }
+            Found::Gone => gone.push(one.id),
+            Found::Back => back.push((one.id, one.file)),
+        }
+    }
+    if !gone.is_empty() {
+        in_transaction(conn, |tx| leave_all(tx, &gone))?;
+    }
+    let mut looked = Looked {
+        retired: u32::try_from(gone.len()).unwrap_or(u32::MAX),
+        restored: 0,
+    };
+    for (id, file) in &back {
+        if in_transaction(conn, |tx| put_back(tx, *id, file))? {
+            looked.restored += 1;
+        } else {
+            looked.retired += 1;
         }
     }
     Ok(looked)
+}
+
+#[cfg(test)]
+thread_local! {
+    static BETWEEN_LOOKS: std::cell::RefCell<Option<Box<dyn FnOnce()>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Runs `then` once on this thread's next look in the bin that found something to change, after
+/// its first look and before it takes the disk's turn: where a test changes the bin meanwhile.
+#[cfg(test)]
+fn just_before_looking_again(then: impl FnOnce() + 'static) {
+    BETWEEN_LOOKS.with(|hook| *hook.borrow_mut() = Some(Box::new(then)));
 }
 
 /// What restoring several items did: how many came back, and each one that did not, with why.
@@ -1026,6 +1103,72 @@ mod tests {
     }
 
     #[test]
+    fn looking_in_the_bin_waits_for_no_turn_of_the_disk_while_every_file_is_still_there() {
+        let (conn, root, cairo) = library("look-no-turn");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        trash_items(&conn, &[pyramid], &journal::new_batch()).unwrap();
+        let path = root.parent().unwrap().join("library.db");
+        let (sent, looked) = std::sync::mpsc::channel();
+
+        let turn = crate::fs::turn();
+        let looking = std::thread::spawn(move || {
+            let conn = db::open(&path).unwrap();
+            sent.send(look_in_bin(&conn).unwrap()).unwrap();
+        });
+        let looked = looked.recv_timeout(std::time::Duration::from_secs(10));
+        drop(turn);
+        looking.join().unwrap();
+
+        assert_eq!(looked, Ok(Looked::default()));
+        assert!(items::is_trashed(&conn, pyramid).unwrap());
+    }
+
+    /// Pyramid trashed under its own batch, its file moved aside in the bin so a look finds it
+    /// gone; the batch, and where the file was and is.
+    fn aside_in_bin(conn: &Connection, cairo: i64) -> (i64, String, PathBuf, PathBuf) {
+        let pyramid = id_of(conn, cairo, "pyramid.jpg");
+        let batch = journal::new_batch();
+        trash_items(conn, &[pyramid], &batch).unwrap();
+        let binned = bin_file(conn, pyramid);
+        let aside = binned.with_file_name("aside");
+        std::fs::rename(&binned, &aside).unwrap();
+        (pyramid, batch, binned, aside)
+    }
+
+    #[test]
+    fn a_file_back_in_the_bin_by_the_time_the_look_takes_the_turn_stays_in_the_trash() {
+        let (conn, _, cairo) = library("look-again-in-bin");
+        let (pyramid, batch, binned, aside) = aside_in_bin(&conn, cairo);
+        just_before_looking_again(move || std::fs::rename(aside, binned).unwrap());
+
+        assert_eq!(look_in_bin(&conn).unwrap(), Looked::default());
+
+        assert!(items::is_trashed(&conn, pyramid).unwrap());
+        assert!(!journal::batch(&conn, &batch).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_file_restored_while_the_look_waited_for_the_turn_stays_restored_with_its_undo() {
+        let (conn, root, cairo) = library("look-again-restored");
+        let (pyramid, _, binned, aside) = aside_in_bin(&conn, cairo);
+        let path = root.parent().unwrap().join("library.db");
+        let restored = journal::new_batch();
+        let restoring = restored.clone();
+        just_before_looking_again(move || {
+            std::fs::rename(aside, binned).unwrap();
+            let conn = db::open(&path).unwrap();
+            let report = restore_items(&conn, &[pyramid], None, &restoring).unwrap();
+            assert_eq!(report.restored, 1);
+        });
+
+        assert_eq!(look_in_bin(&conn).unwrap(), Looked::default());
+
+        assert!(items::is_live(&conn, pyramid).unwrap());
+        cairo_holds(&root, &["pyramid.jpg", "sphinx.jpg"]);
+        assert!(!journal::batch(&conn, &restored).unwrap().is_empty());
+    }
+
+    #[test]
     fn a_file_put_back_from_explorer_after_a_walk_took_it_in_is_the_item_it_was() {
         let (conn, root, cairo) = library("look-after-walk");
         let sphinx = id_of(&conn, cairo, "sphinx.jpg");
@@ -1651,5 +1794,48 @@ mod tests {
         );
         assert!(!items::is_trashed(&conn, sphinx).unwrap());
         assert!(stand_in().asked.borrow().is_empty());
+    }
+
+    mod timing {
+        use super::*;
+
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn ten_thousand_files_emptied_outside_the_app_leave_the_trash_inside_five_seconds() {
+            let (conn, root, cairo) = library("timing-look");
+            let bin = root.parent().unwrap().join("bin");
+            std::fs::create_dir_all(&bin).unwrap();
+            let serial = recycle::volume_serial(&bin).unwrap();
+            let tx = db::begin(&conn).unwrap();
+            let trashed: Vec<i64> = (0..10_000_i64)
+                .map(|n| {
+                    tx.execute(
+                        "INSERT INTO item (uuid, source_id, folder_id, disk_name, ext, size_bytes,
+                                           mtime, kind, added_at, deleted_at, trashed_at,
+                                           bin_path, bin_file)
+                         VALUES ('t' || ?1, 1, ?2, ?1 || '.jpg', 'jpg', 1, 1, 'image', 1, 2, 2,
+                                 ?3, ?4)",
+                        rusqlite::params![
+                            n,
+                            cairo,
+                            bin.join(format!("$R{n}.jpg")).to_string_lossy(),
+                            format!("{serial}-{n:x}")
+                        ],
+                    )
+                    .unwrap();
+                    tx.last_insert_rowid()
+                })
+                .collect();
+            tx.commit().unwrap();
+            journal::grow_to_two_hundred_thousand(&conn, &trashed);
+
+            let started = std::time::Instant::now();
+            let looked = look_in_bin(&conn).unwrap();
+            let took = started.elapsed();
+
+            assert_eq!(looked.retired, 10_000);
+            assert!(listing(&conn).unwrap().is_empty());
+            assert!(took < std::time::Duration::from_secs(5), "took {took:?}");
+        }
     }
 }

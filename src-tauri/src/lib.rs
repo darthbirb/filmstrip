@@ -32,9 +32,6 @@ pub fn run() {
             db::jobs::requeue_running(&conn)?;
             jobs::enqueue_index(&conn)?;
             fs::trash::settle_unfinished_send(&conn)?;
-            if let Err(err) = fs::trash::look_in_bin(&conn) {
-                eprintln!("trash: the Recycle Bin was not looked in: {err}");
-            }
 
             // The window may load files from the sources and the thumbnail cache, and a trashed
             // file only once the pane shows it; and nothing else.

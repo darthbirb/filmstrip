@@ -31,6 +31,7 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 | `item_effective_tag` | Everything an item carries once inheritance is resolved. |
 | `setting` | Key-value pairs: `undo_floor`, the newest journal row a restore kept; `recycling`, each send to the Recycle Bin that has not settled: the library file, its item and act, and once its second name is made the file's identity and names, until the send is recorded or a launch settles it. |
 | `journal` | Every change the app made on disk, and every set tagged at once, with what reverses it, grouped into batches. |
+| `journal_subject` | Each file and folder a `journal` row is about, one row each, written and removed with it by triggers on `journal`. |
 | `job` | Background work: waiting, running, or failed with its error. |
 | `destination_key` | A digit, `0` to `9`, bound to a folder that a press moves files into. |
 | `item_fts` | Each item's name and every tag it carries, tokenised for a bare word. |
@@ -74,6 +75,8 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 - `folder_tag` and `item_tag` are each indexed both ways: by their primary key, which leads
   with the folder or the item, and by `idx_folder_tag_rev` and `idx_item_tag_rev`, which lead
   with the tag, so what holds a tag is found without reading the whole table.
+- `journal_subject` is indexed by `entry_id`, `item_id` and `folder_id`, so the journal rows about
+  a file or a folder are found without reading the journal's JSON.
 
 ## Tags and labels
 
@@ -168,6 +171,18 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   each row about it alone is deleted outright, unmarked, and its id leaves every row about
   several as above, so an undo passes over it to the act before. A `folder_delete` row left alone in its
   batch by the last of them is deleted too; one whose batch never held a file stays.
+- Migration 14 added `journal_subject` and filled it from every row already written. Triggers on
+  `journal` keep it: a row inserted gains one subject per file or folder it is about, and one
+  deleted takes them with it. No trigger follows an update: marking a row `gone` leaves its
+  subjects as they are, and taking ids out of a row about several deletes their subjects in the
+  same statements (`journal::leave_several`). A row
+  about one file names it by `itemId`, one about one folder by `folderId`; `items_tag` names
+  each of `itemIds`, `items_untag` each `itemId` of `items`, and `retag` each `itemId` of
+  `itemUses` and each `folderId` of `folderUses`. The folders a row names only as a place, a
+  move's way back among them, are not its subjects. Forgetting and dropping files find their rows
+  through it, and `journal::drop_items` drops many files in one set of statements. Of the folder
+  subjects only `retag`'s are read so far; a one-folder row's are kept for
+  `journal::forget_source`, which still reads the journal's JSON, and for pruning (#264).
 - Undo never reaches a row at or below `setting.undo_floor`, which a restore sets to the newest
   row the restored journal holds.
 
