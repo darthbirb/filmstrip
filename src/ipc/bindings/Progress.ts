@@ -24,4 +24,12 @@ exports: Array<Exporting>,
 /**
  * Each move between drives running or waiting to, oldest first.
  */
-moves: Array<Moving>, };
+moves: Array<Moving>, 
+/**
+ * Walks finished since launch.
+ */
+walks: number, 
+/**
+ * Items whose thumbnail or scrub frames were made since the last report.
+ */
+thumbed: Array<number>, };

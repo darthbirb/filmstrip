@@ -17,7 +17,7 @@ use crate::jobs::kinds::{
 };
 use crate::jobs::{
     Copied, Copying, Exporting, Moved, Moving, QueueInner, enqueue_scrub, enqueue_thumb, exported,
-    lock,
+    lock, thumbed,
 };
 use crate::media::ffmpeg::Ffmpeg;
 use crate::media::probe::Probe;
@@ -376,7 +376,7 @@ fn index(inner: &QueueInner, conn: &mut Connection) -> Result<Done> {
     inner.walking.store(true, Ordering::Relaxed);
     let halt = || inner.held.load(Ordering::Relaxed) || inner.stop.load(Ordering::Relaxed);
     let walked = walk::reconcile_until(conn, &halt);
-    inner.walking.store(false, Ordering::Relaxed);
+    walked_once(inner);
     if walked?.is_none() {
         return Ok(Done::Paused);
     }
@@ -388,21 +388,35 @@ fn index(inner: &QueueInner, conn: &mut Connection) -> Result<Done> {
 fn index_folder(inner: &QueueInner, conn: &mut Connection, payload: FolderPayload) -> Result<()> {
     inner.walking.store(true, Ordering::Relaxed);
     let walked = walk::reconcile_folder(conn, payload.folder_id);
-    inner.walking.store(false, Ordering::Relaxed);
+    walked_once(inner);
     walked?;
     queue_thumbs(inner, conn)
 }
 
+fn walked_once(inner: &QueueInner) {
+    inner.walking.store(false, Ordering::Relaxed);
+    inner.walks.fetch_add(1, Ordering::Relaxed);
+}
+
 /// Every picture, and every video once ffmpeg is at hand, not yet read or missing its thumbnail;
-/// and every video read since, with its thumbnail, still missing its scrub frames.
+/// and every video read since, with its thumbnail, still missing its scrub frames. The index is
+/// told what the cache holds of each.
 fn queue_thumbs(inner: &QueueInner, conn: &mut Connection) -> Result<()> {
     let media = items::live_media(conn, inner.ffmpeg.is_some())?;
     let tx = db::begin(conn)?;
     for one in media {
         let cached = |rel: String| inner.thumbs.join(rel).is_file();
-        if !one.read || !cached(paths::thumb_rel(&one.uuid)) {
+        let thumbed = cached(paths::thumb_rel(&one.uuid));
+        let scrubbed = one.scrubs && cached(paths::frames_rel(&one.uuid));
+        if thumbed != one.thumbed {
+            items::set_thumbed(&tx, one.id, thumbed)?;
+        }
+        if scrubbed != one.scrubbed {
+            items::set_scrubbed(&tx, one.id, scrubbed)?;
+        }
+        if !one.read || !thumbed {
             enqueue_thumb(&tx, one.id)?;
-        } else if one.scrubs && !cached(paths::frames_rel(&one.uuid)) {
+        } else if one.scrubs && !scrubbed {
             enqueue_scrub(&tx, one.id)?;
         }
     }
@@ -425,7 +439,10 @@ fn thumb(inner: &QueueInner, conn: &Connection, payload: ItemPayload) -> Result<
             )));
         }
     };
-    record(conn, payload.item_id, &file.kind, &learned)
+    record(conn, payload.item_id, &file.kind, &learned)?;
+    items::set_thumbed(conn, payload.item_id, true)?;
+    thumbed(inner, payload.item_id);
+    Ok(())
 }
 
 /// Records what a thumbnail's read taught, and queues a video's scrub frames after it.
@@ -447,7 +464,10 @@ fn scrub(inner: &QueueInner, conn: &Connection, payload: ItemPayload) -> Result<
         .ok_or_else(|| AppError::invalid("only a video with a length has scrub frames"))?;
     let source = paths::item_path(conn, file.folder_id, &file.disk_name)?;
     let out = inner.thumbs.join(paths::frames_rel(&file.uuid));
-    scrub::make(ffmpeg_of(inner)?, &source, length, &out)
+    scrub::make(ffmpeg_of(inner)?, &source, length, &out)?;
+    items::set_scrubbed(conn, payload.item_id, true)?;
+    thumbed(inner, payload.item_id);
+    Ok(())
 }
 
 fn ffmpeg_of(inner: &QueueInner) -> Result<&Ffmpeg> {
@@ -596,6 +616,82 @@ mod tests {
                 (kinds::SCRUB.to_owned(), missing.0),
                 (kinds::THUMB.to_owned(), unread.0),
             ]
+        );
+    }
+
+    fn cached(conn: &Connection, id: i64) -> (bool, bool) {
+        conn.query_row(
+            "SELECT thumbed, scrubbed FROM item WHERE id = ?1",
+            [id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn a_walk_tells_the_index_what_the_cache_holds_of_each_file() {
+        let dir = scratch("walk-records-cache");
+        let inner = queue_in(&dir);
+        let (mut conn, ids) = library(&dir, &["clip.mp4", "lost.png", "photo.png"]);
+        let [(clip, clip_uuid), (lost, _), (photo, photo_uuid)] = ids.as_slice() else {
+            unreachable!()
+        };
+        items::record_media(&conn, *clip, &length(Some(12_000))).unwrap();
+        made(&inner, paths::thumb_rel(clip_uuid));
+        made(&inner, paths::frames_rel(clip_uuid));
+        made(&inner, paths::thumb_rel(photo_uuid));
+        items::set_thumbed(&conn, *lost, true).unwrap();
+        items::set_scrubbed(&conn, *lost, true).unwrap();
+
+        queue_thumbs(&inner, &mut conn).unwrap();
+        assert_eq!(cached(&conn, *clip), (true, true));
+        assert_eq!(cached(&conn, *photo), (true, false));
+        assert_eq!(
+            cached(&conn, *lost),
+            (false, false),
+            "its cache was cleared"
+        );
+    }
+
+    #[test]
+    fn progress_counts_each_walk_that_ends() {
+        let dir = scratch("walks-counted");
+        let inner = queue_in(&dir);
+        let (mut conn, _) = library(&dir, &["photo.png"]);
+        let root: i64 = conn
+            .query_row("SELECT id FROM folder WHERE parent_id IS NULL", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(inner.progress(&conn).unwrap().walks, 0);
+
+        index_folder(&inner, &mut conn, FolderPayload { folder_id: root }).unwrap();
+        index(&inner, &mut conn).unwrap();
+        assert_eq!(inner.progress(&conn).unwrap().walks, 2);
+    }
+
+    #[test]
+    fn a_thumbnail_and_scrub_frames_made_are_recorded_and_reported_once() {
+        let dir = scratch("made-reported");
+        let inner = queue_in(&dir);
+        let (conn, ids) = library(&dir, &["photo.png"]);
+        let [(photo, _)] = ids.as_slice() else {
+            unreachable!()
+        };
+        image::RgbImage::new(4, 3)
+            .save(dir.join("library/photo.png"))
+            .unwrap();
+
+        thumb(&inner, &conn, ItemPayload { item_id: *photo }).unwrap();
+        assert_eq!(cached(&conn, *photo), (true, false));
+
+        let mut previous = None;
+        let first = crate::jobs::next_report(&inner, &conn, &mut previous).unwrap();
+        assert_eq!(first.thumbed, [*photo]);
+        assert_eq!(
+            crate::jobs::next_report(&inner, &conn, &mut previous),
+            None,
+            "nothing else changed"
         );
     }
 }

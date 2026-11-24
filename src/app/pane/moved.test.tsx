@@ -27,6 +27,8 @@ const IDLE: Progress = {
   copies: [],
   exports: [],
   moves: [],
+  walks: 0,
+  thumbed: [],
 };
 
 test("a move between drives has its own line at the foot, and its dismiss cancels it", async () => {

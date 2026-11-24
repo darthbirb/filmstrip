@@ -1,10 +1,10 @@
-import { emit } from "@tauri-apps/api/event";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import { beforeEach, expect, onTestFinished, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
+import { libraryChanged } from "../library";
 import { getFullScreen, setFullScreen, useEscapeLeavesFullScreen } from "../pane/full-screen";
 import { getPaneItem, showInPane } from "../pane/pane-store";
 import { setPlace } from "../place";
@@ -144,7 +144,7 @@ test("a checked file that leaves the grid leaves the set", async () => {
   await userEvent.click(box(0));
   await userEvent.click(box(1));
   held[1] = (held[1] ?? []).filter((row) => row.id !== 102);
-  await emit("job-progress");
+  await libraryChanged();
   await expect.poll(() => getSelection().ids).toEqual([101]);
 });
 

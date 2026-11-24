@@ -48,6 +48,10 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   there, and `item.bin_file` is the file's identity, its volume's serial and its index on it, in
   hex as `<volume>-<index>`; its row keeps the folder and name it left. Both are NULL on any row
   not in the Trash. Migration 12 added them.
+- Thumbnails and a video's scrub frames are cached under `data\cache\thumbs`, named by `item.uuid`
+  (`fs::paths::thumb_rel` and `frames_rel`). `item.thumbed` and `item.scrubbed` say whether the
+  cache holds each, so a listing never looks for the files: the job that makes one sets it, and
+  every walk sets both to what the cache holds. Migration 15 added them.
 - The index's backups are whole copies of it in `data\backups`, each named
   `index-<ms>-<how>.db` for when and how it was taken (`fs::backups`).
 - **Every item has a folder.** A file waiting in a sorting source sits in that source's root

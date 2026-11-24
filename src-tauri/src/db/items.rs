@@ -155,6 +155,14 @@ pub struct ItemRow {
     pub thumb: Option<String>,
     /// A video's scrub frames, once they have been made.
     pub scrub: Option<Scrub>,
+    /// Whether the cache holds its thumbnail, as the index records it.
+    #[serde(skip)]
+    #[ts(skip)]
+    pub thumbed: bool,
+    /// Whether the cache holds its scrub frames, as the index records it.
+    #[serde(skip)]
+    #[ts(skip)]
+    pub scrubbed: bool,
 }
 
 /// A strip of frames through a video, side by side, left to right through the clip.
@@ -168,10 +176,10 @@ pub struct Scrub {
 /// The columns [`row`] reads, in its order, from `item` named `i`.
 pub(crate) const ROW: &str =
     "i.id, i.uuid, i.folder_id, i.disk_name, i.ext, i.kind, i.size_bytes, i.mtime,
-                   i.width, i.height, i.duration_ms, i.favorite";
+                   i.width, i.height, i.duration_ms, i.favorite, i.thumbed, i.scrubbed";
 
 /// How many columns [`ROW`] is, so a query can read what it selects after them.
-pub(crate) const ROW_WIDTH: usize = 12;
+pub(crate) const ROW_WIDTH: usize = 14;
 
 pub(crate) fn row(r: &rusqlite::Row) -> rusqlite::Result<ItemRow> {
     Ok(ItemRow {
@@ -189,6 +197,8 @@ pub(crate) fn row(r: &rusqlite::Row) -> rusqlite::Result<ItemRow> {
         favorite: r.get(11)?,
         thumb: None,
         scrub: None,
+        thumbed: r.get(12)?,
+        scrubbed: r.get(13)?,
     })
 }
 
@@ -704,7 +714,7 @@ pub fn in_trash(conn: &Connection) -> Result<Vec<(ItemRow, i64)>> {
           ORDER BY i.trashed_at DESC, i.id DESC"
     ))?;
     let rows = stmt
-        .query_map([], |r| Ok((row(r)?, r.get(12)?)))?
+        .query_map([], |r| Ok((row(r)?, r.get(ROW_WIDTH)?)))?
         .collect::<rusqlite::Result<_>>()?;
     Ok(rows)
 }
@@ -808,15 +818,15 @@ pub fn detail(conn: &Connection, id: i64) -> Result<Option<ItemDetail>> {
             |r| {
                 Ok(ItemDetail {
                     row: row(r)?,
-                    codec: r.get(12)?,
-                    bitrate: r.get(13)?,
-                    captured_at: r.get(14)?,
-                    captured_src: r.get(15)?,
-                    added_at: r.get(16)?,
-                    trashed_at: r.get(17)?,
-                    source_id: r.get(18)?,
-                    source_kind: SourceKind::parse(&r.get::<_, String>(19)?),
-                    frame_us: r.get(20)?,
+                    codec: r.get(ROW_WIDTH)?,
+                    bitrate: r.get(ROW_WIDTH + 1)?,
+                    captured_at: r.get(ROW_WIDTH + 2)?,
+                    captured_src: r.get(ROW_WIDTH + 3)?,
+                    added_at: r.get(ROW_WIDTH + 4)?,
+                    trashed_at: r.get(ROW_WIDTH + 5)?,
+                    source_id: r.get(ROW_WIDTH + 6)?,
+                    source_kind: SourceKind::parse(&r.get::<_, String>(ROW_WIDTH + 7)?),
+                    frame_us: r.get(ROW_WIDTH + 8)?,
                     folders: Vec::new(),
                     path: String::new(),
                 })
@@ -880,6 +890,24 @@ pub fn record_media(conn: &Connection, id: i64, media: &Probe) -> Result<()> {
     Ok(())
 }
 
+/// Records whether the cache holds an item's thumbnail.
+pub fn set_thumbed(conn: &Connection, id: i64, thumbed: bool) -> Result<()> {
+    conn.execute(
+        "UPDATE item SET thumbed = ?1 WHERE id = ?2",
+        params![thumbed, id],
+    )?;
+    Ok(())
+}
+
+/// Records whether the cache holds a video's scrub frames.
+pub fn set_scrubbed(conn: &Connection, id: i64, scrubbed: bool) -> Result<()> {
+    conn.execute(
+        "UPDATE item SET scrubbed = ?1 WHERE id = ?2",
+        params![scrubbed, id],
+    )?;
+    Ok(())
+}
+
 /// A live picture or video, and whether its file has been read since it last changed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LiveMedia {
@@ -888,12 +916,16 @@ pub struct LiveMedia {
     pub read: bool,
     /// A video with a length, which gets scrub frames.
     pub scrubs: bool,
+    pub thumbed: bool,
+    pub scrubbed: bool,
 }
 
 /// Every live picture, and every live video too when `videos` is set.
 pub fn live_media(conn: &Connection, videos: bool) -> Result<Vec<LiveMedia>> {
     let mut stmt = conn.prepare(
-        "SELECT id, uuid, probed_at IS NOT NULL, kind = 'video' AND COALESCE(duration_ms, 0) > 0 FROM item
+        "SELECT id, uuid, probed_at IS NOT NULL, kind = 'video' AND COALESCE(duration_ms, 0) > 0,
+                thumbed, scrubbed
+           FROM item
           WHERE deleted_at IS NULL AND (kind = 'image' OR (?1 AND kind = 'video'))
           ORDER BY id",
     )?;
@@ -904,6 +936,8 @@ pub fn live_media(conn: &Connection, videos: bool) -> Result<Vec<LiveMedia>> {
                 uuid: r.get(1)?,
                 read: r.get(2)?,
                 scrubs: r.get(3)?,
+                thumbed: r.get(4)?,
+                scrubbed: r.get(5)?,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;

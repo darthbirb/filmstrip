@@ -6,11 +6,14 @@ import { render } from "vitest-browser-react";
 
 import { withoutGlyphs } from "../../dev/words";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
+import type { Progress } from "../../ipc/bindings/Progress";
+import { libraryChanged } from "../library";
 import { getFullScreen, setFullScreen } from "../pane/full-screen";
 import { getPaneItem, showInPane } from "../pane/pane-store";
 import { setPlace } from "../place";
 import { updatePreferences } from "../preferences";
 import { Grid } from "./Grid";
+import { RELOAD_WINDOW_MS } from "./useGridItems";
 
 const SHAPES = [
   [900, 600],
@@ -210,13 +213,99 @@ test("a video's tile writes its length after a play glyph, and a picture's write
   expect(screen.getByRole("button", { name: picture.diskName }).element().textContent).toBe("");
 });
 
-test("the grid fetches its items again when background work moves on", async () => {
-  const sent = serve(4);
-  await renderGrid("justified");
-  await expect.poll(() => sent.filter((cmd) => cmd === "folder_items").length).toBe(1);
+const QUIET: Progress = {
+  phase: "working",
+  pending: 40,
+  running: 2,
+  failed: 0,
+  completed: 0,
+  copies: [],
+  exports: [],
+  moves: [],
+  walks: 1,
+  thumbed: [],
+};
 
-  await emit("job-progress", { phase: "working", pending: 1, running: 1, failed: 0, completed: 3 });
-  await expect.poll(() => sent.filter((cmd) => cmd === "folder_items").length).toBe(2);
+const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test("a walk under way reads the place again at most once a window, however often it reports", async () => {
+  const listed: number[] = [];
+  mockIPC(
+    (cmd) => {
+      if (cmd !== "folder_items") return undefined;
+      listed.push(performance.now());
+      return rows(4);
+    },
+    { shouldMockEvents: true },
+  );
+  await renderGrid("justified");
+  await expect.poll(() => listed.length).toBe(1);
+
+  for (let tick = 0; tick < 20; tick++) {
+    await emit("job-progress", { ...QUIET, phase: "walking", completed: tick });
+    await pause(RELOAD_WINDOW_MS / 10);
+  }
+  await expect.poll(() => listed.length, { timeout: RELOAD_WINDOW_MS * 2 }).toBeGreaterThan(1);
+  await pause(RELOAD_WINDOW_MS * 1.5);
+  const reads = listed.slice(1);
+  expect(reads.length).toBeLessThan(5);
+  for (const [n, at] of reads.entries())
+    if (n > 0) expect(at - (reads[n - 1] ?? 0)).toBeGreaterThanOrEqual(RELOAD_WINDOW_MS - 20);
+});
+
+test("thumbnails made patch their tiles, and nothing else is read again", async () => {
+  const sent: string[] = [];
+  const asked: unknown[] = [];
+  mockIPC(
+    (cmd, payload) => {
+      sent.push(cmd);
+      if (cmd === "folder_items") return rows(4);
+      if (cmd === "items_detail") {
+        asked.push(payload);
+        return [{ ...rows(4)[1], thumb: "C:/thumbs/item-1.webp" }, null];
+      }
+      return undefined;
+    },
+    { shouldMockEvents: true },
+  );
+  await renderGrid("justified");
+  await expect.poll(() => tiles().length).toBe(4);
+  const picture = () => document.querySelector('[title="item-1.png"] img');
+  expect(picture()).toBeNull();
+
+  for (let tick = 1; tick <= 5; tick++)
+    await emit("job-progress", { ...QUIET, completed: tick, thumbed: tick === 1 ? [2, 9] : [] });
+  await expect.poll(picture).not.toBeNull();
+  expect(document.querySelectorAll("figure img")).toHaveLength(1);
+  expect(asked).toEqual([{ itemIds: [2, 9] }]);
+  await pause(RELOAD_WINDOW_MS * 1.5);
+  expect(sent.filter((cmd) => cmd === "folder_items")).toHaveLength(1);
+});
+
+test("a listing that answers after a newer one is dropped", async () => {
+  const answers: ((rows: ItemRow[]) => void)[] = [];
+  mockIPC(
+    (cmd) => {
+      if (cmd !== "folder_items") return undefined;
+      if (answers.length === 0) {
+        answers.push(() => undefined);
+        return rows(4);
+      }
+      return new Promise<ItemRow[]>((resolve) => answers.push(resolve));
+    },
+    { shouldMockEvents: true },
+  );
+  await renderGrid("justified");
+  await expect.poll(() => tiles().length).toBe(4);
+
+  await libraryChanged();
+  await libraryChanged();
+  await expect.poll(() => answers.length).toBe(3);
+  answers[2]?.(rows(2));
+  await expect.poll(() => tiles().length).toBe(2);
+  answers[1]?.(rows(6));
+  for (let frame = 0; frame < 3; frame++) await new Promise(requestAnimationFrame);
+  expect(tiles()).toHaveLength(2);
 });
 
 test("two grids on one page each keep their own layout", async () => {

@@ -62,6 +62,10 @@ pub struct Progress {
     pub exports: Vec<Exporting>,
     /// Each move between drives running or waiting to, oldest first.
     pub moves: Vec<Moving>,
+    /// Walks finished since launch.
+    pub walks: u64,
+    /// Items whose thumbnail or scrub frames were made since the last report.
+    pub thumbed: Vec<i64>,
 }
 
 /// A copy in progress: where it is going, and how many of the files it carries are settled.
@@ -172,7 +176,9 @@ pub struct QueueInner {
     /// Each job runs holding it to read; a hold takes it to write, so it waits out the jobs in flight.
     gate: RwLock<()>,
     walking: AtomicBool,
+    walks: AtomicU64,
     completed: AtomicU64,
+    thumbed: Mutex<Vec<i64>>,
     report: Report,
     announce: Announce,
     exported: AnnounceExport,
@@ -201,7 +207,9 @@ impl QueueInner {
             held: AtomicBool::new(false),
             gate: RwLock::new(()),
             walking: AtomicBool::new(false),
+            walks: AtomicU64::new(0),
             completed: AtomicU64::new(0),
+            thumbed: Mutex::new(Vec::new()),
             report,
             announce,
             exported,
@@ -231,6 +239,8 @@ impl QueueInner {
             copies: copies(conn, &lock(&self.copies))?,
             exports: exports(conn, &lock(&self.exports))?,
             moves: moves(conn, &lock(&self.moves))?,
+            walks: self.walks.load(Ordering::Relaxed),
+            thumbed: Vec::new(),
         })
     }
 }
@@ -555,13 +565,34 @@ fn tick(inner: &QueueInner) {
     let mut previous: Option<Progress> = None;
     while !inner.stop.load(Ordering::Relaxed) {
         std::thread::sleep(TICK);
-        let Ok(progress) = inner.progress(&conn) else {
-            continue;
-        };
-        if previous.as_ref() != Some(&progress) {
+        if let Some(progress) = next_report(inner, &conn, &mut previous) {
             (inner.report)(&progress);
-            previous = Some(progress);
         }
+    }
+}
+
+/// What to report now, if anything: the thumbnails made since the last report, and the rest when
+/// it changed. Each item made is reported once.
+fn next_report(
+    inner: &QueueInner,
+    conn: &Connection,
+    previous: &mut Option<Progress>,
+) -> Option<Progress> {
+    let mut progress = inner.progress(conn).ok()?;
+    let thumbed = std::mem::take(&mut *lock(&inner.thumbed));
+    if thumbed.is_empty() && previous.as_ref() == Some(&progress) {
+        return None;
+    }
+    *previous = Some(progress.clone());
+    progress.thumbed = thumbed;
+    Some(progress)
+}
+
+/// Says the item's thumbnail or scrub frames have been made, in the next report.
+fn thumbed(inner: &QueueInner, item_id: i64) {
+    let mut made = lock(&inner.thumbed);
+    if !made.contains(&item_id) {
+        made.push(item_id);
     }
 }
 
