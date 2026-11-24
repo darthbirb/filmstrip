@@ -1,12 +1,13 @@
 //! What each kind of job does. Runs on a worker thread, never on the window's.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 
 use rusqlite::Connection;
 
 use crate::db::jobs::{self as table, QueuedJob};
-use crate::db::{self, items, journal};
+use crate::db::{self, items, journal, sources};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::export as fs_export;
 use crate::fs::paste::{self, Halt};
@@ -398,29 +399,58 @@ fn walked_once(inner: &QueueInner) {
     inner.walks.fetch_add(1, Ordering::Relaxed);
 }
 
-/// Every picture, and every video once ffmpeg is at hand, not yet read or missing its thumbnail;
-/// and every video read since, with its thumbnail, still missing its scrub frames. The index is
-/// told what the cache holds of every picture and video, ffmpeg or not.
+/// Queues what a reachable source's pictures, and its videos once ffmpeg is at hand, still lack:
+/// a thumbnail for one unread or without it, then a read video's scrub frames. The index is told
+/// what the cache holds of every picture and video, ffmpeg or not.
 fn queue_thumbs(inner: &QueueInner, conn: &mut Connection) -> Result<()> {
-    let media = items::live_media(conn)?;
+    let looked = look_in_cache(inner, conn)?;
+    queue_looked(inner, conn, &looked)
+}
+
+struct Looked {
+    media: items::LiveMedia,
+    thumbed: bool,
+    scrubbed: bool,
+    here: bool,
+}
+
+/// What the cache holds of every live picture and video, looked for without the write lock.
+/// DECISIONS.md "Background work".
+fn look_in_cache(inner: &QueueInner, conn: &Connection) -> Result<Vec<Looked>> {
+    let here: HashSet<i64> = sources::list(conn)?
+        .into_iter()
+        .filter(|source| Path::new(&source.root).is_dir())
+        .map(|source| source.id)
+        .collect();
+    let cached = |rel: String| inner.thumbs.join(rel).is_file();
+    Ok(items::live_media(conn)?
+        .into_iter()
+        .map(|media| Looked {
+            thumbed: cached(paths::thumb_rel(&media.uuid)),
+            scrubbed: media.scrubs && cached(paths::frames_rel(&media.uuid)),
+            here: here.contains(&media.source_id),
+            media,
+        })
+        .collect())
+}
+
+fn queue_looked(inner: &QueueInner, conn: &mut Connection, looked: &[Looked]) -> Result<()> {
     let tx = db::begin(conn)?;
-    for one in media {
-        let cached = |rel: String| inner.thumbs.join(rel).is_file();
-        let thumbed = cached(paths::thumb_rel(&one.uuid));
-        let scrubbed = one.scrubs && cached(paths::frames_rel(&one.uuid));
-        if thumbed != one.thumbed {
-            items::set_thumbed(&tx, one.id, thumbed)?;
+    for one in looked {
+        let media = &one.media;
+        if one.thumbed != media.thumbed {
+            items::set_thumbed(&tx, media.id, one.thumbed)?;
         }
-        if scrubbed != one.scrubbed {
-            items::set_scrubbed(&tx, one.id, scrubbed)?;
+        if one.scrubbed != media.scrubbed {
+            items::set_scrubbed(&tx, media.id, one.scrubbed)?;
         }
-        if one.video && inner.ffmpeg.is_none() {
+        if !one.here || (media.video && inner.ffmpeg.is_none()) {
             continue;
         }
-        if !one.read || !thumbed {
-            enqueue_thumb(&tx, one.id)?;
-        } else if one.scrubs && !scrubbed {
-            enqueue_scrub(&tx, one.id)?;
+        if !media.read || !one.thumbed {
+            enqueue_thumb(&tx, media.id)?;
+        } else if media.scrubs && !one.scrubbed {
+            enqueue_scrub(&tx, media.id)?;
         }
     }
     tx.commit()?;
@@ -429,23 +459,47 @@ fn queue_thumbs(inner: &QueueInner, conn: &mut Connection) -> Result<()> {
 
 /// Makes an item's thumbnail, and records what reading its file taught.
 fn thumb(inner: &QueueInner, conn: &Connection, payload: ItemPayload) -> Result<()> {
-    let file = items::file_of(conn, payload.item_id)?
-        .ok_or_else(|| AppError::invalid("the item is gone"))?;
-    let source = paths::item_path(conn, file.folder_id, &file.disk_name)?;
-    let out = inner.thumbs.join(paths::thumb_rel(&file.uuid));
-    let learned = match file.kind.as_str() {
-        "image" => thumbs::picture(&source, &out)?,
-        "video" => thumbs::video(ffmpeg_of(inner)?, &source, &out)?,
-        kind => {
-            return Err(AppError::invalid(format!(
-                "no thumbnail is made for a file of the kind {kind}"
-            )));
-        }
+    let Some(file) = items::file_of(conn, payload.item_id)? else {
+        return Ok(());
+    };
+    let made = make_thumb(inner, conn, &file);
+    let Some(learned) = unless_away(conn, payload.item_id, &file, made)? else {
+        return Ok(());
     };
     record(conn, payload.item_id, &file.kind, &learned)?;
     items::set_thumbed(conn, payload.item_id, true)?;
     thumbed(inner, payload.item_id);
     Ok(())
+}
+
+fn make_thumb(inner: &QueueInner, conn: &Connection, file: &items::ItemFile) -> Result<Probe> {
+    let source = paths::item_path(conn, file.folder_id, &file.disk_name)?;
+    let out = inner.thumbs.join(paths::thumb_rel(&file.uuid));
+    match file.kind.as_str() {
+        "image" => thumbs::picture(&source, &out),
+        "video" => thumbs::video(ffmpeg_of(inner)?, &source, &out),
+        kind => Err(AppError::invalid(format!(
+            "no thumbnail is made for a file of the kind {kind}"
+        ))),
+    }
+}
+
+/// A file that could not be read because it or its source went away is not a failure: the next
+/// walk retires it, or queues it again once its drive is back.
+fn unless_away<T>(
+    conn: &Connection,
+    item_id: i64,
+    file: &items::ItemFile,
+    made: Result<T>,
+) -> Result<Option<T>> {
+    let err = match made {
+        Ok(made) => return Ok(Some(made)),
+        Err(err) => err,
+    };
+    let root_here = items::live_root(conn, item_id)?.is_some_and(|root| Path::new(&root).is_dir());
+    let file_here = root_here
+        && paths::item_path(conn, file.folder_id, &file.disk_name).is_ok_and(|path| path.is_file());
+    if file_here { Err(err) } else { Ok(None) }
 }
 
 /// Records what a thumbnail's read taught, and queues a video's scrub frames after it.
@@ -459,15 +513,20 @@ fn record(conn: &Connection, item_id: i64, kind: &str, learned: &Probe) -> Resul
 
 /// Makes a video's scrub frames, from the length its thumbnail's probe recorded.
 fn scrub(inner: &QueueInner, conn: &Connection, payload: ItemPayload) -> Result<()> {
-    let file = items::file_of(conn, payload.item_id)?
-        .ok_or_else(|| AppError::invalid("the item is gone"))?;
+    let Some(file) = items::file_of(conn, payload.item_id)? else {
+        return Ok(());
+    };
     let length = file
         .duration_ms
         .filter(|_| file.kind == "video")
         .ok_or_else(|| AppError::invalid("only a video with a length has scrub frames"))?;
-    let source = paths::item_path(conn, file.folder_id, &file.disk_name)?;
-    let out = inner.thumbs.join(paths::frames_rel(&file.uuid));
-    scrub::make(ffmpeg_of(inner)?, &source, length, &out)?;
+    let made = paths::item_path(conn, file.folder_id, &file.disk_name).and_then(|source| {
+        let out = inner.thumbs.join(paths::frames_rel(&file.uuid));
+        scrub::make(ffmpeg_of(inner)?, &source, length, &out)
+    });
+    if unless_away(conn, payload.item_id, &file, made)?.is_none() {
+        return Ok(());
+    }
     items::set_scrubbed(conn, payload.item_id, true)?;
     thumbed(inner, payload.item_id);
     Ok(())
@@ -691,6 +750,124 @@ mod tests {
     }
 
     #[test]
+    fn two_walks_queue_one_job_per_item() {
+        let dir = scratch("walked-twice");
+        let inner = queue_in(&dir);
+        let (mut conn, ids) = library(&dir, &["clip.mp4", "photo.png"]);
+        let [(clip, clip_uuid), (photo, _)] = ids.as_slice() else {
+            unreachable!()
+        };
+        items::record_media(&conn, *clip, &length(Some(12_000))).unwrap();
+        made(&inner, paths::thumb_rel(clip_uuid));
+
+        queue_thumbs(&inner, &mut conn).unwrap();
+        queue_thumbs(&inner, &mut conn).unwrap();
+        assert_eq!(
+            queued(&conn),
+            [
+                (kinds::SCRUB.to_owned(), *clip),
+                (kinds::THUMB.to_owned(), *photo),
+            ]
+        );
+    }
+
+    /// A second source, walked while its drive was in and then unplugged; its one picture's id.
+    fn unplugged(dir: &Path, conn: &Connection) -> i64 {
+        let away = dir.join("away");
+        std::fs::create_dir_all(&away).unwrap();
+        std::fs::write(away.join("far.png"), "bytes").unwrap();
+        sources::add(conn, &away, "Away", SourceKind::Library).unwrap();
+        walk::reconcile(conn).unwrap();
+        std::fs::remove_dir_all(&away).unwrap();
+        conn.query_row("SELECT id FROM item WHERE disk_name = 'far.png'", [], |r| {
+            r.get(0)
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn a_source_that_cannot_be_reached_has_nothing_queued() {
+        let dir = scratch("walk-offline");
+        let inner = queue_in(&dir);
+        let (mut conn, ids) = library(&dir, &["photo.png"]);
+        let far = unplugged(&dir, &conn);
+        items::set_thumbed(&conn, far, true).unwrap();
+
+        queue_thumbs(&inner, &mut conn).unwrap();
+        assert_eq!(queued(&conn), [(kinds::THUMB.to_owned(), ids[0].0)]);
+        assert_eq!(
+            cached(&conn, far),
+            (false, false),
+            "the cache is on this disk, so the index still learns what it holds"
+        );
+    }
+
+    #[test]
+    fn a_job_whose_source_went_away_is_not_a_failure() {
+        let dir = scratch("job-offline");
+        let inner = queue_in(&dir);
+        let (conn, ids) = library(&dir, &["broken.png", "clip.mp4"]);
+        let [(broken, _), (clip, _)] = ids.as_slice() else {
+            unreachable!()
+        };
+        items::record_media(&conn, *clip, &length(Some(12_000))).unwrap();
+        let far = unplugged(&dir, &conn);
+        let item = |item_id| ItemPayload { item_id };
+
+        assert!(thumb(&inner, &conn, item(*broken)).is_err(), "it is here");
+        assert!(scrub(&inner, &conn, item(*clip)).is_err(), "it is here");
+        assert!(thumb(&inner, &conn, item(far)).is_ok());
+
+        std::fs::remove_dir_all(dir.join("library")).unwrap();
+        assert!(thumb(&inner, &conn, item(*broken)).is_ok());
+        assert!(scrub(&inner, &conn, item(*clip)).is_ok());
+        assert_eq!(cached(&conn, *broken), (false, false));
+        assert_eq!(cached(&conn, *clip), (false, false));
+    }
+
+    #[test]
+    fn a_job_for_an_item_since_removed_is_not_a_failure() {
+        let dir = scratch("job-gone");
+        let inner = queue_in(&dir);
+        let (conn, ids) = library(&dir, &["gone.png"]);
+        std::fs::remove_file(dir.join("library/gone.png")).unwrap();
+        walk::reconcile(&conn).unwrap();
+
+        assert!(thumb(&inner, &conn, ItemPayload { item_id: ids[0].0 }).is_ok());
+        let removed = ItemPayload { item_id: 9_999 };
+        assert!(thumb(&inner, &conn, removed).is_ok());
+    }
+
+    #[test]
+    fn a_job_whose_file_was_deleted_before_a_walk_noticed_is_not_a_failure() {
+        let dir = scratch("job-file-deleted");
+        let inner = queue_in(&dir);
+        let (conn, ids) = library(&dir, &["deleted.png", "clip.mp4"]);
+        let [(deleted, _), (clip, _)] = ids.as_slice() else {
+            unreachable!()
+        };
+        items::record_media(&conn, *clip, &length(Some(12_000))).unwrap();
+        let read_at = |id: i64| -> Option<i64> {
+            conn.query_row("SELECT probed_at FROM item WHERE id = ?1", [id], |r| {
+                r.get(0)
+            })
+            .unwrap()
+        };
+        let clip_read = read_at(*clip);
+        std::fs::remove_file(dir.join("library/deleted.png")).unwrap();
+        std::fs::remove_file(dir.join("library/clip.mp4")).unwrap();
+
+        assert!(thumb(&inner, &conn, ItemPayload { item_id: *deleted }).is_ok());
+        assert!(scrub(&inner, &conn, ItemPayload { item_id: *clip }).is_ok());
+        assert!(items::is_live(&conn, *deleted).unwrap(), "no walk ran");
+        assert_eq!(read_at(*deleted), None, "nothing was recorded");
+        assert_eq!(read_at(*clip), clip_read);
+        assert_eq!(cached(&conn, *deleted), (false, false));
+        assert_eq!(cached(&conn, *clip), (false, false));
+        assert!(queued(&conn).is_empty());
+    }
+
+    #[test]
     fn progress_counts_each_walk_that_ends() {
         let dir = scratch("walks-counted");
         let inner = queue_in(&dir);
@@ -730,5 +907,43 @@ mod tests {
             None,
             "nothing else changed"
         );
+    }
+
+    mod timing {
+        use super::*;
+
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn a_walk_over_a_hundred_thousand_waiting_pictures_holds_the_write_lock_under_two_seconds()
+        {
+            let dir = scratch("timing-queue");
+            let inner = queue_in(&dir);
+            let (mut conn, _) = library(&dir, &[]);
+            let root: i64 = conn
+                .query_row("SELECT id FROM folder WHERE parent_id IS NULL", [], |r| {
+                    r.get(0)
+                })
+                .unwrap();
+            let tx = db::begin(&conn).unwrap();
+            for n in 0..100_000_i64 {
+                tx.execute(
+                    "INSERT INTO item (uuid, source_id, folder_id, disk_name, ext, size_bytes,
+                                       mtime, kind, added_at)
+                     VALUES ('u' || ?1, 1, ?2, ?1 || '.jpg', 'jpg', 1, 1, 'image', 1)",
+                    rusqlite::params![n, root],
+                )
+                .unwrap();
+            }
+            tx.commit().unwrap();
+            queue_thumbs(&inner, &mut conn).unwrap();
+
+            let looked = look_in_cache(&inner, &conn).unwrap();
+            let started = std::time::Instant::now();
+            queue_looked(&inner, &mut conn, &looked).unwrap();
+            let held = started.elapsed();
+
+            assert_eq!(queued(&conn).len(), 100_000);
+            assert!(held < std::time::Duration::from_secs(2), "held it {held:?}");
+        }
     }
 }

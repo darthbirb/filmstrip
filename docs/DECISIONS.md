@@ -152,6 +152,15 @@ if the failure might pass — a locked file, a busy database — and otherwise k
 for the failure list. One left running at shutdown goes back to waiting at the next launch. A
 decoder that panics on one file fails that job and nothing else.
 
+**A walk queues thumbnails without holding up the app.** It looks in the cache for every
+picture and video before it takes the write lock, then records what it found and queues what is
+missing in one short transaction, so a library of 100,000 files never keeps an act waiting on
+100,000 lookups. A thumbnail or scrub frames already waiting are not queued again; one being made
+may have read the file before it changed, so it does not count. A source that cannot be reached
+has nothing queued, and a job whose file, or whose source, went away while it waited ends without
+a failure: the next walk retires a file deleted meanwhile, and queues one on a drive that comes
+back. An unplugged drive, or files deleted in Explorer, never fill the failure list.
+
 **Every transaction that may write takes the write lock as it begins**, through `db::begin` or
 `db::in_transaction`, and `tags::atomically` does the same when no transaction is open. Idle
 workers claim in `BEGIN IMMEDIATE` several times a second. A deferred transaction that has read

@@ -622,9 +622,12 @@ pub fn enqueue_folder_walk(conn: &Connection, folder_id: i64) -> Result<()> {
     Ok(())
 }
 
+/// Queues an item's thumbnail, unless it is already waiting.
 pub fn enqueue_thumb(conn: &Connection, item_id: i64) -> Result<()> {
     let payload = serde_json::to_string(&kinds::ItemPayload { item_id })?;
-    table::enqueue(conn, kinds::THUMB, &payload, kinds::PRIORITY_THUMB)?;
+    if !table::is_pending(conn, kinds::THUMB, &payload)? {
+        table::enqueue(conn, kinds::THUMB, &payload, kinds::PRIORITY_THUMB)?;
+    }
     Ok(())
 }
 
