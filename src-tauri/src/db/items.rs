@@ -921,17 +921,17 @@ pub struct LiveMedia {
     pub scrubbed: bool,
 }
 
-/// Every live picture, and every live video too when `videos` is set.
-pub fn live_media(conn: &Connection, videos: bool) -> Result<Vec<LiveMedia>> {
+/// Every live picture and video.
+pub fn live_media(conn: &Connection) -> Result<Vec<LiveMedia>> {
     let mut stmt = conn.prepare(
         "SELECT id, uuid, probed_at IS NOT NULL, kind = 'video',
                 kind = 'video' AND COALESCE(duration_ms, 0) > 0, thumbed, scrubbed
            FROM item
-          WHERE deleted_at IS NULL AND (kind = 'image' OR (?1 AND kind = 'video'))
+          WHERE deleted_at IS NULL AND kind IN ('image', 'video')
           ORDER BY id",
     )?;
     let rows = stmt
-        .query_map(params![videos], |r| {
+        .query_map([], |r| {
             Ok(LiveMedia {
                 id: r.get(0)?,
                 uuid: r.get(1)?,
@@ -1502,8 +1502,8 @@ mod tests {
             ..sample(1, root, "c.txt")
         };
         upsert(&conn, &notes).unwrap();
-        let unread = |videos| -> Vec<i64> {
-            live_media(&conn, videos)
+        let unread = || -> Vec<i64> {
+            live_media(&conn)
                 .unwrap()
                 .into_iter()
                 .filter(|media| !media.read)
@@ -1512,11 +1512,10 @@ mod tests {
         };
 
         assert_eq!(
-            unread(false),
-            [picture],
-            "videos wait for ffmpeg; other files are never read"
+            unread(),
+            [picture, clip],
+            "pictures and videos are read; other files never are"
         );
-        assert_eq!(unread(true), [picture, clip]);
 
         let learned = Probe {
             width: Some(4),
@@ -1524,7 +1523,7 @@ mod tests {
             ..Probe::default()
         };
         record_media(&conn, picture, &learned).unwrap();
-        assert!(unread(false).is_empty());
+        assert_eq!(unread(), [clip]);
 
         let read = Probe {
             duration_ms: Some(12_000),
@@ -1548,8 +1547,8 @@ mod tests {
         };
         upsert(&conn, &changed).unwrap();
         assert_eq!(
-            unread(false),
-            [picture],
+            unread(),
+            [picture, clip],
             "a refreshed row forgets it was read"
         );
     }

@@ -402,7 +402,7 @@ fn walked_once(inner: &QueueInner) {
 /// and every video read since, with its thumbnail, still missing its scrub frames. The index is
 /// told what the cache holds of every picture and video, ffmpeg or not.
 fn queue_thumbs(inner: &QueueInner, conn: &mut Connection) -> Result<()> {
-    let media = items::live_media(conn, true)?;
+    let media = items::live_media(conn)?;
     let tx = db::begin(conn)?;
     for one in media {
         let cached = |rel: String| inner.thumbs.join(rel).is_file();
