@@ -81,6 +81,8 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   with the tag, so what holds a tag is found without reading the whole table.
 - `journal_subject` is indexed by `entry_id`, `item_id` and `folder_id`, so the journal rows about
   a file or a folder are found without reading the journal's JSON.
+- `job` is indexed by `kind` and `payload` (`idx_job_payload`, migration 16), so a walk asks
+  whether each file's job is already waiting without reading the whole table.
 
 ## Tags and labels
 

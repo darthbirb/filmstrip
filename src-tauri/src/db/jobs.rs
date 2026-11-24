@@ -25,16 +25,15 @@ pub struct Counts {
 }
 
 pub fn enqueue(conn: &Connection, kind: &str, payload: &str, priority: i64) -> Result<i64> {
-    conn.execute(
+    conn.prepare_cached(
         "INSERT INTO job (kind, payload, status, priority, created_at)
          VALUES (?1, ?2, 'pending', ?3, ?4)",
-        params![kind, payload, priority, now()],
-    )?;
+    )?
+    .execute(params![kind, payload, priority, now()])?;
     Ok(conn.last_insert_rowid())
 }
 
-/// Whether this exact job is already waiting or running. It scans the table, so a walk asks
-/// once, never once per file.
+/// Whether this exact job is already waiting or running.
 pub fn is_queued(conn: &Connection, kind: &str, payload: &str) -> Result<bool> {
     Ok(conn.query_row(
         "SELECT EXISTS(SELECT 1 FROM job
@@ -46,11 +45,11 @@ pub fn is_queued(conn: &Connection, kind: &str, payload: &str) -> Result<bool> {
 
 /// Whether this exact job is waiting to start. One already running may have read too early.
 pub fn is_pending(conn: &Connection, kind: &str, payload: &str) -> Result<bool> {
-    Ok(conn.query_row(
-        "SELECT EXISTS(SELECT 1 FROM job WHERE kind = ?1 AND payload = ?2 AND status = 'pending')",
-        params![kind, payload],
-        |r| r.get(0),
-    )?)
+    Ok(conn
+        .prepare_cached(
+            "SELECT EXISTS(SELECT 1 FROM job WHERE kind = ?1 AND payload = ?2 AND status = 'pending')",
+        )?
+        .query_row(params![kind, payload], |r| r.get(0))?)
 }
 
 /// Takes the most urgent waiting job and marks it running. The immediate transaction stops two

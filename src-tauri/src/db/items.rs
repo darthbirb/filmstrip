@@ -892,26 +892,35 @@ pub fn record_media(conn: &Connection, id: i64, media: &Probe) -> Result<()> {
 
 /// Records whether the cache holds an item's thumbnail.
 pub fn set_thumbed(conn: &Connection, id: i64, thumbed: bool) -> Result<()> {
-    conn.execute(
-        "UPDATE item SET thumbed = ?1 WHERE id = ?2",
-        params![thumbed, id],
-    )?;
+    conn.prepare_cached("UPDATE item SET thumbed = ?1 WHERE id = ?2")?
+        .execute(params![thumbed, id])?;
     Ok(())
 }
 
 /// Records whether the cache holds a video's scrub frames.
 pub fn set_scrubbed(conn: &Connection, id: i64, scrubbed: bool) -> Result<()> {
-    conn.execute(
-        "UPDATE item SET scrubbed = ?1 WHERE id = ?2",
-        params![scrubbed, id],
-    )?;
+    conn.prepare_cached("UPDATE item SET scrubbed = ?1 WHERE id = ?2")?
+        .execute(params![scrubbed, id])?;
     Ok(())
+}
+
+/// The root of a live item's source; none once the item is retired or gone.
+pub fn live_root(conn: &Connection, id: i64) -> Result<Option<String>> {
+    Ok(conn
+        .query_row(
+            "SELECT s.root FROM item i JOIN source s ON s.id = i.source_id
+              WHERE i.id = ?1 AND i.deleted_at IS NULL",
+            params![id],
+            |r| r.get(0),
+        )
+        .optional()?)
 }
 
 /// A live picture or video, and whether its file has been read since it last changed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LiveMedia {
     pub id: i64,
+    pub source_id: i64,
     pub uuid: String,
     pub read: bool,
     pub video: bool,
@@ -925,7 +934,7 @@ pub struct LiveMedia {
 pub fn live_media(conn: &Connection) -> Result<Vec<LiveMedia>> {
     let mut stmt = conn.prepare(
         "SELECT id, uuid, probed_at IS NOT NULL, kind = 'video',
-                kind = 'video' AND COALESCE(duration_ms, 0) > 0, thumbed, scrubbed
+                kind = 'video' AND COALESCE(duration_ms, 0) > 0, thumbed, scrubbed, source_id
            FROM item
           WHERE deleted_at IS NULL AND kind IN ('image', 'video')
           ORDER BY id",
@@ -940,6 +949,7 @@ pub fn live_media(conn: &Connection) -> Result<Vec<LiveMedia>> {
                 scrubs: r.get(4)?,
                 thumbed: r.get(5)?,
                 scrubbed: r.get(6)?,
+                source_id: r.get(7)?,
             })
         })?
         .collect::<rusqlite::Result<_>>()?;

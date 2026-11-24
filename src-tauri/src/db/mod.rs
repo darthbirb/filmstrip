@@ -41,6 +41,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (13, include_str!("migrations/013_name_fold.sql")),
     (14, include_str!("migrations/014_journal_subject.sql")),
     (15, include_str!("migrations/015_cached.sql")),
+    (16, include_str!("migrations/016_job_payload.sql")),
 ];
 
 type Rewrite = fn(&Connection) -> Result<()>;
