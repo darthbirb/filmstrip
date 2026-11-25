@@ -82,7 +82,7 @@ const IDLE: Progress = {
   exports: [],
   moves: [],
   walks: 0,
-  walking: null,
+  walkedSource: null,
   thumbed: [],
 };
 

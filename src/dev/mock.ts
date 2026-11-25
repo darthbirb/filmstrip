@@ -1442,6 +1442,7 @@ const walkingSource = () =>
 
 // `?undo-fails` has every undo fail on a full disk, its act left in the journal.
 let undoFailing = false;
+let lookupFailing = false;
 const undoFails = () => undoFailing || new URLSearchParams(location.search).has("undo-fails");
 const diskFull = () => Promise.reject<AppError>({ kind: "io", reason: { kind: "diskFull" } });
 
@@ -1615,9 +1616,10 @@ let binRefuses = new Set<number>();
 /** Trashed files emptied from the bin outside the app, which an undo still finds gone. */
 const emptiedOutside = new Set<number>();
 
-/** Has every undo fail, or succeed again, as `?undo-fails` does. */
-export function failUndo(failing: boolean) {
+/** Has every undo fail, or succeed again, as `?undo-fails` does; and the look for its act, too. */
+export function failUndo(failing: boolean, lookupToo = false) {
   undoFailing = failing;
+  lookupFailing = failing && lookupToo;
 }
 
 /** Has the Recycle Bin refuse these files when Delete sends them there. */
@@ -2060,6 +2062,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   },
   can_undo: ({ batchId }) => journal.some((batch) => batch.batchId === batchId),
   act_to_undo: ({ batchId }) => {
+    if (lookupFailing) return diskFull();
     const one = batchId ? journal.find((batch) => batch.batchId === batchId) : journal.at(-1);
     return one ? describeBatch(one.batchId, one.steps) : null;
   },
@@ -2473,18 +2476,19 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   copy_item_paths: () => null,
   start_index: () => null,
   index_progress: (): Progress => {
-    const walking = walkingSource();
+    const walkedSource = walkingSource();
+    const walking = walkedSource !== null;
     return {
-      phase: walking === null ? "idle" : "walking",
-      pending: walking === null ? 0 : 4119,
-      running: walking === null ? 0 : 1,
+      phase: walking ? "walking" : "idle",
+      pending: walking ? 4119 : 0,
+      running: walking ? 1 : 0,
       failed: failures().length,
-      completed: walking === null ? 0 : 2526,
+      completed: walking ? 2526 : 0,
       copies: [],
       exports: [...exporting.values()],
       moves: [...moving.values()],
       walks: 0,
-      walking,
+      walkedSource,
       thumbed: [],
     };
   },

@@ -376,7 +376,7 @@ fn index(inner: &QueueInner, conn: &mut Connection) -> Result<Done> {
     table::clear_failed(conn)?;
     inner.walking.store(true, Ordering::Relaxed);
     let halt = || inner.held.load(Ordering::Relaxed) || inner.stop.load(Ordering::Relaxed);
-    let walked = walk::reconcile_until(conn, &halt, &reading(inner));
+    let walked = walk::reconcile_until(conn, &halt, &note_walked_source(inner));
     walked_once(inner);
     if walked?.is_none() {
         return Ok(Done::Paused);
@@ -388,20 +388,20 @@ fn index(inner: &QueueInner, conn: &mut Connection) -> Result<Done> {
 /// One folder's subtree walked again, then the same thumbnails queued as after a whole walk.
 fn index_folder(inner: &QueueInner, conn: &mut Connection, payload: FolderPayload) -> Result<()> {
     inner.walking.store(true, Ordering::Relaxed);
-    let walked = walk::reconcile_folder(conn, payload.folder_id, &reading(inner));
+    let walked = walk::reconcile_folder(conn, payload.folder_id, &note_walked_source(inner));
     walked_once(inner);
     walked?;
     queue_thumbs(inner, conn)
 }
 
 /// Tells progress which source the walk is reading.
-fn reading(inner: &QueueInner) -> impl Fn(i64) + '_ {
-    |source_id| *lock(&inner.reading) = Some(source_id)
+fn note_walked_source(inner: &QueueInner) -> impl Fn(i64) + '_ {
+    |source_id| *lock(&inner.walked_source) = Some(source_id)
 }
 
 fn walked_once(inner: &QueueInner) {
     inner.walking.store(false, Ordering::Relaxed);
-    *lock(&inner.reading) = None;
+    *lock(&inner.walked_source) = None;
     inner.walks.fetch_add(1, Ordering::Relaxed);
 }
 
@@ -895,12 +895,12 @@ mod tests {
         let dir = scratch("walking-source");
         let inner = queue_in(&dir);
         let (mut conn, _) = library(&dir, &["photo.png"]);
-        assert_eq!(inner.progress(&conn).unwrap().walking, None);
+        assert_eq!(inner.progress(&conn).unwrap().walked_source, None);
 
-        reading(&inner)(1);
-        assert_eq!(inner.progress(&conn).unwrap().walking, Some(1));
+        note_walked_source(&inner)(1);
+        assert_eq!(inner.progress(&conn).unwrap().walked_source, Some(1));
         index(&inner, &mut conn).unwrap();
-        assert_eq!(inner.progress(&conn).unwrap().walking, None);
+        assert_eq!(inner.progress(&conn).unwrap().walked_source, None);
     }
 
     #[test]

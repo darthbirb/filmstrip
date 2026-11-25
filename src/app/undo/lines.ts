@@ -520,9 +520,18 @@ export function whyFailed(error: unknown): string {
   return reasonSentence(failed?.reason ?? { kind: "other" });
 }
 
-/** What the foot says when an undo failed, its Undo kept to try again. */
-export function undoFailedLine(batch: Batch, error: unknown): string {
-  return `Could not undo “${actLine(batch).replace(/\.$/, "")}”. ${whyFailed(error)}`;
+/**
+ * What the foot says when an undo failed, its Undo kept to try again: the act by its line's one
+ * sentence, when the act could be read.
+ */
+export function undoFailedLine(batch: Batch | null, error: unknown): string {
+  if (!batch) return `Could not undo. ${whyFailed(error)}`;
+  const { act } = batch;
+  const line =
+    act.kind === "deleteFolder" && act.into && batch.files > 0
+      ? `Deleted ${act.name}`
+      : actLine(batch).replace(/\.$/, "");
+  return `Could not undo “${line}”. ${whyFailed(error)}`;
 }
 
 /**

@@ -32,7 +32,7 @@ walks: number,
 /**
  * The source a walk is reading, while one is.
  */
-walking: number | null, 
+walkedSource: number | null, 
 /**
  * Items whose thumbnail or scrub frames were made since the last report.
  */

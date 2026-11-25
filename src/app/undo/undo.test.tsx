@@ -89,6 +89,51 @@ test("Ctrl+Z that fails names the newest act, with no line at the foot to go by"
   }
 });
 
+test("an undo whose act cannot be read either still says it failed, never that nothing was left", async () => {
+  const screen = await render(<Harness />);
+  await moveTrips();
+  failUndo(true, true);
+  try {
+    await screen.getByRole("button", { name: "Undo" }).click();
+    await expect.element(screen.getByText("Could not undo. The disk is full.")).toBeVisible();
+    setNews(null);
+    await userEvent.keyboard("{Control>}z{/Control}");
+    await expect.element(screen.getByText("Could not undo. The disk is full.")).toBeVisible();
+    expect(screen.getByText("Nothing to undo.").elements()).toHaveLength(0);
+  } finally {
+    failUndo(false);
+  }
+
+  await screen.getByRole("button", { name: "Undo" }).click();
+  await expect.element(screen.getByText("2 files are back in Trips.")).toBeVisible();
+});
+
+test("folded, a failed undo keeps the rail's Undo and its sentence comes out beside it", async () => {
+  const screen = await render(<Foot rail />);
+  await moveTrips();
+  const failure = "Could not undo “Moved 2 files to People”. The disk is full.";
+  failUndo(true);
+  try {
+    await screen.getByRole("button", { name: /^Undo · Moved 2 files/ }).click();
+    await expect.element(screen.getByText(failure)).toBeVisible();
+    await expect
+      .element(screen.getByRole("button", { name: `Undo · ${failure} · Ctrl+Z` }))
+      .toBeVisible();
+  } finally {
+    failUndo(false);
+  }
+  const out = () =>
+    [...document.querySelectorAll("[popover=manual]")].find((line) =>
+      line.textContent?.includes(failure),
+    );
+  expect(out()?.matches(":popover-open")).toBe(true);
+  await userEvent.keyboard("{Shift}");
+  await expect.poll(() => out()?.matches(":popover-open")).toBe(false);
+  await expect
+    .element(screen.getByRole("button", { name: `Undo · ${failure} · Ctrl+Z` }))
+    .toBeVisible();
+});
+
 test("the newest news takes the slot: a refusal replaces the line, and the line a refusal", async () => {
   const screen = await render(<Harness />);
   await moveTrips();

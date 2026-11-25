@@ -248,7 +248,7 @@ test("only the source a walk is reading says Indexing, and only it gives up its 
     exports: [],
     moves: [],
     walks: 0,
-    walking: 1,
+    walkedSource: 1,
     thumbed: [],
   };
   try {
@@ -258,7 +258,7 @@ test("only the source a walk is reading says Indexing, and only it gives up its 
     expect(kind("Pictures").query()).toBeNull();
     await expect.element(kind("Archive")).toBeVisible();
 
-    await emit("job-progress", { ...walking, phase: "working", walking: null });
+    await emit("job-progress", { ...walking, phase: "working", walkedSource: null });
     await expect.element(kind("Pictures")).toBeVisible();
     expect(section.getByText(/Indexing/).elements()).toHaveLength(0);
   } finally {

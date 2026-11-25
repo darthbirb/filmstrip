@@ -22,8 +22,8 @@ export type FootNews =
   | { kind: "exported"; line: string; path: string }
   /** What an act did that changed nothing in the library, or one no longer in the journal. */
   | { kind: "said"; line: string }
-  /** An undo that failed, and the batch its Undo tries again. */
-  | { kind: "undoFailed"; line: string; batchId: string }
+  /** An undo that failed, and the batch its Undo tries again: the newest, when none is named. */
+  | { kind: "undoFailed"; line: string; batchId?: string }
   /** What an undo brought back, and the batch it took back. */
   | { kind: "undone"; line: string; batchId?: string }
   | { kind: "nothing" }

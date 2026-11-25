@@ -133,7 +133,7 @@ function Settled({ source, onRemove }: { source: SourceSummary; onRemove: () => 
   useEffect(() => {
     if (naming) field.current?.select();
   }, [naming]);
-  const walking = progress?.walking === source.id;
+  const walking = progress?.walkedSource === source.id;
   const left = progress ? progress.pending + progress.running : 0;
   const done = progress?.completed ?? 0;
   const percent = done + left > 0 ? Math.round((done / (done + left)) * 100) : 0;

@@ -68,10 +68,17 @@ export async function undo(batchId?: string, earlier: readonly Stayed[] = []) {
 
 /**
  * An undo that failed names its act and why, and keeps its Undo; one whose act is already taken
- * back had nothing left to undo.
+ * back had nothing left to undo. What came back before it failed is drawn.
  */
 async function failed(batchId: string | undefined, error: unknown) {
-  const batch = await actToUndo(batchId ?? null).catch(() => null);
+  await libraryChanged();
+  let batch: Batch | null;
+  try {
+    batch = await actToUndo(batchId ?? null);
+  } catch {
+    setNews({ kind: "undoFailed", line: undoFailedLine(null, error), batchId });
+    return;
+  }
   if (!batch) {
     sayNothing();
     return;

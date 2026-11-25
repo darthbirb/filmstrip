@@ -1053,7 +1053,10 @@ toward the rest surface.
   `danger-wash` ground, as when the Recycle Bin would not take a file Delete sent it. A way to go
   and look stands under why as a Button. There is only ever one, and a second refusal replaces it rather
   than stacking. An undo that failed is the Band, naming its act and why, with Undo under it to try
-  again; folded, the rail keeps the Undo glyph button, as for the Line.
+  again. Folded, the rail keeps the Undo glyph button, and the sentence comes out beside it as
+  "Nothing to undo." does, in the Band's alarm: the `warning` glyph in `danger` on `danger-wash`
+  inside a `line-danger` ring. It goes at the next key or click, and the button keeps it in its
+  tooltip.
 - **Line.** What an act did, in the Band's slot and shape without its alarm: a `glyph` in `fg-dim`
   (a check after an act, the undo arrow after an undo), the sentence in `ui`, the way back under it
   as a raised Undo button, and a dismiss. An act that changed nothing in the library, as a drop on

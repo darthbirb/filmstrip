@@ -1,4 +1,12 @@
-import { type CSSProperties, useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import type { Copying } from "../../ipc/bindings/Copying";
 import type { Exporting } from "../../ipc/bindings/Exporting";
@@ -245,12 +253,20 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
   if (rail) {
     return (
       <div className="grid place-items-center border-line border-t py-1.5">
-        {news.kind === "done" || news.kind === "undoFailed" ? (
+        {news.kind === "done" ? (
           <GlyphButton
             glyph="undo"
             label={`Undo · ${news.line} · Ctrl+Z`}
             onClick={() => void undo(news.batchId)}
           />
+        ) : news.kind === "undoFailed" ? (
+          <OutOfRail news={news} sentence={news.line} alarm>
+            <GlyphButton
+              glyph="undo"
+              label={`Undo · ${news.line} · Ctrl+Z`}
+              onClick={() => void undo(news.batchId)}
+            />
+          </OutOfRail>
         ) : news.kind === "exported" ? (
           <GlyphButton
             glyph="folderOpen"
@@ -258,7 +274,11 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
             onClick={() => void revealPath(news.path).catch(() => undefined)}
           />
         ) : (
-          <Nothing noFiles={news.kind === "noFiles"} />
+          <OutOfRail news={news} sentence={news.kind === "noFiles" ? NO_FILES : "Nothing to undo."}>
+            <span className="grid size-control place-items-center text-fg-dim text-icon">
+              <Glyph name={news.kind === "noFiles" ? "paste" : "undo"} />
+            </span>
+          </OutOfRail>
         )}
       </div>
     );
@@ -331,29 +351,62 @@ function showInTrash(itemId: number) {
   showInPane(itemId, trash);
 }
 
-/** Folded, the rail has no room for the sentence, so it comes out beside the slot. */
-function Nothing({ noFiles = false }: { noFiles?: boolean }) {
+/**
+ * Folded, the rail has no room for the sentence, so it comes out beside the slot, and goes at the
+ * next key or click; a failure comes out in the Band's alarm.
+ */
+function OutOfRail({
+  news,
+  sentence,
+  alarm = false,
+  children,
+}: {
+  news: FootNews;
+  sentence: string;
+  alarm?: boolean;
+  children: ReactNode;
+}) {
   const line = useRef<HTMLDivElement>(null);
-  const anchor = `--nothing-${useId().replace(/[^\w-]/g, "")}`;
+  const anchor = `--out-${useId().replace(/[^\w-]/g, "")}`;
   // The top layer escapes the folded face's hiding, so it shows only while the rail is the face shown.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each new piece of news comes out afresh.
   useLayoutEffect(() => {
     if (!line.current?.closest("[inert]")) line.current?.showPopover();
-  }, []);
+  }, [news]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each new piece of news comes out afresh.
+  useEffect(() => {
+    const said = performance.now();
+    const go = (event: Event) => {
+      // The key or click that said it may still be on its way through the page.
+      if (event.timeStamp < said || !line.current?.matches(":popover-open")) return;
+      line.current.hidePopover();
+    };
+    window.addEventListener("keydown", go, true);
+    window.addEventListener("pointerdown", go, true);
+    return () => {
+      window.removeEventListener("keydown", go, true);
+      window.removeEventListener("pointerdown", go, true);
+    };
+  }, [news]);
   return (
-    <span
-      style={{ anchorName: anchor } as CSSProperties}
-      className="grid size-control place-items-center text-fg-dim text-icon"
-    >
-      <Glyph name={noFiles ? "paste" : "undo"} />
+    <span style={{ anchorName: anchor } as CSSProperties} className="grid">
+      {children}
       <div
         ref={line}
         popover="manual"
         style={
           { positionAnchor: anchor, left: "anchor(right)", top: "anchor(top)" } as CSSProperties
         }
-        className="m-0 ml-1.5 flex h-control items-center whitespace-nowrap rounded-control border-0 bg-panel px-2.5 text-fg text-ui shadow-overlay inset-ring inset-ring-line-control"
+        className={`m-0 ml-1.5 flex h-control items-center gap-2 whitespace-nowrap rounded-control border-0 bg-panel px-2.5 text-fg text-ui shadow-overlay inset-ring ${alarm ? "inset-ring-line-danger before:pointer-events-none before:absolute before:inset-0 before:rounded-control before:bg-danger-wash" : "inset-ring-line-control"}`}
       >
-        {noFiles ? NO_FILES : "Nothing to undo."}
+        {alarm ? (
+          <>
+            <Glyph name="warning" className="shrink-0 text-danger text-glyph" />
+            <span>{sentence}</span>
+          </>
+        ) : (
+          sentence
+        )}
       </div>
     </span>
   );
