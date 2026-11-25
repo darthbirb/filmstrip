@@ -18,7 +18,7 @@ import {
   restoreForgets,
   setBackupsKept,
 } from "../../ipc/commands";
-import { formatBytes, formatCount, formatWhen } from "../../lib/format";
+import { formatBytes, formatCount, formatWhen, midSentence } from "../../lib/format";
 import { BackupGroup, BackupRow, RowProgress } from "../../ui/BackupTable";
 import { Band } from "../../ui/Band";
 import { Bar } from "../../ui/Bar";
@@ -31,7 +31,7 @@ import { RowQuestion } from "../../ui/TermTable";
 import { libraryChanged } from "../library";
 import { setNews } from "../navigation/foot-slot";
 import { useWork } from "../navigation/work-store";
-import { backupWhen, howTaken, notBackedUp, whyFailed } from "./backup-words";
+import { howTaken, notBackedUp, whyFailed } from "./backup-words";
 import { Rows } from "./Rows";
 import { binStays, listed } from "./recycle-words";
 import {
@@ -274,7 +274,7 @@ export function Backups() {
 /** A restore, run outside the section so that leaving it and coming back loses nothing. */
 async function restoreIndex(backup: Backup) {
   if (settingsHeld()) return;
-  const when = backupWhen(backup);
+  const when = midSentence(formatWhen(backup.takenAt));
   startRestore(backup.name);
   const heard = listen<number>("restore-progress", (event) =>
     restoreProgress(backup.name, event.payload),

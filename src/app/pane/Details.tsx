@@ -3,13 +3,7 @@ import { Fragment, type ReactNode, useState } from "react";
 import type { EffectiveTag } from "../../ipc/bindings/EffectiveTag";
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import { addItemTag, removeItemTag } from "../../ipc/commands";
-import {
-  formatBytes,
-  formatDate,
-  formatDimensions,
-  formatDuration,
-  formatWhen,
-} from "../../lib/format";
+import { formatBytes, formatDimensions, formatDuration, formatWhen } from "../../lib/format";
 import { Stat } from "../../ui/Chip";
 import { type Fact, Facts } from "../../ui/Facts";
 import { Glyph } from "../../ui/Glyph";
@@ -179,9 +173,9 @@ function File({ item }: { item: ItemDetail }) {
 function Dates({ item }: { item: ItemDetail }) {
   const dates: [string, string][] = [];
   if (item.capturedAt !== null) {
-    dates.push(["Taken", formatDate(item.capturedAt, item.capturedSrc === "exif")]);
+    dates.push(["Taken", formatWhen(item.capturedAt, { floating: item.capturedSrc === "exif" })]);
   }
-  dates.push(["Modified", formatDate(item.mtime)], ["Added", formatDate(item.addedAt)]);
+  dates.push(["Modified", formatWhen(item.mtime)], ["Added", formatWhen(item.addedAt)]);
   return (
     <span className="flex flex-col">
       {dates.map(([what, when], index) => (

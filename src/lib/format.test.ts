@@ -3,12 +3,11 @@ import { expect, test } from "vitest";
 import {
   formatBytes,
   formatDate,
-  formatDay,
   formatDimensions,
   formatDuration,
   formatElapsed,
-  formatShortDay,
   formatWhen,
+  midSentence,
 } from "./format";
 
 test("sizes step by 1024, as Windows counts them", () => {
@@ -41,27 +40,60 @@ test("a shape is its width by its height", () => {
   expect(formatDimensions(4000, 3000)).toBe("4000 × 3000");
 });
 
-test("a camera's clock is shown as it was written, wherever the viewer is", () => {
-  const taken = formatDate(1_718_188_401, true);
-  expect(taken).toContain("2024");
-  expect(taken).toMatch(/10[:.]33/);
-});
+const at = (date: Date) => date.getTime() / 1000;
 
-test("a day reads as Today, Yesterday, then its date, with a year only when it is not this one", () => {
-  const now = new Date(2026, 8, 24, 9, 30);
-  const at = (date: Date) => date.getTime() / 1000;
-  expect(formatDay(at(new Date(2026, 8, 24, 0, 5)), now)).toBe("Today");
-  expect(formatDay(at(new Date(2026, 8, 23, 23, 50)), now)).toBe("Yesterday");
-  const earlier = new Date(2026, 8, 12, 12);
-  const date = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "long" });
-  expect(formatDay(at(earlier), now)).toBe(date.format(earlier));
-  expect(formatDay(at(new Date(2025, 8, 12, 12)), now)).toMatch(/2025/);
-  expect(formatWhen(at(new Date(2026, 8, 24, 14, 2)), now)).toMatch(/^Today, \S/);
-});
-
-test("a day in short leaves out its year when it is this one", () => {
+test("a date is Today, Yesterday, or its day and short month, its year only outside this one", () => {
   const now = new Date(2026, 9, 13, 9, 30);
-  const at = (date: Date) => date.getTime() / 1000;
-  expect(formatShortDay(at(new Date(2026, 9, 3, 12)), now)).toBe("3 Oct");
-  expect(formatShortDay(at(new Date(2025, 9, 3, 12)), now)).toBe("3 Oct 2025");
+  expect(formatDate(at(new Date(2026, 9, 13, 0, 5)), { now })).toBe("Today");
+  expect(formatDate(at(new Date(2026, 9, 12, 23, 50)), { now })).toBe("Yesterday");
+  expect(formatDate(at(new Date(2026, 9, 3, 12)), { now })).toBe("3 Oct");
+  expect(formatDate(at(new Date(2026, 0, 1, 0, 0)), { now })).toBe("1 Jan");
+  expect(formatDate(at(new Date(2025, 9, 3, 12)), { now })).toBe("3 Oct 2025");
+  expect(formatDate(at(new Date(2025, 11, 31, 23, 59)), { now })).toBe("31 Dec 2025");
+});
+
+test("the year turns with the calendar: Yesterday across New Year, then the year written", () => {
+  const now = new Date(2027, 0, 1, 8);
+  expect(formatDate(at(new Date(2026, 11, 31, 22)), { now })).toBe("Yesterday");
+  expect(formatDate(at(new Date(2026, 11, 30, 22)), { now })).toBe("30 Dec 2026");
+});
+
+test("a day the clocks change in is still one day", () => {
+  const now = new Date(2026, 2, 30, 12);
+  expect(formatDate(at(new Date(2026, 2, 29, 0, 30)), { now })).toBe("Yesterday");
+  expect(formatDate(at(new Date(2026, 2, 28, 23, 30)), { now })).toBe("28 Mar");
+});
+
+test("a date and time is the date, then the time on the clock", () => {
+  const now = new Date(2026, 9, 13, 9, 30);
+  expect(formatWhen(at(new Date(2026, 9, 13, 14, 2)), { now })).toBe("Today, 14:02");
+  expect(formatWhen(at(new Date(2026, 9, 12, 9, 41)), { now })).toBe("Yesterday, 09:41");
+  expect(formatWhen(at(new Date(2026, 9, 3, 7, 5)), { now })).toBe("3 Oct, 07:05");
+  expect(formatWhen(at(new Date(2024, 5, 12, 22, 25)), { now })).toBe("12 Jun 2024, 22:25");
+});
+
+test("both follow the system's locale, in its order and on its clock", () => {
+  const now = new Date(2026, 9, 13, 9, 30);
+  const moment = new Date(2025, 9, 3, 14, 2);
+  const date = new Intl.DateTimeFormat(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  const time = new Intl.DateTimeFormat(undefined, { timeStyle: "short" });
+  expect(formatDate(at(moment), { now })).toBe(date.format(moment));
+  expect(formatWhen(at(moment), { now })).toBe(`${date.format(moment)}, ${time.format(moment)}`);
+});
+
+test("a camera's clock is shown as it was written, wherever the viewer is", () => {
+  const now = new Date(2026, 9, 13, 9, 30);
+  expect(formatWhen(1_718_188_401, { now, floating: true })).toBe("12 Jun 2024, 10:33");
+  const sameDay = new Date(2024, 5, 12, 23, 59);
+  expect(formatWhen(1_718_188_401, { now: sameDay, floating: true })).toBe("Today, 10:33");
+});
+
+test("inside a sentence, today and yesterday are not capitalised", () => {
+  expect(midSentence("Today, 14:02")).toBe("today, 14:02");
+  expect(midSentence("Yesterday")).toBe("yesterday");
+  expect(midSentence("3 Oct 2025, 14:02")).toBe("3 Oct 2025, 14:02");
 });

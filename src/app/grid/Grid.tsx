@@ -17,7 +17,7 @@ import type { Hit } from "../../ipc/bindings/Hit";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import type { Origin } from "../../ipc/bindings/Origin";
 import type { Trashed } from "../../ipc/bindings/Trashed";
-import { formatCount, formatDay, formatDuration } from "../../lib/format";
+import { formatCount, formatDate, formatDuration } from "../../lib/format";
 import { FolderCard } from "../../ui/FolderCard";
 import { Glyph } from "../../ui/Glyph";
 import { type HeadedMenu, useContextMenu } from "../../ui/Menu";
@@ -357,7 +357,7 @@ function byDay(items: readonly Trashed[]) {
   const starts: number[] = [];
   const headings: string[] = [];
   items.forEach((item, index) => {
-    const day = formatDay(item.trashedAt);
+    const day = formatDate(item.trashedAt);
     if (day === headings.at(-1)) return;
     starts.push(index);
     headings.push(day);

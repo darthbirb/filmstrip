@@ -207,7 +207,7 @@ test("a source that is away is counted from the index, and the totals say which 
     rootFolderId: 3,
     reachable: false,
     itemCount: 6_120,
-    indexedAt: new Date(new Date().getFullYear(), 9, 3, 12).getTime() / 1000,
+    indexedAt: new Date(2025, 9, 3, 12).getTime() / 1000,
   };
   await holding([...SOURCES, archive], TOTALS);
   const screen = await render(<Foot />);
@@ -217,7 +217,7 @@ test("a source that is away is counted from the index, and the totals say which 
   expect(rowsOf(totals.element()).at(-1)).toEqual(["Sources", "3", "1 offline"]);
   await expect
     .element(
-      totals.getByText("Archive is offline · its 6,120 are counted from the last walk, 3 Oct"),
+      totals.getByText("Archive is offline · its 6,120 are counted from the last walk, 3 Oct 2025"),
     )
     .toBeVisible();
 });

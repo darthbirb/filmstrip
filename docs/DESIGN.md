@@ -552,6 +552,13 @@ on a row ("offline", "current") and a name the person chose. An ellipsis only wh
 typing follows before anything happens, and figures for a count. One act has one name everywhere
 it appears; the Components sheet's Words block lists them, with the reason each changed.
 
+Dates come in two styles, both in the system's locale, its order and its clock, and every date
+the interface writes is one of them. **The date** is Today, Yesterday, or the day and the short
+month, the year only outside the current one: "3 Oct", "3 Oct 2025". **The date and time** is the
+date, a comma, then the time to the minute: "Today, 14:02", "12 Jun 2024, 10:33". Inside a
+sentence today and yesterday drop their capital: "last indexed today". `src/lib/format.ts` writes
+both.
+
 ## Layout
 
 **Everything is in rem**, so the interface size scales it all at once, and "does it fit" is
