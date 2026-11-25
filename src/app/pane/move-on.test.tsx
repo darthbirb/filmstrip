@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test } from "vitest";
+import { afterEach, beforeAll, beforeEach, expect, test } from "vitest";
 import { render } from "vitest-browser-react";
 
 import { resetBin } from "../../dev/mock";
@@ -16,7 +16,7 @@ import { type Place, setPlace } from "../place";
 import { updatePreferences } from "../preferences";
 import { showReport } from "../undo/report-store";
 import { forgetActFocus } from "./act-focus";
-import { MovePickerHost, moveFiles, openMovePicker } from "./move-picker";
+import { MovePickerHost, moveFiles, openMovePicker, watchMoves } from "./move-picker";
 import { Pane } from "./Pane";
 import { PaneDetailProvider } from "./pane-detail";
 import { getPaneItem, showInPane } from "./pane-store";
@@ -41,6 +41,10 @@ const JPGS: Place = { kind: "search", query: "jpg", back: null };
 const IN_CAIRO: Place = { kind: "search", query: "path:Pictures/Trips/Cairo", back: null };
 
 const address = location.href;
+
+beforeAll(async () => {
+  await watchMoves();
+});
 
 beforeEach(async () => {
   resetBin();
@@ -174,16 +178,26 @@ test("a search that still finds the moved file keeps the pane on it", async () =
 });
 
 test("a search the moved file no longer matches moves the pane on", async () => {
-  const [felucca, pyramid, sphinx] = [
-    await id(6, "felucca.mp4"),
-    await id(6, "pyramid.jpg"),
-    await id(6, "sphinx.jpg"),
-  ];
+  const pyramid = await id(6, "pyramid.jpg");
+  const sphinx = await id(6, "sphinx.jpg");
   const { screen } = await showing(pyramid, IN_CAIRO);
   await moveTo(screen, "Move to…", /People/);
 
-  await expect.poll(getPaneItem).not.toBe(pyramid);
-  expect([felucca, sphinx]).toContain(getPaneItem());
+  await expect.poll(getPaneItem).toBe(sphinx);
+});
+
+test("a move between drives out of a search it leaves moves the pane on once it lands", async () => {
+  const pyramid = await id(6, "pyramid.jpg");
+  const sphinx = await id(6, "sphinx.jpg");
+  const { screen } = await showing(pyramid, IN_CAIRO);
+  history.replaceState(null, "", "?across");
+  await moveTo(screen, "Move to…", /People/);
+
+  await expect.poll(async () => (await indexProgress()).moves).toHaveLength(1);
+  expect(getPaneItem()).toBe(pyramid);
+  await expect.poll(async () => (await indexProgress()).moves, { timeout: 5000 }).toEqual([]);
+  await expect.poll(getPaneItem).toBe(sphinx);
+  expect((await folderItems(5)).map((row) => row.id)).toEqual([pyramid]);
 });
 
 test("a move between drives out of a search keeps the pane, as the search will still find it", async () => {

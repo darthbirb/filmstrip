@@ -724,9 +724,10 @@ keeps the pane on it, since no tile took its place. **A move between drives move
 it starts**, not when its job ends: the file is already on its way, a press per picture would
 otherwise wait out each copy, and the pane jumping seconds later would take the picture from
 under whatever is being looked at by then. So whether it leaves is judged from where it is going:
-out of a folder it does, out of the Sorting Box unless into a sorting source, and out of a search
-it does not, as the file keeps the name it was found by. One the job leaves where it was is named
-by its banner.
+out of a folder it does, and out of the Sorting Box unless into a sorting source. A search can
+only be asked once the job lands, since it may find the file by its name or by the folder it
+lived in, so there the pane stays on the file until then and moves on if the search has lost it.
+One the job leaves where it was is named by its banner.
 
 **The focus stays where the act was taken**, settled on 25 November 2026. Delete and Restore take
 their file's bar with them, which dropped the focus to the page and sent a keyboard or screen

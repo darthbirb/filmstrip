@@ -13,7 +13,6 @@ import {
 } from "../../ipc/commands";
 import type { MenuAnchor } from "../../ui/Menu";
 import { Picker, type PickerRow, type PickerSection } from "../../ui/Picker";
-import { placeItems } from "../grid/place-items";
 import { libraryChanged } from "../library";
 import { setNews } from "../navigation/foot-slot";
 import { getIndex, refreshIndex, useIndex } from "../navigation/index-store";
@@ -23,7 +22,7 @@ import { movedBannerLine, moveStoppedLine, reasonText } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
 import { keepFocusThrough } from "./act-focus";
-import { type MoveOn, moveOn, moveOnFrom } from "./move-on";
+import { type MoveOn, moveOn, moveOnFrom, moveOnLanded, stillListed } from "./move-on";
 import { restoreFiles } from "./restore";
 
 /** A folder to move, with everything in it. */
@@ -263,7 +262,9 @@ export async function moveFiles(itemIds: number[], to: Into) {
   if (!moved) return null;
   remember(to);
   if (moved.kind === "started") {
-    await moveOnOut(pane, to, true);
+    if (pane.next === pane.shown) return "started" as const;
+    if (pane.origin?.kind === "search") landing.set(moved.jobId, pane);
+    else if (await leavesAhead(pane.origin, to)) moveOn(pane, []);
     return "started" as const;
   }
   const { batch, report } = moved;
@@ -289,7 +290,7 @@ export async function moveFiles(itemIds: number[], to: Into) {
         }
       : null,
   );
-  await moveOnOut(pane, to, false);
+  await moveOnOut(pane);
   await libraryChanged();
   return report;
 }
@@ -297,28 +298,23 @@ export async function moveFiles(itemIds: number[], to: Into) {
 /**
  * The pane moves on once its file has left the place it was shown in: one the place still lists
  * keeps it, as a search still finding it, the Sorting Box holding it or a file already where it
- * was sent does. A move between drives is judged as it starts. DECISIONS.md "The pane".
+ * was sent does. DECISIONS.md "The pane".
  */
-async function moveOnOut(pane: MoveOn, to: Into, started: boolean) {
-  if (pane.next === pane.shown) return;
-  const stays = started ? await staysAhead(pane.origin, to) : await stillListed(pane);
-  if (!stays) moveOn(pane, []);
+async function moveOnOut(pane: MoveOn) {
+  if (pane.next !== pane.shown && !(await stillListed(pane))) moveOn(pane, []);
 }
 
-async function stillListed({ shown, origin }: MoveOn) {
-  const rows = await placeItems(origin).catch(() => null);
-  return rows === null || rows.some((row) => row.id === shown);
-}
+// Moves between drives out of a search, by job, waiting to land before the search is asked.
+const landing = new Map<number, MoveOn>();
 
 /**
- * Whether the place will still list the file once a move between drives lands: a search keeps a
- * file it found, whose name goes with it, and the Sorting Box one sent to a sorting source.
+ * Whether a move between drives takes the file out of its place, judged as it starts: out of a
+ * folder always, out of the Sorting Box unless into a sorting source.
  */
-async function staysAhead(origin: Place | null, to: Into) {
-  if (origin?.kind === "search") return true;
-  if (origin?.kind !== "sorting") return false;
+async function leavesAhead(origin: Place | null, to: Into) {
+  if (origin?.kind !== "sorting") return true;
   const into = await folderDetail(to.id).catch(() => null);
-  return getIndex().sources?.find((one) => one.id === into?.sourceId)?.kind === "sorting";
+  return getIndex().sources?.find((one) => one.id === into?.sourceId)?.kind !== "sorting";
 }
 
 /**
@@ -355,6 +351,9 @@ export async function moveFolderTo(
  */
 export async function afterMoved(moved: Moved) {
   await libraryChanged();
+  const pane = landing.get(moved.jobId);
+  landing.delete(moved.jobId);
+  if (pane) await moveOnLanded(pane);
   const { batch, refused, whole, to, stopped } = moved;
   const into = { id: moved.folderId, title: to };
   const [only] = refused;

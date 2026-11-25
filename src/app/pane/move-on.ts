@@ -1,10 +1,18 @@
-import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { placeItems } from "../grid/place-items";
-import type { Place } from "../place";
+import { type Place, placeKey } from "../place";
 import { getPaneItem, getPaneOrigin, paneMovesOn, showInPane } from "./pane-store";
 
-/** Where the pane goes if these files take its file out of its place. */
-export type MoveOn = { shown: number | null; origin: Place | null; next: number | null };
+/**
+ * Where the pane goes if these files take its file out of its place, and the place's files in
+ * their order before they went.
+ */
+export type MoveOn = {
+  shown: number | null;
+  origin: Place | null;
+  next: number | null;
+  going: readonly number[];
+  order: readonly number[];
+};
 
 /**
  * The file that takes the pane's place once these go, worked out before the list changes, from
@@ -13,8 +21,10 @@ export type MoveOn = { shown: number | null; origin: Place | null; next: number 
 export async function moveOnFrom(going: number[]): Promise<MoveOn> {
   const shown = getPaneItem();
   const origin = getPaneOrigin();
-  const next = paneMovesOn(going) ? await neighbour(origin, going) : shown;
-  return { shown, origin, next };
+  if (!paneMovesOn(going)) return { shown, origin, next: shown, going, order: [] };
+  const rows = await placeItems(origin).catch(() => []);
+  const order = rows.map((row) => row.id);
+  return { shown, origin, next: neighbour(order, going), going, order };
 }
 
 /** The pane moves on, unless its file is among those that stayed. */
@@ -23,14 +33,39 @@ export function moveOn({ shown, origin, next }: MoveOn, stayed: readonly { id: n
   showInPane(next, origin);
 }
 
+/** Whether the pane's place still lists its file, asked again. */
+export async function stillListed({ shown, origin }: MoveOn) {
+  const rows = await placeItems(origin).catch(() => null);
+  return rows === null || rows.some((row) => row.id === shown);
+}
+
+/**
+ * After files that went later than asked, as a move between drives does: the pane, still on its
+ * file in its place, moves on once the place no longer lists it, to the file after them that it
+ * still lists.
+ */
+export async function moveOnLanded(pane: MoveOn) {
+  const { shown, origin, going, order } = pane;
+  const same = () =>
+    shown !== null &&
+    getPaneItem() === shown &&
+    paneMovesOn([shown]) &&
+    placeKey(getPaneOrigin()) === placeKey(origin);
+  if (!same()) return;
+  const rows = await placeItems(origin).catch(() => null);
+  if (!rows || rows.some((row) => row.id === shown) || !same()) return;
+  const listed = new Set(rows.map((row) => row.id));
+  showInPane(neighbour(order, going, listed), origin);
+}
+
 /**
  * The file after the last of these in their place, or the nearest before it when none follows, or
- * none. For one file, the one after it or before it. Artboards › Selecting.
+ * none; of those the place lists, when that is given. For one file, the one after it or before
+ * it. Artboards › Selecting.
  */
-export async function neighbour(place: Place | null, going: number[]) {
-  const rows: ItemRow[] = await placeItems(place).catch(() => []);
-  const last = rows.findLastIndex((row) => going.includes(row.id));
+function neighbour(order: readonly number[], going: readonly number[], listed?: Set<number>) {
+  const last = order.findLastIndex((id) => going.includes(id));
   if (last < 0) return null;
-  const stays = (row: ItemRow) => !going.includes(row.id);
-  return rows.slice(last + 1).find(stays)?.id ?? rows.slice(0, last).findLast(stays)?.id ?? null;
+  const stays = (id: number) => !going.includes(id) && (listed?.has(id) ?? true);
+  return order.slice(last + 1).find(stays) ?? order.slice(0, last).findLast(stays) ?? null;
 }
