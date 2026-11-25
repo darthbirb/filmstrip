@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 
 import { Glyph } from "./Glyph";
 import type { GlyphName } from "./glyphs";
@@ -19,6 +19,7 @@ type Props = {
   /** For a toggle: whether it is on. */
   pressed?: boolean;
   title?: string;
+  ref?: Ref<HTMLButtonElement>;
 };
 
 const LOOKS = {
@@ -41,10 +42,12 @@ export function ChipButton({
   filled = false,
   pressed,
   title,
+  ref,
 }: Props) {
   const roomy = round || look === "primary" || look === "secondary";
   return (
     <button
+      ref={ref}
       type="button"
       title={title}
       aria-pressed={pressed}

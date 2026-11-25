@@ -702,6 +702,15 @@ all of them are absent rather than greyed. Nothing purges: emptying the Trash is
 details say where it came from and when it went, in place of where it is, and the Name row is only
 its name. Restored from the Trash, the pane moves on as it does after a delete.
 
+**The focus stays where the act was taken**, settled on 25 November 2026. Delete and Restore take
+their file's bar with them, which dropped the focus to the page and sent a keyboard or screen
+reader back to the top. The next file's bar gives the same button the focus, so Delete pressed
+again deletes the next; when that bar has no such button, as a file restored inside a search
+shows the library's bar, the strip's frame for the file takes it, or its picture once the strip
+no longer runs through it, as a restored file leaves a search of the Trash. Only a focus that fell
+to the page is taken back: one the act moved on purpose, as the question about a drive with no
+Recycle Bin does, stays where it went. A pane left empty has nothing to take it.
+
 **A video plays on a plate of the app's own**, drawn by Claude Design and built on 12 October
 2026, in place of the controls the window brings with it: play, the track, the time and the mute
 on the one dark glass, over the picture's foot and as wide as the picture. **Its glyphs are one
@@ -1148,13 +1157,17 @@ closes them, and words stay the words typed, so the field is the parse and not a
 type-to-find and digits are destination keys. **A search starts everywhere, and where you stand is
 offered, never written**: a search is for finding something whose place is not known, and the
 first build, which wrote the folder as the first term, hid what the wide search would have found.
-The place sits dashed at the field's end, one Tab or one click away; taken, a folder writes
+The place sits dashed at the field's end, one click away, and one Tab once something is typed:
+**an empty field passes Tab on**, so tabbing through the bar moves the focus and writes nothing,
+and the offer shows its Tab key only while Tab would take it. Taken, a folder writes
 `path:`, the Sorting Box `is:sorting` and the Trash `is:trashed`, a chip like any other, so the
 same text still means the same thing wherever it runs and Search Everywhere is only that term
 removed. Tab takes the offer only with no row of the list plated; with one, it picks the row. **Typing moves
 nothing; Enter runs the query**, because a grid that reflows under every letter is a grid nobody
 can look at. A query that does not read runs nothing: the field names the character and the
-results stay as they were.
+results stay as they were. **Escape takes back one thing at a time**: the list, then what did not
+read, then what was typed, which leaves the field holding the query the grid shows, or nothing in
+a place, and gives the focus back to wherever it was before the field took it.
 
 **The list under the field offers terms for the word the text ends on**, by prefix: the words as
 typed, then folders, tags and labels, eight rows at most. ggallery had nothing like it, so the

@@ -69,6 +69,7 @@ async function split(query: string) {
 export function SearchField() {
   const place = usePlace();
   const input = useRef<HTMLInputElement>(null);
+  const frame = useRef<HTMLDivElement>(null);
   const mirror = useRef<HTMLDivElement>(null);
   const [chips, setChips] = useState<Chip[]>([]);
   const [text, setText] = useState("");
@@ -80,6 +81,7 @@ export function SearchField() {
   const [plate, setPlate] = useState<number | null>(null);
   // Counts the askings, so an answer for text since typed over is dropped.
   const asked = useRef(0);
+  const before = useRef<HTMLElement | null>(null);
   const anchor = `--search-${useId().replace(/[^\w-]/g, "")}`;
   const sentence = fault ? faultSentence(fault.why) : null;
   // The list and the sentence share one place, and the sentence has it first.
@@ -124,6 +126,14 @@ export function SearchField() {
     setText(held.text);
   }
 
+  /** Leaves the field for where the focus was before it, or for the page when that has gone. */
+  function leave() {
+    const back = before.current;
+    before.current = null;
+    if (back?.isConnected) back.focus();
+    else input.current?.blur();
+  }
+
   useEffect(() => {
     focusField = (byKey) => {
       setRinged(byKey);
@@ -154,6 +164,8 @@ export function SearchField() {
   const here = backFrom(place);
   const scope = scopeOf(here);
   const offering = focused && here !== null && scope !== null && !chips.some(scoping);
+  // An empty field passes Tab on. DECISIONS.md "Search".
+  const begun = text !== "" || chips.length > 0;
 
   /** Takes the offer: where you stand becomes the first term. */
   async function takeOffer() {
@@ -211,7 +223,7 @@ export function SearchField() {
     } else if (row && (event.key === "Enter" || event.key === "Tab")) {
       event.preventDefault();
       pick(row);
-    } else if (offering && event.key === "Tab" && !event.shiftKey) {
+    } else if (offering && begun && event.key === "Tab" && !event.shiftKey) {
       event.preventDefault();
       void takeOffer();
     } else if (event.key === "Enter") {
@@ -224,7 +236,7 @@ export function SearchField() {
       else if (fault) setFault(null);
       else {
         void hold();
-        input.current?.blur();
+        leave();
       }
     } else if (event.key === "Backspace") {
       const at = event.currentTarget;
@@ -250,6 +262,7 @@ export function SearchField() {
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: the input is the control; a press anywhere on its frame only hands it the caret.
     <div
+      ref={frame}
       style={{ anchorName: anchor } as CSSProperties}
       className={`relative flex h-full min-w-0 flex-1 cursor-text items-center gap-1.5 overflow-hidden rounded-nested pr-1 pl-2.5 inset-ring ${ring} ${focused ? "bg-well" : "bg-ground"} ${ringed && focused ? "outline-(length:--focus-width) outline-focus outline-offset-(--focus-gap) outline-solid" : ""} ${resting ? "justify-center" : ""}`}
       onMouseDown={(event) => {
@@ -308,7 +321,12 @@ export function SearchField() {
           autoComplete="off"
           spellCheck={false}
           value={text}
-          onFocus={() => setFocused(true)}
+          onFocus={(event) => {
+            setFocused(true);
+            const from = event.relatedTarget;
+            if (from instanceof HTMLElement && frame.current?.contains(from)) return;
+            before.current = from instanceof HTMLElement ? from : null;
+          }}
           onBlur={() => {
             setFocused(false);
             setRinged(false);
@@ -338,16 +356,18 @@ export function SearchField() {
           type="button"
           tabIndex={-1}
           aria-label={`Search Only in ${placeName(here)}`}
-          title={`Search Only in ${placeName(here)} · Tab`}
+          title={`Search Only in ${placeName(here)}${begun ? " · Tab" : ""}`}
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => void takeOffer()}
           className="flex h-badge shrink-0 items-center gap-1.25 whitespace-nowrap rounded-badge border border-line-strong border-dashed pr-0.75 pl-1.5 text-fg-dim text-small hover:bg-panel hover:text-fg"
         >
           <Glyph name={OFFER_GLYPHS[here.kind]} className="text-glyph-small" />
           in {placeName(here)}
-          <span className="flex items-center rounded-badge bg-panel px-1.25 text-eyebrow text-fg-dim inset-ring inset-ring-line-control">
-            Tab
-          </span>
+          {begun && (
+            <span className="flex items-center rounded-badge bg-panel px-1.25 text-eyebrow text-fg-dim inset-ring inset-ring-line-control">
+              Tab
+            </span>
+          )}
         </button>
       )}
       {listed && (
