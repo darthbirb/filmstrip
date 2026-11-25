@@ -88,6 +88,19 @@ test("its question counts the files and their space, keeps the rest of the bin, 
   expect(await trashListing()).toHaveLength(2);
 });
 
+test("Empty Trash… is disabled while its question is open, so one act has one way in", async () => {
+  await trashed(await cairo(2));
+  const screen = await opened();
+  const head = screen.getByRole("button", { name: "Empty Trash…" });
+  await head.click();
+  await expect.element(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+  await expect.element(head).toBeDisabled();
+
+  await screen.getByRole("button", { name: "Cancel" }).click();
+  await expect.element(head).toBeEnabled();
+  await expect.element(head).toHaveFocus();
+});
+
 test("emptying counts as it goes, the foot says it is done, and Ctrl+Z passes over what went", async () => {
   const [renamed, ...gone] = await cairo(3);
   if (renamed === undefined) throw new Error("Cairo holds files");

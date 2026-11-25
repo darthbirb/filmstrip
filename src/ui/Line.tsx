@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
+import { DismissButton } from "./DismissButton";
 import { Glyph } from "./Glyph";
-import { GlyphButton } from "./GlyphButton";
 import type { GlyphName } from "./glyphs";
 
 type Props = {
@@ -25,7 +25,7 @@ export function Line({ glyph, sentence, action, onDismiss }: Props) {
         <span className="text-pretty text-fg text-ui tabular-nums">{sentence}</span>
         {action}
       </span>
-      <GlyphButton glyph="close" label="Dismiss" onClick={onDismiss} />
+      <DismissButton label="Dismiss" onClick={onDismiss} />
     </div>
   );
 }

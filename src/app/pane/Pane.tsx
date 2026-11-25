@@ -17,7 +17,8 @@ import { Strip } from "./Strip";
 
 /**
  * The pane's header row: the way into full screen, then the item's shape and size, opening onto
- * everything else known about it. Both go with the item, so an empty pane's header holds only its fold.
+ * everything else known about it, which then says them. Both go with the item, so an empty pane's
+ * header holds only its fold.
  */
 export function PaneHeader() {
   const shown = usePaneDetail();
@@ -25,6 +26,7 @@ export function PaneHeader() {
   const several = usePaneSetDetail();
   const folder = usePaneFolderDetail();
   const full = useFullScreen();
+  const open = usePreferences().details ?? false;
   const into = (
     <GlyphButton
       glyph={full ? "leaveFullScreen" : "fullScreen"}
@@ -48,7 +50,7 @@ export function PaneHeader() {
   if (shown.status !== "ready") return null;
   return (
     <DetailsToggle into={into}>
-      <span className="min-w-0 flex-1 truncate">{summary(shown.item)}</span>
+      <span className="min-w-0 flex-1 truncate">{open ? "Details" : summary(shown.item)}</span>
     </DetailsToggle>
   );
 }

@@ -39,6 +39,24 @@ test("the backups are listed newest first, with how each was taken and what they
   await expect.element(page.getByRole("button", { name: "Backups to Keep: 7" })).toBeVisible();
 });
 
+test("Size stands over its figures while the list scrolls", async () => {
+  await page.viewport(1280, 500);
+  await opened();
+  await expect.poll(() => rows().length).toBe(7);
+  const head = list()?.firstElementChild as HTMLElement;
+  const scroller = list()?.lastElementChild as HTMLElement;
+  expect(scroller.scrollHeight).toBeGreaterThan(scroller.clientHeight);
+  // Headless Edge draws no scrollbar, so the gutter both keep is what holds them together.
+  expect(getComputedStyle(head).scrollbarGutter).toBe("stable");
+  expect(getComputedStyle(scroller).scrollbarGutter).toBe("stable");
+  const right = (element: Element | null | undefined) =>
+    element?.getBoundingClientRect().right ?? Number.NaN;
+  const heading = [...head.children].find((cell) => cell.textContent === "Size");
+  for (const row of rows()) {
+    expect(right(row.querySelector(".text-right"))).toBeCloseTo(right(heading), 0);
+  }
+});
+
 test("Restore… asks on its row, and Escape puts the row back with the focus on its Restore…", async () => {
   await opened();
   await expect.poll(() => rows().length).toBe(7);

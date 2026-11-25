@@ -17,12 +17,14 @@ export function BackupGroup({ label, children }: { label: string; children: Reac
       aria-label={label}
       className="flex min-h-0 flex-1 flex-col rounded-control bg-inset inset-ring inset-ring-line-control"
     >
-      <div className={`${COLUMNS} shrink-0 border-line border-b py-0.5 pr-1 pl-2`}>
+      <div
+        className={`${COLUMNS} shrink-0 overflow-hidden border-line border-b py-0.5 pr-1 pl-2 [scrollbar-gutter:stable]`}
+      >
         <span className={heading}>Taken</span>
         <span className={`${heading} justify-end`}>Size</span>
         <span />
       </div>
-      <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+      <div className="min-h-0 flex-1 overflow-auto [scrollbar-gutter:stable]">{children}</div>
     </section>
   );
 }

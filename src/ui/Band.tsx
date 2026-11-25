@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
+import { DismissButton } from "./DismissButton";
 import { Glyph } from "./Glyph";
-import { GlyphButton } from "./GlyphButton";
 
 type Props = {
   /** One line, said where the act began. */
@@ -32,7 +32,7 @@ export function Band({ sentence, path, detail, action, onDismiss }: Props) {
         </span>
         {action}
       </span>
-      <GlyphButton glyph="close" label="Dismiss" onClick={onDismiss} />
+      <DismissButton label="Dismiss" onClick={onDismiss} />
     </div>
   );
 }

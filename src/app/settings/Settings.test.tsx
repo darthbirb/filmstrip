@@ -218,6 +218,19 @@ test("Sources lists every folder read, and an offline one keeps remove but loses
   await expect.element(section.getByRole("button", { name: "Remove Archive" })).toBeVisible();
 });
 
+test("an offline source's kind and remove stand in the column of the rows above it", async () => {
+  await page.viewport(1100, 700);
+  const section = await onSources();
+  const kind = (title: string) => section.getByRole("group", { name: `Kind of ${title}` });
+  const remove = (title: string) => section.getByRole("button", { name: `Remove ${title}` });
+  const left = (at: { element: () => Element }) => at.element().getBoundingClientRect().left;
+  await expect.element(kind("Archive")).toBeVisible();
+  await expect.element(remove("Archive")).toBeVisible();
+
+  expect(left(kind("Archive"))).toBeCloseTo(left(kind("Pictures")), 0);
+  expect(left(remove("Archive"))).toBeCloseTo(left(remove("Pictures")), 0);
+});
+
 test("a source's name is a field where it stands, with no button of its own", async () => {
   const section = await onSources();
 

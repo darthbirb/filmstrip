@@ -226,9 +226,11 @@ function tree(
       const inside = (children.get(folder.id) ?? []).length > 0;
       rows.push({
         ...row(folder, depth, barred),
-        // The tree's rows read as navigation's do; a recent or found row names its parent instead.
-        count: { own: folder.itemCount, all: folder.allCount },
-        detail: folder.id === current ? "current" : undefined,
+        // The tree's rows read as navigation's do, but the current one says so in its pill's place;
+        // a recent or found row names its parent instead.
+        ...(folder.id === current
+          ? { detail: "current" }
+          : { count: { own: folder.itemCount, all: folder.allCount } }),
         expanded: inside ? open.has(folder.id) : undefined,
       });
       if (inside && open.has(folder.id)) walk(folder.id, depth + 1);

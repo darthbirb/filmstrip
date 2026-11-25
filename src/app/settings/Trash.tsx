@@ -1,5 +1,6 @@
 import { listen } from "@tauri-apps/api/event";
 import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 
 import type { Counted } from "../../ipc/bindings/Counted";
 import type { ToEmpty } from "../../ipc/bindings/ToEmpty";
@@ -48,7 +49,8 @@ export function Trash() {
       .catch(() => undefined);
   };
   const cancel = () => {
-    setAsking(null);
+    // The button is disabled until the question goes, and a disabled button cannot take the focus.
+    flushSync(() => setAsking(null));
     button.current?.focus();
   };
   const answer = (asked: ToEmpty) => {
@@ -74,7 +76,7 @@ export function Trash() {
     );
   } else if (held && held.count > 0) {
     action = (
-      <Button ref={button} tone="danger" onClick={ask}>
+      <Button ref={button} tone="danger" disabled={asking !== null} onClick={ask}>
         Empty Trash…
       </Button>
     );

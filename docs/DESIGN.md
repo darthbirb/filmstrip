@@ -618,7 +618,9 @@ toward the rest surface.
   A label never wraps: too little room ends it in an ellipsis, and the panel it sits in stops
   before it comes to that. DECISIONS.md "The frame". A row's own button, as a backup's Restore…
   is, is the small raised one: `chip`-tall at the `nested` corner, `small` text in `fg-mid` until
-  the pointer brings `fg`.
+  the pointer brings `fg`. Disabled, either size of any tone sinks to `inset` on a `line` ring,
+  its label `fg-dim` and its glyph `fg-faint`, and the pointer lights nothing, as Empty Trash…
+  does while its question is open.
 - **Glyph button.** A `control` square on `raised` with a `line-control` ring. Disabled, it sinks
   to `inset` on a `line` ring, its glyph `fg-faint`. The one that destroys or forgets takes the
   button's `danger` colours.
@@ -642,8 +644,8 @@ toward the rest surface.
   and slash `on-plate-dim`; on a row that cannot be picked, figures and slash `fg-dim`. A folded row
   and the same row opened show the same pill. Every row carries one, the Sorting Box and the Trash
   included; an offline source shows its word instead. Move to…'s tree rows and a matched folder's
-  card carry it too; Settings' key rows and No Pictures Here print the same figures as text. The
-  folded rail's badges keep one figure.
+  card carry it too, but the row the file is in says current in its place; Settings' key rows and
+  No Pictures Here print the same figures as text. The folded rail's badges keep one figure.
 - **Rail button.** A folded panel's place: a `control` square holding a filled glyph, `plate` with
   `on-plate` ink when it is where you are, a `wash` under the pointer otherwise. Its count rides the
   glyph's top-right corner as a `mark-badge` plate in `micro` figures, ringed in the panel's own
@@ -826,8 +828,8 @@ toward the rest surface.
   `veil`, its glyph `glyph-small` in `fg`, `hover-wash` under the pointer and the focus ring for
   the keyboard; the cover's pencil is one too.
 - **Pane disclosure.** The pane's header row: a chevron and the item's shape, length and size in
-  tabular `ui` figures. A `wash` under the pointer; opened, it rests on `raised` in `fg` and the
-  chevron turns down.
+  tabular `ui` figures. A `wash` under the pointer; opened, it rests on `raised` in `fg`, the
+  chevron turns down, and the figures give way to Details, since the File row says them.
 - **Action bar.** A `toolbar`-tall row between the picture and the filmstrip, holding what the app
   can do to the file. Favourite sits at the left and never leaves; the rest fill from the right, and
   each one that does not fit moves into a menu under a `more` glyph. What fits is measured against
@@ -855,9 +857,9 @@ toward the rest surface.
   it, with a filter field on `ground` at its head, Recent under an `eyebrow` heading, a rule, then
   the tree. Rows are `control` tall, indented a `chevron` a level with the chevron's square kept on
   every row, a filled glyph in `fg-dim`, the name, and quieter words at the end in `small`: a
-  folder's parent, or "current" on the one the file is in, drawn in `fg-dim` and never picked.
-  Moving a folder, its own branch is drawn the same way. The field keeps the focus; the arrows move
-  a `raised-hi` row, Enter picks it, Right and Left open and shut it.
+  folder's parent, or "current" in place of the pill on the one the file is in, drawn in `fg-dim`
+  and never picked. Moving a folder, its own branch is drawn the same way. The field keeps the
+  focus; the arrows move a `raised-hi` row, Enter picks it, Right and Left open and shut it.
 - **Full screen.** The pane takes the frame below the bar, keeping its header, picture and
   filmstrip and losing only the columns beside it. Its control is a glyph button at the header's
   left end, an arrow pointing along the edge that moves: left going in, right coming out, where it
@@ -995,8 +997,8 @@ toward the rest surface.
   Nothing in it, over two lines on where a deleted file goes: the recycle glyph, and the usb
   glyph for a drive with no bin, in `glyph`, each sentence in `small` `fg-dim`. Empty Trash… in
   `danger` ends its head while it holds anything, and asks under the head in the row question's
-  shape, its own `line-danger` ring round it. Emptying, the head counts as it goes and the
-  `progress` bar, `head-progress` wide, stands where the button was.
+  shape, its own `line-danger` ring round it, disabled while it asks. Emptying, the head counts
+  as it goes and the `progress` bar, `head-progress` wide, stands where the button was.
 - **Filter field.** Narrows the list under it as you type: `bar-field` tall on `ground` at the
   `nested` corner in a `line-control` ring, `line-strong` while it has the focus, the search glyph
   before it in `fg-dim` and "3 of 228" at its end in `small` tabular figures once something is
@@ -1021,11 +1023,12 @@ toward the rest surface.
   `eyebrow` capitals, Taken and Size, over a `line` rule; then rows `row` tall, each when it was
   taken in `ui` `fg`, never cut, and how after it in `small` `fg-dim`, the first to give way, then
   its size right-aligned in the `count` column in `small` `fg-mid` tabular figures, then the small
-  Restore… in a `row-action` column, which a row without one keeps empty. A row that will go at
-  the next backup says so where how it was taken goes, its time in `fg-mid`; one that cannot be
-  read says unreadable and has no Restore…; one being written arrives at the top as a push-down,
-  "backing up…" and the `progress` bar in place of its size. Restore… asks in the row question's
-  shape, naming in `fg` each source it forgets with files in the Recycle Bin and counting the
+  Restore… in a `row-action` column, which a row without one keeps empty. The heading row keeps
+  the list's scrollbar gutter, so Size stands over its figures whether the list scrolls or not.
+  A row that will go at the next backup says so where how it was taken goes, its time in
+  `fg-mid`; one that cannot be read says unreadable and has no Restore…; one being written
+  arrives at the top as a push-down, "backing up…" and the `progress` bar in place of its size.
+  Restore… asks in the row question's shape, naming in `fg` each source it forgets with files in the Recycle Bin and counting the
   files, which stay there; when what it forgets cannot be read, it says any source added since is
   forgotten and its files stay in the bin, with no names or count, and while it restores the answers give way to the walk's line and bar inside the same
   ring, and Settings holds still: the rail's sections and its filter field are disabled, those
@@ -1072,7 +1075,8 @@ toward the rest surface.
   until chosen. In a sheet it fills the width, its segments sharing it, each label centred.
 - **Source row.** In Settings, two lines: the source's glyph, its name as a field where it stands,
   its count — or the walk, while one runs — its kind as a segmented group, then reveal and remove;
-  its path beneath in `--font-mono`. One that cannot be read keeps its remove and loses its reveal.
+  its path beneath in `--font-mono`. One that cannot be read keeps its remove and loses its reveal,
+  whose `control` square stays empty so its kind and remove keep the column of the rows above.
   Remove asks on the row: a `line-danger` ring, the glyph becomes the warning, the kind and the
   buttons give up their space, and the path gives way to what removing forgets, over **Remove
   source** and **Cancel**. The name and the count stay, and Escape puts the row back. A source

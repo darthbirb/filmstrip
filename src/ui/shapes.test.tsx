@@ -5,11 +5,14 @@ import { expect, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
+import { Band } from "./Band";
 import { Button } from "./Button";
 import { Chip } from "./Chip";
+import { DismissButton } from "./DismissButton";
 import { Dropdown } from "./Dropdown";
 import { Glyph } from "./Glyph";
 import { GLYPHS } from "./glyphs";
+import { Line } from "./Line";
 import { THUMB_FRAME, ThumbFace } from "./Thumb";
 
 /** The codepoint Phosphor's own stylesheet gives an icon in one family. */
@@ -158,4 +161,77 @@ test("a button keeps its label on one line, however little room it is given", as
   // Narrower than the label, so what it cannot show it ends rather than wrapping.
   const label = button.querySelector(".truncate") as HTMLElement;
   expect(label.scrollWidth).toBeGreaterThan(label.clientWidth);
+});
+
+test("the Line and the Band put themselves away with the quiet dismiss: no ground and no ring at rest", async () => {
+  const screen = await render(
+    <>
+      <Line glyph="done" sentence="Moved pyramid.jpg to People." onDismiss={() => {}} />
+      <Band sentence="pyramid.jpg was not moved." onDismiss={() => {}} />
+      <DismissButton label="Clear Selection" onClick={() => {}} />
+    </>,
+  );
+  const rest = (element: Element) => {
+    const style = getComputedStyle(element);
+    return { ground: style.backgroundColor, ring: style.boxShadow };
+  };
+  const quiet = rest(screen.getByRole("button", { name: "Clear Selection" }).element());
+  expect(quiet).toEqual({ ground: "rgba(0, 0, 0, 0)", ring: "none" });
+  const dismisses = screen.getByRole("button", { name: "Dismiss" }).elements();
+  expect(dismisses).toHaveLength(2);
+  for (const dismiss of dismisses) expect(rest(dismiss)).toEqual(quiet);
+});
+
+test("an opened button stays raised-hi under the pointer, and sinks with the rest when disabled", async () => {
+  const screen = await render(
+    <>
+      <span data-testid="opened" className="bg-raised-hi" />
+      <span data-testid="sunk" className="bg-inset" />
+      <Button tone="quiet" expanded onClick={() => {}}>
+        Hide Files
+      </Button>
+      <Button tone="quiet" expanded disabled onClick={() => {}}>
+        Show Files
+      </Button>
+    </>,
+  );
+  const ground = (element: Element) => getComputedStyle(element).backgroundColor;
+  const opened = ground(screen.getByTestId("opened").element());
+  const hide = screen.getByRole("button", { name: "Hide Files" });
+  await userEvent.hover(hide);
+  await expect.poll(() => ground(hide.element())).toBe(opened);
+
+  const show = screen.getByRole("button", { name: "Show Files" });
+  await userEvent.hover(show, { force: true });
+  await expect
+    .poll(() => ground(show.element()))
+    .toBe(ground(screen.getByTestId("sunk").element()));
+});
+
+test("a disabled button sinks to inset in fg-dim and takes no click", async () => {
+  const clicked = vi.fn();
+  const screen = await render(
+    <>
+      <span data-testid="sunk" className="bg-inset text-fg-dim" />
+      <Button tone="danger" disabled onClick={clicked}>
+        Empty Trash…
+      </Button>
+      <Button tone="quiet" disabled onClick={clicked}>
+        Cancel
+      </Button>
+      <Button small disabled onClick={clicked}>
+        Restore…
+      </Button>
+    </>,
+  );
+  const sunk = getComputedStyle(screen.getByTestId("sunk").element());
+  for (const name of ["Empty Trash…", "Cancel", "Restore…"]) {
+    const button = screen.getByRole("button", { name });
+    await expect.element(button).toBeDisabled();
+    await userEvent.hover(button, { force: true });
+    const drawn = getComputedStyle(button.element());
+    expect([drawn.backgroundColor, drawn.color], name).toEqual([sunk.backgroundColor, sunk.color]);
+    await userEvent.click(button, { force: true });
+  }
+  expect(clicked).not.toHaveBeenCalled();
 });

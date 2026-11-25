@@ -128,6 +128,28 @@ test("the header row gives the shape and size, and opens onto the rest, remember
   expect(getPreferences().details).toBe(true);
 });
 
+test("opened, the header gives its figures up to the File row, so each is said once", async () => {
+  const pyramid = await inCairo("pyramid.jpg");
+  showInPane(pyramid.id);
+  updatePreferences({ details: true });
+  const screen = await render(<Harness />);
+  const pane = screen.getByRole("complementary", { name: "Pane" });
+  const shape = `${pyramid.width} × ${pyramid.height}`;
+
+  const row = pane.getByRole("button", { name: "Details", exact: true });
+  await expect.element(row).toHaveAttribute("aria-expanded", "true");
+  await expect
+    .element(pane.getByRole("region", { name: "Details" }).getByText(shape))
+    .toBeVisible();
+  expect(pane.getByText(shape).elements()).toHaveLength(1);
+  expect(pane.getByText(/2[.,]3 MB/).elements()).toHaveLength(1);
+
+  await row.click();
+  await expect
+    .element(pane.getByRole("button", { name: new RegExp(`^${shape} · 2[.,]3 MB$`) }))
+    .toHaveAttribute("aria-expanded", "false");
+});
+
 test("the details push back up when shut, out of sight and out of reach", async () => {
   const pyramid = await inCairo("pyramid.jpg");
   showInPane(pyramid.id);
@@ -137,9 +159,7 @@ test("the details push back up when shut, out of sight and out of reach", async 
   const details = () => document.getElementById("pane-details");
   await expect.poll(() => inSight(details())).toBe(true);
 
-  await pane
-    .getByRole("button", { name: new RegExp(`^${pyramid.width} × ${pyramid.height} · `) })
-    .click();
+  await pane.getByRole("button", { name: "Details", exact: true }).click();
   // It stays in the tree so it can grow back, and nothing in it can be seen or tabbed to meanwhile.
   await expect.poll(() => inSight(details())).toBe(false);
   expect(details()).not.toBeNull();
