@@ -16,7 +16,7 @@ import { type Place, setPlace } from "../place";
 import { updatePreferences } from "../preferences";
 import { showReport } from "../undo/report-store";
 import { forgetActFocus } from "./act-focus";
-import { MovePickerHost, openMovePicker } from "./move-picker";
+import { MovePickerHost, moveFiles, openMovePicker } from "./move-picker";
 import { Pane } from "./Pane";
 import { PaneDetailProvider } from "./pane-detail";
 import { getPaneItem, showInPane } from "./pane-store";
@@ -37,6 +37,8 @@ const CAIRO: Place = {
 };
 const TRASH: Place = { kind: "trash" };
 const SORTING: Place = { kind: "sorting" };
+const JPGS: Place = { kind: "search", query: "jpg", back: null };
+const IN_CAIRO: Place = { kind: "search", query: "path:Pictures/Trips/Cairo", back: null };
 
 const address = location.href;
 
@@ -160,6 +162,49 @@ test("a file moved inside the Sorting Box stays in its place, so the pane stays 
 
   await expect.poll(async () => (await folderItems(made.folderId)).length).toBe(1);
   expect(getPaneItem()).toBe(first.id);
+});
+
+test("a search that still finds the moved file keeps the pane on it", async () => {
+  const pyramid = await id(6, "pyramid.jpg");
+  const { screen } = await showing(pyramid, JPGS);
+  await moveTo(screen, "Move to…", /People/);
+
+  await expect.poll(async () => (await folderItems(5)).map((row) => row.id)).toEqual([pyramid]);
+  expect(getPaneItem()).toBe(pyramid);
+});
+
+test("a search the moved file no longer matches moves the pane on", async () => {
+  const [felucca, pyramid, sphinx] = [
+    await id(6, "felucca.mp4"),
+    await id(6, "pyramid.jpg"),
+    await id(6, "sphinx.jpg"),
+  ];
+  const { screen } = await showing(pyramid, IN_CAIRO);
+  await moveTo(screen, "Move to…", /People/);
+
+  await expect.poll(getPaneItem).not.toBe(pyramid);
+  expect([felucca, sphinx]).toContain(getPaneItem());
+});
+
+test("a move between drives out of a search keeps the pane, as the search will still find it", async () => {
+  const pyramid = await id(6, "pyramid.jpg");
+  const { screen } = await showing(pyramid, JPGS);
+  history.replaceState(null, "", "?across");
+  await moveTo(screen, "Move to…", /People/);
+
+  await expect.poll(async () => (await indexProgress()).moves, { timeout: 5000 }).toEqual([]);
+  expect((await folderItems(5)).map((row) => row.id)).toEqual([pyramid]);
+  expect(getPaneItem()).toBe(pyramid);
+});
+
+test("a file already in the folder the rest are sent to keeps the pane on it", async () => {
+  const pyramid = await id(6, "pyramid.jpg");
+  const hotel = await id(4, "hotel.jpg");
+  await showing(pyramid, IN_CAIRO);
+  await moveFiles([pyramid, hotel], { id: 6, title: "Cairo" });
+
+  expect((await folderItems(6)).map((row) => row.id)).toContain(hotel);
+  expect(getPaneItem()).toBe(pyramid);
 });
 
 test("Restore to… in the Trash moves the pane on, the focus on Restore to… again", async () => {

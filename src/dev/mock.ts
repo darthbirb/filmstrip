@@ -2359,7 +2359,11 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   item_detail: ({ itemId }) => detail(itemId as number),
   items_detail: ({ itemIds }) => (itemIds as number[]).map((id) => detail(id)),
   item_path: ({ itemId }) => detail(itemId as number)?.path ?? null,
-  sorting_items: ({ sort }) => sorted(ITEMS[2] ?? [], sort),
+  sorting_items: ({ sort }) =>
+    sorted(
+      SOURCES.filter((one) => one.kind === "sorting").flatMap((one) => under(one.rootFolderId)),
+      sort,
+    ),
   // The bar acts on the mock library as it would on a real one, so the dev window shows the state.
   set_item_favorite: ({ itemIds, favorite }) => {
     const wanted = new Set(itemIds as number[]);

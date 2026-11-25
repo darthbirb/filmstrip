@@ -13,9 +13,11 @@ import {
 } from "../../ipc/commands";
 import type { MenuAnchor } from "../../ui/Menu";
 import { Picker, type PickerRow, type PickerSection } from "../../ui/Picker";
+import { placeItems } from "../grid/place-items";
 import { libraryChanged } from "../library";
 import { setNews } from "../navigation/foot-slot";
 import { getIndex, refreshIndex, useIndex } from "../navigation/index-store";
+import type { Place } from "../place";
 import { getPreferences, RECENT, updatePreferences, usePreferences } from "../preferences";
 import { movedBannerLine, moveStoppedLine, reasonText } from "../undo/lines";
 import { showReport } from "../undo/report-store";
@@ -261,7 +263,7 @@ export async function moveFiles(itemIds: number[], to: Into) {
   if (!moved) return null;
   remember(to);
   if (moved.kind === "started") {
-    await moveOnOut(pane, to, []);
+    await moveOnOut(pane, to, true);
     return "started" as const;
   }
   const { batch, report } = moved;
@@ -287,23 +289,36 @@ export async function moveFiles(itemIds: number[], to: Into) {
         }
       : null,
   );
-  await moveOnOut(pane, to, report.refused);
+  await moveOnOut(pane, to, false);
   await libraryChanged();
   return report;
 }
 
 /**
- * The pane moves on from a file moved out of its place. Only the Sorting Box keeps a file moved
- * inside it, to a folder of a sorting source. DECISIONS.md "The pane".
+ * The pane moves on once its file has left the place it was shown in: one the place still lists
+ * keeps it, as a search still finding it, the Sorting Box holding it or a file already where it
+ * was sent does. A move between drives is judged as it starts. DECISIONS.md "The pane".
  */
-async function moveOnOut(pane: MoveOn, to: Into, stayed: readonly { id: number }[]) {
+async function moveOnOut(pane: MoveOn, to: Into, started: boolean) {
   if (pane.next === pane.shown) return;
-  if (pane.origin?.kind === "sorting") {
-    const into = await folderDetail(to.id).catch(() => null);
-    const source = getIndex().sources?.find((one) => one.id === into?.sourceId);
-    if (source?.kind === "sorting") return;
-  }
-  moveOn(pane, stayed);
+  const stays = started ? await staysAhead(pane.origin, to) : await stillListed(pane);
+  if (!stays) moveOn(pane, []);
+}
+
+async function stillListed({ shown, origin }: MoveOn) {
+  const rows = await placeItems(origin).catch(() => null);
+  return rows === null || rows.some((row) => row.id === shown);
+}
+
+/**
+ * Whether the place will still list the file once a move between drives lands: a search keeps a
+ * file it found, whose name goes with it, and the Sorting Box one sent to a sorting source.
+ */
+async function staysAhead(origin: Place | null, to: Into) {
+  if (origin?.kind === "search") return true;
+  if (origin?.kind !== "sorting") return false;
+  const into = await folderDetail(to.id).catch(() => null);
+  return getIndex().sources?.find((one) => one.id === into?.sourceId)?.kind === "sorting";
 }
 
 /**

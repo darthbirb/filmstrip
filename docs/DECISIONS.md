@@ -717,11 +717,16 @@ its name. Restored from the Trash, the pane moves on as it does after a delete.
 **A move takes the pane on as a delete does**, settled on 25 November 2026: Move to…, a drop on a
 row of navigation and a destination key are one act, and each moved the pane's file out of its
 place while the pane stayed on it, the strip running through files with none of them ringed.
-Triage tools advance after a move as after a delete. Only the Sorting Box keeps a file moved to a
-folder of a sorting source, so there the pane stays. **A move between drives moves the pane on as
+Triage tools advance after a move as after a delete. **It moves on only once the file has left
+its place**, and the place itself is asked again after the move: a search that still finds the
+file, the Sorting Box still holding it, or a file that was already in the folder the rest went to
+keeps the pane on it, since no tile took its place. **A move between drives moves the pane on as
 it starts**, not when its job ends: the file is already on its way, a press per picture would
 otherwise wait out each copy, and the pane jumping seconds later would take the picture from
-under whatever is being looked at by then. One the job leaves where it was is named by its banner.
+under whatever is being looked at by then. So whether it leaves is judged from where it is going:
+out of a folder it does, out of the Sorting Box unless into a sorting source, and out of a search
+it does not, as the file keeps the name it was found by. One the job leaves where it was is named
+by its banner.
 
 **The focus stays where the act was taken**, settled on 25 November 2026. Delete and Restore take
 their file's bar with them, which dropped the focus to the page and sent a keyboard or screen
