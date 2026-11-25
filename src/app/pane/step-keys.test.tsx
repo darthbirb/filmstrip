@@ -11,6 +11,7 @@ import { getFullScreen, setFullScreen, useFullScreen } from "./full-screen";
 import { Pane, PaneHeader } from "./Pane";
 import { PaneDetailProvider } from "./pane-detail";
 import { getPaneItem, showInPane, whenShownInPane } from "./pane-store";
+import { stopRename } from "./rename";
 
 // Against the dev mock's library: Cairo holds felucca.mp4, pyramid.jpg and sphinx.jpg.
 
@@ -63,6 +64,7 @@ function Framed() {
 }
 
 afterEach(() => {
+  stopRename();
   updatePreferences({ widths: undefined, hidden: undefined });
 });
 
@@ -198,7 +200,9 @@ test("a field in the pane keeps the arrows", async () => {
   const { screen } = await showing("pyramid.jpg");
   await expect.poll(shown).toBe("pyramid.jpg");
   await screen.getByRole("button", { name: /MB$/ }).click();
-  await screen.getByRole("button", { name: "pyramid.jpg", exact: true }).last().click();
+  // The Name row, not the grid's tile of the same name, which a locator can reach before the row is drawn.
+  const details = screen.getByRole("region", { name: "Details" });
+  await details.getByRole("button", { name: "pyramid.jpg", exact: true }).click();
   const field = screen.getByRole("textbox", { name: "Rename pyramid.jpg" });
   await expect.element(field).toHaveFocus();
 
