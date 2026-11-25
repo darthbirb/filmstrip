@@ -28,6 +28,7 @@ import { EmptyState } from "../../ui/EmptyState";
 import { Line } from "../../ui/Line";
 import { PushDown } from "../../ui/PushDown";
 import { RowQuestion } from "../../ui/TermTable";
+import { failed, unasked } from "../failure";
 import { libraryChanged } from "../library";
 import { setNews } from "../navigation/foot-slot";
 import { useWork } from "../navigation/work-store";
@@ -55,6 +56,8 @@ const Term = ({ children }: { children: ReactNode }) => <span className="text-fg
 
 type Said = { kind: "line"; sentence: string } | { kind: "band"; sentence: string; path?: string };
 
+const UNREAD = "Could not read the backups.";
+
 export function Backups() {
   const [shelved, setShelved] = useState<Shelved | null>(null);
   const [writing, setWriting] = useState<number | null>(null);
@@ -68,13 +71,11 @@ export function Backups() {
   const { progress } = useWork();
 
   const load = useCallback(() => {
-    void listBackups()
-      .then(setShelved)
-      .catch(() => undefined);
+    void listBackups().then(setShelved).catch(failed(UNREAD));
   }, []);
   useEffect(() => {
     load();
-    const heard = listen("backups-changed", load).catch(() => undefined);
+    const heard = listen("backups-changed", load).catch(unasked);
     return () => {
       void heard.then((unlisten) => unlisten?.());
     };
@@ -90,7 +91,7 @@ export function Backups() {
     );
     void listBackups()
       .then(setShelved)
-      .catch(() => undefined)
+      .catch(failed(UNREAD))
       .finally(() => setFocus(ended.focus));
   }, [ended]);
 
@@ -236,7 +237,7 @@ export function Backups() {
                   onChange={(kept) => {
                     setShelved({ ...shelved, keep: Number(kept) });
                     void setBackupsKept(Number(kept))
-                      .catch(() => undefined)
+                      .catch(failed(`Could not keep ${kept} backups.`))
                       .finally(load);
                   }}
                 />
@@ -280,7 +281,7 @@ async function restoreIndex(backup: Backup) {
   startRestore(backup.name);
   const heard = listen<number>("restore-progress", (event) =>
     restoreProgress(backup.name, event.payload),
-  ).catch(() => undefined);
+  ).catch(unasked);
   let ended: RestoreEnd;
   try {
     const restored = await restoreBackup(backup.name);
@@ -292,7 +293,7 @@ async function restoreIndex(backup: Backup) {
       };
     } else {
       setNews(null);
-      await libraryChanged().catch(() => undefined);
+      await libraryChanged().catch(unasked);
       ended = {
         kind: "line",
         sentence: `Restored the index from ${when}.`,

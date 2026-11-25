@@ -9,8 +9,10 @@ import {
   binRefusedDetail,
   binRefusedLine,
   copiedBannerLine,
+  copiedFailed,
   copyCancelledLine,
   deletedBannerLine,
+  favouriteFailed,
   folderForGoodLine,
   folderKeptBanner,
   folderKeptLine,
@@ -22,16 +24,21 @@ import {
   holdsLine,
   letGo,
   movedBannerLine,
+  movedFailed,
   noBinDetail,
   noBinHead,
+  pathsFailed,
   reasonSentence,
   reasonText,
   refusedName,
   restoredBannerLine,
+  restoredFailed,
+  shownFailed,
   stayedGroups,
   undoBannerLine,
   undoFailedLine,
   undoneLine,
+  whyFailed,
 } from "./lines";
 
 const batch = (act: Act, files = 0, folders = 0) => ({ batchId: "b", act, files, folders });
@@ -160,6 +167,7 @@ const EVERY: { [K in Reason["kind"]]: Extract<Reason, { kind: K }> } = {
   unsupported: { kind: "unsupported" },
   unreadable: { kind: "unreadable" },
   noFfmpeg: { kind: "noFfmpeg" },
+  forbiddenCharacter: { kind: "forbiddenCharacter", character: ":" },
   other: { kind: "other" },
 };
 
@@ -315,6 +323,31 @@ test("a name field says where the name is taken, or why else it was refused", ()
     "No longer in the index.",
   );
   expect(refusedName({ kind: "invalid", reason: { kind: "other" } })).toBeNull();
+});
+
+test("a name holding a character Windows refuses is refused with the character named", () => {
+  const holding = (character: string) => ({
+    kind: "refused" as const,
+    reason: { kind: "forbiddenCharacter" as const, character },
+  });
+  expect(refusedName(holding(":"))).toBe("A name cannot contain “:”.");
+  expect(refusedName(holding("	"))).toBe("A name cannot contain a control character.");
+});
+
+test("an act that failed names what it could not do, the file by name or the files counted", () => {
+  const one = [{ id: 1, diskName: "_DSC4411.ARW" }];
+  const unnamed = [{ id: 1 }, { id: 2 }, { id: 3 }];
+  expect(shownFailed("_DSC4411.ARW")).toBe("Could not show _DSC4411.ARW in Explorer.");
+  expect(copiedFailed(one)).toBe("Could not copy _DSC4411.ARW.");
+  expect(copiedFailed([{ id: 1 }])).toBe("Could not copy 1 file.");
+  expect(pathsFailed(unnamed)).toBe("Could not copy the paths of 3 files.");
+  expect(movedFailed(3, "Lisbon")).toBe("Could not move 3 files to Lisbon.");
+  expect(restoredFailed(1, null)).toBe("Could not restore 1 file.");
+  expect(favouriteFailed("Lisbon", false)).toBe("Could not favourite Lisbon.");
+  expect(favouriteFailed(2, true)).toBe("Could not remove 2 files from favourites.");
+  expect(whyFailed({ kind: "db", reason: { kind: "busy" } })).toBe(
+    "The index is busy. Try again in a moment.",
+  );
 });
 
 test("a folder's delete asks, and says what went when the folder stayed, as the table words it", () => {

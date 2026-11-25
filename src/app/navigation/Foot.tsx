@@ -26,8 +26,10 @@ import { Line } from "../../ui/Line";
 import { keepEscape, SURFACE } from "../../ui/Menu";
 import { PushDown } from "../../ui/PushDown";
 import { Tallies, type TallyNote, type TallyRow } from "../../ui/Tallies";
+import { failed } from "../failure";
 import { showInPane } from "../pane/pane-store";
 import { setPlace } from "../place";
+import { dirName, shownFailed } from "../undo/lines";
 import { undo } from "../undo/undo";
 import { refusalSentence } from "./add-source";
 import { type FootNews, setNews, useNews } from "./foot-slot";
@@ -231,7 +233,7 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
   if (news.kind === "binRefused") {
     return <Band sentence={news.line} detail={news.detail} onDismiss={dismiss} />;
   }
-  if (news.kind === "kept") {
+  if (news.kind === "kept" || news.kind === "failed") {
     return <Band sentence={news.line} onDismiss={dismiss} />;
   }
   if (news.kind === "skipped") {
@@ -266,7 +268,9 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
           <GlyphButton
             glyph="folderOpen"
             label={`Show in Explorer · ${news.line}`}
-            onClick={() => void revealPath(news.path).catch(() => undefined)}
+            onClick={() =>
+              void revealPath(news.path).catch(failed(shownFailed(dirName(news.path))))
+            }
           />
         ) : (
           <OutOfRail news={news} sentence={news.kind === "noFiles" ? NO_FILES : "Nothing to undo."}>
@@ -313,7 +317,9 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
         action={
           <Button
             glyph="folderOpen"
-            onClick={() => void revealPath(news.path).catch(() => undefined)}
+            onClick={() =>
+              void revealPath(news.path).catch(failed(shownFailed(dirName(news.path))))
+            }
           >
             Show in Explorer
           </Button>

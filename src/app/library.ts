@@ -1,3 +1,4 @@
+import { unasked } from "./failure";
 import { refreshIndex } from "./navigation/index-store";
 
 /**
@@ -20,6 +21,6 @@ export function whenLibraryChanges(listener: () => void) {
 }
 
 export async function libraryChanged() {
-  await refreshIndex().catch(() => undefined);
+  await refreshIndex().catch(unasked);
   for (const listener of listeners) listener();
 }

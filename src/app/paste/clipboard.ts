@@ -3,6 +3,7 @@ import { useSyncExternalStore } from "react";
 import type { Carried } from "../../ipc/bindings/Carried";
 import { clipboardFiles, copyItems } from "../../ipc/commands";
 import { formatCount } from "../../lib/format";
+import { unasked } from "../failure";
 
 // What the clipboard holds that Paste would bring in, read whenever it may have changed, since a
 // menu opens at once and cannot wait on it. DECISIONS.md "Bringing files in".
@@ -20,7 +21,7 @@ export function useClipboard() {
 
 /** Reads the clipboard again, and says what it holds. */
 export async function readClipboard() {
-  const next = await clipboardFiles().catch(() => null);
+  const next = await clipboardFiles().catch(unasked);
   if (next?.files !== held?.files || next?.folders !== held?.folders) {
     held = next;
     for (const listener of listeners) listener();

@@ -98,6 +98,10 @@ pub enum Reason {
     Unreadable,
     /// A video waits on ffmpeg, which was not found.
     NoFfmpeg,
+    /// A name typed with a character Windows refuses in a name.
+    ForbiddenCharacter {
+        character: String,
+    },
     /// Anything else. What it said went to the log; the interface says one fixed thing.
     Other,
 }
@@ -133,6 +137,9 @@ impl fmt::Display for Reason {
             Reason::Unsupported => f.write_str("its format is not one the app reads"),
             Reason::Unreadable => f.write_str("its file could not be read"),
             Reason::NoFfmpeg => f.write_str("ffmpeg was not found"),
+            Reason::ForbiddenCharacter { character } => {
+                write!(f, "a name cannot contain {character:?}")
+            }
             Reason::Other => f.write_str("something went wrong"),
         }
     }

@@ -1,4 +1,5 @@
 import { lookInBin } from "../../ipc/commands";
+import { unasked } from "../failure";
 import { libraryChanged } from "../library";
 import { getPlace, whenPlaceChanges } from "../place";
 import { settleLine } from "../undo/undo";
@@ -22,7 +23,7 @@ export function watchTrashOpening() {
  * has opened, and each time the Trash opens.
  */
 export async function settleTrash() {
-  const looked = await lookInBin().catch(() => null);
+  const looked = await lookInBin().catch(unasked);
   if (!looked || looked.retired + looked.restored === 0) return;
   await libraryChanged();
   await settleLine();

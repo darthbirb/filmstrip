@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import { copyItemPaths, itemDetail } from "../ipc/commands";
+import { failed, unasked } from "./failure";
 import { inTrash } from "./grid/place-items";
 import { getChecked } from "./grid/selection";
 import { setNews } from "./navigation/foot-slot";
@@ -10,6 +11,7 @@ import { moveFiles } from "./pane/move-picker";
 import { getPaneItem, getPaneSet } from "./pane/pane-store";
 import { copyFiles } from "./paste/clipboard";
 import { getPlace } from "./place";
+import { copiedFailed, pathsFailed } from "./undo/lines";
 
 // Destination keys: the ten digits, each bound to a folder a press moves files into.
 // DECISIONS.md "Destination keys".
@@ -82,8 +84,8 @@ async function actOn(key: FileKey) {
   if (!chosen || chosen.files.length === 0 || chosen.files.every(inTrash)) return;
   const ids = chosen.files.map((file) => file.id);
   if (key === "delete") await deleteFiles(ids);
-  else if (key === "copy") await copyFiles(ids).catch(() => undefined);
-  else await copyItemPaths(ids).catch(() => undefined);
+  else if (key === "copy") await copyFiles(ids).catch(failed(copiedFailed(chosen.files)));
+  else await copyItemPaths(ids).catch(failed(pathsFailed(chosen.files)));
 }
 
 /** What is checked, else the pane's one file; none when the pane shows several and none is checked. */
@@ -95,7 +97,7 @@ async function chosenFiles() {
   const file =
     shown === null
       ? null
-      : (listed.find((row) => row.id === shown) ?? (await itemDetail(shown).catch(() => null)));
+      : (listed.find((row) => row.id === shown) ?? (await itemDetail(shown).catch(unasked)));
   return { files: file ? [file] : [] };
 }
 

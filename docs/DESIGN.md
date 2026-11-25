@@ -882,10 +882,11 @@ toward the rest surface.
   frame its step falls to `fg-faint`.
 - **Empty state.** A `glyph-large` glyph in `fg-faint` over a semibold Title Case line of `ui`.
   One shape for every empty place, with its own glyph and its own words: a cleared Sorting Box, an
-  emptied Trash, a folder of folders, an empty folder, an unreachable source, and the pane with
-  nothing clicked or a file gone. A line under the title carries a count, a name, a path or a
-  query — `small`, held to a `note` measure, a path in `--font-mono` — or there is no line; it
-  never explains the app. Where there is one move worth offering it follows as `control`-tall
+  emptied Trash, a folder of folders, an empty folder, an unreachable source, the pane with
+  nothing clicked or a file gone, and navigation when the index would not open, the `warning`
+  glyph over Could Not Open the Index, why under it and Retry. A line under the title carries a
+  count, a name, a path, a query or a reason — `small`, held to a `note` measure, a path in
+  `--font-mono` — or there is no line; it never explains the app. Where there is one move worth offering it follows as `control`-tall
   buttons on `raised`: a folder's folders, and Add Sorting Source… under Nothing to Sort; most
   places have none.
 - **Stand-in.** A tile still being read: `inset` at the `control` corner, in rows of photograph
@@ -994,7 +995,9 @@ toward the rest surface.
   row's rename glyph comes after it, and a click anywhere in it opens it. Opened, it is a box on
   `ground` at the `nested` corner in a `line-control` ring, three lines tall to begin with and
   growing as it fills, `fg-hi` text with a sentence-case placeholder, and under it "Ctrl+Enter
-  saves · Escape abandons" in `key` `fg-dim` before Cancel and Save.
+  saves · Escape abandons" in `key` `fg-dim` before Cancel and Save. A note that was not saved
+  comes back open holding what was written, its ring `line-danger`, "Not saved." and why in `key`
+  `danger` where the keys were.
 - **Settings.** A dialog over the `scrim`: a header with its `title` and a close button; a rail of
   sections grouped under `eyebrow` captions, with a filter field on `ground` above them, the one
   shown on `raised-hi`; and the section's settings as rows in an `inset` group, each a label and
@@ -1052,8 +1055,9 @@ toward the rest surface.
   folder's path under it in `--font-mono` or why in `small` `fg-dim`, and a dismiss, on a
   `danger-wash` ground, as when the Recycle Bin would not take a file Delete sent it. A way to go
   and look stands under why as a Button. There is only ever one, and a second refusal replaces it rather
-  than stacking. An undo that failed is the Band, naming its act and why, with Undo under it to try
-  again. Folded, the rail keeps the Undo glyph button, and the sentence comes out beside it as
+  than stacking. An act that failed is the Band too, "Could not show _DSC4411.ARW in Explorer."
+  then why, and Settings, over the foot, shows it at its own foot while it is open. An undo that
+  failed is the Band, naming its act and why, with Undo under it to try again. Folded, the rail keeps the Undo glyph button, and the sentence comes out beside it as
   "Nothing to undo." does, in the Band's alarm: the `warning` glyph in `danger` on `danger-wash`
   inside a `line-danger` ring. A long one wraps a `tile-gap` short of the window's edge, growing
   up from the slot, so its reason is never cut off. It goes at the next key or click, and the

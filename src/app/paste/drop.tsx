@@ -7,6 +7,7 @@ import { countCarried } from "../../ipc/commands";
 import { formatCount } from "../../lib/format";
 import { DragGhost } from "../../ui/DragGhost";
 import { ContextMenu } from "../../ui/Menu";
+import { unasked } from "../failure";
 import { scrollTreeNear } from "../grid/drag";
 import { getIndex } from "../navigation/index-store";
 import { type Crumb, getPlace } from "../place";
@@ -190,7 +191,7 @@ export function useExplorerDrops() {
             .then((carried) => {
               if (drag?.paths === paths) set({ ...drag, carried });
             })
-            .catch(() => undefined);
+            .catch(unasked);
           track(x, y);
         } else if (payload.type === "over") track(x, y);
         else land(x, y);
@@ -199,7 +200,7 @@ export function useExplorerDrops() {
         if (gone) unlisten();
         else stop = unlisten;
       })
-      .catch(() => undefined);
+      .catch(unasked);
     return () => {
       gone = true;
       stop?.();

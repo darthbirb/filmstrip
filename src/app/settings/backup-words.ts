@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import type { Reason } from "../../ipc/bindings/Reason";
 import type { Taken } from "../../ipc/bindings/Taken";
 import { launchBackupRefusal, listBackups } from "../../ipc/commands";
+import { unasked } from "../failure";
 import { setNews } from "../navigation/foot-slot";
 import { reasonSentence } from "../undo/lines";
 
@@ -32,7 +33,7 @@ export function useLaunchBackup() {
         const { dir } = await listBackups();
         setNews({ kind: "keyRefused", line: notBackedUp(reasonSentence(reason)), path: dir });
       })
-      .catch(() => undefined);
+      .catch(unasked);
     return () => {
       live = false;
     };

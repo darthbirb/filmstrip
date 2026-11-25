@@ -49,7 +49,7 @@ drawn. **Not started** — neither.
 | Create a folder | Built | `create_folder`, New Folder on a folder's and a source's menu, a row already in its name field |
 | Move a folder | Built | `move_folder`, across drives too; Move to… on its menu, its own branch not a choice |
 | Delete a folder, choosing what happens to what is inside | Built | `delete_folder`, `folder_file_count`; asks in a banner, and Settings › Sources keeps the answer |
-| Rename a folder, on disk | Built | `rename_folder`, in its tree row, F2 on it, a name already there said under it |
+| Rename a folder, on disk | Built | `rename_folder`, in its tree row, F2 on it, a name already there said under it, and a character Windows refuses named there rather than dropped |
 | A folder's cover | Built | `folder_cover_choices`, `set_folder_cover`, the pencil on the band's cover, which takes only a live picture at or below the folder; the first picture stands in while none is chosen |
 | A folder's status, notes, favourite | Built | favourite: `set_folder_favorite`, `favourite_places`, a group of its own in navigation and in the band; status: `set_folder_status`, the band's segmented group; notes: `set_folder_note`, written in the band |
 | A folder's labels and tags, inherited by everything under it | Built | `add_folder_tag`, `set_folder_label`, `remove_folder_tag` and their offers, the band's Add Tag… and Add Label…; one value per key, and a key given once down a branch, refused above a folder that holds it as below one; where a move, or undoing a delete, brings two together, the nearest folder's; items inherit labels, and never own one |
@@ -67,7 +67,7 @@ drawn. **Not started** — neither.
 | Sort by key and direction, random order held steady | Built | `folder_items`, `sorting_items` and `search` take the order; the grid's header chooses it per kind of place |
 | Move items between folders | Built | `move_items`, Move to… on the pane's bar and a file's menu; a name already taken is reported, never changed; between drives a job with its line and Cancel, `cancel_move`: DECISIONS.md "Undo"; the pane's file moved out of its place moves the pane on, as after a delete |
 | Delete items to the trash | Built | `trash_items`, Delete on the pane's bar and a file's menu, sending each file to the Windows Recycle Bin on its own drive through `fs::recycle`; one the bin will not take stays where it was, said at the foot, and one never handed to it, its path too long for the shell or its drive without hard links, stays with that reason in the banner; undo takes an item back out of the bin |
-| Rename a file, on disk | Built | `rename_item`, the pane's Name row, F2 on a tile; not in ggallery; a name already taken is refused |
+| Rename a file, on disk | Built | `rename_item`, the pane's Name row, F2 on a tile; not in ggallery; a name already taken is refused, and so is one holding a character Windows refuses, which the field names |
 | Paste files in, and take an OS drop | Built | `paste_files`, `drop_files`: Paste on a folder's, a source's and the Sorting Box's menus, on the rows and on the grid's ground, Ctrl+V, and a drop from Explorer on a row or a folder's grid, the tree scrolling near its edges; a copy as a job with Cancel, a name taken refused, never changed; undo sends what came in to the Trash, and on a drive with no Recycle Bin leaves it and lets the act go |
 | Copy an item's path | Built | `copy_item_paths`, Copy Path in a file's menu, a set's and the pane's ⋯; one path to a line |
 | Counts: unsorted, trashed, totals, arrival duplicates | Partly | `library_totals`, one query: the foot says what the library holds and weighs, and opens its totals by kind with the Sorting Box, the Trash and the sources, any offline named; arrival duplicates wait for duplicate detection |
@@ -122,6 +122,7 @@ drawn. **Not started** — neither.
 | --- | --- | --- |
 | Export a folder's subtree or a selection as a zip, as a job | Built | `export_plan`, `pick_export_zip`, `start_export`, `cancel_export`; DECISIONS.md "Exporting a zip". Filmstrip's own change: renaming the files or keeping their own names is chosen at export |
 | An undo journal that survives a restart | Built | `journal`, DECISIONS.md "Undo"; the line at the foot of navigation, Ctrl+Z |
+| An act that fails says what and why | Built | at the foot, in the Band, and at Settings' foot while it is open; a note keeps its text, a tag its field, and an index that will not open says so in navigation with Retry: DECISIONS.md "Acts say why they failed" |
 | Undo the last batch, or a named one | Built | Ctrl+Z takes the last, the line's Undo its own batch; an undo that fails names its act and why in the Band and keeps Undo, `act_to_undo`; no list of batches yet |
 
 ## The interface

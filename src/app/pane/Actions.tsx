@@ -6,8 +6,10 @@ import { Button } from "../../ui/Button";
 import { GlyphButton } from "../../ui/GlyphButton";
 import type { GlyphName } from "../../ui/glyphs";
 import { Menu } from "../../ui/Menu";
+import { failed } from "../failure";
 import { setFavourite, useFavourite } from "../favourites";
 import { copyFiles } from "../paste/clipboard";
+import { copiedFailed, openFailed, pathsFailed, shownFailed } from "../undo/lines";
 import { answerOnBar, keepFocusThrough } from "./act-focus";
 import { deleteFiles } from "./delete";
 import { openMovePicker } from "./move-picker";
@@ -72,26 +74,26 @@ function InLibrary({ item }: { item: ItemDetail }) {
       id: "reveal",
       label: "Show in Explorer",
       glyph: "folderOpen",
-      run: () => void revealItem(item.id).catch(() => undefined),
+      run: () => void revealItem(item.id).catch(failed(shownFailed(item.diskName))),
     },
     {
       id: "copy",
       label: "Copy",
       glyph: "copy",
-      run: () => void copyFiles([item.id]).catch(() => undefined),
+      run: () => void copyFiles([item.id]).catch(failed(copiedFailed([item]))),
     },
     {
       id: "copy-path",
       label: "Copy Path",
       glyph: "copy",
       menuOnly: true,
-      run: () => void copyItemPaths([item.id]).catch(() => undefined),
+      run: () => void copyItemPaths([item.id]).catch(failed(pathsFailed([item]))),
     },
     {
       id: "open",
       label: "Open with Default App",
       glyph: "openExternal",
-      run: () => void openItem(item.id).catch(() => undefined),
+      run: () => void openItem(item.id).catch(failed(openFailed(item.diskName))),
     },
   ];
 
@@ -114,7 +116,7 @@ function InLibrary({ item }: { item: ItemDetail }) {
           filled={favorite}
           pressed={favorite}
           label={favorite ? "Remove Favourite" : "Favourite"}
-          onClick={() => setFavourite(item.id, !favorite)}
+          onClick={() => setFavourite(item, !favorite)}
         />
         <Button
           ref={moveTo}

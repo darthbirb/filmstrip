@@ -182,6 +182,21 @@ export function rowFolder(id: string) {
   return undefined;
 }
 
+/** The index could not be opened at all, so there is nothing to list: why, and Retry. */
+export function Unopened({ why, onRetry }: { why: string; onRetry: () => void }) {
+  return (
+    <EmptyState
+      glyph="warning"
+      title="Could Not Open the Index"
+      note={`Filmstrip could not open its index. ${why}`}
+    >
+      <Button glyph="readAgain" onClick={onRetry}>
+        Retry
+      </Button>
+    </EmptyState>
+  );
+}
+
 /** The doorway, where the tree will be. A folder is read where it stands, never moved. */
 export function NoSources({ onAdd }: { onAdd: () => void }) {
   return (

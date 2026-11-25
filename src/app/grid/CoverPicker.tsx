@@ -6,6 +6,7 @@ import { folderCoverChoices, setFolderCover } from "../../ipc/commands";
 import { BadgeButton } from "../../ui/BadgeButton";
 import { SURFACE } from "../../ui/Menu";
 import { Plate } from "../../ui/Plate";
+import { failed } from "../failure";
 import { detailChanged } from "./folder-detail";
 
 type Props = {
@@ -40,7 +41,7 @@ export function CoverPicker({ folderId, title, chosen, anchor }: Props) {
     if (itemId !== chosen) {
       void setFolderCover(folderId, itemId)
         .then(detailChanged)
-        .catch(() => undefined);
+        .catch(failed(`Could not change the cover of ${title}.`));
     }
   };
 

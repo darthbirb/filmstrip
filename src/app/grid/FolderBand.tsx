@@ -28,11 +28,13 @@ import { Plate } from "../../ui/Plate";
 import { PushDown } from "../../ui/PushDown";
 import { Segmented } from "../../ui/Segmented";
 import type { Refusal } from "../../ui/TagField";
+import { failed, sayFailed } from "../failure";
 import { libraryChanged } from "../library";
 import { refreshIndex, useIndex } from "../navigation/index-store";
 import { type Place, setPlace, usePlace } from "../place";
 import { addToSearch, searchFor } from "../search/search";
 import { stopsIn, TagsRow, takeOff, titleOf } from "../tags/TagsRow";
+import { favouriteFailed, whyFailed } from "../undo/lines";
 import { CoverPicker } from "./CoverPicker";
 import { detailChanged, diskPath, useBandOpen, useFolderDetail } from "./folder-detail";
 
@@ -98,11 +100,11 @@ export function FolderFacts({ detail, source }: FactsProps) {
   const status = (next: FolderStatus | "none") =>
     void setFolderStatus(detail.id, next === "none" ? null : next)
       .then(detailChanged)
-      .catch(() => undefined);
+      .catch(failed(`Could not change the status of ${title}.`));
   const star = () =>
     void setFolderFavorite(detail.id, !favourite)
       .then(() => refreshIndex())
-      .catch(() => undefined);
+      .catch(failed(favouriteFailed(title, favourite)));
 
   const facts: Fact[] = [
     ["Path", <BandPath key="path" place={place} source={source} />],
@@ -162,9 +164,15 @@ export function FolderFacts({ detail, source }: FactsProps) {
       note={detail.note}
       of={title}
       onSave={(note) =>
-        void setFolderNote(detail.id, note)
+        setFolderNote(detail.id, note)
           .then(detailChanged)
-          .catch(() => undefined)
+          .then(
+            () => null,
+            (error: unknown) => {
+              sayFailed(`The note on ${title} was not saved.`, error);
+              return `Not saved. ${whyFailed(error)}`;
+            },
+          )
       }
     />,
   ]);
@@ -326,7 +334,7 @@ function LabelsRow({ folderId, title, labels, keysBelow }: LabelsRowProps) {
                 setEditing(null);
                 void setFolderLabel(folderId, key, value)
                   .then(changed)
-                  .catch(() => undefined);
+                  .catch(failed(`Could not change ${key} on ${title} to ${value}.`));
               }}
             />
           );
@@ -347,6 +355,7 @@ function LabelsRow({ folderId, title, labels, keysBelow }: LabelsRowProps) {
                     takeOff(
                       () => removeFolderTag(folderId, label.tagId).then(changed),
                       () => stopsIn(row.current),
+                      `Could not take ${key}: ${label.value} off ${title}.`,
                     )
                 : undefined
             }
@@ -362,7 +371,7 @@ function LabelsRow({ folderId, title, labels, keysBelow }: LabelsRowProps) {
         onAdd={(key, value) =>
           setFolderLabel(folderId, key, value)
             .then(changed)
-            .catch(() => undefined)
+            .catch(failed(`Could not add ${key}: ${value} to ${title}.`))
         }
         onEcho={setEcho}
       />

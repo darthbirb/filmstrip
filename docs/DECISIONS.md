@@ -217,6 +217,32 @@ something to do: "The index is busy. Try again in a moment." The failure list ke
 reason in the job table rather than its text, so the list words it as the undo banner does, under
 the same heading.
 
+## Acts say why they failed
+
+**An act the person asked for never fails in silence.** Show in Explorer, a copy, a favourite, a
+note, a key, a move or a delete that the backend refuses says so at the foot, in the Band: what
+could not be done, naming what it was done to, then the reason's sentence, as "Could not show
+_DSC4411.ARW in Explorer. Windows refused access." A catch that turns a failure into nothing is
+the one way this breaks, so a lint rule in `lint/` refuses `.catch(() => undefined)` and
+`.catch(() => null)` under `src/app` and `src/ui`: an act catches with `failed(what)`, and work
+nobody asked for, a read again after a job, a listener, a clip's play, with `unasked`, which says
+by its name that there is nobody to tell. Settings sits over the foot, so it shows the same Band
+at its own foot while it is open.
+
+**A field keeps what was typed when its save fails.** A note that was not saved comes back open
+with the text in it and says "Not saved." and why under it, where its keys were; a tag that was
+not added is typed in its field again. Losing what someone wrote to a failure they were not told
+about is the worst of these, because the text looked kept.
+
+**A name Windows would refuse is refused, not cleaned.** Explorer refuses `\ / : * ? " < > |` in a
+name with a tip; dropping the character instead leaves a name the person did not type. A rename
+or a new folder holding one is refused with `ForbiddenCharacter`, the name field saying which.
+Names the app makes itself, an export's zip and the folders inside it, are still made safe
+quietly, since nobody typed them.
+
+**The index that cannot be opened says so where the sources would be**, with Retry: with nothing
+read there is nothing else for navigation to show, and an empty panel reads as an empty library.
+
 ## Thumbnails
 
 **320px on the longest edge, lossy WebP at quality 78**, as measured in ggallery: AVIF encoded

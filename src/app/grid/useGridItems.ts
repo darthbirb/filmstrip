@@ -5,6 +5,7 @@ import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import type { Progress } from "../../ipc/bindings/Progress";
 import { itemsDetail } from "../../ipc/commands";
+import { unasked } from "../failure";
 import { RELOAD_WINDOW_MS, whenLibraryChanges } from "../library";
 import { type Place, placeKey } from "../place";
 import { placeItems } from "./place-items";
@@ -89,7 +90,7 @@ export function useGridItems(place: Place | null) {
       if (thumbed.length > 0) refresh(thumbed);
       if (mayHaveMoved(payload, before)) soon();
       before = payload ?? null;
-    }).catch(() => undefined);
+    }).catch(unasked);
     const stop = whenLibraryChanges(load);
     return () => {
       live = false;

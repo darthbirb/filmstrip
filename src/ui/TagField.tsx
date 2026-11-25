@@ -27,6 +27,7 @@ type Props = {
   offers: (typed: string) => Promise<Offer[]>;
   /** Why a folded value cannot be added here, or `null` when it can. */
   refuse: (value: string) => Refusal | null;
+  /** Rejects when it was not added, and the field holds what was typed again. */
   onAdd: (value: string) => Promise<void>;
   /** The tag a refused value repeats, or `null`, for the row to outline it. */
   onEcho: (tagId: number | null) => void;
@@ -124,7 +125,9 @@ function Field({
   const add = (next: string) => {
     setTyped("");
     setLit(0);
-    void onAdd(next).finally(() => field.current?.focus());
+    void onAdd(next)
+      .catch(() => setTyped((now) => now || next))
+      .finally(() => field.current?.focus());
   };
 
   const onKeyDown = (event: KeyboardEvent) => {

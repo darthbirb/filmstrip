@@ -87,7 +87,7 @@ function Name({ item }: { item: ItemDetail }) {
       name={item.diskName}
       taken={taken}
       onEdit={() => setTaken(null)}
-      onCommit={(name) => void renameFile(item.id, name).then(setTaken)}
+      onCommit={(name) => void renameFile(item, name).then(setTaken)}
       onCancel={() => {
         setTaken(null);
         stopRename();

@@ -16,6 +16,7 @@ import { readQuery, searchSuggestions } from "../../ipc/commands";
 import { Glyph } from "../../ui/Glyph";
 import type { GlyphName } from "../../ui/glyphs";
 import { TermChip } from "../../ui/TermChip";
+import { unasked } from "../failure";
 import { backFrom, getPlace, type Place, placeKey, usePlace } from "../place";
 import { faultSentence, marksCharacter } from "./fault";
 import { Suggestions } from "./Suggestions";
@@ -105,7 +106,7 @@ export function SearchField() {
     asked.current += 1;
     const mine = asked.current;
     const scope = chips.find(scoping)?.text ?? null;
-    const found = await searchSuggestions(scope, typed).catch(() => null);
+    const found = await searchSuggestions(scope, typed).catch(unasked);
     if (mine !== asked.current) return;
     setOffered(found && found.rows.length > 0 ? found : null);
     setPlate(null);
@@ -140,7 +141,7 @@ export function SearchField() {
       input.current?.focus();
     };
     scopeField = async (term) => {
-      const reading = await readQuery(term).catch(() => null);
+      const reading = await readQuery(term).catch(unasked);
       const chip = reading?.terms.find(isChip);
       if (!chip) return;
       setChips((held) => [chip, ...held.filter((one) => !scoping(one))]);
@@ -170,7 +171,7 @@ export function SearchField() {
   /** Takes the offer: where you stand becomes the first term. */
   async function takeOffer() {
     if (!scope) return;
-    const reading = await readQuery(scope).catch(() => null);
+    const reading = await readQuery(scope).catch(unasked);
     const chip = reading?.terms.find(isChip);
     if (!chip) return;
     setChips((held) => [...withScope({ chips: held, text }, chip).chips]);
@@ -179,7 +180,7 @@ export function SearchField() {
 
   /** Once a space closes a word, the terms it read as take their chips; words stay words. */
   async function absorb(typed: string) {
-    const reading = await readQuery(typed).catch(() => null);
+    const reading = await readQuery(typed).catch(unasked);
     if (!reading || reading.fault) return;
     const taken = reading.terms.filter(isChip);
     if (taken.length === 0) return;

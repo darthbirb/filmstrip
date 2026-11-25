@@ -10,6 +10,7 @@ import { Button } from "../../ui/Button";
 import { Glyph } from "../../ui/Glyph";
 import type { GlyphName } from "../../ui/glyphs";
 import { RowQuestion } from "../../ui/TermTable";
+import { failed, unasked } from "../failure";
 import { libraryChanged } from "../library";
 import { setNews } from "../navigation/foot-slot";
 import { useIndex } from "../navigation/index-store";
@@ -46,7 +47,7 @@ export function Trash() {
   const ask = () => {
     void trashToEmpty()
       .then((asked) => setAsking(asked.files.length > 0 ? asked : null))
-      .catch(() => undefined);
+      .catch(failed("The Trash could not be emptied."));
   };
   const cancel = () => {
     // The button is disabled until the question goes, and a disabled button cannot take the focus.
@@ -129,7 +130,7 @@ async function emptyAll(counted: Counted[]) {
   if (getEmptying()) return;
   startEmptying(counted.length);
   const heard = listen<number>("empty-progress", (event) => emptyingProgress(event.payload)).catch(
-    () => undefined,
+    unasked,
   );
   try {
     const emptied = await emptyTrash(counted);

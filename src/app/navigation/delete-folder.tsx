@@ -5,6 +5,7 @@ import type { Contents } from "../../ipc/bindings/Contents";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { binlessUnder, deleteFolder, folderDetail, folderFileCount } from "../../ipc/commands";
 import { Question } from "../../ui/Question";
+import { sayFailed, unasked } from "../failure";
 import { libraryChanged } from "../library";
 import { dropPaneFolder, getPaneFolder } from "../pane/pane-store";
 import { getPreferences, updatePreferences } from "../preferences";
@@ -50,7 +51,11 @@ export function sortingSources(sources: readonly SourceSummary[] | null) {
  * there is one, and otherwise after asking where its files go.
  */
 export async function deleteFolderAsking(folder: Doomed, sources: readonly SourceSummary[]) {
-  const held = await folderFileCount(folder.id).catch(() => null);
+  const failing = (error: unknown) => {
+    sayFailed(`Could not delete ${folder.name}.`, error);
+    return null;
+  };
+  const held = await folderFileCount(folder.id).catch(failing);
   if (held === null) return;
   if (held === 0) return settle(folder, null, 0, sources);
   const into = getPreferences().deleteInto;
@@ -58,7 +63,7 @@ export async function deleteFolderAsking(folder: Doomed, sources: readonly Sourc
     return settle(folder, { kind: "moveTo", sourceId: into }, held, sources);
   }
   const focused = document.activeElement;
-  const binless = await binlessUnder(folder.id).catch(() => null);
+  const binless = await binlessUnder(folder.id).catch(failing);
   if (binless === null) return;
   showReport(null);
   ask({ folder, held, back: focused instanceof HTMLElement ? focused : null, binless });
@@ -75,7 +80,10 @@ async function settle(
   sources: readonly SourceSummary[],
 ) {
   const inPane = await showsInPane(folder.id);
-  const done = await deleteFolder(folder.id, contents).catch(() => null);
+  const done = await deleteFolder(folder.id, contents).catch((error: unknown) => {
+    sayFailed(`Could not delete ${folder.name}.`, error);
+    return null;
+  });
   if (!done) return;
   const { batch, report } = done;
   if (report.deleted && inPane !== null) dropPaneFolder((shown) => shown.folderId === inPane);
@@ -117,7 +125,7 @@ async function showsInPane(folderId: number) {
   const shown = getPaneFolder();
   if (!shown) return null;
   if (shown.folderId === folderId) return shown.folderId;
-  const detail = await folderDetail(shown.folderId).catch(() => null);
+  const detail = await folderDetail(shown.folderId).catch(unasked);
   return detail?.path.some((crumb) => crumb.id === folderId) ? shown.folderId : null;
 }
 

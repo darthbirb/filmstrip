@@ -2,6 +2,7 @@ import { beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
+import { failCommand } from "../../dev/mock";
 import { withoutGlyphs } from "../../dev/words";
 import {
   createFolder,
@@ -15,6 +16,7 @@ import {
   undoLast,
 } from "../../ipc/commands";
 import { Breadcrumb } from "../navigation/Breadcrumb";
+import { getNews, setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { getPlace, type Place, setPlace } from "../place";
 import { EmptyPlace } from "./EmptyPlace";
@@ -241,6 +243,58 @@ test("a note is written in its row: Ctrl+Enter keeps it, Escape leaves it, empti
   await userEvent.clear(box);
   await screen.getByRole("button", { name: "Save" }).click();
   await expect.element(screen.getByRole("button", { name: "Add Note…" })).toBeVisible();
+});
+
+test("a note that could not be saved keeps what was written and says it is not saved", async () => {
+  setNews(null);
+  failCommand("set_folder_note", { kind: "permissionDenied" });
+  try {
+    const screen = await renderHeader(PEOPLE);
+    await details(screen).click();
+    await screen.getByRole("button", { name: "Add Note…" }).click();
+    await userEvent.keyboard("Faces{Control>}{Enter}{/Control}");
+
+    const box = screen.getByRole("textbox", { name: "Note on People" });
+    await expect.element(box).toHaveValue("Faces");
+    await expect.element(box).toHaveFocus();
+    await expect.element(screen.getByText("Not saved. Windows refused access.")).toBeVisible();
+    expect(getNews()).toEqual({
+      kind: "failed",
+      line: "The note on People was not saved. Windows refused access.",
+    });
+
+    failCommand("set_folder_note", null);
+    await screen.getByRole("button", { name: "Save" }).click();
+    const note = screen.getByRole("button", { name: "Change Note on People" });
+    await expect.poll(() => withoutGlyphs(note.query()?.textContent)).toBe("Faces");
+
+    await note.click();
+    await userEvent.clear(box);
+    await screen.getByRole("button", { name: "Save" }).click();
+    await expect.element(screen.getByRole("button", { name: "Add Note…" })).toBeVisible();
+  } finally {
+    failCommand("set_folder_note", null);
+  }
+});
+
+test("a tag that could not be added is typed in the field again, and the foot says why", async () => {
+  setNews(null);
+  failCommand("add_folder_tag", { kind: "busy" });
+  try {
+    const screen = await renderHeader(CAIRO);
+    await details(screen).click();
+    await screen.getByRole("button", { name: "Add Tag…" }).click();
+    await userEvent.keyboard("felucca{Enter}");
+    const field = screen.getByRole("combobox", { name: "Add Tag to Cairo" });
+    await expect.element(field).toHaveValue("felucca");
+    expect(getNews()).toEqual({
+      kind: "failed",
+      line: "Could not add felucca to Cairo. The index is busy. Try again in a moment.",
+    });
+    expect(chipTexts(row(screen.container, "Tags"))).not.toContain("felucca");
+  } finally {
+    failCommand("add_folder_tag", null);
+  }
 });
 
 test("the pencil picks a cover from the branch, the first standing in until one is chosen", async () => {

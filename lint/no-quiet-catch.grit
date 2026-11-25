@@ -1,0 +1,8 @@
+language js
+
+or {
+  `$promise.catch(() => undefined)`,
+  `$promise.catch(() => null)`
+} as $quiet where {
+  register_diagnostic(span=$quiet, message="A failure caught to nothing says nothing. An act catches with failed(what), and work nobody asked for with unasked: DECISIONS.md, Acts say why they failed.")
+}

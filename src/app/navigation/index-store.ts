@@ -15,16 +15,19 @@ import {
   listFolders,
   listSources,
 } from "../../ipc/commands";
+import { unasked } from "../failure";
 import { dropPaneFolder, getPaneOrigin, movePaneOrigin, showInPane } from "../pane/pane-store";
 import { type Crumb, getPlace, type Place, setPlace } from "../place";
+import { whyFailed } from "../undo/lines";
 import { openFolders, setOpenFolders } from "./open-folders";
 
 /**
  * The index as navigation reads it: the sources, each folder's children once asked for, the
- * library's totals, the favourite places, and the destination keys.
+ * library's totals, the favourite places, and the destination keys; or why it could not be opened.
  */
 type Snapshot = {
   sources: SourceSummary[] | null;
+  unopened: string | null;
   children: ReadonlyMap<number, FolderNode[]>;
   totals: LibraryTotals | null;
   favourites: FavouritePlace[];
@@ -33,6 +36,7 @@ type Snapshot = {
 
 const EMPTY: Snapshot = {
   sources: null,
+  unopened: null,
   children: new Map(),
   totals: null,
   favourites: [],
@@ -46,11 +50,11 @@ const listeners = new Set<() => void>();
 export async function loadIndex() {
   const [sources, totals, favourites, keys] = await Promise.all([
     listSources(),
-    libraryTotals().catch(() => null),
+    libraryTotals().catch(unasked),
     favouritePlaces().catch(() => []),
     destinationKeys().catch(() => []),
   ]);
-  publish({ sources, children: new Map(), totals, favourites, keys });
+  publish({ sources, unopened: null, children: new Map(), totals, favourites, keys });
   ensureChildren(sources.map((source) => source.rootFolderId));
   await settle(sources);
 }
@@ -61,7 +65,7 @@ export async function loadIndex() {
  * that no longer exists. Then an empty window settles on the first library. DECISIONS.md "Places, not queries".
  */
 async function settle(sources: SourceSummary[]) {
-  const folders = await listFolders().catch(() => null);
+  const folders = await listFolders().catch(unasked);
   const held = (place: Place | null) =>
     place?.kind !== "folder" || sources.some((source) => source.id === place.sourceId);
   const now = (place: Place | null) =>
@@ -93,17 +97,25 @@ async function settle(sources: SourceSummary[]) {
 
 /** Loads what is indexed, and again each time the background work goes quiet. */
 export async function startIndex() {
-  await loadIndex().catch(() => undefined);
+  await openIndex();
   // A copy's or an export's line moves while the walk stays idle, and a job that ends between two
   // ticks only counts one more done; reading again then must keep what is open.
   let was: Progress | null = null;
   await listen<Progress>("job-progress", (event) => {
     const { phase, completed } = event.payload;
-    if (phase === "idle" && was?.phase !== "idle") void loadIndex().catch(() => undefined);
-    else if (phase === "idle" && completed !== was?.completed)
-      void refreshIndex().catch(() => undefined);
+    if (phase === "idle" && was?.phase !== "idle") void loadIndex().catch(unasked);
+    else if (phase === "idle" && completed !== was?.completed) void refreshIndex().catch(unasked);
     was = event.payload;
-  }).catch(() => undefined);
+  }).catch(unasked);
+}
+
+/** Loads what is indexed, or keeps why it could not, for navigation to say with Retry. */
+export async function openIndex() {
+  try {
+    await loadIndex();
+  } catch (error) {
+    if (snapshot.sources === null) publish({ ...snapshot, unopened: whyFailed(error) });
+  }
 }
 
 export function getIndex() {
@@ -122,8 +134,8 @@ export async function refreshIndex() {
   const known = [...snapshot.children.keys()];
   const [sources, lists, totals, favourites, keys] = await Promise.all([
     listSources(),
-    Promise.all(known.map((id) => folderChildren(id).catch(() => null))),
-    libraryTotals().catch(() => null),
+    Promise.all(known.map((id) => folderChildren(id).catch(unasked))),
+    libraryTotals().catch(unasked),
     favouritePlaces().catch(() => []),
     destinationKeys().catch(() => []),
   ]);
@@ -132,7 +144,7 @@ export async function refreshIndex() {
     const list = lists[at];
     if (list) children.set(id, list);
   });
-  publish({ sources, children, totals, favourites, keys });
+  publish({ sources, unopened: null, children, totals, favourites, keys });
   await settle(sources);
 }
 
@@ -179,7 +191,7 @@ export function ensureChildren(folderIds: number[]) {
         children.set(id, list);
         publish({ ...snapshot, children });
       })
-      .catch(() => undefined)
+      .catch(unasked)
       .finally(() => pending.delete(id));
   }
 }

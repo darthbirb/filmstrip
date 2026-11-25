@@ -25,6 +25,7 @@ pub fn create(conn: &Connection, parent_id: i64, title: &str, batch_id: &str) ->
     if !folders::is_live(conn, parent_id)? {
         return Err(AppError::refused(Reason::NotIndexed));
     }
+    sanitize::refuse_forbidden(title)?;
     let title = sanitize::folder_title(title);
     refuse_clash(conn, parent_id, &title, None)?;
 
@@ -68,6 +69,7 @@ pub(super) fn rename_unjournalled(
             "a source's own folder is renamed as a source",
         ));
     };
+    sanitize::refuse_forbidden(title)?;
     let old = folders::title(conn, folder_id)?.unwrap_or_default();
     let title = sanitize::folder_title(title);
     if title == old {
@@ -526,7 +528,7 @@ mod tests {
     fn a_folder_is_made_on_disk_and_in_the_index_under_a_name_windows_accepts() {
         let (conn, root, _, trips) = library("make");
         let batch = journal::new_batch();
-        let made = create(&conn, trips, "Lisbon: day 2.", &batch).unwrap();
+        let made = create(&conn, trips, "Lisbon day 2.", &batch).unwrap();
 
         assert!(root.join("Trips/Lisbon day 2").is_dir());
         assert_eq!(
@@ -534,6 +536,25 @@ mod tests {
             Some("Lisbon day 2")
         );
         assert_eq!(journal::latest_batch(&conn).unwrap(), Some(batch));
+    }
+
+    #[test]
+    fn a_name_holding_a_character_windows_refuses_is_refused_with_it_named() {
+        let (conn, root, _, trips) = library("forbidden");
+        let refused = |err: AppError| Reason::of(&err);
+        let colon = Reason::ForbiddenCharacter {
+            character: ":".into(),
+        };
+
+        let made = create(&conn, trips, "Lisbon: day 2", &journal::new_batch());
+        assert_eq!(made.map_err(refused).unwrap_err(), colon);
+        assert!(!root.join("Trips/Lisbon day 2").exists());
+
+        let cairo = folders::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        let renamed = rename(&conn, cairo, "Cairo: day 2", &journal::new_batch());
+        assert_eq!(renamed.map_err(refused).unwrap_err(), colon);
+        assert!(root.join("Trips/Cairo").is_dir());
+        assert_eq!(journal::latest_batch(&conn).unwrap(), None);
     }
 
     #[test]

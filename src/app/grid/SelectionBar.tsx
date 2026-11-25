@@ -13,12 +13,14 @@ import { DismissButton } from "../../ui/DismissButton";
 import { Menu, type MenuAction } from "../../ui/Menu";
 import { PushDown } from "../../ui/PushDown";
 import { exportChecked } from "../export/export";
+import { failed } from "../failure";
 import { setFavourites, useEveryFavourite } from "../favourites";
 import { deleteFiles } from "../pane/delete";
 import { openMovePicker } from "../pane/move-picker";
 import { restoreFiles } from "../pane/restore";
 import { copyFiles } from "../paste/clipboard";
 import { TagSheet, whenTagSheetAsked } from "../tags/TagSheet";
+import { copiedFailed } from "../undo/lines";
 import { inTrash } from "./place-items";
 import {
   type CheckedFile,
@@ -108,7 +110,7 @@ function InLibrary({ rows }: { rows: readonly CheckedFile[] }) {
   const remove = `Delete ${files(ids.length)}`;
   const run = {
     favourite: () => setFavourites(ids, !favourite),
-    copy: () => void copyFiles(ids).catch(() => undefined),
+    copy: () => void copyFiles(ids).catch(failed(copiedFailed(rows))),
     export: () => exportChecked(ids),
     delete: () => void deleteFiles(ids),
   };

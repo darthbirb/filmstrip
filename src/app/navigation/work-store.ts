@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react";
 import type { Failure } from "../../ipc/bindings/Failure";
 import type { Progress } from "../../ipc/bindings/Progress";
 import { indexFailures, indexProgress, retryFailedJobs } from "../../ipc/commands";
+import { unasked } from "../failure";
 
 /** How far the background work has got, and what it could not read. DECISIONS.md "Background work". */
 type Work = { progress: Progress | null; failures: Failure[] };
@@ -13,10 +14,10 @@ const listeners = new Set<() => void>();
 
 /** Follows the work from where it already is; the queue reports every change it makes. */
 export async function watchWork() {
-  await report(await indexProgress().catch(() => null));
+  await report(await indexProgress().catch(unasked));
   await listen<Progress>("job-progress", (event) => {
     void report(event.payload);
-  }).catch(() => undefined);
+  }).catch(unasked);
 }
 
 export function useWork() {

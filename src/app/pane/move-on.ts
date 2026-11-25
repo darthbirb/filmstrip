@@ -1,3 +1,4 @@
+import { unasked } from "../failure";
 import { placeItems } from "../grid/place-items";
 import { type Place, placeKey } from "../place";
 import { getPaneItem, getPaneOrigin, paneMovesOn, showInPane } from "./pane-store";
@@ -35,7 +36,7 @@ export function moveOn({ shown, origin, next }: MoveOn, stayed: readonly { id: n
 
 /** Whether the pane's place still lists its file, asked again. */
 export async function stillListed({ shown, origin }: MoveOn) {
-  const rows = await placeItems(origin).catch(() => null);
+  const rows = await placeItems(origin).catch(unasked);
   return rows === null || rows.some((row) => row.id === shown);
 }
 
@@ -52,7 +53,7 @@ export async function moveOnLanded(pane: MoveOn) {
     paneMovesOn([shown]) &&
     placeKey(getPaneOrigin()) === placeKey(origin);
   if (!same()) return;
-  const rows = await placeItems(origin).catch(() => null);
+  const rows = await placeItems(origin).catch(unasked);
   if (!rows || rows.some((row) => row.id === shown) || !same()) return;
   const listed = new Set(rows.map((row) => row.id));
   showInPane(neighbour(order, going, listed), origin);

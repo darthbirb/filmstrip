@@ -2,6 +2,7 @@ import { copyItemPaths, openItem, revealItem } from "../../ipc/commands";
 import { formatCount } from "../../lib/format";
 import type { HeadedMenu, MenuAction, MenuGroups } from "../../ui/Menu";
 import { exportChecked } from "../export/export";
+import { failed } from "../failure";
 import { isFavourite, setFavourite, setFavourites } from "../favourites";
 import { oneFolder } from "../grid/selection";
 import { deleteFiles } from "../pane/delete";
@@ -11,9 +12,16 @@ import { startRename } from "../pane/rename";
 import { restoreFiles } from "../pane/restore";
 import { copyFiles } from "../paste/clipboard";
 import { openTagSheet } from "../tags/TagSheet";
+import { copiedFailed, openFailed, pathsFailed, shownFailed } from "../undo/lines";
 
-/** A file, with when it went to the Trash when it is there. */
-type Item = { id: number; folderId: number; favorite: boolean; trashedAt?: number | null };
+/** A file, with when it went to the Trash when it is there; a checked branch's go unnamed. */
+type Item = {
+  id: number;
+  folderId: number;
+  diskName?: string;
+  favorite: boolean;
+  trashedAt?: number | null;
+};
 
 // The menu has handed the focus back by now, so the picker opens against the file.
 const anchor = () => {
@@ -75,13 +83,13 @@ export function setMenu(items: readonly Item[], trash: boolean): HeadedMenu {
           id: "copy",
           label: "Copy",
           glyph: "copy",
-          onSelect: () => void copyFiles(ids).catch(() => undefined),
+          onSelect: () => void copyFiles(ids).catch(failed(copiedFailed(items))),
         },
         {
           id: "copy-path",
           label: "Copy Path",
           glyph: "copy",
-          onSelect: () => void copyItemPaths(ids).catch(() => undefined),
+          onSelect: () => void copyItemPaths(ids).catch(failed(pathsFailed(items))),
         },
         { id: "export", label: "Export…", glyph: "zip", onSelect: () => exportChecked(ids) },
       ],
@@ -102,9 +110,9 @@ export function setMenu(items: readonly Item[], trash: boolean): HeadedMenu {
  * A file's right-click menu: the pane's bar in its own order, with only the verbs that exist.
  * `show` puts this item in the pane, as a click on it would. DECISIONS.md "Right-click menus".
  */
-export function itemMenu(item: Item, show: () => void): MenuGroups {
+export function itemMenu(item: Item & { diskName: string }, show: () => void): MenuGroups {
   const favourite = isFavourite(item.id, item.favorite);
-  const quietly = (work: Promise<void>) => void work.catch(() => undefined);
+  const saying = (work: Promise<void>, what: string) => void work.catch(failed(what));
   const full: MenuAction = getFullScreen()
     ? {
         id: "leave",
@@ -150,7 +158,7 @@ export function itemMenu(item: Item, show: () => void): MenuGroups {
         label: favourite ? "Remove Favourite" : "Favourite",
         glyph: "star",
         filled: favourite,
-        onSelect: () => setFavourite(item.id, !favourite),
+        onSelect: () => setFavourite(item, !favourite),
       },
       {
         id: "move",
@@ -165,20 +173,25 @@ export function itemMenu(item: Item, show: () => void): MenuGroups {
         id: "reveal",
         label: "Show in Explorer",
         glyph: "folderOpen",
-        onSelect: () => quietly(revealItem(item.id)),
+        onSelect: () => saying(revealItem(item.id), shownFailed(item.diskName)),
       },
-      { id: "copy", label: "Copy", glyph: "copy", onSelect: () => quietly(copyFiles([item.id])) },
+      {
+        id: "copy",
+        label: "Copy",
+        glyph: "copy",
+        onSelect: () => saying(copyFiles([item.id]), copiedFailed([item])),
+      },
       {
         id: "copy-path",
         label: "Copy Path",
         glyph: "copy",
-        onSelect: () => quietly(copyItemPaths([item.id])),
+        onSelect: () => saying(copyItemPaths([item.id]), pathsFailed([item])),
       },
       {
         id: "open",
         label: "Open with Default App",
         glyph: "openExternal",
-        onSelect: () => quietly(openItem(item.id)),
+        onSelect: () => saying(openItem(item.id), openFailed(item.diskName)),
       },
       {
         id: "rename",
