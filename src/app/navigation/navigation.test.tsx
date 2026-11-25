@@ -107,13 +107,15 @@ test("a pill reads its own files, then everything at or below it, even where the
   expect(shown("Trips 2 of 5")).toBe("2/5");
   expect(row("Cairo 3 of 3").elements()).toHaveLength(0);
 
-  // The slash is the separator ink at rest, and the plate's on the row you stand in.
-  const slash = (name: string) =>
-    getComputedStyle(
-      row(name).element().querySelector(".rounded-badge [aria-hidden] span") as Element,
-    ).color;
-  expect(slash("Pictures 1 of 6")).toBe("rgb(92, 90, 86)");
-  expect(slash("Trips 2 of 5")).toBe("rgba(23, 24, 26, 0.4)");
+  // At rest the slash is fg-dim, a step under the figures; on the plate it takes the figures' ink.
+  const ink = (name: string, part: string) =>
+    getComputedStyle(row(name).element().querySelector(part) as Element).color;
+  const slash = (name: string) => ink(name, ".rounded-badge [aria-hidden] span");
+  const figures = (name: string) => ink(name, ".rounded-badge [aria-hidden]");
+  expect(slash("Pictures 1 of 6")).toBe("rgb(144, 140, 134)");
+  expect(figures("Pictures 1 of 6")).toBe("rgb(168, 165, 160)");
+  expect(slash("Trips 2 of 5")).toBe("rgba(23, 24, 26, 0.62)");
+  expect(figures("Trips 2 of 5")).toBe("rgba(23, 24, 26, 0.62)");
 });
 
 test("the breadcrumb goes back up to any folder on the path", async () => {
