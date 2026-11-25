@@ -14,6 +14,7 @@ import { formatCount } from "../../lib/format";
 import { keepEscape, SURFACE } from "../../ui/Menu";
 import { SetChip } from "../../ui/SetChip";
 import { StandingTagField } from "../../ui/TagField";
+import { sayFailed } from "../failure";
 import { libraryChanged, whenLibraryChanges } from "../library";
 import { getPlace } from "../place";
 import { afterAct } from "../undo/undo";
@@ -46,6 +47,7 @@ type Props = {
 const HEADING = "m-0 flex h-chip shrink-0 items-center px-2 text-eyebrow text-fg-dim uppercase";
 const RULE = "mx-2 my-1 h-px shrink-0 border-0 bg-line";
 const files = (n: number) => `${formatCount(n)} ${n === 1 ? "File" : "Files"}`;
+const lower = (n: number) => `${formatCount(n)} ${n === 1 ? "file" : "files"}`;
 
 /**
  * Tag…: what a set of checked files carries and whose each tag is, with the shared tag field to
@@ -101,26 +103,44 @@ export function TagSheet({ itemIds, anchor, maxHeight, onClose }: Props) {
     if (sheet.current?.matches(":popover-open")) sheet.current.hidePopover();
   };
 
-  const act = async (work: () => Promise<Parameters<typeof afterAct>[0] | null>) => {
+  const act = async (
+    work: () => Promise<Parameters<typeof afterAct>[0] | null>,
+    what: string,
+  ): Promise<boolean> => {
+    let batch: Parameters<typeof afterAct>[0] | null;
     try {
-      const batch = await work();
-      if (batch) {
-        afterAct(batch);
-        await libraryChanged();
-      }
-    } catch {}
+      batch = await work();
+    } catch (error) {
+      sayFailed(what, error);
+      await load();
+      return false;
+    }
+    if (batch) {
+      afterAct(batch);
+      await libraryChanged();
+    }
     await load();
+    return true;
   };
   const wanted = () => itemIds.slice();
-  const add = (value: string) => act(() => addItemsTag(wanted(), value));
-  const remove = (tagId: number) => act(() => removeItemsTag(wanted(), tagId));
+  const them = () => lower(itemIds.length);
+  const added = (value: string) =>
+    act(() => addItemsTag(wanted(), value), `Could not add ${value} to ${them()}.`);
+  const add = async (value: string) => {
+    if (!(await added(value))) throw new Error(`${value} was not added`);
+  };
+  const remove = (tag: SetTag) =>
+    act(
+      () => removeItemsTag(wanted(), tag.tagId),
+      `Could not take ${tag.key ? `${tag.key}: ${tag.value}` : tag.value} off ${them()}.`,
+    );
 
   // A chip taken off with the keyboard hands its stop to the one after it.
   const stops = () => [...(sheet.current?.querySelectorAll<HTMLElement>("[data-stop]") ?? [])];
-  const takeOff = (tagId: number) => {
+  const takeOff = (tag: SetTag) => {
     const at = stops().indexOf(document.activeElement as HTMLElement);
-    void remove(tagId).then(() => {
-      if (at < 0) return;
+    void remove(tag).then((done) => {
+      if (!done || at < 0) return;
       requestAnimationFrame(() => (stops()[at] ?? sheet.current?.querySelector("input"))?.focus());
     });
   };
@@ -206,8 +226,8 @@ export function TagSheet({ itemIds, anchor, maxHeight, onClose }: Props) {
                   own={section.own}
                   gathered={section.gathered}
                   echoed={tag.tagId === echo}
-                  onAdd={() => void add(tag.value)}
-                  onRemove={() => takeOff(tag.tagId)}
+                  onAdd={() => void added(tag.value)}
+                  onRemove={() => takeOff(tag)}
                 />
               ))}
             </div>

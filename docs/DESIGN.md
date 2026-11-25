@@ -666,7 +666,8 @@ toward the rest surface.
   under the pointer, `raised` while its totals are open, its focus ring inside, flush to the
   edge. Where the line does not fit, "items" goes first, then the size, whole, and the count
   stands alone; the tooltip then gives the whole line. Folded, it keeps its glyph alone, the line
-  in its tooltip. Its totals open as tallies a `tile-gap` above the foot and whatever line stands
+  in its tooltip. While the index cannot be opened it says nothing: its glyph alone in `fg-faint`,
+  and it does not open. Its totals open as tallies a `tile-gap` above the foot and whatever line stands
   on it, left edges met, flipping below only without room; folded, a `tile-gap` beside the rail,
   bottoms met.
 - **Tallies.** Figures under a heading in the menu's surface and width: the `eyebrow` heading

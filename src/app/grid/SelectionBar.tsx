@@ -109,7 +109,7 @@ function InLibrary({ rows }: { rows: readonly CheckedFile[] }) {
   const star = favourite ? "Remove Favourite" : "Favourite";
   const remove = `Delete ${files(ids.length)}`;
   const run = {
-    favourite: () => setFavourites(ids, !favourite),
+    favourite: () => setFavourites(rows, !favourite),
     copy: () => void copyFiles(ids).catch(failed(copiedFailed(rows))),
     export: () => exportChecked(ids),
     delete: () => void deleteFiles(ids),

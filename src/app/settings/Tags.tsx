@@ -146,18 +146,22 @@ export function Tags() {
   const act = async (run: () => Promise<Batch | null>, what: string) => {
     const row = editing?.row ?? null;
     setEditing(null);
+    let batch: Batch | null;
     try {
-      const batch = await run();
-      if (batch) {
-        mine.current.add(batch.batchId);
-        afterAct(batch);
-        await libraryChanged();
-      }
-      setVocabulary(await listTags());
+      batch = await run();
     } catch (error) {
       sayFailed(what, error);
       load();
+      back.current = row;
+      return;
     }
+    if (batch) {
+      mine.current.add(batch.batchId);
+      afterAct(batch);
+      await libraryChanged();
+    }
+    const read = await listTags().catch(failed("Could not read the tags."));
+    if (read) setVocabulary(read);
     back.current = row;
   };
 

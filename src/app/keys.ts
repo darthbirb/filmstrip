@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
 import { copyItemPaths, itemDetail } from "../ipc/commands";
-import { failed, unasked } from "./failure";
+import { failed } from "./failure";
 import { inTrash } from "./grid/place-items";
 import { getChecked } from "./grid/selection";
 import { setNews } from "./navigation/foot-slot";
@@ -11,7 +11,7 @@ import { moveFiles } from "./pane/move-picker";
 import { getPaneItem, getPaneSet } from "./pane/pane-store";
 import { copyFiles } from "./paste/clipboard";
 import { getPlace } from "./place";
-import { copiedFailed, pathsFailed } from "./undo/lines";
+import { copiedFailed, deletedFailed, movedFailed, pathsFailed } from "./undo/lines";
 
 // Destination keys: the ten digits, each bound to a folder a press moves files into.
 // DECISIONS.md "Destination keys".
@@ -78,8 +78,13 @@ export function useFileKeys() {
   }, []);
 }
 
+const oneFailed = (key: FileKey) => {
+  if (key === "delete") return deletedFailed(1);
+  return key === "copy" ? copiedFailed([{ id: 0 }]) : pathsFailed([{ id: 0 }]);
+};
+
 async function actOn(key: FileKey) {
-  const chosen = await chosenFiles();
+  const chosen = await chosenFiles(oneFailed(key));
   // A trashed file goes only by Restore, as the bar in the Trash has nothing else.
   if (!chosen || chosen.files.length === 0 || chosen.files.every(inTrash)) return;
   const ids = chosen.files.map((file) => file.id);
@@ -88,8 +93,11 @@ async function actOn(key: FileKey) {
   else await copyItemPaths(ids).catch(failed(pathsFailed(chosen.files)));
 }
 
-/** What is checked, else the pane's one file; none when the pane shows several and none is checked. */
-async function chosenFiles() {
+/**
+ * What is checked, else the pane's one file; none when the pane shows several and none is checked.
+ * `what` says what could not be done when the pane's file cannot be read.
+ */
+async function chosenFiles(what: string) {
   const { checked, listed } = getChecked();
   if (checked.length > 0) return { files: checked };
   if (getPaneSet().length > 1) return null;
@@ -97,7 +105,7 @@ async function chosenFiles() {
   const file =
     shown === null
       ? null
-      : (listed.find((row) => row.id === shown) ?? (await itemDetail(shown).catch(unasked)));
+      : (listed.find((row) => row.id === shown) ?? (await itemDetail(shown).catch(failed(what))));
   return { files: file ? [file] : [] };
 }
 
@@ -116,7 +124,7 @@ export async function press(digit: string) {
     });
     return;
   }
-  const chosen = await chosenFiles();
+  const chosen = await chosenFiles(movedFailed(1, name));
   // A pane showing several has no one file for a key to move, as it has no bar.
   if (!chosen) {
     setNews({

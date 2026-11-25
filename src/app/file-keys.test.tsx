@@ -2,14 +2,14 @@ import { afterEach, beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
-import { onDriveWithoutBin, resetBin } from "../dev/mock";
+import { failCommand, onDriveWithoutBin, resetBin } from "../dev/mock";
 import { recording } from "../dev/recording";
 import { folderItems, undoLast } from "../ipc/commands";
 import { Grid } from "./grid/Grid";
 import { clearChecked } from "./grid/selection";
 import { useFileKeys } from "./keys";
 import { Foot } from "./navigation/Foot";
-import { setNews } from "./navigation/foot-slot";
+import { getNews, setNews } from "./navigation/foot-slot";
 import { loadIndex, resetIndex } from "./navigation/index-store";
 import { NoBinQuestion, resetNoBinQuestion } from "./pane/no-bin";
 import { addToPane, getPaneItem, showInPane } from "./pane/pane-store";
@@ -152,6 +152,25 @@ test("with nothing checked Ctrl+C and Ctrl+Shift+C take the pane's file", async 
     await userEvent.keyboard("{Control>}{Shift>}C{/Shift}{/Control}");
     await expect.poll(() => sent(calls, "copy_item_paths")).toEqual({ itemIds: [sphinx] });
   });
+});
+
+test("a pane's file that cannot be read says so when a key acts on it", async () => {
+  await renderIt();
+  const scan = 3;
+  expect(await idOf("scan 03.tif")).toBe(-1);
+  showInPane(scan, null);
+  failCommand("item_detail", { kind: "permissionDenied" });
+  try {
+    await recording(async (calls) => {
+      await userEvent.keyboard("{Control>}c{/Control}");
+      await expect
+        .poll(getNews)
+        .toEqual({ kind: "failed", line: "Could not copy 1 file. Windows refused access." });
+      never(calls, "copy_items");
+    });
+  } finally {
+    failCommand("item_detail", null);
+  }
 });
 
 test("none of the keys acts in a text field, or over Settings", async () => {

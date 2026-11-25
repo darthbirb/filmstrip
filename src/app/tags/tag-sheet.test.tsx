@@ -2,6 +2,7 @@ import { beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
+import { failCommand } from "../../dev/mock";
 import { recording } from "../../dev/recording";
 import { folderItems, undoLast } from "../../ipc/commands";
 import { Grid } from "../grid/Grid";
@@ -151,6 +152,36 @@ test("a chip on some of the set adds to the rest, and × takes it off every file
 
   await undo();
   await expect.poll(own).toEqual(["dawn"]);
+});
+
+test("an add or a take-off that fails says why at the foot, and the typed value comes back", async () => {
+  await openOnAll();
+  await userEvent.type(field(3), "felucca{Enter}");
+  await expect.poll(own).toEqual(["felucca"]);
+
+  failCommand("add_items_tag", { kind: "permissionDenied" });
+  failCommand("remove_items_tag", { kind: "busy" });
+  try {
+    await userEvent.type(field(3), "dawn{Enter}");
+    await expect
+      .poll(getNews)
+      .toEqual({ kind: "failed", line: "Could not add dawn to 3 files. Windows refused access." });
+    await expect.element(field(3)).toHaveValue("dawn");
+    await expect.element(field(3)).toHaveFocus();
+    expect(own()).toEqual(["felucca"]);
+
+    const chip = sheet(3).getByRole("button", { name: "felucca", exact: true });
+    await userEvent.hover(chip);
+    await userEvent.click(sheet(3).getByRole("button", { name: "Remove from 3 Files" }));
+    await expect.poll(getNews).toEqual({
+      kind: "failed",
+      line: "Could not take felucca off 3 files. The index is busy. Try again in a moment.",
+    });
+    expect(own()).toEqual(["felucca"]);
+  } finally {
+    failCommand("add_items_tag", null);
+    failCommand("remove_items_tag", null);
+  }
 });
 
 test("a tag every checked file carries is refused where it is typed, and says whose it is", async () => {

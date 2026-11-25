@@ -68,7 +68,7 @@ export function setMenu(items: readonly Item[], trash: boolean): HeadedMenu {
           label: favourite ? "Remove Favourite" : "Favourite",
           glyph: "star",
           filled: favourite,
-          onSelect: () => setFavourites(ids, !favourite),
+          onSelect: () => setFavourites(items, !favourite),
         },
         { id: "tag", label: "Tag…", glyph: "tag", onSelect: openTagSheet },
         {
