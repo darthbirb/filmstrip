@@ -45,6 +45,8 @@ type Props = {
   menuFor?: (id: string) => HeadedMenu;
   /** The row whose name is a field for now, and what becomes of what is typed there. */
   renaming?: Renaming | null;
+  /** F2 on a row: its name becomes a field, where the row can be renamed. */
+  onRename?: (id: string) => void;
   /** The row a dragged ghost rests on and that will take it: lifted inside a pewter ring. */
   accepting?: string | null;
 };
@@ -70,6 +72,7 @@ export function Tree({
   onCollapse,
   menuFor,
   renaming,
+  onRename,
   accepting,
 }: Props) {
   const [focusId, setFocusId] = useState<string | null>(null);
@@ -122,6 +125,10 @@ export function Tree({
       case "Enter":
       case " ":
         onSelect(row.id);
+        break;
+      case "F2":
+        if (!onRename || event.shiftKey || event.ctrlKey || event.altKey) return;
+        onRename(row.id);
         break;
       default:
         return;

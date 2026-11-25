@@ -28,6 +28,7 @@ import { fromFocus, groundMenu, placeMenu } from "../menus/ground";
 import { itemMenu, setMenu } from "../menus/item-menu";
 import { setFullScreen } from "../pane/full-screen";
 import { showInPane, usePaneItem, usePaneSet } from "../pane/pane-store";
+import { startRename } from "../pane/rename";
 import { useOutsideDrag } from "../paste/drop";
 import { type Place, setPlace, usePlace } from "../place";
 import { usePreferences } from "../preferences";
@@ -47,7 +48,7 @@ import {
   useSelection,
   useSelectionKeys,
 } from "./selection";
-import { tileSize } from "./TileSize";
+import { tileSize, useTileWheel } from "./TileSize";
 import { useGridItems } from "./useGridItems";
 import { useLayout } from "./useLayout";
 
@@ -61,6 +62,7 @@ export function Grid({ mode }: { mode: LayoutMode }) {
   const { tile } = usePreferences();
   const scroller = useRef<HTMLDivElement>(null);
   const view = useViewport(scroller);
+  useTileWheel(scroller);
   const gap = view.gap;
   const rowHeight = tileSize(tile) * view.rem;
   // The Trash runs newest first under a heading per day, each tile saying where it came from.
@@ -128,12 +130,20 @@ export function Grid({ mode }: { mode: LayoutMode }) {
     element.querySelector<HTMLElement>(`[data-item="${id}"]`)?.focus({ preventScroll: true });
   });
 
-  // The arrows move the ring and nothing else; Space is the box and Enter shows the tile.
+  // The arrows move the ring and nothing else; Space is the box, Enter shows the tile, F2 renames it.
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     const target = event.target instanceof HTMLElement ? event.target : null;
     const from = Number(target?.dataset.item);
     const index = indexOf.get(from);
     if (index === undefined || !result || event.altKey || event.metaKey || event.ctrlKey) return;
+    if (event.key === "F2") {
+      event.preventDefault();
+      const item = items?.[index];
+      if (event.shiftKey || !item || inTrash(item)) return;
+      showInPane(from, place);
+      startRename(from);
+      return;
+    }
     if (event.key === " " || event.key === "Enter") {
       event.preventDefault();
       if (event.shiftKey) return;

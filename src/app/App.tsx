@@ -11,7 +11,7 @@ import { Notices } from "./grid/Notices";
 import { SelectionBar } from "./grid/SelectionBar";
 import { SortOrder } from "./grid/SortOrder";
 import { TileSize } from "./grid/TileSize";
-import { useDestinationKeys } from "./keys";
+import { useDestinationKeys, useFileKeys } from "./keys";
 import { addFolder } from "./navigation/add-source";
 import { Breadcrumb } from "./navigation/Breadcrumb";
 import { DeleteQuestion } from "./navigation/delete-folder";
@@ -44,6 +44,7 @@ export function App() {
   useEscapeLeavesFullScreen();
   useUndoKey();
   useDestinationKeys();
+  useFileKeys();
   useSearchKeys();
   usePasteKey();
   useExplorerDrops();

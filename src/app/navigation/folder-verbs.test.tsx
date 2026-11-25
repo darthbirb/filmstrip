@@ -98,6 +98,21 @@ test("New Folder lands a row in its place, already in its field, and Enter makes
   expect(await titles(4)).toEqual(["Cairo", "Egypt"]);
 });
 
+test("F2 on a folder's row puts its name in a field, and on the Sorting Box does nothing", async () => {
+  const screen = await render(<Harness />);
+  await openPictures(screen);
+  await userEvent.keyboard("{ArrowDown}{ArrowDown}");
+  await expect.element(screen.getByRole("treeitem", { name: "Trips 2 of 5" })).toHaveFocus();
+  await userEvent.keyboard("{F2}");
+  await expect.element(screen.getByRole("textbox", { name: "Rename Trips" })).toHaveFocus();
+  await userEvent.keyboard("{Escape}");
+
+  const sorting = screen.getByRole("treeitem", { name: /^Sorting Box/ });
+  (sorting.element() as HTMLElement).focus();
+  await userEvent.keyboard("{F2}");
+  expect(screen.getByRole("textbox").query()).toBeNull();
+});
+
 test("Escape leaves nothing, and a name already there is said under the row", async () => {
   const screen = await render(<Harness />);
   await openPictures(screen);

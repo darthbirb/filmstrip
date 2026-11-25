@@ -49,7 +49,7 @@ drawn. **Not started** — neither.
 | Create a folder | Built | `create_folder`, New Folder on a folder's and a source's menu, a row already in its name field |
 | Move a folder | Built | `move_folder`, across drives too; Move to… on its menu, its own branch not a choice |
 | Delete a folder, choosing what happens to what is inside | Built | `delete_folder`, `folder_file_count`; asks in a banner, and Settings › Sources keeps the answer |
-| Rename a folder, on disk | Built | `rename_folder`, in its tree row, a name already there said under it |
+| Rename a folder, on disk | Built | `rename_folder`, in its tree row, F2 on it, a name already there said under it |
 | A folder's cover | Built | `folder_cover_choices`, `set_folder_cover`, the pencil on the band's cover, which takes only a live picture at or below the folder; the first picture stands in while none is chosen |
 | A folder's status, notes, favourite | Built | favourite: `set_folder_favorite`, `favourite_places`, a group of its own in navigation and in the band; status: `set_folder_status`, the band's segmented group; notes: `set_folder_note`, written in the band |
 | A folder's labels and tags, inherited by everything under it | Built | `add_folder_tag`, `set_folder_label`, `remove_folder_tag` and their offers, the band's Add Tag… and Add Label…; one value per key, and a key given once down a branch, refused above a folder that holds it as below one; where a move, or undoing a delete, brings two together, the nearest folder's; items inherit labels, and never own one |
@@ -67,7 +67,7 @@ drawn. **Not started** — neither.
 | Sort by key and direction, random order held steady | Built | `folder_items`, `sorting_items` and `search` take the order; the grid's header chooses it per kind of place |
 | Move items between folders | Built | `move_items`, Move to… on the pane's bar and a file's menu; a name already taken is reported, never changed; between drives a job with its line and Cancel, `cancel_move`: DECISIONS.md "Undo" |
 | Delete items to the trash | Built | `trash_items`, Delete on the pane's bar and a file's menu, sending each file to the Windows Recycle Bin on its own drive through `fs::recycle`; one the bin will not take stays where it was, said at the foot, and one never handed to it, its path too long for the shell or its drive without hard links, stays with that reason in the banner; undo takes an item back out of the bin |
-| Rename a file, on disk | Built | `rename_item`, the pane's Name row; not in ggallery; a name already taken is refused |
+| Rename a file, on disk | Built | `rename_item`, the pane's Name row, F2 on a tile; not in ggallery; a name already taken is refused |
 | Paste files in, and take an OS drop | Built | `paste_files`, `drop_files`: Paste on a folder's, a source's and the Sorting Box's menus, on the rows and on the grid's ground, Ctrl+V, and a drop from Explorer on a row or a folder's grid, the tree scrolling near its edges; a copy as a job with Cancel, a name taken refused, never changed; undo sends what came in to the Trash, and on a drive with no Recycle Bin leaves it and lets the act go |
 | Copy an item's path | Built | `copy_item_paths`, Copy Path in a file's menu, a set's and the pane's ⋯; one path to a line |
 | Counts: unsorted, trashed, totals, arrival duplicates | Partly | `library_totals`, one query: the foot says what the library holds and weighs, and opens its totals by kind with the Sorting Box, the Trash and the sources, any offline named; arrival duplicates wait for duplicate detection |
@@ -109,7 +109,7 @@ drawn. **Not started** — neither.
 
 | Capability | Filmstrip | Where |
 | --- | --- | --- |
-| Select in a grid, and act on the selection | Built | a box on each tile, Ctrl and Shift with a click, the keyboard; a bar at the grid's foot with Favourite, Tag…, Move to…, Copy and Delete, or Restore in the Trash |
+| Select in a grid, and act on the selection | Built | a box on each tile, Ctrl and Shift with a click, the keyboard; a bar at the grid's foot with Favourite, Tag…, Move to…, Copy and Delete, or Restore in the Trash; Delete, Ctrl+C and Ctrl+Shift+C act on the set, else the pane's file |
 | Move a selection somewhere | Built | the bar's Move to…, or dragged onto a row in navigation; one batch undone as one |
 | Destination hotkeys | Built | `destination_keys`, `set_destination_key`, `remove_destination_key`; the digits 1 to 0, bound from a folder's menu or Settings, shown on its row, a press moving the set or the pane's file |
 | The trash as a place, in the Recycle Bin | Built | `trash_listing`, `library_totals`: newest first under a heading per day, each tile saying where it came from, counted on its row and header and in Settings › Trash. `look_in_bin` once the window has opened and as the Trash opens retires what was emptied from the bin outside the app, Ctrl+Z passing over it and the foot's line losing Undo for an act that left with it, and restores what was put back from Explorer. On a drive with no Recycle Bin, Delete asks first (`binless_items`, `binless_under`, `delete_for_good`): the rest of the selection goes to the bin with Undo, the asked files go outright with none, and a folder's Delete Files Permanently takes its files and then the folder |

@@ -69,3 +69,37 @@ test("a size saved before the steps existed lands on the nearest one", async () 
     .element(screen.getByRole("button", { name: "Tile Size: Extra Large" }))
     .toBeVisible();
 });
+
+test("Ctrl+wheel over the grid steps the tile size and saves it, a touchpad's small turns gathered", async () => {
+  await page.viewport(1000, 700);
+  const screen = await render(
+    <div style={{ display: "flex", flexDirection: "column", width: 1000, height: 600 }}>
+      <TileSize />
+      <div data-testid="grid" style={{ flex: 1, minHeight: 0 }}>
+        <Grid mode="uniform" />
+      </div>
+    </div>,
+  );
+  await expect.poll(side).toBeGreaterThan(0);
+  const over = screen.getByTestId("grid").getByRole("button").first().element();
+  const turn = (deltaY: number, ctrlKey = true) => {
+    const wheel = new WheelEvent("wheel", { deltaY, ctrlKey, bubbles: true, cancelable: true });
+    over.dispatchEvent(wheel);
+    return wheel.defaultPrevented;
+  };
+
+  expect(turn(-100)).toBe(true);
+  await expect.element(screen.getByRole("button", { name: "Tile Size: Large" })).toBeVisible();
+  expect(getPreferences().tile).toBe(15);
+  turn(-100);
+  turn(-100);
+  expect(getPreferences().tile).toBe(20);
+
+  for (let n = 0; n < 4; n += 1) turn(10);
+  expect(getPreferences().tile).toBe(20);
+  turn(10);
+  await expect.element(screen.getByRole("button", { name: "Tile Size: Large" })).toBeVisible();
+
+  expect(turn(100, false)).toBe(false);
+  expect(getPreferences().tile).toBe(15);
+});

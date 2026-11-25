@@ -471,6 +471,12 @@ export function Navigation() {
         onExpand={(id) => setOpen(id, true)}
         onCollapse={(id) => setOpen(id, false)}
         menuFor={menuFor}
+        onRename={(id) => {
+          const rename = menuFor(id)
+            .groups.flat()
+            .find((action) => action.id === "rename");
+          rename?.onSelect();
+        }}
         accepting={
           drag?.over?.landing.kind === "accept"
             ? drag.over.rowId

@@ -428,7 +428,9 @@ hold first.
 **The tile size stays in the header**, the one view preference people change while looking, as
 one button naming the step it is on: Small, Medium, Large or Extra large, 8, 11, 15 and 20rem. A
 named step says where the size is without a click, which two nudge buttons and a slider never
-did. A size saved before the steps existed lands on the nearest.
+did. A size saved before the steps existed lands on the nearest. **Ctrl+wheel over the grid steps
+it too**, as Explorer, Photos and XnView do, a notch a step and a touchpad's small turns gathered
+into one; Ctrl+= and Ctrl+- stay with the interface size, as a browser's do.
 
 **A video's tile writes its length** in the corner opposite the in-pane plate, decided on 14
 September 2026, so a clip and a photograph no longer draw the same cell, after a filled play
@@ -1105,8 +1107,8 @@ its place, as after a delete, so sorting a place is a press per picture. Files a
 folder are passed over without a word and only what moved is counted; when nothing would move,
 the foot says "Already in Lisbon." in the refusal band. A free key is silent, like any key the app
 does not use, but a key whose folder has gone did mean something, so its press says which key and
-where the folder was. A key does nothing in a field, over a menu or Settings, or in the Trash,
-whose only way out is Restore. The top row and the number pad are the same keys.
+where the folder was. A key does nothing in a field, over a menu, a question or Settings, or in
+the Trash, whose only way out is Restore. The top row and the number pad are the same keys.
 
 ## Search
 
