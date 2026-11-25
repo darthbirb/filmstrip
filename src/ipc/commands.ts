@@ -60,9 +60,8 @@ import { FIRST_SORT } from "./sort";
 /** What a failed command rejects with; `kind` mirrors `AppError::kind` in Rust. */
 export type AppError = {
   kind: "io" | "db" | "json" | "invalid" | "media" | "refused";
-  message: string;
-  /** Why, for a refusal, in terms the interface words itself. */
-  reason?: Reason;
+  /** Why, in terms the interface words itself: what the error said went to the log. */
+  reason: Reason;
 };
 
 export const listSources = () => invoke<SourceSummary[]>("list_sources");

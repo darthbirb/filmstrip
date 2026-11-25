@@ -547,8 +547,10 @@ names an action. All three ship inside the app and are never fetched.
 Every label is Title Case: a button, a menu row, a tooltip, a segmented option, a dropdown's value,
 a Settings row, a section's name and a caption. Each word is capitalised but *a an the and but or
 nor as at by for from in into of off on to up via with*, unless it opens or closes the label. A
-sentence stays a sentence, and so do a field's placeholder, an error a file carries, a state word
-on a row ("offline", "current") and a name the person chose. An ellipsis only where a choice or
+sentence stays a sentence, and so do a field's placeholder, a reason a file carries, a state word
+on a row ("offline", "current") and a name the person chose. Why something failed or stayed is its
+**Reason**, in every list's column and wherever it is said, never Error, and never the words the
+error came with. An ellipsis only where a choice or
 typing follows before anything happens, and figures for a count. One act has one name everywhere
 it appears; the Components sheet's Words block lists them, with the reason each changed.
 
@@ -676,11 +678,12 @@ toward the rest surface.
   its actions and a dismiss. What needs a decision takes a `line-danger` hairline and a `danger`
   glyph, never a fill; what is only worth knowing takes the ordinary `line-control` ring. Its list
   opens in place beneath it rather than in a dialog: `eyebrow` headings over rows `control` tall,
-  each row the name, why, and at its end a quiet way to go and look. What an act or an undo could
-  not finish is grouped under a heading per place it is still in, "Reason" said over the first;
-  a file emptied from the Recycle Bin outside the app is under Gone from the Recycle Bin, last,
-  and one the index forgot under Gone from the folder or source it was last in, neither with a
-  way to look, and Retry stays only while a row of neither kind could succeed.
+  each row the name, why, and at its end a quiet way to go and look. What the walk could not read
+  is a row per file: its path from inside its source, its Reason and its Attempts. What an act or
+  an undo could not finish is grouped under a heading per place it is still in, "Reason" said over
+  the first; a file emptied from the Recycle Bin outside the app is under Gone from the Recycle
+  Bin, last, and one the index forgot under Gone from the folder or source it was last in, neither
+  with a way to look, and Retry stays only while a row of neither kind could succeed.
 - **Question.** The notice's shape, asking: the `danger` glyph, the question and × to answer none
   on one line; under the question its answers as buttons, the one that destroys last in `danger`;
   under them, where an answer can be kept, a checkbox. The answers hold the line or all fold into

@@ -149,7 +149,7 @@ pub async fn reveal_source(app: AppHandle, state: State<'_, AppState>, id: i64) 
     let root = run(&state, move |conn| {
         sources::get(conn, id)?
             .map(|source| source.root)
-            .ok_or_else(|| AppError::invalid("that source is no longer in the index"))
+            .ok_or_else(|| AppError::refused(Reason::NotIndexed))
     })
     .await?;
     app.opener()
@@ -187,7 +187,7 @@ pub async fn reveal_held(app: AppHandle, state: State<'_, AppState>, folder_id: 
 /// Where a folder is on disk; a folder the index has retired has nowhere to show.
 pub fn folder_to_reveal(conn: &Connection, folder_id: i64) -> Result<PathBuf> {
     if !folders::is_live(conn, folder_id)? {
-        return Err(AppError::invalid("that folder is no longer in the index"));
+        return Err(AppError::refused(Reason::NotIndexed));
     }
     paths::folder_dir(conn, folder_id)
 }
@@ -287,7 +287,7 @@ pub async fn move_items(
 
 pub fn start_items_move(conn: &Connection, item_ids: &[i64], folder_id: i64) -> Result<ItemsMoved> {
     if !folders::is_live(conn, folder_id)? {
-        return Err(AppError::invalid("that folder is no longer in the index"));
+        return Err(AppError::refused(Reason::NotIndexed));
     }
     if fs_items::cross_drives(conn, item_ids, folder_id)? {
         let job_id = jobs::enqueue_move_items(conn, item_ids, folder_id)?;
@@ -1653,8 +1653,8 @@ fn thumb_of(uuid: &str, thumbs: &Path) -> Option<String> {
 
 /// Where an item file actually is, or an error once the index no longer holds it.
 fn item_abs_path(conn: &Connection, item_id: i64) -> Result<PathBuf> {
-    let file = items::file_of(conn, item_id)?
-        .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
+    let file =
+        items::file_of(conn, item_id)?.ok_or_else(|| AppError::refused(Reason::NotIndexed))?;
     paths::item_path(conn, file.folder_id, &file.disk_name)
 }
 

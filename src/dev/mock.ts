@@ -21,6 +21,7 @@ import type { End } from "../ipc/bindings/End";
 import type { Exported } from "../ipc/bindings/Exported";
 import type { Exporting } from "../ipc/bindings/Exporting";
 import type { ExportStart } from "../ipc/bindings/ExportStart";
+import type { Failure } from "../ipc/bindings/Failure";
 import type { Fault } from "../ipc/bindings/Fault";
 import type { FavouritePlace } from "../ipc/bindings/FavouritePlace";
 import type { FolderDetail } from "../ipc/bindings/FolderDetail";
@@ -431,7 +432,6 @@ function refusedName(parent: number, name: string, folder: boolean) {
   const place = folderName(parent);
   return Promise.reject<AppError>({
     kind: "refused",
-    message: `${place} already has a ${folder ? "folder" : "file"} named ${name}`,
     reason: { kind: "nameTaken", place, name, folder },
   });
 }
@@ -628,7 +628,9 @@ function live(folderId: number) {
   return at && node ? { node, parent: at.parent } : null;
 }
 
-const invalid = (message: string) => Promise.reject<AppError>({ kind: "invalid", message });
+/** Refused as the Rust side refuses what it will not do: `why` is what its log would say. */
+const invalid = (_why: string) =>
+  Promise.reject<AppError>({ kind: "invalid", reason: { kind: "other" } });
 
 /** Where the first `(` outside quotes is, else the `"` left open, else -1. */
 function openedAt(text: string) {
@@ -1385,6 +1387,56 @@ function moveOne(item: ItemRow, to: number, steps: Step[], refused: Stayed[]) {
   relocate(item, to);
 }
 
+// `?failures` fills the list of what the walk could not read, one of each kind of row.
+const FAILURES: Failure[] = [
+  {
+    jobId: 1,
+    kind: "thumb",
+    path: ["Trips", "Cairo", "_DSC4411.ARW"],
+    itemId: 1,
+    folderId: 6,
+    reason: { kind: "unsupported" },
+    attempts: 1,
+  },
+  {
+    jobId: 2,
+    kind: "thumb",
+    path: ["Trips", "Cairo", "clip_0007.mov"],
+    itemId: 2,
+    folderId: 6,
+    reason: { kind: "noFfmpeg" },
+    attempts: 1,
+  },
+  {
+    jobId: 3,
+    kind: "thumb",
+    path: ["People", "scan 03.tif"],
+    itemId: 3,
+    folderId: 5,
+    reason: { kind: "permissionDenied" },
+    attempts: 2,
+  },
+  {
+    jobId: 4,
+    kind: "index_folder",
+    path: ["People"],
+    itemId: null,
+    folderId: 5,
+    reason: { kind: "busy" },
+    attempts: 2,
+  },
+  {
+    jobId: 5,
+    kind: "index",
+    path: [],
+    itemId: null,
+    folderId: null,
+    reason: { kind: "other" },
+    attempts: 2,
+  },
+];
+const failures = () => (new URLSearchParams(location.search).has("failures") ? FAILURES : []);
+
 // `?across` makes every move of files one between drives: a job with its line, so its Cancel
 // can be reached.
 const movesAcross = () => new URLSearchParams(location.search).has("across");
@@ -1523,11 +1575,7 @@ function rotateBackups(spare?: string) {
 
 function backUpNow(): Promise<Backup | null> {
   if (backupsWanted().has("backup-refused")) {
-    const full: AppError = {
-      kind: "refused",
-      message: "the disk is full",
-      reason: { kind: "diskFull" },
-    };
+    const full: AppError = { kind: "refused", reason: { kind: "diskFull" } };
     return Promise.reject(full);
   }
   return new Promise((resolve) =>
@@ -1796,8 +1844,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   // `?no-sources` empties the library, which is the only way to see the doorways it draws instead.
   list_sources: () =>
     new URLSearchParams(location.search).has("no-sources") ? [] : SOURCES.map(withTrashCount),
-  add_source: () =>
-    Promise.reject<AppError>({ kind: "invalid", message: "Adding a source needs the real app." }),
+  add_source: () => invalid("adding a source needs the real app"),
   // The picker is the system's, so outside Tauri there is nothing to open and nothing chosen.
   pick_folder: () => null,
   rename_source: () => null,
@@ -1995,7 +2042,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   undo_batch: ({ batchId }) => {
     const at = journal.findIndex((batch) => batch.batchId === batchId);
     if (at >= 0) return takeBack(at);
-    return Promise.reject<AppError>({ kind: "invalid", message: "nothing left to undo here" });
+    return invalid("nothing left to undo here");
   },
   can_undo: ({ batchId }) => journal.some((batch) => batch.batchId === batchId),
   folder_children: ({ folderId }) => FOLDERS[folderId as number] ?? [],
@@ -2411,7 +2458,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     phase: "idle",
     pending: 0,
     running: 0,
-    failed: 0,
+    failed: failures().length,
     completed: 0,
     copies: [],
     exports: [...exporting.values()],
@@ -2419,7 +2466,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     walks: 0,
     thumbed: [],
   }),
-  index_failures: () => [],
+  index_failures: () => failures(),
   retry_failed_jobs: () => 0,
   list_backups: () => shelved(),
   back_up_now: () => backUpNow(),

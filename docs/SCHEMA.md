@@ -32,7 +32,7 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
 | `setting` | Key-value pairs: `undo_floor`, the newest journal row a restore kept; `recycling`, each send to the Recycle Bin that has not settled: the library file, its item and act, and once its second name is made the file's identity and names, until the send is recorded or a launch settles it. |
 | `journal` | Every change the app made on disk, and every set tagged at once, with what reverses it, grouped into batches. |
 | `journal_subject` | Each file and folder a `journal` row is about, one row each, written and removed with it by triggers on `journal`. |
-| `job` | Background work: waiting, running, or failed with its error. |
+| `job` | Background work: waiting, running, or failed with its reason, kept as JSON in `error`. |
 | `destination_key` | A digit, `0` to `9`, bound to a folder that a press moves files into. |
 | `item_fts` | Each item's name and every tag it carries, tokenised for a bare word. |
 | `folder_fts` | Each folder's own tags, its title's among them, tokenised the same way. |

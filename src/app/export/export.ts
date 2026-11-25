@@ -4,7 +4,6 @@ import { useSyncExternalStore } from "react";
 import type { Exported } from "../../ipc/bindings/Exported";
 import type { Naming } from "../../ipc/bindings/Naming";
 import type { Plan } from "../../ipc/bindings/Plan";
-import type { Reason } from "../../ipc/bindings/Reason";
 import type { Scope } from "../../ipc/bindings/Scope";
 import type { ZipPick } from "../../ipc/bindings/ZipPick";
 import { exportPlan, pickExportZip, startExport } from "../../ipc/commands";
@@ -12,7 +11,7 @@ import { formatCount } from "../../lib/format";
 import { type FootNews, setNews } from "../navigation/foot-slot";
 import { getPlace } from "../place";
 import { getPreferences, updatePreferences } from "../preferences";
-import { reasonText } from "../undo/lines";
+import { reasonSentence } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 
 // A branch or a set out of the library as one zip: Windows' save dialog, then the sheet, then a
@@ -168,11 +167,6 @@ export async function startSheet(sheet: Sheet, naming: Naming) {
   if (start?.kind === "taken") setNews(takenNews(start));
 }
 
-/** The band's second sentence for a zip that could not be written. */
-function failure(reason: Reason) {
-  return `${reasonText(reason)}.`;
-}
-
 /**
  * How an export ended: the Line with Show in Explorer, the banner for what was skipped, with no
  * Retry since the zip is finished, and the band for a zip that could not be put in place.
@@ -215,7 +209,7 @@ export function afterExported(done: Exported) {
     case "failed":
       setNews({
         kind: "keyRefused",
-        line: `${zip} could not be written. ${failure(end.reason)}`,
+        line: `${zip} could not be written. ${reasonSentence(end.reason)}`,
         path: done.dir,
       });
   }

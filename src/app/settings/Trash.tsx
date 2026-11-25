@@ -144,7 +144,7 @@ async function emptyAll(counted: Counted[]) {
     await libraryChanged();
     setNews({
       kind: "skipped",
-      line: `The Trash could not be emptied. ${whyFailed(error)}. What is still in it stays.`,
+      line: `The Trash could not be emptied. ${whyFailed(error)} What is still in it stays.`,
       first: null,
     });
   } finally {

@@ -160,13 +160,13 @@ fn move_one(
     control: &impl Control,
 ) -> Result<Went> {
     if !items::is_live(conn, item_id)? {
-        return Err(AppError::invalid("that file is no longer in the index"));
+        return Err(AppError::refused(Reason::NotIndexed));
     }
     if !folders::is_live(conn, folder_id)? {
-        return Err(AppError::invalid("that folder is no longer in the index"));
+        return Err(AppError::refused(Reason::NotIndexed));
     }
-    let file = items::file_of(conn, item_id)?
-        .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
+    let file =
+        items::file_of(conn, item_id)?.ok_or_else(|| AppError::refused(Reason::NotIndexed))?;
     if file.folder_id == folder_id {
         return Ok(Went::There);
     }
@@ -226,10 +226,10 @@ pub(super) fn rename_unjournalled(
     batch_id: Option<&str>,
 ) -> Result<bool> {
     if !items::is_live(conn, item_id)? {
-        return Err(AppError::invalid("that file is no longer in the index"));
+        return Err(AppError::refused(Reason::NotIndexed));
     }
-    let file = items::file_of(conn, item_id)?
-        .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
+    let file =
+        items::file_of(conn, item_id)?.ok_or_else(|| AppError::refused(Reason::NotIndexed))?;
     let name = sanitize::file_name(name.trim());
     if name == file.disk_name {
         return Ok(false);

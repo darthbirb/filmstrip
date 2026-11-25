@@ -65,8 +65,8 @@ pub fn file(conn: &Connection, item_id: i64, err: &AppError) -> Result<Stayed> {
             reason,
         });
     }
-    let file = items::file_of(conn, item_id)?
-        .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
+    let file =
+        items::file_of(conn, item_id)?.ok_or_else(|| AppError::refused(Reason::NotIndexed))?;
     let at = if items::is_trashed(conn, item_id)? {
         Whereabouts::Trash
     } else {

@@ -32,7 +32,7 @@ drawn. **Not started** — neither.
 | --- | --- | --- |
 | Walk every source in the background | Built | `start_index`, the job queue; a directory it cannot read, or a drive lost mid-walk, retires nothing, and hidden or system entries are never read: DECISIONS.md "A walk only judges what it read" |
 | Report progress | Built | the foot's indexing line |
-| Report per-file failures, and retry them | Built | the notices above the grid |
+| Report per-file failures, each by its path and reason, and retry them | Built | the notices above the grid, with Show in Explorer |
 | Thumbnails for pictures | Built | `thumb` jobs |
 | Thumbnails for video, through ffmpeg | Built | the ffmpeg in `tools\` beside the app, else one on PATH |
 | Read a file's shape, dates and length | Built | `probed_at`, `captured_at` |

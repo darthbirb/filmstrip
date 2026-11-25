@@ -10,7 +10,7 @@ use rusqlite::types::Value;
 use rusqlite::{Connection, OpenFlags, OptionalExtension, params, params_from_iter};
 
 use crate::db::{folders, items, journal, now, tags};
-use crate::error::{AppError, Result};
+use crate::error::{AppError, Reason, Result};
 
 /// Pages copied back per step, so a restore can say how far it has got.
 const PAGES_PER_STEP: i32 = 256;
@@ -35,7 +35,7 @@ pub fn copy(conn: &Connection, to: &Path) -> Result<()> {
     {
         let backup = Backup::new(conn, &mut copy)?;
         if backup.step(-1)? != StepResult::Done {
-            return Err(AppError::invalid("the index was too busy to copy"));
+            return Err(AppError::refused(Reason::Busy));
         }
     }
     let _: String = copy.query_row("PRAGMA journal_mode=DELETE", [], |r| r.get(0))?;

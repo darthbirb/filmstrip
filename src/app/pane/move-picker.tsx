@@ -18,7 +18,7 @@ import { setNews } from "../navigation/foot-slot";
 import { getIndex, refreshIndex, useIndex } from "../navigation/index-store";
 import type { Place } from "../place";
 import { getPreferences, RECENT, updatePreferences, usePreferences } from "../preferences";
-import { movedBannerLine, moveStoppedLine, reasonText } from "../undo/lines";
+import { movedBannerLine, moveStoppedLine, reasonSentence } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
 import { keepFocusThrough } from "./act-focus";
@@ -334,8 +334,8 @@ export async function moveFolderTo(
     if (batch) afterAct(batch);
     showReport(null);
   } catch (error) {
-    const { reason } = (error ?? {}) as AppError;
-    if (!reason) return;
+    const { kind, reason } = (error ?? {}) as Partial<AppError>;
+    if (kind !== "refused" || !reason) return;
     const at = { kind: "folder" as const, ...from };
     showReport({
       sentence: movedBannerLine(0, 1, to.title, folder.name),
@@ -374,7 +374,7 @@ export async function afterMoved(moved: Moved) {
     });
   }
   if (stopped) {
-    const why = `${reasonText(stopped)}.`;
+    const why = reasonSentence(stopped);
     if (batch) afterAct(batch, 0, `${moveStoppedLine(batch, whole, to)} ${why}`);
     else if (only) setNews({ kind: "keyRefused", line: why });
     else setNews({ kind: "keyRefused", line: `${movedBannerLine(0, whole, to)}.`, detail: why });

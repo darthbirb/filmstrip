@@ -632,11 +632,7 @@ mod tests {
         };
         assert_eq!((row.id, &row.name), (b, &"b.jpg".to_owned()));
         assert_eq!(row.at, stayed::Whereabouts::Trash);
-        assert!(
-            matches!(row.reason, Reason::Other { .. }),
-            "{:?}",
-            row.reason
-        );
+        assert!(matches!(row.reason, Reason::Other), "{:?}", row.reason);
         for file in [&binned[0], &binned[2]] {
             assert!(std::fs::symlink_metadata(file).is_err());
         }

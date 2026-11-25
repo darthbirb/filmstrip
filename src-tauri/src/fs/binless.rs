@@ -114,8 +114,8 @@ pub fn delete_items(conn: &Connection, item_ids: &[i64]) -> Result<GoneReport> {
 
 /// Whether a live file is on a drive with no Recycle Bin.
 pub(super) fn is_binless(conn: &Connection, item_id: i64) -> Result<bool> {
-    let file = items::file_of(conn, item_id)?
-        .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
+    let file =
+        items::file_of(conn, item_id)?.ok_or_else(|| AppError::refused(Reason::NotIndexed))?;
     let from = paths::item_path(conn, file.folder_id, &file.disk_name)?;
     Ok(Shell.binless(&from).is_some())
 }
@@ -124,10 +124,10 @@ pub(super) fn is_binless(conn: &Connection, item_id: i64) -> Result<bool> {
 /// file on a drive with no Recycle Bin ever is; one open in another app or read-only stays whole.
 pub(super) fn delete_unjournalled(conn: &Connection, item_id: i64) -> Result<()> {
     if !items::is_live(conn, item_id)? {
-        return Err(AppError::invalid("that file is no longer in the index"));
+        return Err(AppError::refused(Reason::NotIndexed));
     }
-    let file = items::file_of(conn, item_id)?
-        .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
+    let file =
+        items::file_of(conn, item_id)?.ok_or_else(|| AppError::refused(Reason::NotIndexed))?;
     let from = paths::item_path(conn, file.folder_id, &file.disk_name)?;
     let meta = match std::fs::symlink_metadata(&from) {
         Ok(meta) if meta.is_file() => meta,

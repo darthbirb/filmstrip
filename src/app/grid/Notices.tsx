@@ -1,10 +1,14 @@
 import { useState } from "react";
 
+import type { Failure } from "../../ipc/bindings/Failure";
+import { revealFolder, revealItem } from "../../ipc/commands";
 import { formatCount } from "../../lib/format";
 import { Banner, LIST_HEADING, LIST_ROW, listRow } from "../../ui/Banner";
 import { retryFailures, useWork } from "../navigation/work-store";
+import { reasonText } from "../undo/lines";
+import { ShowInExplorer } from "../undo/ReportBanner";
 
-const COLUMNS = listRow("badge");
+const COLUMNS = listRow("figureControl");
 
 /** What could not be read, above the grid until it is dealt with. DECISIONS.md "Background work". */
 export function Notices() {
@@ -25,16 +29,37 @@ export function Notices() {
     >
       <div className={`${COLUMNS} ${LIST_HEADING}`}>
         <span>File</span>
-        <span>Error</span>
+        <span>Reason</span>
         <span className="text-right">Attempts</span>
+        <span />
       </div>
       {failures.map((failure) => (
         <div key={failure.jobId} className={`${COLUMNS} ${LIST_ROW}`}>
-          <span className="truncate text-fg">{failure.name}</span>
-          <span className="truncate text-fg-dim">{failure.error}</span>
+          <span className="truncate text-fg">{placeOf(failure)}</span>
+          <span className="truncate text-fg-dim">{reasonText(failure.reason)}</span>
           <span className="text-right text-fg-dim tabular-nums">{failure.attempts}</span>
+          <Look failure={failure} />
         </div>
       ))}
     </Banner>
+  );
+}
+
+/** Where a failure's file is inside its source, as Explorer writes a path. */
+function placeOf(failure: Failure) {
+  return failure.path.length > 0 ? failure.path.join("\\") : "The library";
+}
+
+function Look({ failure }: { failure: Failure }) {
+  const { itemId, folderId, path } = failure;
+  const reveal =
+    itemId !== null
+      ? () => revealItem(itemId)
+      : folderId !== null
+        ? () => revealFolder(folderId)
+        : null;
+  if (!reveal) return <span />;
+  return (
+    <ShowInExplorer name={path.at(-1) ?? ""} onClick={() => void reveal().catch(() => undefined)} />
   );
 }

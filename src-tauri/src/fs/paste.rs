@@ -60,11 +60,11 @@ pub fn check(
     entries: &[PathBuf],
 ) -> Result<std::result::Result<String, CopyRefusal>> {
     if !folders::is_live(conn, folder_id)? {
-        return Err(AppError::invalid("that folder is no longer in the index"));
+        return Err(AppError::refused(Reason::NotIndexed));
     }
     let source_id = folders::location(conn, folder_id)?.source_id;
-    let source = sources::get(conn, source_id)?
-        .ok_or_else(|| AppError::invalid("that source is no longer in the index"))?;
+    let source =
+        sources::get(conn, source_id)?.ok_or_else(|| AppError::refused(Reason::NotIndexed))?;
     if !Path::new(&source.root).is_dir() {
         return Ok(Err(CopyRefusal::Offline {
             source: source.title,

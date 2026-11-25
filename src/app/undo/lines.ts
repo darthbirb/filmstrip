@@ -448,11 +448,11 @@ export function binRefusedDetail(count: number) {
 export function refusedName(error: unknown): string | null {
   const { kind, reason } = (error ?? {}) as AppError;
   if (kind !== "refused" || !reason) return null;
-  if (reason.kind !== "nameTaken") return `${reasonText(reason)}.`;
+  if (reason.kind !== "nameTaken") return reasonSentence(reason);
   return `${reason.place} already has a ${reason.folder ? "folder" : "file"} named ${reason.name}.`;
 }
 
-/** Why one row stayed, in the banner's Reason column. */
+/** Why one row stayed, in the banner's Reason column: never the words the error came with. */
 export function reasonText(reason: Reason): string {
   switch (reason.kind) {
     case "nameTaken":
@@ -487,8 +487,30 @@ export function reasonText(reason: Reason): string {
       return "Path too long for the Recycle Bin";
     case "noHardLinks":
       return `${reason.drive} has no hard links`;
+    case "busy":
+      return "The index is busy";
+    case "notIndexed":
+      return "No longer in the index";
+    case "unsupported":
+      return "Unsupported format";
+    case "unreadable":
+      return "Could not be read";
+    case "noFfmpeg":
+      return "ffmpeg not found";
     case "other":
-      return reason.message.charAt(0).toUpperCase() + reason.message.slice(1);
+      return "Something went wrong";
+  }
+}
+
+/** Why, as the sentence after the one that says what failed. */
+export function reasonSentence(reason: Reason): string {
+  switch (reason.kind) {
+    case "busy":
+      return "The index is busy. Try again in a moment.";
+    case "permissionDenied":
+      return "Windows refused access.";
+    default:
+      return `${reasonText(reason)}.`;
   }
 }
 

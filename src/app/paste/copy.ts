@@ -12,7 +12,7 @@ import type { MenuAnchor } from "../../ui/Menu";
 import { libraryChanged, RELOAD_WINDOW_MS } from "../library";
 import { type FootNews, sayOnce, setNews } from "../navigation/foot-slot";
 import { refreshIndex } from "../navigation/index-store";
-import { actLine, copiedBannerLine, copyCancelledLine, reasonText } from "../undo/lines";
+import { actLine, copiedBannerLine, copyCancelledLine, reasonSentence } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
 import { counted } from "./clipboard";
@@ -109,7 +109,7 @@ export async function afterCopied(copied: Copied) {
     });
   }
   if (stopped) {
-    const why = `${reasonText(stopped)}.`;
+    const why = reasonSentence(stopped);
     if (batch) afterAct(batch, 0, `${copyCancelledLine(batch, whole)} ${why}`);
     else if (refused.length > 0) setNews({ kind: "keyRefused", line: why });
     else setNews({ kind: "keyRefused", line: `${copiedBannerLine(0, whole, to)}.`, detail: why });
