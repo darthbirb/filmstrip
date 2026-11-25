@@ -301,7 +301,7 @@ async function restoreIndex(backup: Backup) {
   } catch (error) {
     ended = {
       kind: "band",
-      sentence: `The index could not be restored. ${whyFailed(error)}. The index is as it was.`,
+      sentence: `The index could not be restored. ${whyFailed(error)} The index is as it was.`,
       focus: backup.name,
     };
   } finally {

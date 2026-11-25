@@ -547,9 +547,12 @@ fn work(inner: &QueueInner) {
             Ok(Ok(worker::Done::Paused)) => table::release(&conn, job.id),
             Ok(Err(err)) => {
                 let retry = job.attempt < kinds::MAX_ATTEMPTS && worker::is_transient(&err);
-                table::fail(&conn, job.id, &err.to_string(), retry)
+                table::fail(&conn, job.id, &Reason::of(&err), retry)
             }
-            Err(_) => table::fail(&conn, job.id, "the worker stopped on this file", false),
+            Err(_) => {
+                eprintln!("job {}: the worker stopped on its file", job.id);
+                table::fail(&conn, job.id, &Reason::Unreadable, false)
+            }
         };
         drop(open);
     }

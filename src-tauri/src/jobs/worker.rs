@@ -536,7 +536,7 @@ fn ffmpeg_of(inner: &QueueInner) -> Result<&Ffmpeg> {
     inner
         .ffmpeg
         .as_ref()
-        .ok_or_else(|| AppError::Media("ffmpeg is not available".into()))
+        .ok_or_else(|| AppError::refused(Reason::NoFfmpeg))
 }
 
 /// A locked or busy file may work next time; a format the decoder cannot read never will.

@@ -97,10 +97,10 @@ pub(super) fn trash_unjournalled(
     batch_id: Option<&str>,
 ) -> Result<()> {
     if !items::is_live(conn, item_id)? {
-        return Err(AppError::invalid("that file is no longer in the index"));
+        return Err(AppError::refused(Reason::NotIndexed));
     }
-    let file = items::file_of(conn, item_id)?
-        .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
+    let file =
+        items::file_of(conn, item_id)?.ok_or_else(|| AppError::refused(Reason::NotIndexed))?;
     let from = paths::item_path(conn, file.folder_id, &file.disk_name)?;
     if !from.is_file() {
         return Err(AppError::refused(Reason::NotOnDisk {
@@ -162,7 +162,7 @@ fn unheld(file: &Path, code: Option<i32>) -> Reason {
         std::io::Error::from_raw_os_error,
     );
     match Reason::of_io(&err) {
-        Reason::Other { .. } => Reason::NoHardLinks {
+        Reason::Other => Reason::NoHardLinks {
             drive: recycle::drive_of(file),
         },
         own => own,
@@ -439,8 +439,8 @@ fn restore_unjournalled(
     if !items::is_trashed(conn, item_id)? {
         return Err(AppError::invalid("that file is not in the trash"));
     }
-    let file = items::file_of(conn, item_id)?
-        .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
+    let file =
+        items::file_of(conn, item_id)?.ok_or_else(|| AppError::refused(Reason::NotIndexed))?;
     let trashed_at = items::trashed_at(conn, item_id)?.unwrap_or_default();
     let binned = match find(conn, item_id, &file)? {
         Found::Bin(binned) => binned,
@@ -476,7 +476,7 @@ fn restore_unjournalled(
     };
     let home = match to {
         Some(folder) if folders::is_live(conn, folder)? => folder,
-        Some(_) => return Err(AppError::invalid("that folder is no longer in the index")),
+        Some(_) => return Err(AppError::refused(Reason::NotIndexed)),
         None => folders::live_at(conn, file.folder_id)?.ok_or_else(|| {
             AppError::refused(Reason::FolderGone {
                 name: folders::title(conn, file.folder_id)
@@ -565,7 +565,7 @@ pub(super) fn unrestore(conn: &Connection, restored: &ItemRestored) -> Result<()
     in_transaction(conn, |tx| {
         if restored.left_folder_id != restored.to_folder_id {
             let file = items::file_of(tx, restored.item_id)?
-                .ok_or_else(|| AppError::invalid("that file is no longer in the index"))?;
+                .ok_or_else(|| AppError::refused(Reason::NotIndexed))?;
             items::set_folder(
                 tx,
                 restored.item_id,

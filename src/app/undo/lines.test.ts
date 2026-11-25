@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 
 import type { Act } from "../../ipc/bindings/Act";
+import type { Reason } from "../../ipc/bindings/Reason";
 import type { Stayed } from "../../ipc/bindings/Stayed";
 import type { UndoReport } from "../../ipc/bindings/UndoReport";
 import {
@@ -23,6 +24,7 @@ import {
   movedBannerLine,
   noBinDetail,
   noBinHead,
+  reasonSentence,
   reasonText,
   refusedName,
   restoredBannerLine,
@@ -127,6 +129,50 @@ test("each reason is said in the banner's own words", () => {
     "Photos (F:) has no hard links",
   );
   expect(reasonText({ kind: "sourceRemoved", source: "Phone" })).toBe("Phone was removed");
+  expect(reasonText({ kind: "busy" })).toBe("The index is busy");
+  expect(reasonText({ kind: "notIndexed" })).toBe("No longer in the index");
+  expect(reasonText({ kind: "unsupported" })).toBe("Unsupported format");
+  expect(reasonText({ kind: "unreadable" })).toBe("Could not be read");
+  expect(reasonText({ kind: "noFfmpeg" })).toBe("ffmpeg not found");
+  expect(reasonText({ kind: "other" })).toBe("Something went wrong");
+});
+
+/** One of every reason, so a new one fails to compile here until it is worded. */
+const EVERY: { [K in Reason["kind"]]: Extract<Reason, { kind: K }> } = {
+  nameTaken: { kind: "nameTaken", place: "Trips", name: "a.jpg", folder: false },
+  folderGone: { kind: "folderGone", name: "Egypt" },
+  inUse: { kind: "inUse" },
+  permissionDenied: { kind: "permissionDenied" },
+  notOnDisk: { kind: "notOnDisk", name: "a.jpg" },
+  holds: { kind: "holds", name: "notes.txt", more: 2 },
+  alreadyIn: { kind: "alreadyIn", place: "Cairo" },
+  offline: { kind: "offline", source: "Phone" },
+  sourceRemoved: { kind: "sourceRemoved", source: "Phone" },
+  diskFull: { kind: "diskFull" },
+  goneFromBin: { kind: "goneFromBin", name: "a.jpg", place: "Cairo" },
+  binRefused: { kind: "binRefused" },
+  noBin: { kind: "noBin", drive: "USB Drive (E:)" },
+  pathTooLong: { kind: "pathTooLong" },
+  noHardLinks: { kind: "noHardLinks", drive: "Photos (F:)" },
+  busy: { kind: "busy" },
+  notIndexed: { kind: "notIndexed" },
+  unsupported: { kind: "unsupported" },
+  unreadable: { kind: "unreadable" },
+  noFfmpeg: { kind: "noFfmpeg" },
+  other: { kind: "other" },
+};
+
+test("every reason is worded as a phrase and as a sentence with one full stop", () => {
+  for (const reason of Object.values(EVERY)) {
+    const phrase = reasonText(reason);
+    const sentence = reasonSentence(reason);
+    expect(phrase, reason.kind).toMatch(/^\S.*[^.\s]$/);
+    expect(sentence, reason.kind).toMatch(/[^.]\.$/);
+  }
+  expect(reasonSentence(EVERY.busy)).toBe("The index is busy. Try again in a moment.");
+  expect(reasonSentence(EVERY.permissionDenied)).toBe("Windows refused access.");
+  expect(reasonSentence(EVERY.diskFull)).toBe("The disk is full.");
+  expect(reasonSentence(EVERY.other)).toBe("Something went wrong.");
 });
 
 test("what the foot says when the Recycle Bin would not take what Delete sent it", () => {
@@ -260,13 +306,14 @@ test("a copy undone on a drive with no Recycle Bin is still where it is, with no
 
 test("a name field says where the name is taken, or why else it was refused", () => {
   const taken = { kind: "nameTaken", place: "Trips", name: "Cairo", folder: true } as const;
-  expect(refusedName({ kind: "refused", message: "", reason: taken })).toBe(
+  expect(refusedName({ kind: "refused", reason: taken })).toBe(
     "Trips already has a folder named Cairo.",
   );
-  expect(refusedName({ kind: "refused", message: "", reason: { kind: "inUse" } })).toBe(
-    "Open in another app.",
+  expect(refusedName({ kind: "refused", reason: { kind: "inUse" } })).toBe("Open in another app.");
+  expect(refusedName({ kind: "refused", reason: { kind: "notIndexed" } })).toBe(
+    "No longer in the index.",
   );
-  expect(refusedName({ kind: "invalid", message: "no" })).toBeNull();
+  expect(refusedName({ kind: "invalid", reason: { kind: "other" } })).toBeNull();
 });
 
 test("a folder's delete asks, and says what went when the folder stayed, as the table words it", () => {

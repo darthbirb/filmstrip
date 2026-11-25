@@ -1,11 +1,13 @@
 //! The job table: what is waiting, what is running, and what failed. The runner is `crate::jobs`.
 
+use std::collections::HashMap;
+
 use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::db::{begin, now};
-use crate::error::Result;
+use crate::db::{begin, folders, now};
+use crate::error::{Reason, Result};
 use crate::jobs::kinds::{COPY_IN, OWN_LINES, WALKS};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -90,11 +92,15 @@ pub fn complete(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
-/// Back to waiting when another attempt is allowed; otherwise failed, keeping the error.
-pub fn fail(conn: &Connection, id: i64, error: &str, retry: bool) -> Result<()> {
+/// Back to waiting when another attempt is allowed; otherwise failed, keeping why.
+pub fn fail(conn: &Connection, id: i64, reason: &Reason, retry: bool) -> Result<()> {
     conn.execute(
         "UPDATE job SET status = ?1, error = ?2 WHERE id = ?3",
-        params![if retry { "pending" } else { "failed" }, error, id],
+        params![
+            if retry { "pending" } else { "failed" },
+            serde_json::to_string(reason)?,
+            id
+        ],
     )?;
     Ok(())
 }
@@ -186,39 +192,76 @@ pub fn retry_failed(conn: &Connection) -> Result<usize> {
     )?)
 }
 
-/// One failed job, named by the file it was about, with what went wrong.
+/// One failed job that counts in the walk's line, placed by the file or folder it was about, with
+/// why.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Failure {
     pub job_id: i64,
     pub kind: String,
-    pub name: String,
-    pub error: String,
+    /// From inside its source down: the folders, then the file's own name; a source's own folder
+    /// by the source's title. Empty for a job about no one file or folder.
+    pub path: Vec<String>,
+    pub item_id: Option<i64>,
+    pub folder_id: Option<i64>,
+    pub reason: Reason,
     pub attempts: i64,
 }
 
 pub fn failures(conn: &Connection) -> Result<Vec<Failure>> {
     let mut stmt = conn.prepare(
-        "SELECT j.id, j.kind, COALESCE(i.disk_name, j.kind),
-                COALESCE(j.error, 'unknown error'), j.attempts
+        "SELECT j.id, j.kind, j.error, j.attempts, i.id, i.disk_name, f.id,
+                CASE WHEN f.parent_id IS NULL THEN s.title END
            FROM job j
            LEFT JOIN item i ON i.id = json_extract(j.payload, '$.itemId')
-          WHERE j.status = 'failed'
+           LEFT JOIN folder f ON f.id = COALESCE(i.folder_id, json_extract(j.payload, '$.folderId'))
+           LEFT JOIN source s ON s.id = f.source_id
+          WHERE j.status = 'failed' AND j.kind NOT IN (SELECT value FROM json_each(?1))
           ORDER BY j.id",
     )?;
-    let rows = stmt
-        .query_map([], |r| {
-            Ok(Failure {
-                job_id: r.get(0)?,
-                kind: r.get(1)?,
-                name: r.get(2)?,
-                error: r.get(3)?,
-                attempts: r.get(4)?,
-            })
+    let rows: Vec<_> = stmt
+        .query_map([serde_json::to_string(&OWN_LINES)?], |r| {
+            Ok((
+                r.get::<_, i64>(0)?,
+                r.get::<_, String>(1)?,
+                r.get::<_, Option<String>>(2)?,
+                r.get::<_, i64>(3)?,
+                r.get::<_, Option<i64>>(4)?,
+                r.get::<_, Option<String>>(5)?,
+                r.get::<_, Option<i64>>(6)?,
+                r.get::<_, Option<String>>(7)?,
+            ))
         })?
         .collect::<rusqlite::Result<_>>()?;
-    Ok(rows)
+    let mut places: HashMap<i64, Vec<String>> = HashMap::new();
+    rows.into_iter()
+        .map(
+            |(job_id, kind, error, attempts, item_id, name, folder_id, source)| {
+                let mut path = match folder_id {
+                    Some(id) if places.contains_key(&id) => places[&id].clone(),
+                    Some(id) => {
+                        let titles = folders::location(conn, id)?.titles;
+                        places.insert(id, titles.clone());
+                        titles
+                    }
+                    None => Vec::new(),
+                };
+                path.extend(name.or(source));
+                Ok(Failure {
+                    job_id,
+                    kind,
+                    path,
+                    item_id,
+                    folder_id,
+                    reason: error
+                        .and_then(|kept| serde_json::from_str(&kept).ok())
+                        .unwrap_or(Reason::Other),
+                    attempts,
+                })
+            },
+        )
+        .collect()
 }
 
 #[cfg(test)]
@@ -275,7 +318,7 @@ mod tests {
         let mut conn = conn();
         let id = enqueue(&conn, "thumb", "{}", 20).unwrap();
         assert_eq!(claim(&mut conn).unwrap().unwrap().attempt, 1);
-        fail(&conn, id, "locked", true).unwrap();
+        fail(&conn, id, &Reason::InUse, true).unwrap();
         assert_eq!(claim(&mut conn).unwrap().unwrap().attempt, 2);
     }
 
@@ -287,7 +330,7 @@ mod tests {
         claim(&mut conn).unwrap();
         claim(&mut conn).unwrap();
         complete(&conn, done).unwrap();
-        fail(&conn, broken, "not an image", false).unwrap();
+        fail(&conn, broken, &Reason::Unsupported, false).unwrap();
 
         assert_eq!(
             counts(&conn).unwrap(),
@@ -315,7 +358,7 @@ mod tests {
     }
 
     #[test]
-    fn a_failure_is_named_after_the_file_it_was_about() {
+    fn a_failure_is_placed_by_its_file_inside_its_source_with_its_reason() {
         let mut conn = conn();
         let source = sources::add(
             &conn,
@@ -325,15 +368,17 @@ mod tests {
         )
         .unwrap();
         let root = folders::source_root_folder(&conn, source.id).unwrap();
+        let trips = folders::create(&conn, root, "Trips").unwrap();
+        let cairo = folders::create(&conn, trips, "Cairo").unwrap();
         let item = items::upsert(
             &conn,
             &NewItem {
                 uuid: "u".into(),
                 source_id: source.id,
-                folder_id: root,
-                disk_name: "broken.jpg".into(),
-                ext: "jpg".into(),
-                orig_name: "broken.jpg".into(),
+                folder_id: cairo,
+                disk_name: "_DSC4411.ARW".into(),
+                ext: "arw".into(),
+                orig_name: "_DSC4411.ARW".into(),
                 hash: None,
                 size_bytes: 1,
                 mtime: 0,
@@ -348,14 +393,76 @@ mod tests {
             },
         )
         .unwrap();
-        let id = enqueue(&conn, "thumb", &format!("{{\"itemId\":{item}}}"), 20).unwrap();
-        claim(&mut conn).unwrap();
-        fail(&conn, id, "not an image", false).unwrap();
+        let thumb = enqueue(&conn, "thumb", &format!("{{\"itemId\":{item}}}"), 20).unwrap();
+        let walk = enqueue(
+            &conn,
+            "index_folder",
+            &format!("{{\"folderId\":{trips}}}"),
+            100,
+        )
+        .unwrap();
+        let refresh = enqueue(
+            &conn,
+            "index_folder",
+            &format!("{{\"folderId\":{root}}}"),
+            100,
+        )
+        .unwrap();
+        let whole = enqueue(&conn, "index", "{}", 100).unwrap();
+        for _ in 0..3 {
+            claim(&mut conn).unwrap();
+        }
+        fail(&conn, thumb, &Reason::Unsupported, false).unwrap();
+        fail(&conn, walk, &Reason::PermissionDenied, false).unwrap();
+        fail(&conn, refresh, &Reason::Busy, false).unwrap();
+        conn.execute(
+            "UPDATE job SET status = 'failed', error = 'database is locked' WHERE id = ?1",
+            [whole],
+        )
+        .unwrap();
 
-        let [failure] = failures(&conn).unwrap().try_into().unwrap();
+        let failed = failures(&conn).unwrap();
+        let placed: Vec<_> = failed
+            .iter()
+            .map(|one| (one.path.join("\\"), one.item_id, one.folder_id, &one.reason))
+            .collect();
         assert_eq!(
-            (failure.name.as_str(), failure.error.as_str()),
-            ("broken.jpg", "not an image")
+            placed,
+            [
+                (
+                    r"Trips\Cairo\_DSC4411.ARW".to_owned(),
+                    Some(item),
+                    Some(cairo),
+                    &Reason::Unsupported
+                ),
+                (
+                    "Trips".to_owned(),
+                    None,
+                    Some(trips),
+                    &Reason::PermissionDenied
+                ),
+                ("Library".to_owned(), None, Some(root), &Reason::Busy),
+                (String::new(), None, None, &Reason::Other),
+            ]
         );
+    }
+
+    #[test]
+    fn the_list_leaves_out_what_counts_itself_as_the_count_does() {
+        let conn = conn();
+        let walk = enqueue(&conn, "index", "{}", 100).unwrap();
+        fail(&conn, walk, &Reason::Busy, false).unwrap();
+        for kind in OWN_LINES {
+            let own = enqueue(&conn, kind, "{\"folderId\":1}", 50).unwrap();
+            fail(&conn, own, &Reason::DiskFull, false).unwrap();
+        }
+
+        let listed: Vec<i64> = failures(&conn)
+            .unwrap()
+            .iter()
+            .map(|one| one.job_id)
+            .collect();
+        assert_eq!(listed, [walk]);
+        assert_eq!(counts(&conn).unwrap().failed, 1);
     }
 }

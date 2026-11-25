@@ -21,6 +21,7 @@ import type { End } from "../ipc/bindings/End";
 import type { Exported } from "../ipc/bindings/Exported";
 import type { Exporting } from "../ipc/bindings/Exporting";
 import type { ExportStart } from "../ipc/bindings/ExportStart";
+import type { Failure } from "../ipc/bindings/Failure";
 import type { Fault } from "../ipc/bindings/Fault";
 import type { FavouritePlace } from "../ipc/bindings/FavouritePlace";
 import type { FolderDetail } from "../ipc/bindings/FolderDetail";
@@ -431,7 +432,6 @@ function refusedName(parent: number, name: string, folder: boolean) {
   const place = folderName(parent);
   return Promise.reject<AppError>({
     kind: "refused",
-    message: `${place} already has a ${folder ? "folder" : "file"} named ${name}`,
     reason: { kind: "nameTaken", place, name, folder },
   });
 }
@@ -628,7 +628,8 @@ function live(folderId: number) {
   return at && node ? { node, parent: at.parent } : null;
 }
 
-const invalid = (message: string) => Promise.reject<AppError>({ kind: "invalid", message });
+/** Invalid, as the Rust side answers a command it will not carry out: its words go to the log. */
+const invalid = () => Promise.reject<AppError>({ kind: "invalid", reason: { kind: "other" } });
 
 /** Where the first `(` outside quotes is, else the `"` left open, else -1. */
 function openedAt(text: string) {
@@ -1385,6 +1386,56 @@ function moveOne(item: ItemRow, to: number, steps: Step[], refused: Stayed[]) {
   relocate(item, to);
 }
 
+// `?failures` fills the list of what the walk could not read, one of each kind of row.
+const FAILURES: Failure[] = [
+  {
+    jobId: 1,
+    kind: "thumb",
+    path: ["Trips", "Cairo", "_DSC4411.ARW"],
+    itemId: 1,
+    folderId: 6,
+    reason: { kind: "unsupported" },
+    attempts: 1,
+  },
+  {
+    jobId: 2,
+    kind: "thumb",
+    path: ["Trips", "Cairo", "clip_0007.mov"],
+    itemId: 2,
+    folderId: 6,
+    reason: { kind: "noFfmpeg" },
+    attempts: 1,
+  },
+  {
+    jobId: 3,
+    kind: "thumb",
+    path: ["People", "scan 03.tif"],
+    itemId: 3,
+    folderId: 5,
+    reason: { kind: "permissionDenied" },
+    attempts: 2,
+  },
+  {
+    jobId: 4,
+    kind: "index_folder",
+    path: ["People"],
+    itemId: null,
+    folderId: 5,
+    reason: { kind: "busy" },
+    attempts: 2,
+  },
+  {
+    jobId: 5,
+    kind: "index",
+    path: [],
+    itemId: null,
+    folderId: null,
+    reason: { kind: "other" },
+    attempts: 2,
+  },
+];
+const failures = () => (new URLSearchParams(location.search).has("failures") ? FAILURES : []);
+
 // `?across` makes every move of files one between drives: a job with its line, so its Cancel
 // can be reached.
 const movesAcross = () => new URLSearchParams(location.search).has("across");
@@ -1523,11 +1574,7 @@ function rotateBackups(spare?: string) {
 
 function backUpNow(): Promise<Backup | null> {
   if (backupsWanted().has("backup-refused")) {
-    const full: AppError = {
-      kind: "refused",
-      message: "the disk is full",
-      reason: { kind: "diskFull" },
-    };
+    const full: AppError = { kind: "refused", reason: { kind: "diskFull" } };
     return Promise.reject(full);
   }
   return new Promise((resolve) =>
@@ -1759,7 +1806,7 @@ function removeSource(id: number) {
 
 function restoreBackup(name: string): Promise<Restored> | Restored {
   const from = backups.find((backup) => backup.name === name);
-  if (!from) return invalid(`there is no backup named ${name}`) as never;
+  if (!from) return invalid() as never;
   if (from.name === unreadable || !from.readable) {
     from.readable = false;
     return { kind: "unreadable", from };
@@ -1796,8 +1843,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   // `?no-sources` empties the library, which is the only way to see the doorways it draws instead.
   list_sources: () =>
     new URLSearchParams(location.search).has("no-sources") ? [] : SOURCES.map(withTrashCount),
-  add_source: () =>
-    Promise.reject<AppError>({ kind: "invalid", message: "Adding a source needs the real app." }),
+  add_source: () => invalid(),
   // The picker is the system's, so outside Tauri there is nothing to open and nothing chosen.
   pick_folder: () => null,
   rename_source: () => null,
@@ -1817,7 +1863,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   },
   rename_folder: ({ folderId, title }) => {
     const found = live(folderId as number);
-    if (!found) return invalid("a source's own folder is renamed as a source");
+    if (!found) return invalid();
     const { node, parent } = found;
     const name = (title as string).trim();
     if (name === node.title) return null;
@@ -1831,11 +1877,10 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   move_folder: ({ folderId, parentId }) => {
     const found = live(folderId as number);
     const to = parentId as number;
-    if (!found) return invalid("a source's own folder sits inside nothing");
+    if (!found) return invalid();
     const { node, parent } = found;
     if (parent === to) return null;
-    if (crumbs(to).folders.some((crumb) => crumb.id === node.id))
-      return invalid("a folder cannot go inside itself");
+    if (crumbs(to).folders.some((crumb) => crumb.id === node.id)) return invalid();
     if (folderTaken(to, node.title)) return refusedName(to, node.title, true);
     detach(node);
     attach(node, to);
@@ -1927,12 +1972,11 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   // Everything under the folder goes where `contents` says, then the folder, as the Rust side does.
   delete_folder: ({ folderId, contents }) => {
     const found = live(folderId as number);
-    if (!found) return invalid("a source's own folder is removed as a source, never deleted");
+    if (!found) return invalid();
     const { node, parent } = found;
     const held = under(node.id);
     const how = contents as Contents | null;
-    if (held.length > 0 && !how)
-      return invalid(`${node.title} holds ${held.length} files, so where they go has to be chosen`);
+    if (held.length > 0 && !how) return invalid();
     const steps: Step[] = [];
     const refused: Stayed[] = [];
     let outright = 0;
@@ -1995,7 +2039,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   undo_batch: ({ batchId }) => {
     const at = journal.findIndex((batch) => batch.batchId === batchId);
     if (at >= 0) return takeBack(at);
-    return Promise.reject<AppError>({ kind: "invalid", message: "nothing left to undo here" });
+    return invalid();
   },
   can_undo: ({ batchId }) => journal.some((batch) => batch.batchId === batchId),
   folder_children: ({ folderId }) => FOLDERS[folderId as number] ?? [],
@@ -2060,7 +2104,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     if (held >= 0) own.tags[held] = label;
     else {
       const refused = keyHeldElsewhere(folderId as number, label.key);
-      if (refused) return invalid(refused);
+      if (refused) return invalid();
       own.tags.push(label);
     }
     return null;
@@ -2251,10 +2295,10 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   rename_tag: ({ tagId: id, value }) => {
     const term = termOf(id);
     const to = fold(String(value));
-    if (!term || term.key !== null) return invalid("that tag is gone");
-    if (!to) return invalid("a tag needs a word");
+    if (!term || term.key !== null) return invalid();
+    if (!to) return invalid();
     if (to === term.value) return null;
-    if (vocabulary().tags.some((row) => row.value === to)) return invalid(`${to} is already a tag`);
+    if (vocabulary().tags.some((row) => row.value === to)) return invalid();
     if (UNUSED.delete(term.value)) UNUSED.add(to);
     const was = same(null, term.value);
     return retag(
@@ -2265,7 +2309,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   },
   merge_tags: ({ fromId, intoId }) => {
     const [from, into] = [termOf(fromId), termOf(intoId)];
-    if (!from || !into) return invalid("that tag is gone");
+    if (!from || !into) return invalid();
     UNUSED.delete(from.value);
     const was = same(null, from.value);
     return retag(
@@ -2276,7 +2320,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   },
   delete_tag: ({ tagId: id }) => {
     const term = termOf(id);
-    if (!term) return invalid("that tag is gone");
+    if (!term) return invalid();
     UNUSED.delete(term.value);
     const was = same(null, term.value);
     return retag(
@@ -2294,9 +2338,9 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   },
   rename_label_key: ({ key, to }) => {
     const [from, next] = [fold(String(key)), fold(String(to))];
-    if (!next) return invalid("a key needs a word");
+    if (!next) return invalid();
     if (vocabulary().keys.some((row) => row.key === next)) {
-      return invalid(`${next} is already a key`);
+      return invalid();
     }
     return retag(
       { kind: "renameKey", from, to: next },
@@ -2306,7 +2350,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   },
   merge_label_keys: ({ key, into }) => {
     const [from, kept] = [fold(String(key)), fold(String(into))];
-    if (keyClash(from, kept)) return invalid(`${from} cannot merge into ${kept}`);
+    if (keyClash(from, kept)) return invalid();
     return retag(
       { kind: "mergeKeys", from, into: kept },
       (tag) => (tag.key === from ? { key: kept, value: tag.value } : tag),
@@ -2324,9 +2368,9 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   rename_label_value: ({ tagId: id, value }) => {
     const term = termOf(id);
     const to = fold(String(value));
-    if (!term?.key) return invalid("that label is gone");
+    if (!term?.key) return invalid();
     const key = term.key;
-    if (!to) return invalid("a label needs a value");
+    if (!to) return invalid();
     if (to === term.value) return null;
     const was = same(key, term.value);
     return retag(
@@ -2337,7 +2381,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   },
   merge_label_values: ({ fromId, intoId }) => {
     const [from, into] = [termOf(fromId), termOf(intoId)];
-    if (!from?.key || from.key !== into?.key) return invalid("a value never leaves its key");
+    if (!from?.key || from.key !== into?.key) return invalid();
     const key = from.key;
     const was = same(key, from.value);
     return retag(
@@ -2348,7 +2392,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   },
   delete_label_value: ({ tagId: id }) => {
     const term = termOf(id);
-    if (!term?.key) return invalid("that label is gone");
+    if (!term?.key) return invalid();
     const was = same(term.key, term.value);
     return retag(
       { kind: "deleteValue", key: term.key, value: term.value },
@@ -2411,7 +2455,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     phase: "idle",
     pending: 0,
     running: 0,
-    failed: 0,
+    failed: failures().length,
     completed: 0,
     copies: [],
     exports: [...exporting.values()],
@@ -2419,15 +2463,13 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     walks: 0,
     thumbed: [],
   }),
-  index_failures: () => [],
+  index_failures: () => failures(),
   retry_failed_jobs: () => 0,
   list_backups: () => shelved(),
   back_up_now: () => backUpNow(),
   restore_backup: ({ name }) => restoreBackup(name as string),
   restore_forgets: (): Promise<Forgets> | Forgets =>
-    forgetting?.unknown
-      ? (invalid("the index could not be read") as never)
-      : (forgetting?.forgets ?? { sources: [], files: 0 }),
+    forgetting?.unknown ? (invalid() as never) : (forgetting?.forgets ?? { sources: [], files: 0 }),
   set_backups_kept: ({ kept }) => {
     backupsKept = kept as number;
     return null;

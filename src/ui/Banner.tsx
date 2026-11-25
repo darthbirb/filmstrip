@@ -60,9 +60,12 @@ export function FilesToggle({ open, onToggle }: { open: boolean; onToggle: () =>
   );
 }
 
-/** A list row's columns: the name, why, and a narrow end column. `end` is that column's width. */
-export const listRow = (end: "badge" | "control") =>
-  `grid ${end === "badge" ? "grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_3.5rem]" : "grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_var(--spacing-control)]"} items-center gap-3.5 px-3`;
+/**
+ * A list row's columns: the name, why, and narrow end columns. `end` is their widths: a control's,
+ * or a figure's then a control's.
+ */
+export const listRow = (end: "control" | "figureControl") =>
+  `grid ${end === "control" ? "grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_var(--spacing-control)]" : "grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_3.5rem_var(--spacing-control)]"} items-center gap-3.5 px-3`;
 
 /** The capitals over a list's columns. */
 export const LIST_HEADING = "h-7 text-eyebrow text-fg-dim uppercase";

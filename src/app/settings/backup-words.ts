@@ -4,7 +4,7 @@ import type { Reason } from "../../ipc/bindings/Reason";
 import type { Taken } from "../../ipc/bindings/Taken";
 import { type AppError, launchBackupRefusal, listBackups } from "../../ipc/commands";
 import { setNews } from "../navigation/foot-slot";
-import { reasonText } from "../undo/lines";
+import { reasonSentence } from "../undo/lines";
 
 // How the index's backups are worded, and the launch's refused. Artboards › Backing up the index.
 
@@ -18,16 +18,14 @@ export function howTaken(how: Taken) {
   return HOW[how];
 }
 
-/** Why a backup or a restore failed, as the band says it after its first sentence. */
+/** Why a backup, a restore or a removal failed, as the sentence after the one that says so. */
 export function whyFailed(error: unknown): string {
   const failed = error as Partial<AppError> | null;
-  if (failed?.reason) return reasonText(failed.reason);
-  const message = failed?.message ?? "Something went wrong";
-  return message.charAt(0).toUpperCase() + message.slice(1);
+  return reasonSentence(failed?.reason ?? { kind: "other" });
 }
 
 export function notBackedUp(why: string) {
-  return `The index could not be backed up. ${why}.`;
+  return `The index could not be backed up. ${why}`;
 }
 
 /** The launch's backup, refused, says so at the foot of navigation; the app opens as ever. */
@@ -38,7 +36,7 @@ export function useLaunchBackup() {
       .then(async (reason: Reason | null) => {
         if (!reason || !live) return;
         const { dir } = await listBackups();
-        setNews({ kind: "keyRefused", line: notBackedUp(reasonText(reason)), path: dir });
+        setNews({ kind: "keyRefused", line: notBackedUp(reasonSentence(reason)), path: dir });
       })
       .catch(() => undefined);
     return () => {

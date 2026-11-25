@@ -288,7 +288,7 @@ async function removeNow(source: SourceSummary, onKept: () => void) {
   try {
     await removeSource(source.id);
   } catch (error) {
-    ended = { sentence: `${source.title} was not removed. ${whyFailed(error)}.` };
+    ended = { sentence: `${source.title} was not removed. ${whyFailed(error)}` };
   }
   await libraryChanged().catch(() => undefined);
   if (ended) onKept();

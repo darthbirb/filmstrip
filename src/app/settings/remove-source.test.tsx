@@ -52,7 +52,7 @@ beforeEach(async () => {
         removed.push(id);
         return new Promise<null>((resolve, reject) => {
           answer = () => resolve(null);
-          fail = () => reject({ kind: "invalid", message: "the index is busy" });
+          fail = () => reject({ kind: "db", reason: { kind: "busy" } });
         });
       }
       if (cmd === "can_undo") return held.has((payload as { batchId: string }).batchId);
@@ -140,7 +140,7 @@ test("a line whose act the journal still holds keeps its Undo after a removal", 
   expect(getNews()).toBe(kept);
 });
 
-test("a removal that failed leaves the line as it was", async () => {
+test("a removal that failed leaves the line as it was, and says why in its own words", async () => {
   const kept = { kind: "done", line: "Tagged 3 files dusk.", batchId: "tagged" } as const;
   setNews(kept);
   const question = await asking("Pictures");
@@ -149,4 +149,11 @@ test("a removal that failed leaves the line as it was", async () => {
   fail();
   await expect.poll(settingsHeld).toBe(false);
   expect(getNews()).toBe(kept);
+  await expect
+    .element(
+      page.getByText("Pictures was not removed. The index is busy. Try again in a moment.", {
+        exact: true,
+      }),
+    )
+    .toBeVisible();
 });

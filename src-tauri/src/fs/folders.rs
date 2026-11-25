@@ -23,7 +23,7 @@ use crate::fs::{
 pub fn create(conn: &Connection, parent_id: i64, title: &str, batch_id: &str) -> Result<i64> {
     let _turn = super::turn();
     if !folders::is_live(conn, parent_id)? {
-        return Err(AppError::invalid("that folder is no longer in the index"));
+        return Err(AppError::refused(Reason::NotIndexed));
     }
     let title = sanitize::folder_title(title);
     refuse_clash(conn, parent_id, &title, None)?;
@@ -61,7 +61,7 @@ pub(super) fn rename_unjournalled(
     batch_id: Option<&str>,
 ) -> Result<bool> {
     if !folders::is_live(conn, folder_id)? {
-        return Err(AppError::invalid("that folder is no longer in the index"));
+        return Err(AppError::refused(Reason::NotIndexed));
     }
     let Some(parent_id) = folders::parent(conn, folder_id)? else {
         return Err(AppError::invalid(
@@ -114,7 +114,7 @@ pub(super) fn move_unjournalled(
     batch_id: Option<&str>,
 ) -> Result<bool> {
     if !folders::is_live(conn, folder_id)? || !folders::is_live(conn, parent_id)? {
-        return Err(AppError::invalid("that folder is no longer in the index"));
+        return Err(AppError::refused(Reason::NotIndexed));
     }
     let Some(from_parent) = folders::parent(conn, folder_id)? else {
         return Err(AppError::invalid(
@@ -187,7 +187,7 @@ pub fn delete(
 ) -> Result<DeleteReport> {
     let _turn = super::turn();
     if !folders::is_live(conn, folder_id)? {
-        return Err(AppError::invalid("that folder is no longer in the index"));
+        return Err(AppError::refused(Reason::NotIndexed));
     }
     if folders::parent(conn, folder_id)?.is_none() {
         return Err(AppError::invalid(
@@ -328,8 +328,8 @@ pub(super) fn undelete(conn: &Connection, folder_id: i64, retired_at: i64) -> Re
 
 /// A sorting source's own folder, which is where "move them to" puts what a deleted folder held.
 fn sorting_root(conn: &Connection, source_id: i64) -> Result<i64> {
-    let source = sources::get(conn, source_id)?
-        .ok_or_else(|| AppError::invalid("that source is no longer in the index"))?;
+    let source =
+        sources::get(conn, source_id)?.ok_or_else(|| AppError::refused(Reason::NotIndexed))?;
     if source.kind != SourceKind::Sorting {
         return Err(AppError::invalid(format!(
             "{} is not a sorting source",

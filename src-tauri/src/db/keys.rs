@@ -4,7 +4,7 @@
 use rusqlite::{Connection, params};
 
 use crate::db::folders;
-use crate::error::{AppError, Result};
+use crate::error::{AppError, Reason, Result};
 
 /// One binding as it stands: whether its folder is still live, and how many files that folder
 /// holds directly.
@@ -53,7 +53,7 @@ fn digit(key: &str) -> Result<()> {
 pub fn set(conn: &Connection, key: &str, folder_id: i64) -> Result<()> {
     digit(key)?;
     if !folders::is_live(conn, folder_id)? {
-        return Err(AppError::invalid("that folder is no longer in the index"));
+        return Err(AppError::refused(Reason::NotIndexed));
     }
     let tx = super::begin(conn)?;
     tx.execute(

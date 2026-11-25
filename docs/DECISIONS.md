@@ -158,7 +158,7 @@ eight, each with its own connection, claim jobs from the `job` table in priority
 is queued at every launch.
 
 **The table outlives the app.** A job that succeeds is deleted. One that fails is retried once
-if the failure might pass — a locked file, a busy database — and otherwise kept with its error
+if the failure might pass — a locked file, a busy database — and otherwise kept with its reason
 for the failure list. One left running at shutdown goes back to waiting at the next launch. A
 decoder that panics on one file fails that job and nothing else.
 
@@ -194,6 +194,28 @@ than red, because progress states a fact rather than raising an alarm. **What co
 goes above the grid instead**, where it stays in the way until it is dealt with: a banner on a
 danger hairline, never a fill, that counts the failures, offers to try them again, and opens its
 list in place rather than in a dialog. Neither is a dialog, and both leave when they are done.
+Each row is the file's path from inside its source, as Explorer writes it, so two files of one
+name in different folders read apart, with a way to go and look at it; a failed walk of a source's
+own folder goes by the source's name. Copies, moves and exports count themselves on their own
+lines, so they are left out of the list as they are out of its count.
+
+## Reasons, never raw errors
+
+**Every failure reaches the interface as a `Reason`, and the interface words it.** An error's
+own text is written for whoever reads the code: SQLite's "database is locked", Windows' "Access is
+denied. (os error 5)", a decoder's complaint, the app's own "journal row 12 does not read". None
+of it is a sentence for the person using the app, and capitalising it does not make one. So
+`AppError` crosses to the interface as its kind and a `Reason` only, `Reason::of` mapping the
+disk's, the index's and the decoder's failures to the reasons they mean, and what the error said
+goes to the log, which is the backend's standard error as everywhere else in it. What has no
+reason of its own is `Other`, worded "Something went wrong": one fixed sentence the person can
+trust is not a fragment of something else.
+
+**Each reason has two forms**: a phrase for a banner's Reason column, and a sentence for after
+the one that says what failed, which ends in one full stop and says what to do where there is
+something to do: "The index is busy. Try again in a moment." The failure list keeps a job's
+reason in the job table rather than its text, so the list words it as the undo banner does, under
+the same heading.
 
 ## Thumbnails
 
