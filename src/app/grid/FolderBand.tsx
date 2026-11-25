@@ -16,7 +16,7 @@ import {
   setFolderNote,
   setFolderStatus,
 } from "../../ipc/commands";
-import { formatDay, formatShortDate } from "../../lib/format";
+import { formatDate, midSentence } from "../../lib/format";
 import { labelTerm } from "../../lib/queryTerm";
 import { Chip } from "../../ui/Chip";
 import { ChipButton } from "../../ui/ChipButton";
@@ -127,7 +127,7 @@ export function FolderFacts({ detail, source }: FactsProps) {
         </ChipButton>
         {detail.status !== null && detail.statusSetAt !== null && (
           <span className="text-fg-dim text-key tabular-nums">
-            set {formatShortDate(detail.statusSetAt)}
+            set {midSentence(formatDate(detail.statusSetAt))}
           </span>
         )}
       </span>,
@@ -242,7 +242,7 @@ function BandPath({ place, source }: { place: Place & { kind: "folder" }; source
         <span>{path}</span>
         {indexedAt !== null && (
           <span className="font-mono text-fg-dim text-key leading-(--spacing-chip)">
-            last indexed {lastIndexed(indexedAt)}
+            last indexed {midSentence(formatDate(indexedAt))}
           </span>
         )}
       </span>
@@ -270,12 +270,6 @@ function BandPath({ place, source }: { place: Place & { kind: "folder" }; source
       <span className="text-fg">{below.at(-1)?.title}</span>
     </span>
   );
-}
-
-/** Today and Yesterday read in the line's own case; any other day is a date. */
-function lastIndexed(seconds: number) {
-  const day = formatDay(seconds);
-  return day === "Today" || day === "Yesterday" ? day.toLowerCase() : day;
 }
 
 type Where = { root: boolean; offline: boolean };

@@ -101,7 +101,7 @@ test("the band reads in the pane's rhythm: status, labels, then tags, its own na
   await expect.poll(() => row(screen.container, "Note")?.textContent).toMatch(/^Four mornings/);
 
   await expect.element(screen.getByRole("radio", { name: "Working" })).toBeChecked();
-  expect(row(screen.container, "Status")?.textContent).toMatch(/set \d/);
+  expect(row(screen.container, "Status")?.textContent).toMatch(/set (today|yesterday)$/);
   expect(chipTexts(row(screen.container, "Labels"))).toEqual(["locationcairo", "tripegypt 2024"]);
   expect(chipTexts(row(screen.container, "Tags"))).toEqual([
     "cairo",
@@ -506,7 +506,7 @@ test("an offline source says so in place of its counts, and its band says when i
   await expect
     .element(screen.getByTitle("Archive is offline · its pictures are on the drive"))
     .toBeInTheDocument();
-  expect(row(screen.container, "Path")?.textContent).toMatch(/^E:\\Archivelast indexed 4 March/);
+  expect(row(screen.container, "Path")?.textContent).toMatch(/^E:\\Archivelast indexed 4 Mar\b/);
 
   setPlace(folderAt(3, ARCHIVE, { id: 7, title: "Scans" }));
   await expect

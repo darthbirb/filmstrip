@@ -7,7 +7,7 @@ import type { Moving } from "../../ipc/bindings/Moving";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import type { Tally } from "../../ipc/bindings/Tally";
 import { cancelCopy, cancelExport, cancelMove, revealPath } from "../../ipc/commands";
-import { formatBytes, formatCount, formatShortDay } from "../../lib/format";
+import { formatBytes, formatCount, formatDate, midSentence } from "../../lib/format";
 import { Band } from "../../ui/Band";
 import { Bar } from "../../ui/Bar";
 import { Button } from "../../ui/Button";
@@ -208,7 +208,7 @@ function Totals({ totals, sources }: { totals: LibraryTotals; sources: readonly 
 function offlineNote(source: SourceSummary): TallyNote {
   const held = source.itemCount;
   if (held === 0) return { key: source.id, text: `${source.title} is offline` };
-  const when = source.indexedAt === null ? "" : `, ${formatShortDay(source.indexedAt)}`;
+  const when = source.indexedAt === null ? "" : `, ${midSentence(formatDate(source.indexedAt))}`;
   return {
     key: source.id,
     text: `${source.title} is offline · its ${formatCount(held)} ${held === 1 ? "is" : "are"} counted from the last walk${when}`,

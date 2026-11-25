@@ -1,10 +1,8 @@
 import { useEffect } from "react";
 
-import type { Backup } from "../../ipc/bindings/Backup";
 import type { Reason } from "../../ipc/bindings/Reason";
 import type { Taken } from "../../ipc/bindings/Taken";
 import { type AppError, launchBackupRefusal, listBackups } from "../../ipc/commands";
-import { formatWhen } from "../../lib/format";
 import { setNews } from "../navigation/foot-slot";
 import { reasonText } from "../undo/lines";
 
@@ -18,10 +16,6 @@ const HOW: Record<Taken, string> = {
 
 export function howTaken(how: Taken) {
   return HOW[how];
-}
-
-export function backupWhen(backup: Backup, now = new Date()) {
-  return formatWhen(backup.takenAt, now);
 }
 
 /** Why a backup or a restore failed, as the band says it after its first sentence. */
