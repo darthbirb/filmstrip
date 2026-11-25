@@ -1,7 +1,7 @@
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import { beforeEach, expect, test, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { inSight } from "../../dev/in-sight";
@@ -469,6 +469,44 @@ test("the rail's own line for a key that did nothing stays out of sight while th
 });
 
 const NO_FILES = "The clipboard holds no files.";
+
+test("folded at the narrowest window, a failed undo naming a long file wraps short of the edge, its reason whole", async () => {
+  await page.viewport(640, 480);
+  const name = `${"a".repeat(251)}.jpg`;
+  const reason = "The index is busy. Try again in a moment.";
+  await render(
+    <div style={{ width: "2.75rem", height: 460, display: "flex", alignItems: "end" }}>
+      <Foot rail />
+    </div>,
+  );
+  setNews({
+    kind: "undoFailed",
+    line: `Could not undo “Deleted ${name}”. ${reason}`,
+    batchId: "b",
+  });
+  try {
+    const out = () =>
+      [...document.querySelectorAll("[popover=manual]")].find((line) =>
+        line.textContent?.includes(reason),
+      );
+    await expect.poll(() => out()?.matches(":popover-open")).toBe(true);
+    const text = [...(out()?.querySelectorAll("span") ?? [])]
+      .map((span) => span.firstChild)
+      .find((node) => node?.nodeType === Node.TEXT_NODE && node.textContent?.endsWith(reason));
+    if (!text?.textContent) throw new Error("the sentence is not drawn");
+    const last = document.createRange();
+    last.setStart(text, text.textContent.length - 1);
+    last.setEnd(text, text.textContent.length);
+    const end = last.getBoundingClientRect();
+    const box = out()?.getBoundingClientRect();
+    expect(box?.right).toBeLessThanOrEqual(window.innerWidth);
+    expect(box?.top).toBeGreaterThanOrEqual(0);
+    expect(end.right).toBeLessThanOrEqual(window.innerWidth);
+    expect(end.bottom).toBeLessThanOrEqual(window.innerHeight);
+  } finally {
+    setNews(null);
+  }
+});
 
 test("a line said once goes at a key pressed the moment it is drawn", async () => {
   const screen = await render(<Foot />);

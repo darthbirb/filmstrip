@@ -1055,8 +1055,9 @@ toward the rest surface.
   than stacking. An undo that failed is the Band, naming its act and why, with Undo under it to try
   again. Folded, the rail keeps the Undo glyph button, and the sentence comes out beside it as
   "Nothing to undo." does, in the Band's alarm: the `warning` glyph in `danger` on `danger-wash`
-  inside a `line-danger` ring. It goes at the next key or click, and the button keeps it in its
-  tooltip.
+  inside a `line-danger` ring. A long one wraps a `tile-gap` short of the window's edge, growing
+  up from the slot, so its reason is never cut off. It goes at the next key or click, and the
+  button, the same one the act's Undo was, keeps it in its tooltip.
 - **Line.** What an act did, in the Band's slot and shape without its alarm: a `glyph` in `fg-dim`
   (a check after an act, the undo arrow after an undo), the sentence in `ui`, the way back under it
   as a raised Undo button, and a dismiss. An act that changed nothing in the library, as a drop on

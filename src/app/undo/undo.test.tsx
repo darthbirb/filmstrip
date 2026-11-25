@@ -116,9 +116,9 @@ test("folded, a failed undo keeps the rail's Undo and its sentence comes out bes
   try {
     await screen.getByRole("button", { name: /^Undo · Moved 2 files/ }).click();
     await expect.element(screen.getByText(failure)).toBeVisible();
-    await expect
-      .element(screen.getByRole("button", { name: `Undo · ${failure} · Ctrl+Z` }))
-      .toBeVisible();
+    const again = screen.getByRole("button", { name: `Undo · ${failure} · Ctrl+Z` });
+    await expect.element(again).toBeVisible();
+    expect(document.activeElement, "the focus stays on the button pressed").toBe(again.element());
   } finally {
     failUndo(false);
   }

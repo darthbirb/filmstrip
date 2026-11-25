@@ -253,14 +253,9 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
   if (rail) {
     return (
       <div className="grid place-items-center border-line border-t py-1.5">
-        {news.kind === "done" ? (
-          <GlyphButton
-            glyph="undo"
-            label={`Undo · ${news.line} · Ctrl+Z`}
-            onClick={() => void undo(news.batchId)}
-          />
-        ) : news.kind === "undoFailed" ? (
-          <OutOfRail news={news} sentence={news.line} alarm>
+        {news.kind === "done" || news.kind === "undoFailed" ? (
+          // One button for both, so a failed press keeps the focus on it.
+          <OutOfRail news={news} sentence={news.kind === "undoFailed" ? news.line : null} alarm>
             <GlyphButton
               glyph="undo"
               label={`Undo · ${news.line} · Ctrl+Z`}
@@ -353,7 +348,7 @@ function showInTrash(itemId: number) {
 
 /**
  * Folded, the rail has no room for the sentence, so it comes out beside the slot, and goes at the
- * next key or click; a failure comes out in the Band's alarm.
+ * next key or click; a failure comes out in the Band's alarm, wrapping short of the window's edge.
  */
 function OutOfRail({
   news,
@@ -362,7 +357,7 @@ function OutOfRail({
   children,
 }: {
   news: FootNews;
-  sentence: string;
+  sentence: string | null;
   alarm?: boolean;
   children: ReactNode;
 }) {
@@ -391,23 +386,37 @@ function OutOfRail({
   return (
     <span style={{ anchorName: anchor } as CSSProperties} className="grid">
       {children}
-      <div
-        ref={line}
-        popover="manual"
-        style={
-          { positionAnchor: anchor, left: "anchor(right)", top: "anchor(top)" } as CSSProperties
-        }
-        className={`m-0 ml-1.5 flex h-control items-center gap-2 whitespace-nowrap rounded-control border-0 bg-panel px-2.5 text-fg text-ui shadow-overlay inset-ring ${alarm ? "inset-ring-line-danger before:pointer-events-none before:absolute before:inset-0 before:rounded-control before:bg-danger-wash" : "inset-ring-line-control"}`}
-      >
-        {alarm ? (
-          <>
-            <Glyph name="warning" className="shrink-0 text-danger text-glyph" />
-            <span>{sentence}</span>
-          </>
-        ) : (
-          sentence
-        )}
-      </div>
+      {sentence !== null && alarm && (
+        <div
+          ref={line}
+          popover="manual"
+          style={
+            {
+              positionAnchor: anchor,
+              left: "anchor(right)",
+              top: "auto",
+              bottom: "anchor(bottom)",
+              right: "var(--spacing-tile-gap)",
+            } as CSSProperties
+          }
+          className="m-0 ml-1.5 flex min-h-control items-center gap-2 rounded-control border-0 bg-[linear-gradient(var(--color-danger-wash),var(--color-danger-wash))] bg-panel px-2.5 py-1.5 text-fg text-ui shadow-overlay inset-ring inset-ring-line-danger"
+        >
+          <Glyph name="warning" className="shrink-0 text-danger text-glyph" />
+          <span className="min-w-0 text-pretty wrap-anywhere">{sentence}</span>
+        </div>
+      )}
+      {sentence !== null && !alarm && (
+        <div
+          ref={line}
+          popover="manual"
+          style={
+            { positionAnchor: anchor, left: "anchor(right)", top: "anchor(top)" } as CSSProperties
+          }
+          className="m-0 ml-1.5 flex h-control items-center whitespace-nowrap rounded-control border-0 bg-panel px-2.5 text-fg text-ui shadow-overlay inset-ring inset-ring-line-control"
+        >
+          {sentence}
+        </div>
+      )}
     </span>
   );
 }
