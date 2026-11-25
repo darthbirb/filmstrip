@@ -13,6 +13,7 @@ import {
 import { formatCount } from "../lib/format";
 import { fold } from "../lib/queryTerm";
 import { ChipButton } from "./ChipButton";
+import { useFocusBack } from "./focus-back";
 import { anchorOf, OfferList, type OfferRow, useOffers } from "./OfferList";
 import { RefusalLine } from "./RefusalLine";
 import type { Refusal } from "./TagField";
@@ -45,9 +46,10 @@ const folders = (count: number) => `on ${formatCount(count)} ${count === 1 ? "fo
  */
 export function LabelField(props: Props) {
   const [open, setOpen] = useState(false);
+  const back = useFocusBack();
   if (!open) {
     return (
-      <ChipButton look="outline" onClick={() => setOpen(true)}>
+      <ChipButton ref={back.ref} look="outline" onClick={() => setOpen(true)}>
         Add Label…
       </ChipButton>
     );
@@ -55,7 +57,8 @@ export function LabelField(props: Props) {
   return (
     <Field
       {...props}
-      onClose={() => {
+      onClose={(byKey) => {
+        if (byKey) back.arm();
         props.onEcho(null);
         setOpen(false);
       }}
@@ -71,7 +74,7 @@ function Field({
   onAdd,
   onEcho,
   onClose,
-}: Props & { onClose: () => void }) {
+}: Props & { onClose: (byKey?: boolean) => void }) {
   const id = useId();
   const anchor = anchorOf(id, "label-field");
   const keyField = useRef<HTMLInputElement>(null);
@@ -121,7 +124,7 @@ function Field({
     valueField.current?.focus();
   };
   const add = (picked: string) => {
-    onClose();
+    onClose(true);
     void onAdd(typedKey, picked);
   };
 
@@ -133,7 +136,7 @@ function Field({
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
-      onClose();
+      onClose(true);
     } else if (event.key === "ArrowDown") move(1);
     else if (event.key === "ArrowUp") move(-1);
     else if (

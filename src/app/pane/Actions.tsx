@@ -8,6 +8,7 @@ import type { GlyphName } from "../../ui/glyphs";
 import { Menu } from "../../ui/Menu";
 import { setFavourite, useFavourite } from "../favourites";
 import { copyFiles } from "../paste/clipboard";
+import { answerOnBar, keepFocusThrough } from "./act-focus";
 import { deleteFiles } from "./delete";
 import { openMovePicker } from "./move-picker";
 import { startRename } from "./rename";
@@ -25,14 +26,17 @@ export function Actions({ item }: { item: ItemDetail }) {
  * because there is nothing left for it to hold. Pane sheet "A file in the Trash".
  */
 function InTrash({ item }: { item: ItemDetail }) {
+  const bar = useRef<HTMLDivElement>(null);
   const restoreTo = useRef<HTMLButtonElement>(null);
+  useAnswer(bar, item.id);
   return (
     <div
+      ref={bar}
       role="toolbar"
       aria-label="Actions"
       className="flex h-toolbar shrink-0 items-center gap-1.5 border-line border-t px-1.5"
     >
-      <Button glyph="putBack" onClick={() => void restoreFiles([item.id])}>
+      <Button glyph="putBack" onClick={() => keepFocusThrough("Restore", restoreFiles([item.id]))}>
         Restore
       </Button>
       <Button
@@ -55,6 +59,7 @@ function InLibrary({ item }: { item: ItemDetail }) {
   const kept = useRef<HTMLDivElement>(null);
   const moveTo = useRef<HTMLButtonElement>(null);
   const favorite = useFavourite(item.id, item.favorite);
+  useAnswer(bar, item.id);
 
   // Written in the order the drawing writes them, which is also the order they leave the bar.
   const actions: Action[] = [
@@ -133,7 +138,7 @@ function InLibrary({ item }: { item: ItemDetail }) {
           glyph="trash"
           label="Delete"
           danger
-          onClick={() => void deleteFiles([item.id])}
+          onClick={() => keepFocusThrough("Delete", deleteFiles([item.id]))}
         />
         {/* Always there: Rename lives in it, whatever else has left the bar. */}
         <Menu
@@ -159,6 +164,14 @@ function InLibrary({ item }: { item: ItemDetail }) {
       </div>
     </div>
   );
+}
+
+/** A bar drawn after an act took its file's bar away answers for the focus that act left. */
+function useAnswer(bar: RefObject<HTMLElement | null>, shown: number) {
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only a bar newly drawn answers.
+  useLayoutEffect(() => {
+    if (bar.current) answerOnBar(bar.current, shown);
+  }, [bar]);
 }
 
 /**

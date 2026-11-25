@@ -16,6 +16,7 @@ import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
 import { useGridItems } from "../grid/useGridItems";
 import { itemMenu } from "../menus/item-menu";
 import type { Place } from "../place";
+import { answerOnStrip } from "./act-focus";
 import { getFullScreen } from "./full-screen";
 import { showInPane, usePaneItem, usePaneOrigin, usePaneSet } from "./pane-store";
 import { focusPicture } from "./picture-focus";
@@ -69,12 +70,16 @@ function Track({ items, current, from }: TrackProps) {
 
   // A keyboard step keeps focus on the frame shown, once it is drawn.
   useEffect(() => {
-    if (!refocus.current) return;
-    const frame = scroller.current?.querySelector<HTMLElement>('[aria-selected="true"]');
-    if (!frame) return;
+    const frame = scroller.current?.querySelector<HTMLElement>('[aria-selected="true"]') ?? null;
+    answerOnStrip(frame, index < 0 ? current : null);
+    if (!refocus.current || !frame) return;
     frame.focus({ preventScroll: true });
     refocus.current = false;
   });
+
+  const shown = useRef(current);
+  shown.current = current;
+  useEffect(() => () => answerOnStrip(null, shown.current), []);
 
   const moves: Record<string, number> = {
     ArrowLeft: index - 1,

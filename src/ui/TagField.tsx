@@ -11,6 +11,7 @@ import {
 import { formatCount } from "../lib/format";
 import { fold } from "../lib/queryTerm";
 import { ChipButton } from "./ChipButton";
+import { useFocusBack } from "./focus-back";
 import { anchorOf, OfferList, type OfferRow, useOffers } from "./OfferList";
 import { RefusalLine } from "./RefusalLine";
 
@@ -39,9 +40,10 @@ type Props = {
  */
 export function TagField(props: Props) {
   const [open, setOpen] = useState(false);
+  const back = useFocusBack();
   if (!open) {
     return (
-      <ChipButton look="outline" round onClick={() => setOpen(true)}>
+      <ChipButton ref={back.ref} look="outline" round onClick={() => setOpen(true)}>
         Add Tag…
       </ChipButton>
     );
@@ -49,7 +51,8 @@ export function TagField(props: Props) {
   return (
     <Field
       {...props}
-      onClose={() => {
+      onClose={(byKey) => {
+        if (byKey) back.arm();
         props.onEcho(null);
         setOpen(false);
       }}
@@ -58,7 +61,8 @@ export function TagField(props: Props) {
 }
 
 type Standing = {
-  onClose: () => void;
+  /** `byKey` when Escape or Enter closed it, with the focus in it. */
+  onClose: (byKey?: boolean) => void;
   /** The keyboard opened what holds it, so it opens with the focus ring a click leaves off. */
   ringed?: boolean;
 };
@@ -127,10 +131,10 @@ function Field({
     if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
-      onClose();
+      onClose(true);
     } else if (event.key === "Enter") {
       event.preventDefault();
-      if (!value) onClose();
+      if (!value) onClose(true);
       else if (!refused && rows[at]) add(rows[at].value);
     } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
@@ -162,7 +166,7 @@ function Field({
         }}
         onKeyDown={onKeyDown}
         onPointerDown={standing ? () => setQuiet(true) : undefined}
-        onBlur={standing ? () => setQuiet(false) : onClose}
+        onBlur={standing ? () => setQuiet(false) : () => onClose()}
         style={{ anchorName: anchor } as CSSProperties}
         className={`h-chip max-w-full rounded-full bg-ground px-2.5 text-fg-hi text-small inset-ring placeholder:text-fg-faint ${standing ? `w-full ${quiet ? "outline-none" : "focus-ring"}` : "focus-ring field-sizing-content min-w-24"} ${refused ? "inset-ring-line-danger" : "inset-ring-line-control"}`}
       />

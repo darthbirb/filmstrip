@@ -51,7 +51,7 @@ test("at rest it is the word Search; Ctrl+F puts the caret in it and offers wher
   await userEvent.keyboard("{Control>}f{/Control}");
   await expect.element(field()).toHaveFocus();
   await expect.element(offer()).toBeVisible();
-  expect(withoutGlyphs(offer().element().textContent)).toBe("in TripsTab");
+  expect(withoutGlyphs(offer().element().textContent)).toBe("in Trips");
   expect(screen.getByTitle("Pictures / Trips").elements()).toHaveLength(0);
   expect(screen.getByText("Search", { exact: true }).elements()).toHaveLength(0);
 });
@@ -86,7 +86,7 @@ test("the Sorting Box and the Trash offer themselves, each as its own term", asy
 
   setPlace({ kind: "sorting" });
   await field().click();
-  await userEvent.keyboard("{Tab}dawn{Enter}");
+  await userEvent.keyboard("dawn{Tab}{Enter}");
   expect(getPlace()).toMatchObject({ query: "is:sorting dawn" });
 });
 
