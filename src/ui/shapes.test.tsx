@@ -182,6 +182,32 @@ test("the Line and the Band put themselves away with the quiet dismiss: no groun
   for (const dismiss of dismisses) expect(rest(dismiss)).toEqual(quiet);
 });
 
+test("an opened button stays raised-hi under the pointer, and sinks with the rest when disabled", async () => {
+  const screen = await render(
+    <>
+      <span data-testid="opened" className="bg-raised-hi" />
+      <span data-testid="sunk" className="bg-inset" />
+      <Button tone="quiet" expanded onClick={() => {}}>
+        Hide Files
+      </Button>
+      <Button tone="quiet" expanded disabled onClick={() => {}}>
+        Show Files
+      </Button>
+    </>,
+  );
+  const ground = (element: Element) => getComputedStyle(element).backgroundColor;
+  const opened = ground(screen.getByTestId("opened").element());
+  const hide = screen.getByRole("button", { name: "Hide Files" });
+  await userEvent.hover(hide);
+  await expect.poll(() => ground(hide.element())).toBe(opened);
+
+  const show = screen.getByRole("button", { name: "Show Files" });
+  await userEvent.hover(show, { force: true });
+  await expect
+    .poll(() => ground(show.element()))
+    .toBe(ground(screen.getByTestId("sunk").element()));
+});
+
 test("a disabled button sinks to inset in fg-dim and takes no click", async () => {
   const clicked = vi.fn();
   const screen = await render(

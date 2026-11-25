@@ -33,9 +33,9 @@ const SMALL =
 
 const TONES = {
   raised:
-    "bg-raised text-fg inset-ring inset-ring-line-control enabled:hover:bg-raised-hi aria-expanded:bg-raised-hi aria-expanded:inset-ring-line-control-hi",
+    "bg-raised text-fg inset-ring inset-ring-line-control enabled:hover:bg-raised-hi enabled:aria-expanded:bg-raised-hi enabled:aria-expanded:inset-ring-line-control-hi",
   quiet:
-    "text-fg-mid enabled:hover:bg-wash enabled:hover:text-fg aria-expanded:bg-raised-hi aria-expanded:text-fg",
+    "text-fg-mid enabled:hover:bg-wash enabled:hover:text-fg enabled:aria-expanded:bg-raised-hi enabled:aria-expanded:text-fg",
   danger:
     "bg-danger-tint text-danger inset-ring inset-ring-line-danger enabled:hover:bg-danger enabled:hover:text-on-danger enabled:active:bg-danger-press",
 };
