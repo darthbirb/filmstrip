@@ -13,8 +13,8 @@ import { RowQuestion } from "../../ui/TermTable";
 import { libraryChanged } from "../library";
 import { setNews } from "../navigation/foot-slot";
 import { useIndex } from "../navigation/index-store";
+import { whyFailed } from "../undo/lines";
 import { showReport } from "../undo/report-store";
-import { whyFailed } from "./backup-words";
 import {
   emptiedBannerLine,
   emptiedLine,

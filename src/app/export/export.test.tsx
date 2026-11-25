@@ -10,7 +10,7 @@ import { Grid } from "../grid/Grid";
 import { SelectionBar } from "../grid/SelectionBar";
 import { clearChecked } from "../grid/selection";
 import { Foot } from "../navigation/Foot";
-import { setNews } from "../navigation/foot-slot";
+import { getNews, setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex, startIndex } from "../navigation/index-store";
 import { Navigation } from "../navigation/Navigation";
 import { setOpenFolders } from "../navigation/open-folders";
@@ -194,6 +194,7 @@ test("Export… on a folder's row takes its branch, and the sheet hangs off the 
   await expect
     .element(page.getByRole("button", { name: "Show in Explorer" }))
     .not.toBeInTheDocument();
+  expect(getNews()?.kind, "said, as an act that changed nothing is").toBe("said");
 });
 
 test("Export… on a folder with no files in it says so, and asks nothing", async () => {

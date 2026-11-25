@@ -30,6 +30,7 @@ function Shown({ report }: { report: Report }) {
       retry={report.retry}
       open={open}
       onToggle={() => setOpen(!open)}
+      all={report.rows.some((row) => row.kind === "folder")}
       onDismiss={() => showReport(null)}
     >
       {groups.map((group, index) => (

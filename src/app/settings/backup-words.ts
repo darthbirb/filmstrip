@@ -2,7 +2,7 @@ import { useEffect } from "react";
 
 import type { Reason } from "../../ipc/bindings/Reason";
 import type { Taken } from "../../ipc/bindings/Taken";
-import { type AppError, launchBackupRefusal, listBackups } from "../../ipc/commands";
+import { launchBackupRefusal, listBackups } from "../../ipc/commands";
 import { setNews } from "../navigation/foot-slot";
 import { reasonSentence } from "../undo/lines";
 
@@ -16,12 +16,6 @@ const HOW: Record<Taken, string> = {
 
 export function howTaken(how: Taken) {
   return HOW[how];
-}
-
-/** Why a backup, a restore or a removal failed, as the sentence after the one that says so. */
-export function whyFailed(error: unknown): string {
-  const failed = error as Partial<AppError> | null;
-  return reasonSentence(failed?.reason ?? { kind: "other" });
 }
 
 export function notBackedUp(why: string) {

@@ -17,8 +17,8 @@ import { loadIndex, useIndex } from "../navigation/index-store";
 import { setRefused, useRefused } from "../navigation/refusal-store";
 import { useWork } from "../navigation/work-store";
 import { updatePreferences, usePreferences } from "../preferences";
+import { whyFailed } from "../undo/lines";
 import { settleLine } from "../undo/undo";
-import { whyFailed } from "./backup-words";
 import { Caption, Rows } from "./Rows";
 import { binStays } from "./recycle-words";
 import {
@@ -133,7 +133,7 @@ function Settled({ source, onRemove }: { source: SourceSummary; onRemove: () => 
   useEffect(() => {
     if (naming) field.current?.select();
   }, [naming]);
-  const walking = progress !== null && progress.phase !== "idle";
+  const walking = progress?.walking === source.id;
   const left = progress ? progress.pending + progress.running : 0;
   const done = progress?.completed ?? 0;
   const percent = done + left > 0 ? Math.round((done / (done + left)) * 100) : 0;

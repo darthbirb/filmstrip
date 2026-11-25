@@ -2,6 +2,7 @@ import { beforeEach, expect, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
+import { failUndo } from "../../dev/mock";
 import { recording } from "../../dev/recording";
 import { folderItems, moveItems, undoLast } from "../../ipc/commands";
 import { Foot } from "../navigation/Foot";
@@ -50,6 +51,42 @@ test("an act says what it did at the foot, and Undo takes it back and says so", 
   await expect.element(screen.getByText("2 files are back in Trips.")).toBeVisible();
   expect(screen.getByRole("button", { name: "Undo" }).elements()).toHaveLength(0);
   expect((await folderItems(4)).length).toBe(2);
+});
+
+test("a failed undo says which act and why, and keeps its Undo to try again", async () => {
+  const screen = await render(<Harness />);
+  await moveTrips();
+  failUndo(true);
+  try {
+    await screen.getByRole("button", { name: "Undo" }).click();
+    await expect
+      .element(screen.getByText("Could not undo “Moved 2 files to People”. The disk is full."))
+      .toBeVisible();
+    expect(screen.getByText("Nothing to undo.").elements()).toHaveLength(0);
+    expect((await folderItems(4)).length).toBe(0);
+  } finally {
+    failUndo(false);
+  }
+
+  await screen.getByRole("button", { name: "Undo" }).click();
+  await expect.element(screen.getByText("2 files are back in Trips.")).toBeVisible();
+  expect((await folderItems(4)).length).toBe(2);
+});
+
+test("Ctrl+Z that fails names the newest act, with no line at the foot to go by", async () => {
+  const screen = await render(<Harness />);
+  await moveTrips();
+  setNews(null);
+  failUndo(true);
+  try {
+    await userEvent.keyboard("{Control>}z{/Control}");
+    await expect
+      .element(screen.getByText("Could not undo “Moved 2 files to People”. The disk is full."))
+      .toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Undo" })).toBeVisible();
+  } finally {
+    failUndo(false);
+  }
 });
 
 test("the newest news takes the slot: a refusal replaces the line, and the line a refusal", async () => {
@@ -124,6 +161,26 @@ test("an undo that came back in part opens the banner, grouped by where each fil
   await expect.element(screen.getByText("Open in another app")).toBeVisible();
   await expect.element(screen.getByRole("button", { name: "Retry" })).toBeVisible();
   await expect.element(screen.getByRole("button", { name: "Hide Files" })).toBeVisible();
+});
+
+test("the banner's toggle names all its rows once a folder is among them", async () => {
+  const screen = await render(<Harness />);
+  showReport({
+    sentence: "Lisbon could not go back to Trips",
+    rows: [
+      {
+        kind: "folder",
+        id: 8,
+        name: "Lisbon",
+        at: { kind: "folder", folderId: 5, path: ["Pictures", "People"] },
+        reason: { kind: "nameTaken", place: "Trips", name: "Lisbon", folder: true },
+      },
+    ],
+  });
+  await expect.element(screen.getByRole("button", { name: "Hide All" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Hide Files" }).elements()).toHaveLength(0);
+  await screen.getByRole("button", { name: "Hide All" }).click();
+  await expect.element(screen.getByRole("button", { name: "Show All" })).toBeVisible();
 });
 
 test("a file its removed source took from the index is gone from it, with nothing to show", async () => {

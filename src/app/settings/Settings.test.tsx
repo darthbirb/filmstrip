@@ -1,3 +1,4 @@
+import { emit } from "@tauri-apps/api/event";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import { useState } from "react";
 import { afterEach, beforeEach, expect, test } from "vitest";
@@ -5,9 +6,11 @@ import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
+import type { Progress } from "../../ipc/bindings/Progress";
 import { Grid } from "../grid/Grid";
 import { DEFAULT_LAYOUT } from "../grid/layout";
 import { loadIndex, resetIndex } from "../navigation/index-store";
+import { resetWork, watchWork } from "../navigation/work-store";
 import { setPlace } from "../place";
 import { getPreferences, updatePreferences, usePreferences } from "../preferences";
 import { Settings } from "./Settings";
@@ -229,6 +232,38 @@ test("an offline source's kind and remove stand in the column of the rows above 
 
   expect(left(kind("Archive"))).toBeCloseTo(left(kind("Pictures")), 0);
   expect(left(remove("Archive"))).toBeCloseTo(left(remove("Pictures")), 0);
+});
+
+test("only the source a walk is reading says Indexing, and only it gives up its kind", async () => {
+  const section = await onSources();
+  await watchWork();
+  const kind = (title: string) => section.getByRole("group", { name: `Kind of ${title}` });
+  const walking: Progress = {
+    phase: "walking",
+    pending: 4119,
+    running: 1,
+    failed: 0,
+    completed: 2526,
+    copies: [],
+    exports: [],
+    moves: [],
+    walks: 0,
+    walking: 1,
+    thumbed: [],
+  };
+  try {
+    await emit("job-progress", walking);
+    await expect.poll(() => section.element().textContent).toContain("Indexing 4,120…");
+    expect(section.getByText(/Indexing/).elements()).toHaveLength(1);
+    expect(kind("Pictures").query()).toBeNull();
+    await expect.element(kind("Archive")).toBeVisible();
+
+    await emit("job-progress", { ...walking, phase: "working", walking: null });
+    await expect.element(kind("Pictures")).toBeVisible();
+    expect(section.getByText(/Indexing/).elements()).toHaveLength(0);
+  } finally {
+    resetWork();
+  }
 });
 
 test("a source's name is a field where it stands, with no button of its own", async () => {

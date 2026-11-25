@@ -18,10 +18,12 @@ export type FootNews =
   | { kind: "keyRefused"; line: string; detail?: string; path?: string }
   /** An act that changed the disk, and the batch its Undo takes back. */
   | { kind: "done"; line: string; batchId: string }
-  /** An export that ended, and the zip it wrote, which Explorer can show; nothing to undo. */
-  | { kind: "exported"; line: string; path?: string }
+  /** An export that wrote its zip, which Explorer can show; nothing to undo. */
+  | { kind: "exported"; line: string; path: string }
   /** What an act did that changed nothing in the library, or one no longer in the journal. */
   | { kind: "said"; line: string }
+  /** An undo that failed, and the batch its Undo tries again. */
+  | { kind: "undoFailed"; line: string; batchId: string }
   /** What an undo brought back, and the batch it took back. */
   | { kind: "undone"; line: string; batchId?: string }
   | { kind: "nothing" }

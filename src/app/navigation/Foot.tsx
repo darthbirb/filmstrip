@@ -32,12 +32,7 @@ export function Foot({ rail = false }: { rail?: boolean }) {
   const news = useNews();
   const anchor = `--foot-${useId().replace(/[^\w-]/g, "")}`;
   // Folded, a line that has been answered leaves: the grid is what shows the files are back.
-  const shown =
-    news !== null &&
-    !(
-      rail &&
-      (news.kind === "undone" || news.kind === "said" || (news.kind === "exported" && !news.path))
-    );
+  const shown = news !== null && !(rail && (news.kind === "undone" || news.kind === "said"));
 
   // Newest highest, above the walk, as the foot is ordered by permanence from the bottom.
   const jobs: Job[] = [
@@ -247,23 +242,20 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
       />
     );
   }
-  const exported = news.kind === "exported" ? news : null;
-  const reveal = exported?.path;
-
   if (rail) {
     return (
       <div className="grid place-items-center border-line border-t py-1.5">
-        {news.kind === "done" ? (
+        {news.kind === "done" || news.kind === "undoFailed" ? (
           <GlyphButton
             glyph="undo"
             label={`Undo · ${news.line} · Ctrl+Z`}
             onClick={() => void undo(news.batchId)}
           />
-        ) : reveal ? (
+        ) : news.kind === "exported" ? (
           <GlyphButton
             glyph="folderOpen"
-            label={`Show in Explorer · ${exported?.line}`}
-            onClick={() => void revealPath(reveal).catch(() => undefined)}
+            label={`Show in Explorer · ${news.line}`}
+            onClick={() => void revealPath(news.path).catch(() => undefined)}
           />
         ) : (
           <Nothing noFiles={news.kind === "noFiles"} />
@@ -285,20 +277,31 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
       />
     );
   }
+  if (news.kind === "undoFailed") {
+    return (
+      <Band
+        sentence={news.line}
+        action={
+          <Button glyph="undo" title="Undo · Ctrl+Z" onClick={() => void undo(news.batchId)}>
+            Undo
+          </Button>
+        }
+        onDismiss={dismiss}
+      />
+    );
+  }
   if (news.kind === "exported") {
     return (
       <Line
         glyph="done"
         sentence={news.line}
         action={
-          reveal && (
-            <Button
-              glyph="folderOpen"
-              onClick={() => void revealPath(reveal).catch(() => undefined)}
-            >
-              Show in Explorer
-            </Button>
-          )
+          <Button
+            glyph="folderOpen"
+            onClick={() => void revealPath(news.path).catch(() => undefined)}
+          >
+            Show in Explorer
+          </Button>
         }
         onDismiss={dismiss}
       />
