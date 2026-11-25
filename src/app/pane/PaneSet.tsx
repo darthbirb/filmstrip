@@ -19,8 +19,8 @@ import { itemMenu } from "../menus/item-menu";
 import { usePreferences } from "../preferences";
 import { getFullScreen } from "./full-screen";
 import { useKeepTime } from "./keep-time";
-import { focusNextPicture } from "./Media";
 import { leavePane, paneFileOrigin, showInPane } from "./pane-store";
+import { focusNextPicture } from "./picture-focus";
 import { arrange, type Least, layOutSet, type Placed } from "./set-layout";
 import type { Size } from "./zoom";
 

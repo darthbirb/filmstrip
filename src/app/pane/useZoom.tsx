@@ -112,8 +112,10 @@ export function useZoom(area: RefObject<HTMLElement | null>, image: Size | null,
           if (event.key === "+" || event.key === "=") zoomBy(NOTCH_IN, { x: 0, y: 0 });
           else if (event.key === "-") zoomBy(NOTCH_OUT, { x: 0, y: 0 });
           else if (event.key === "0") setView(null);
-          else if (move && room) setView((held) => panBy(held, move, fit));
-          else return;
+          else if (move && view !== null) {
+            // Zoomed, the arrows are the picture's even with no room to pan: at fit they step.
+            if (room) setView((held) => panBy(held, move, fit));
+          } else return;
           event.preventDefault();
         },
       }

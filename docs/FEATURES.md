@@ -78,7 +78,7 @@ drawn. **Not started** — neither.
 | --- | --- | --- |
 | Show the item that was clicked, and keep it | Built | |
 | Details, and the tags on an item | Built | |
-| A filmstrip of the place it came from | Built | |
+| A filmstrip of the place it came from | Built | #225, Left and Right step it and Home and End go to its ends wherever the focus is in the pane, and anywhere in full screen; DECISIONS.md "The pane" |
 | Full screen | Built | |
 | Zoom and pan a picture | Built | DECISIONS.md "The pane" |
 | Video playback | Built, on a plate of its own | DECISIONS.md "The pane"; volume and mute are saved preferences |
