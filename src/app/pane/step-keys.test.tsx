@@ -1,15 +1,16 @@
-import { beforeEach, expect, test } from "vitest";
+import { afterEach, beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { folderItems } from "../../ipc/commands";
+import { Frame } from "../frame/Frame";
 import { Grid } from "../grid/Grid";
 import { type Place, setPlace } from "../place";
 import { updatePreferences } from "../preferences";
 import { getFullScreen, setFullScreen, useFullScreen } from "./full-screen";
 import { Pane, PaneHeader } from "./Pane";
 import { PaneDetailProvider } from "./pane-detail";
-import { getPaneItem, showInPane } from "./pane-store";
+import { getPaneItem, showInPane, whenShownInPane } from "./pane-store";
 
 // Against the dev mock's library: Cairo holds felucca.mp4, pyramid.jpg and sphinx.jpg.
 
@@ -42,6 +43,28 @@ function Harness() {
     </PaneDetailProvider>
   );
 }
+
+/** The app's own frame, whose folded or hidden pane is out of reach until it is shown. */
+function Framed() {
+  const full = useFullScreen();
+  return (
+    <PaneDetailProvider>
+      <div className="flex h-dvh flex-col">
+        <Frame
+          grid={<Grid mode="justified" />}
+          pane={<Pane />}
+          paneHeader={<PaneHeader />}
+          revealPane={whenShownInPane}
+          full={full}
+        />
+      </div>
+    </PaneDetailProvider>
+  );
+}
+
+afterEach(() => {
+  updatePreferences({ widths: undefined, hidden: undefined });
+});
 
 beforeEach(async () => {
   setFullScreen(false);
@@ -182,4 +205,32 @@ test("a field in the pane keeps the arrows", async () => {
   await userEvent.keyboard("{ArrowRight}{ArrowLeft}{Home}{End}");
   expect(getPaneItem()).toBe(await idOf("pyramid.jpg"));
   await expect.element(field).toHaveFocus();
+});
+
+test("with the pane hidden, Full Screen from the shown file's menu puts the focus on its picture", async () => {
+  await page.viewport(1600, 900);
+  const screen = await render(<Framed />);
+  const tile = screen.getByRole("button", { name: "pyramid.jpg", exact: true }).first();
+  await tile.click();
+  await expect.poll(shown).toBe("pyramid.jpg");
+  await screen.getByRole("button", { name: "Hide Pane" }).click();
+  await expect.element(screen.getByRole("button", { name: "Show Pane" })).toBeVisible();
+
+  await tile.click({ button: "right" });
+  await screen.getByRole("menuitem", { name: "Full Screen" }).click();
+  expect(getFullScreen()).toBe(true);
+  await expect.poll(focused).toBe("pyramid.jpg");
+});
+
+test("Full Screen from another file's menu puts the focus on that file's picture once it is drawn", async () => {
+  const { screen } = await showing("sphinx.jpg");
+  await expect.poll(shown).toBe("sphinx.jpg");
+
+  await screen
+    .getByRole("button", { name: "pyramid.jpg", exact: true })
+    .first()
+    .click({ button: "right" });
+  await screen.getByRole("menuitem", { name: "Full Screen" }).click();
+  expect(getFullScreen()).toBe(true);
+  await expect.poll(focused).toBe("pyramid.jpg");
 });

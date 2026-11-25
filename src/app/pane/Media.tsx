@@ -4,7 +4,8 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import { useContextMenu } from "../../ui/Menu";
 import { itemMenu } from "../menus/item-menu";
-import { holdPicture } from "./picture-focus";
+import { useFullScreen } from "./full-screen";
+import { holdPicture, reachPicture } from "./picture-focus";
 import { useZoom, ZoomPlate } from "./useZoom";
 import { Video } from "./VideoPlate";
 import { type Size, STAND_IN_SHAPE } from "./zoom";
@@ -34,6 +35,12 @@ export function Media({ item, fill = false }: Props) {
     if (!fill || !area.current) return;
     return holdPicture(item.id, area.current);
   }, [fill, item.id]);
+
+  const full = useFullScreen();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: entering full screen is what brings a folded pane within reach.
+  useEffect(() => {
+    if (fill && area.current) reachPicture(item.id, area.current);
+  }, [fill, item.id, full]);
 
   let body: ReactNode;
   if (item.kind === "video") {

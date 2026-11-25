@@ -8,9 +8,9 @@ export function focusNextPicture() {
   wanted = "next";
 }
 
-/** This item's picture takes the focus: now if the pane has drawn it, else once it does. */
+/** This item's picture takes the focus: now if the pane has drawn it within reach, else once it is. */
 export function focusPicture(id: number) {
-  if (drawn?.id === id) {
+  if (drawn?.id === id && reachable(drawn.area)) {
     wanted = null;
     drawn.area.focus();
   } else {
@@ -22,10 +22,29 @@ export function focusPicture(id: number) {
 export function holdPicture(id: number, area: HTMLElement) {
   const own = { id, area };
   drawn = own;
-  const take = wanted === "next" || wanted === id;
-  wanted = null;
-  if (take) area.focus();
+  if (wanted !== "next" && wanted !== id) {
+    wanted = null;
+  } else if (reachable(area)) {
+    wanted = null;
+    area.focus();
+  } else {
+    wanted = id;
+  }
   return () => {
     if (drawn === own) drawn = null;
   };
+}
+
+/**
+ * The pane's picture may have come within reach: a folded pane is inert until the render that
+ * unfolds it, so a request made before that render is answered after it.
+ */
+export function reachPicture(id: number, area: HTMLElement) {
+  if (wanted !== id || !reachable(area)) return;
+  wanted = null;
+  area.focus();
+}
+
+function reachable(area: HTMLElement) {
+  return !area.closest("[inert]");
 }
