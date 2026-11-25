@@ -2,11 +2,12 @@
 import type { Reason } from "./Reason";
 
 /**
- * One failed job, placed by the file or folder it was about, with why.
+ * One failed job that counts in the walk's line, placed by the file or folder it was about, with
+ * why.
  */
 export type Failure = { jobId: number, kind: string, 
 /**
- * From inside its source down: the folders, then the file's own name. Empty for a job about
- * no one file or folder.
+ * From inside its source down: the folders, then the file's own name; a source's own folder
+ * by the source's title. Empty for a job about no one file or folder.
  */
 path: Array<string>, itemId: number | null, folderId: number | null, reason: Reason, attempts: number, };

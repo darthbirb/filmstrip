@@ -310,6 +310,9 @@ test("a name field says where the name is taken, or why else it was refused", ()
     "Trips already has a folder named Cairo.",
   );
   expect(refusedName({ kind: "refused", reason: { kind: "inUse" } })).toBe("Open in another app.");
+  expect(refusedName({ kind: "refused", reason: { kind: "notIndexed" } })).toBe(
+    "No longer in the index.",
+  );
   expect(refusedName({ kind: "invalid", reason: { kind: "other" } })).toBeNull();
 });
 

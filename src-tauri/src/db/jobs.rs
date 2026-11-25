@@ -192,15 +192,16 @@ pub fn retry_failed(conn: &Connection) -> Result<usize> {
     )?)
 }
 
-/// One failed job, placed by the file or folder it was about, with why.
+/// One failed job that counts in the walk's line, placed by the file or folder it was about, with
+/// why.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
 pub struct Failure {
     pub job_id: i64,
     pub kind: String,
-    /// From inside its source down: the folders, then the file's own name. Empty for a job about
-    /// no one file or folder.
+    /// From inside its source down: the folders, then the file's own name; a source's own folder
+    /// by the source's title. Empty for a job about no one file or folder.
     pub path: Vec<String>,
     pub item_id: Option<i64>,
     pub folder_id: Option<i64>,
@@ -210,15 +211,17 @@ pub struct Failure {
 
 pub fn failures(conn: &Connection) -> Result<Vec<Failure>> {
     let mut stmt = conn.prepare(
-        "SELECT j.id, j.kind, j.error, j.attempts, i.id, i.disk_name, f.id
+        "SELECT j.id, j.kind, j.error, j.attempts, i.id, i.disk_name, f.id,
+                CASE WHEN f.parent_id IS NULL THEN s.title END
            FROM job j
            LEFT JOIN item i ON i.id = json_extract(j.payload, '$.itemId')
            LEFT JOIN folder f ON f.id = COALESCE(i.folder_id, json_extract(j.payload, '$.folderId'))
-          WHERE j.status = 'failed'
+           LEFT JOIN source s ON s.id = f.source_id
+          WHERE j.status = 'failed' AND j.kind NOT IN (SELECT value FROM json_each(?1))
           ORDER BY j.id",
     )?;
     let rows: Vec<_> = stmt
-        .query_map([], |r| {
+        .query_map([serde_json::to_string(&OWN_LINES)?], |r| {
             Ok((
                 r.get::<_, i64>(0)?,
                 r.get::<_, String>(1)?,
@@ -227,13 +230,14 @@ pub fn failures(conn: &Connection) -> Result<Vec<Failure>> {
                 r.get::<_, Option<i64>>(4)?,
                 r.get::<_, Option<String>>(5)?,
                 r.get::<_, Option<i64>>(6)?,
+                r.get::<_, Option<String>>(7)?,
             ))
         })?
         .collect::<rusqlite::Result<_>>()?;
     let mut places: HashMap<i64, Vec<String>> = HashMap::new();
     rows.into_iter()
         .map(
-            |(job_id, kind, error, attempts, item_id, name, folder_id)| {
+            |(job_id, kind, error, attempts, item_id, name, folder_id, source)| {
                 let mut path = match folder_id {
                     Some(id) if places.contains_key(&id) => places[&id].clone(),
                     Some(id) => {
@@ -243,7 +247,7 @@ pub fn failures(conn: &Connection) -> Result<Vec<Failure>> {
                     }
                     None => Vec::new(),
                 };
-                path.extend(name);
+                path.extend(name.or(source));
                 Ok(Failure {
                     job_id,
                     kind,
@@ -397,12 +401,20 @@ mod tests {
             100,
         )
         .unwrap();
+        let refresh = enqueue(
+            &conn,
+            "index_folder",
+            &format!("{{\"folderId\":{root}}}"),
+            100,
+        )
+        .unwrap();
         let whole = enqueue(&conn, "index", "{}", 100).unwrap();
         for _ in 0..3 {
             claim(&mut conn).unwrap();
         }
         fail(&conn, thumb, &Reason::Unsupported, false).unwrap();
         fail(&conn, walk, &Reason::PermissionDenied, false).unwrap();
+        fail(&conn, refresh, &Reason::Busy, false).unwrap();
         conn.execute(
             "UPDATE job SET status = 'failed', error = 'database is locked' WHERE id = ?1",
             [whole],
@@ -429,8 +441,28 @@ mod tests {
                     Some(trips),
                     &Reason::PermissionDenied
                 ),
+                ("Library".to_owned(), None, Some(root), &Reason::Busy),
                 (String::new(), None, None, &Reason::Other),
             ]
         );
+    }
+
+    #[test]
+    fn the_list_leaves_out_what_counts_itself_as_the_count_does() {
+        let conn = conn();
+        let walk = enqueue(&conn, "index", "{}", 100).unwrap();
+        fail(&conn, walk, &Reason::Busy, false).unwrap();
+        for kind in OWN_LINES {
+            let own = enqueue(&conn, kind, "{\"folderId\":1}", 50).unwrap();
+            fail(&conn, own, &Reason::DiskFull, false).unwrap();
+        }
+
+        let listed: Vec<i64> = failures(&conn)
+            .unwrap()
+            .iter()
+            .map(|one| one.job_id)
+            .collect();
+        assert_eq!(listed, [walk]);
+        assert_eq!(counts(&conn).unwrap().failed, 1);
     }
 }

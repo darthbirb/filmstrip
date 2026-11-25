@@ -195,7 +195,9 @@ goes above the grid instead**, where it stays in the way until it is dealt with:
 danger hairline, never a fill, that counts the failures, offers to try them again, and opens its
 list in place rather than in a dialog. Neither is a dialog, and both leave when they are done.
 Each row is the file's path from inside its source, as Explorer writes it, so two files of one
-name in different folders read apart, with a way to go and look at it.
+name in different folders read apart, with a way to go and look at it; a failed walk of a source's
+own folder goes by the source's name. Copies, moves and exports count themselves on their own
+lines, so they are left out of the list as they are out of its count.
 
 ## Reasons, never raw errors
 

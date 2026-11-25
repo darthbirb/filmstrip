@@ -135,6 +135,15 @@ test("each failure is placed inside its source, worded as the undo banner words 
     },
     {
       jobId: 4,
+      kind: "index_folder",
+      path: ["Pictures"],
+      itemId: null,
+      folderId: 1,
+      reason: { kind: "busy" },
+      attempts: 2,
+    },
+    {
+      jobId: 5,
       kind: "index",
       path: [],
       itemId: null,
@@ -142,23 +151,39 @@ test("each failure is placed inside its source, worded as the undo banner words 
       reason: { kind: "other" },
       attempts: 2,
     },
+    {
+      jobId: 6,
+      kind: "index_folder",
+      path: [],
+      itemId: null,
+      folderId: 2,
+      reason: { kind: "other" },
+      attempts: 1,
+    },
   ];
   const screen = await render(<Notices />);
-  await reportFailures(4);
+  await reportFailures(6);
   await screen.getByRole("button", { name: "Show Files" }).click();
 
   await expect.element(screen.getByText("Reason", { exact: true })).toBeVisible();
   expect(screen.getByText("Error", { exact: true }).elements()).toHaveLength(0);
   await expect.element(screen.getByText("People\\scan 03.tif")).toBeVisible();
   await expect.element(screen.getByText("Permission denied")).toBeVisible();
-  await expect.element(screen.getByText("The index is busy")).toBeVisible();
-  await expect.element(screen.getByText("The library")).toBeVisible();
-  await expect.element(screen.getByText("Something went wrong")).toBeVisible();
+  await expect.element(screen.getByText("Pictures", { exact: true })).toBeVisible();
+  expect(screen.getByText("The index is busy").elements()).toHaveLength(2);
+  expect(screen.getByText("The library").elements()).toHaveLength(2);
+  expect(screen.getByText("Something went wrong").elements()).toHaveLength(2);
 
   await screen.getByRole("button", { name: "Show _DSC4411.ARW in Explorer" }).click();
   await screen.getByRole("button", { name: "Show People in Explorer" }).click();
+  await screen.getByRole("button", { name: "Show Pictures in Explorer" }).click();
   await expect
     .poll(() => revealed)
-    .toEqual(['reveal_item {"itemId":11}', 'reveal_folder {"folderId":5}']);
-  expect(screen.getByRole("button", { name: /in Explorer$/ }).elements()).toHaveLength(3);
+    .toEqual([
+      'reveal_item {"itemId":11}',
+      'reveal_folder {"folderId":5}',
+      'reveal_folder {"folderId":1}',
+    ]);
+  expect(screen.getByRole("button", { name: /in Explorer$/ }).elements()).toHaveLength(4);
+  expect(screen.getByRole("button", { name: /^Show {2}in Explorer$/ }).elements()).toHaveLength(0);
 });

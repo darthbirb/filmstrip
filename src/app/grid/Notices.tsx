@@ -50,16 +50,16 @@ function placeOf(failure: Failure) {
   return failure.path.length > 0 ? failure.path.join("\\") : "The library";
 }
 
+/** Show in Explorer, for a row that names the file or folder it would show. */
 function Look({ failure }: { failure: Failure }) {
-  const { itemId, folderId, path } = failure;
+  const { itemId, folderId } = failure;
+  const name = failure.path.at(-1);
   const reveal =
     itemId !== null
       ? () => revealItem(itemId)
       : folderId !== null
         ? () => revealFolder(folderId)
         : null;
-  if (!reveal) return <span />;
-  return (
-    <ShowInExplorer name={path.at(-1) ?? ""} onClick={() => void reveal().catch(() => undefined)} />
-  );
+  if (!reveal || !name) return <span />;
+  return <ShowInExplorer name={name} onClick={() => void reveal().catch(() => undefined)} />;
 }
