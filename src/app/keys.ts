@@ -1,13 +1,14 @@
 import { useEffect } from "react";
 
-import { itemDetail } from "../ipc/commands";
+import { copyItemPaths, itemDetail } from "../ipc/commands";
 import { inTrash } from "./grid/place-items";
 import { getChecked } from "./grid/selection";
 import { setNews } from "./navigation/foot-slot";
 import { getIndex } from "./navigation/index-store";
-import { neighbour } from "./pane/delete";
+import { deleteFiles, neighbour } from "./pane/delete";
 import { moveFiles } from "./pane/move-picker";
 import { getPaneItem, getPaneOrigin, getPaneSet, showInPane } from "./pane/pane-store";
+import { copyFiles } from "./paste/clipboard";
 import { getPlace } from "./place";
 
 // Destination keys: the ten digits, each bound to a folder a press moves files into.
@@ -30,19 +31,72 @@ export function useDestinationKeys() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const digit = digitOf(event);
-      if (digit === null || event.defaultPrevented) return;
+      if (digit === null || !keyIsFree(event)) return;
       if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
-      const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest("input, textarea, select, [contenteditable], [role=menu], [popover]")) {
-        return;
-      }
-      if (document.querySelector("dialog[open]") || getPlace()?.kind === "trash") return;
+      if (getPlace()?.kind === "trash") return;
       event.preventDefault();
       void press(digit);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+}
+
+/** Whether a key is the app's: not in a field, a menu, a question or Settings. */
+function keyIsFree(event: KeyboardEvent) {
+  if (event.defaultPrevented) return false;
+  const target = event.target instanceof Element ? event.target : null;
+  const own = "input, textarea, select, [contenteditable], [role=menu], [popover], [data-question]";
+  return !target?.closest(own) && !document.querySelector("dialog[open]");
+}
+
+type FileKey = "delete" | "copy" | "copyPath";
+
+function fileKeyOf(event: KeyboardEvent): FileKey | null {
+  if (event.altKey || event.metaKey) return null;
+  if (event.key === "Delete" && !event.ctrlKey && !event.shiftKey) return "delete";
+  if (event.key.toLowerCase() !== "c" || !event.ctrlKey) return null;
+  return event.shiftKey ? "copyPath" : "copy";
+}
+
+/**
+ * Explorer's keys for files: Delete, Ctrl+C and Ctrl+Shift+C do what the bar's Delete, Copy and
+ * Copy Path do, to what is checked, or the pane's file when nothing is.
+ */
+export function useFileKeys() {
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const key = fileKeyOf(event);
+      if (key === null || !keyIsFree(event)) return;
+      event.preventDefault();
+      void actOn(key);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+}
+
+async function actOn(key: FileKey) {
+  const chosen = await chosenFiles();
+  // A trashed file goes only by Restore, as the bar in the Trash has nothing else.
+  if (!chosen || chosen.files.length === 0 || chosen.files.every(inTrash)) return;
+  const ids = chosen.files.map((file) => file.id);
+  if (key === "delete") await deleteFiles(ids);
+  else if (key === "copy") await copyFiles(ids).catch(() => undefined);
+  else await copyItemPaths(ids).catch(() => undefined);
+}
+
+/** What is checked, else the pane's one file; none when the pane shows several and none is checked. */
+async function chosenFiles() {
+  const { checked, listed } = getChecked();
+  if (checked.length > 0) return { files: checked, fromPane: false };
+  if (getPaneSet().length > 1) return null;
+  const shown = getPaneItem();
+  const file =
+    shown === null
+      ? null
+      : (listed.find((row) => row.id === shown) ?? (await itemDetail(shown).catch(() => null)));
+  return { files: file ? [file] : [], fromPane: true };
 }
 
 /** A press of one key, answered as Artboards › Destination keys draws each case. */
@@ -60,25 +114,17 @@ export async function press(digit: string) {
     });
     return;
   }
-  const { checked, listed } = getChecked();
+  const chosen = await chosenFiles();
   // A pane showing several has no one file for a key to move, as it has no bar.
-  const several = getPaneSet().length;
-  if (checked.length === 0 && several > 1) {
+  if (!chosen) {
     setNews({
       kind: "keyRefused",
-      line: `The pane shows ${several} files.`,
+      line: `The pane shows ${getPaneSet().length} files.`,
       detail: `Check the ones to move to ${name}.`,
     });
     return;
   }
-  const shown = getPaneItem();
-  const files =
-    checked.length > 0
-      ? checked
-      : shown === null
-        ? []
-        : [listed.find((row) => row.id === shown) ?? (await itemDetail(shown).catch(() => null))];
-  const going = files.flatMap((file) => (file ? [file] : []));
+  const going = chosen.files;
   // A trashed file among a search's results goes only by Restore, as in the Trash.
   if (going.length === 0 || going.every(inTrash)) return;
   if (going.every((file) => file.folderId === bound.folderId)) {
@@ -86,14 +132,15 @@ export async function press(digit: string) {
     return;
   }
   const to = { id: bound.folderId, title: name };
-  if (checked.length > 0) {
+  if (!chosen.fromPane) {
     await moveFiles(
       going.map((file) => file.id),
       to,
     );
     return;
   }
-  if (shown === null) return;
+  const shown = going[0]?.id;
+  if (shown === undefined) return;
   // The pane's file went, so the pane moves on to the tile that took its place, as after a delete.
   const origin = getPaneOrigin();
   const next = await neighbour(origin, [shown]);

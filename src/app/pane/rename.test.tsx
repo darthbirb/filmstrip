@@ -1,8 +1,9 @@
 import { beforeEach, expect, test } from "vitest";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { folderItems, undoLast } from "../../ipc/commands";
+import { Grid } from "../grid/Grid";
 import { Foot } from "../navigation/Foot";
 import { setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex } from "../navigation/index-store";
@@ -10,7 +11,7 @@ import { type Place, setPlace } from "../place";
 import { updatePreferences } from "../preferences";
 import { Pane } from "./Pane";
 import { PaneDetailProvider } from "./pane-detail";
-import { showInPane } from "./pane-store";
+import { getPaneItem, showInPane } from "./pane-store";
 import { stopRename } from "./rename";
 
 // Against the dev mock: Cairo (6) holds felucca.mp4, pyramid.jpg and sphinx.jpg.
@@ -79,4 +80,25 @@ test("a name already taken says where, and Enter does nothing until the name cha
   await userEvent.keyboard("{Escape}");
   await expect.element(screen.getByRole("button", { name: /pyramid\.jpg/ })).toBeVisible();
   expect((await folderItems(6)).map((row) => row.diskName)).toContain("pyramid.jpg");
+});
+
+test("F2 on a tile shows its file in the pane with the name as a field", async () => {
+  await page.viewport(1300, 800);
+  const screen = await render(
+    <div style={{ display: "flex" }}>
+      <div data-testid="grid" style={{ flex: "none", width: 800, height: 600 }}>
+        <Grid mode="uniform" />
+      </div>
+      <Harness />
+    </div>,
+  );
+  const sphinx = screen.getByTestId("grid").getByRole("button", { name: "sphinx.jpg" });
+  await expect.element(sphinx).toBeVisible();
+  (sphinx.element() as HTMLElement).focus();
+  await userEvent.keyboard("{F2}");
+
+  await expect.element(screen.getByRole("textbox", { name: "Rename sphinx.jpg" })).toHaveFocus();
+  expect(getPaneItem()).toBe(
+    (await folderItems(6)).find((row) => row.diskName === "sphinx.jpg")?.id,
+  );
 });

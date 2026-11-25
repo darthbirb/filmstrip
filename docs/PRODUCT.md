@@ -131,6 +131,23 @@ keeps both while the user looks somewhere else.
 Not a screen. Select in any grid — a folder, the Sorting Box, the trash — and move the
 selection somewhere. Destination hotkeys exist for the folders used most.
 
+## Keys
+
+An organiser on Windows takes Explorer's keys. None of them reaches past a text field, which
+keeps its own. Delete, Ctrl+C, Ctrl+Shift+C and the digits act on what is checked, or on the file
+in the pane when nothing is.
+
+- **Delete** sends the files to the Recycle Bin, as the bar's Delete does.
+- **F2** renames the focused tile's file, or the focused folder in navigation.
+- **Ctrl+C** copies the files, and **Ctrl+Shift+C** their paths.
+- **Ctrl+V** pastes into the place the grid shows.
+- **Ctrl+Z** undoes the newest act.
+- **Ctrl+A** checks the whole place, and **Escape** clears it.
+- **Ctrl+F** goes to the search field.
+- **1 to 0** move the files to the folders bound to them.
+- **Ctrl+wheel** over the grid steps the tile size; **Ctrl+=**, **Ctrl+-** and **Ctrl+0** set the
+  size of the whole interface.
+
 ## Later
 
 Built on the finished interface, not alongside it: compression with review before anything is
