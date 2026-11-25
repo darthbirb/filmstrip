@@ -55,13 +55,15 @@ restore to put anything back.
 The Sorting Box is the one that is plural. It is several real folders the user nominates, shown
 as one surface — not one directory, and not a view over the index.
 
-**Which `+` was pressed is the kind.** A folder becomes a source through one of two doorways —
-navigation's Library caption, or the Sorting Box's own row — and nothing is asked once the picker
-closes, because the answer was the button. Asking afterwards would mean a dialog after the picker's
-dialog, and asking someone to choose between two words before they have seen either behave;
-Settings › Sources is where a kind is corrected instead. The Sorting Box's `+` rests on its row
-rather than appearing under the pointer, since it is the only way to nominate a sorting folder and a
-hover-only control has no keyboard.
+**Which doorway was taken is the kind.** A folder becomes a source through one of two doorways —
+navigation's Library caption, or Add Sorting Source… on the Sorting Box's menu — and nothing is
+asked once the picker closes, because the answer was the doorway. Asking afterwards would mean a
+dialog after the picker's dialog, and asking someone to choose between two words before they have
+seen either behave; Settings › Sources is where a kind is corrected instead. The Sorting Box's
+doorway is on its row's menu and its grid's ground, never a button on the row, since a control
+inside a tree row is a second tab stop in a tree that is one, and a screen reader names it in
+the row's name or not at all; the menu key and Shift+F10 reach it as a right-click does, so it
+is never only under the pointer.
 
 **A refused folder is an answer, not an error.** Four folders are turned away — the same one twice,
 one inside a source, one holding a source, and the app's own — and each says so in a band at the
@@ -522,6 +524,13 @@ move checks from the last one checked, and Enter shows the ringed tile in the pa
 the tile's menu or a double-click. Ctrl+A checks the whole place, the tiles scrolled away too, and
 Escape clears it, after whatever else is open has closed. The ringed tile is drawn wherever the
 scroll is, so the focus is never dropped with it.
+
+**A screen reader hears where a tile stands and whether it is checked.** The files are an ARIA
+grid, multi-selectable, of one-cell rows, one per file: each row says its place among all the
+place's files, since only the rows near the view are drawn, and is selected while its file is
+checked. The cell holds the tile and its box, a real checkbox named Select and the file's name,
+as the acts say Select. A multi-select listbox would tell a tile the same way, but its option
+cannot hold a checkbox, and the box is the pointer's way to check a file.
 
 **A tile dragged onto a row in navigation is Move to… that row**, drawn by Claude Design and built
 on 26 September 2026, since the tree is always on screen: the same act, the same line after it and
@@ -1057,7 +1066,8 @@ Shift+F10 did nothing at all.
   Escape closes it and puts the focus back; a verb that takes the focus, as Rename does, keeps it.
 - **The grid's ground opens its place's menu, under the place's name**, since it is not on the
   place's row: a folder's or a source's grid has the rows its row has, the Sorting Box's has Paste
-  alone while the clipboard holds files, and a search and the Trash open nothing. A sorting
+  while the clipboard holds files and Add Sorting Source… after it, and a search and the Trash
+  open nothing. A sorting
   source's folder, on its ground and on its favourite row, has Paste alone, plus its favourite
   verb, as its band does. A tile keeps its own. What a verb there opens, the keys, the picker or
   the Sorting Box's pick, opens where the menu did; Export…'s sheet hangs under the place's

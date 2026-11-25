@@ -115,10 +115,10 @@ function Box({ note, of, onDone }: BoxProps) {
         defaultValue={note ?? ""}
         placeholder="Write a note"
         onKeyDown={onKeyDown}
-        className="focus-ring field-sizing-content min-h-[calc(3*var(--text-ui--line-height)+2*var(--pad))] w-full resize-none rounded-nested bg-ground px-2 py-(--pad) text-fg-hi [--pad:--spacing(1)] text-ui inset-ring inset-ring-line-control placeholder:text-fg-faint"
+        className="focus-ring field-sizing-content min-h-[calc(3*var(--text-ui--line-height)+2*var(--pad))] w-full resize-none rounded-nested bg-ground px-2 py-(--pad) text-fg-hi [--pad:--spacing(1)] text-ui inset-ring inset-ring-line-control placeholder:text-fg-dim"
       />
       <span className="flex items-center gap-1.5">
-        <span className="flex-1 text-fg-faint text-key">Ctrl+Enter saves · Escape abandons</span>
+        <span className="flex-1 text-fg-dim text-key">Ctrl+Enter saves · Escape abandons</span>
         <ChipButton look="secondary" onClick={() => finish(false)}>
           Cancel
         </ChipButton>

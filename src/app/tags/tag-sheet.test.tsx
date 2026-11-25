@@ -51,7 +51,7 @@ async function renderGrid(width = 900) {
   await expect.element(page.getByRole("button", { name: "sphinx.jpg" })).toBeVisible();
 }
 
-const box = (name: string) => page.getByRole("checkbox", { name: `Check ${name}` });
+const box = (name: string) => page.getByRole("checkbox", { name: `Select ${name}` });
 const bar = () => page.getByRole("toolbar", { name: "Selection" });
 const tagButton = () => bar().getByRole("button", { name: "Tag…" }).last();
 const sheet = (count: number) => page.getByRole("dialog", { name: `Tag ${count} Files` });

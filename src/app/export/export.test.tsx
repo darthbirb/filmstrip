@@ -79,7 +79,7 @@ async function renderAll() {
   return screen;
 }
 
-const box = (name: string) => page.getByRole("checkbox", { name: `Check ${name}` });
+const box = (name: string) => page.getByRole("checkbox", { name: `Select ${name}` });
 const bar = () => page.getByRole("toolbar", { name: "Selection" });
 const sheet = (name: string) => page.getByRole("dialog", { name });
 const idsIn = async (names: string[]) =>

@@ -114,7 +114,7 @@ export function TermRow({ name, files, folders, nested, more, asking, onKeyDown 
 function Figure({ count }: { count: number }) {
   return (
     <span
-      className={`whitespace-nowrap text-right text-small tabular-nums ${count === 0 ? "text-fg-faint" : "text-fg-mid"}`}
+      className={`whitespace-nowrap text-right text-small tabular-nums ${count === 0 ? "text-fg-dim" : "text-fg-mid"}`}
     >
       {formatCount(count)}
     </span>

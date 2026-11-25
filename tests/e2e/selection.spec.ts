@@ -14,7 +14,7 @@ test("files checked in the grid move together from the bar, and Ctrl+Z brings th
   await tree.getByRole("treeitem", { name: "Trips 2 of 5" }).click();
 
   const grid = page.getByRole("main");
-  await grid.getByRole("checkbox", { name: "Check boarding-pass.png" }).click();
+  await grid.getByRole("checkbox", { name: "Select boarding-pass.png" }).click();
   await grid.getByRole("button", { name: "hotel.jpg" }).click({ modifiers: ["Control"] });
 
   const bar = page.getByRole("toolbar", { name: "Selection" });
@@ -32,6 +32,6 @@ test("files checked in the grid move together from the bar, and Ctrl+Z brings th
   await expect(page.getByText("2 files are back in Trips.")).toBeVisible();
   await expect(grid.getByRole("button", { name: "hotel.jpg" })).toBeVisible();
   // What an undo brings back comes back unchecked.
-  await expect(grid.getByRole("checkbox", { name: "Check hotel.jpg" })).not.toBeChecked();
+  await expect(grid.getByRole("checkbox", { name: "Select hotel.jpg" })).not.toBeChecked();
   expect(errors).toEqual([]);
 });

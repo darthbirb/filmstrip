@@ -55,7 +55,7 @@ async function renderGrid() {
 }
 
 const tile = (n: number) => page.getByRole("button", { name: `item-${n}.png` });
-const box = (n: number) => page.getByRole("checkbox", { name: `Check item-${n}.png` });
+const box = (n: number) => page.getByRole("checkbox", { name: `Select item-${n}.png` });
 const shownBoxes = () =>
   [...document.querySelectorAll<HTMLInputElement>("figure input[type=checkbox]")].filter(
     (input) => getComputedStyle(input.parentElement as HTMLElement).opacity === "1",
@@ -152,6 +152,27 @@ const focused = () => (document.activeElement as HTMLElement | null)?.getAttribu
 const tabStops = () =>
   [...document.querySelectorAll<HTMLElement>("figure button")].filter((tile) => tile.tabIndex === 0)
     .length;
+
+test("the grid tells each tile's place among the files and whether it is checked", async () => {
+  await renderGrid();
+  const grid = page.getByRole("grid", { name: "Files" });
+  await expect.element(grid).toHaveAttribute("aria-multiselectable", "true");
+  await expect.element(grid).toHaveAttribute("aria-rowcount", "6");
+  const row = (n: number) => tile(n).element().closest("[role=row]");
+  expect(row(2)?.parentElement?.closest("[role=grid]")).toBe(grid.element());
+  expect(tile(2).element().closest("[role=gridcell]")?.parentElement).toBe(row(2));
+  expect(row(2)?.getAttribute("aria-posinset")).toBe("3");
+  expect(row(2)?.getAttribute("aria-setsize")).toBe("6");
+  expect(row(2)?.getAttribute("aria-rowindex")).toBe("3");
+  expect(row(2)?.getAttribute("aria-selected")).toBe("false");
+
+  await userEvent.click(box(2));
+  await expect.poll(() => row(2)?.getAttribute("aria-selected")).toBe("true");
+  expect(row(3)?.getAttribute("aria-selected")).toBe("false");
+  expect(box(2).element().closest("[role=gridcell]")).toBe(
+    tile(2).element().closest("[role=gridcell]"),
+  );
+});
 
 test("the grid is one tab stop, on the tile in the pane, and the arrows move only the ring", async () => {
   await renderGrid();

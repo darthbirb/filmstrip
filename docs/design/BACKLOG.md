@@ -16,6 +16,16 @@ the red focus ring, the white in-pane mark.
 Always update the existing sheets in place. A new drawing belongs on the sheet its subject
 already lives on, never in a file of its own.
 
+## Faint text and the Sorting Box's + · DEFECT
+
+The sheets still draw text in `fg-faint`, which is under 3:1: the count's slash (and
+`on-plate-faint` on the plate, a token the app no longer has), Move to…'s current folder and its
+"current", the note box's "Ctrl+Enter saves · Escape abandons", and placeholders. The app sets
+each in `fg-dim`, and on the plate the slash in `on-plate-dim`, as DESIGN.md "Colors" says. The
+sheets also draw the Sorting Box's + as a button on its row, inside the tree's one tab stop; the
+app has Add Sorting Source… on the row's menu and its grid's ground instead, after Paste, as
+DECISIONS.md "Places, not queries" says. Redraw both, and take `on-plate-faint` off the token sheet.
+
 ## The grid's ground in Components › Right-click · DEFECT
 
 Components › Right-click, under "Where there is no menu, nothing opens", still says the grid's

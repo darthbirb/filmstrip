@@ -26,7 +26,6 @@ colors:
   fg-faint: "#5c5a56"
   on-plate: "#17181a"
   on-plate-dim: "rgb(23 24 26 / 0.62)"
-  on-plate-faint: "rgb(23 24 26 / 0.4)"
   on-plate-wash: "rgb(23 24 26 / 0.14)"
   focus: "#c25a4a"
   in-pane: "#f2f2f2"
@@ -502,12 +501,12 @@ thing and is never decoration:** where the keyboard is, and close.
 | `panel` | The bar, navigation, the pane, the grid's header row, the filmstrip, Settings. |
 | `inset` | A sunk trough: a disabled control, an inherited chip, a group of settings, a tile still being read. |
 | `raised`, `raised-hi` | A control at rest, and its hover, open or chosen state. |
-| `plate`, `on-plate`, `on-plate-dim`, `on-plate-faint`, `on-plate-wash` | Selection, and only selection: a chosen place or option, its ink, its count, the count's slash, and the count pill's sunk plate. |
+| `plate`, `on-plate`, `on-plate-dim`, `on-plate-wash` | Selection, and only selection: a chosen place or option, its ink, its count, and the count pill's sunk plate. |
 | `hatch`, `hatch-alt` | The stand-in for a picture whose thumbnail is not made yet. |
 | `line`, `line-control`, `line-control-hi` | A panel's edge and the rule under a header; a control's ring; a ring on a raised-hi control. |
 | `line-strong` | The ring a tile shows under the pointer; a strip step's under the pointer. |
 | `fg-hi`, `fg`, `fg-mid`, `fg-dim` | Ink: titles; body; a control's label at rest; counts and captions. |
-| `fg-faint` | Separators, a disabled glyph, an offline source's glyph, an unfocused window's caption glyphs; never text to be read. |
+| `fg-faint` | Glyphs and separators alone: a chevron between steps, a disabled glyph, an offline source's glyph, an unfocused window's caption glyphs, an empty place's glyph. Never text, not even a placeholder, a hint, a zero or a row that cannot be picked: those are `fg-dim`, since it is under 3:1 on every surface. |
 | `focus` | Where the keyboard is, and only that: a 2px ring, 2px clear of the element. |
 | `in-pane`, `on-mark` | The item the pane shows: the ring drawn on its tile and frame, its plate, and the plate's ink. |
 | `wash` | White at 9%, laid over something already filled when the pointer is on it. |
@@ -521,7 +520,8 @@ thing and is never decoration:** where the keyboard is, and close.
 **Contrast is measured, not asserted.** `fg-hi`, `fg`, `fg-mid` and `fg-dim` reach 4.5:1 on
 `well`, `ground`, `panel` and `raised`; `focus` and `in-pane` reach 3:1 on each; `on-plate`
 reaches 4.5:1 on the plate and `on-mark` on the in-pane plate. `src/styles/tokens.test.ts`
-paints each and fails below.
+paints each and fails below, and `src/ui/ink.test.tsx` holds a hint, a placeholder, a count's
+slash and a row that cannot be picked to 4.5:1 where each is drawn.
 
 ## Typography
 
@@ -622,9 +622,10 @@ toward the rest surface.
 - **Glyph button.** A `control` square on `raised` with a `line-control` ring. Disabled, it sinks
   to `inset` on a `line` ring, its glyph `fg-faint`. The one that destroys or forgets takes the
   button's `danger` colours.
-- **Tree row.** Chevron, glyph, name and count. At rest the name is `fg-mid`; under the pointer a
-  `wash`; selected, a `plate` with `on-plate` ink. An offline source is `fg-dim` with an
-  `fg-faint` glyph. The app's own places sit above a `line` rule. Renamed in place, the name
+- **Tree row.** Chevron, glyph, name and count, and nothing to press: what a row can do is on
+  its menu, the Sorting Box's Add Sorting Source… included. At rest the name is `fg-mid`; under
+  the pointer a `wash`; selected, a `plate` with `on-plate` ink. An offline source is `fg-dim`
+  with an `fg-faint` glyph. The app's own places sit above a `line` rule. Renamed in place, the name
   becomes a `chip`-tall field on `well` at the `nested` corner with a `line-strong` hairline, the
   whole name selected in `plate` with `on-plate` ink; the row keeps everything else. A folder's
   name that is taken turns the hairline `line-danger`, and where it is taken comes down under the
@@ -637,9 +638,9 @@ toward the rest surface.
   it wears the plate, and so does the place's own row.
 - **Count pill.** A place's files, always both figures: its own, then everything at or below it,
   as `3/9`, `3/3` or `0/0`. `badge` tall at the `badge` corner, on `raised` with a `line-control`
-  ring, figures `fg-mid` and the slash `fg-faint`; on a selected row it sinks to `on-plate-wash`,
-  figures `on-plate-dim` and the slash `on-plate-faint`. A folded row and the same row opened
-  show the same pill. Every row carries one, the Sorting Box and the Trash included; an offline
+  ring, figures `fg-mid` and the slash `fg-dim`; on a selected row it sinks to `on-plate-wash`,
+  figures and slash `on-plate-dim`; on a row that cannot be picked, figures and slash `fg-dim`.
+  A folded row and the same row opened show the same pill. Every row carries one, the Sorting Box and the Trash included; an offline
   source shows its word instead. Move to…'s tree rows and a matched folder's card carry it too;
   Settings' key rows and No Pictures Here print the same figures as text. The folded rail's
   badges keep one figure.

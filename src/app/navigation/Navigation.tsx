@@ -109,10 +109,7 @@ export function Navigation() {
   if (!sources) return null;
   if (sources.length === 0) return <NoSources onAdd={() => void addFolder("library")} />;
 
-  const rows: TreeRow[] = [
-    sortingRow(sources, () => void addFolder("sorting")),
-    trashRow(totals?.trash),
-  ];
+  const rows: TreeRow[] = [sortingRow(sources), trashRow(totals?.trash)];
   drawn.current = rows;
   const places = new Map<string, Place>([
     [SORTING_ID, { kind: "sorting" }],
@@ -209,26 +206,27 @@ export function Navigation() {
     return landingInto(source, at.path, paths, open);
   };
 
-  /** The Sorting Box's own menu: Paste alone, and only while the clipboard holds files. */
+  /** The Sorting Box's own menu: Paste while the clipboard holds files, and its one way to grow. */
   const sortingMenu = (against: Against): HeadedMenu => {
+    const nominate: MenuAction = {
+      id: "add-sorting-source",
+      label: "Add Sorting Source…",
+      glyph: "plus",
+      onSelect: () => void addFolder("sorting"),
+    };
     const held = getClipboard();
     const boxes = sortingPlaces(sources);
     const [one] = boxes;
-    if (!held || !one) return { groups: [] };
+    if (!held || !one) return { groups: [[nominate]] };
     const what = counted(held, true);
     if (boxes.length === 1) {
-      return {
-        groups: [
-          [
-            {
-              id: "paste",
-              label: `Paste ${what}`,
-              glyph: "paste",
-              onSelect: () => void pasteInto(one),
-            },
-          ],
-        ],
+      const paste: MenuAction = {
+        id: "paste",
+        label: `Paste ${what}`,
+        glyph: "paste",
+        onSelect: () => void pasteInto(one),
       };
+      return { groups: [[paste], [nominate]] };
     }
     // The pick takes the menu's place, against what it was opened on.
     const ask = () => {
@@ -239,7 +237,12 @@ export function Navigation() {
         onPick: (to) => void pasteInto(to),
       });
     };
-    return { groups: [[{ id: "paste", label: `Paste ${what}…`, glyph: "paste", onSelect: ask }]] };
+    return {
+      groups: [
+        [{ id: "paste", label: `Paste ${what}…`, glyph: "paste", onSelect: ask }],
+        [nominate],
+      ],
+    };
   };
 
   /** A place's menu, on its row `id` or on the grid's ground, whose verbs open `against` it. */

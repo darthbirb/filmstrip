@@ -189,6 +189,8 @@ export function Grid({ mode }: { mode: LayoutMode }) {
         <Tile
           key={item.id}
           item={item}
+          at={index + 1}
+          of={items.length}
           from={place}
           shown={shownHere.has(item.id)}
           checked={checked.has(item.id)}
@@ -260,6 +262,19 @@ export function Grid({ mode }: { mode: LayoutMode }) {
             ),
           }}
         >
+          {/* First, so the folders and headings drawn over its empty stretches stay in reach. */}
+          {items && items.length > 0 && (
+            // biome-ignore lint/a11y/useSemanticElements: tiles placed by the layout are no table's rows and columns.
+            <div
+              role="grid"
+              aria-label="Files"
+              aria-multiselectable="true"
+              aria-rowcount={items.length}
+              className="absolute inset-0"
+            >
+              {tiles}
+            </div>
+          )}
           {found.length > 0 && (
             <div
               ref={setBlock}
@@ -316,7 +331,6 @@ export function Grid({ mode }: { mode: LayoutMode }) {
                 {day}
               </h3>
             ))}
-          {tiles}
         </div>
       )}
       {ground.menu}
@@ -409,6 +423,9 @@ function standIns(row: number, width: number, rowHeight: number, gap: number, mo
 
 type TileProps = {
   item: ItemRow;
+  /** Where it stands in the place, from 1, and how many the place holds. */
+  at: number;
+  of: number;
   /** The place it is listed in, which the pane's filmstrip then runs through. */
   from: Place | null;
   /** Whether the pane is showing it. */
@@ -438,92 +455,97 @@ type TileProps = {
 };
 
 function Tile(props: TileProps) {
-  const { item, from, shown, checked, boxes, ringed, onCheck, setOf, onPress, onRing, onKeyDown } =
-    props;
+  const { item, at, of, from, shown, checked, boxes, ringed, onCheck, setOf } = props;
+  const { onPress, onRing, onKeyDown } = props;
   const { left, top, width, height, origin, fromTrash, below } = props;
   // Opening it moves nothing: the pane keeps what it shows until a verb says otherwise.
   const context = useContextMenu();
   const { scrub, handlers } = useScrub(item);
+  // A row of one cell per tile, the focus on the tile inside it. DECISIONS.md "The grid".
   return (
-    <>
-      {/* Outside the figure, so moving over the menu does not scrub the tile under it. */}
-      {context.menu}
-      <figure
-        title={item.diskName}
-        className="group/tile absolute m-0"
-        style={{ left, top, width, height: height + below }}
-        {...handlers}
-      >
-        <button
-          type="button"
-          aria-label={item.diskName}
-          data-item={item.id}
-          tabIndex={ringed ? 0 : -1}
-          onFocus={() => onRing(item.id)}
-          onPointerDown={onPress && ((event) => onPress(event, item))}
-          onKeyDown={onKeyDown}
-          onContextMenu={(event) => {
-            if (!checked) {
-              context.open(
-                event,
-                item.diskName,
-                itemMenu(item, () => showInPane(item.id, from)),
-              );
-              return;
-            }
-            const set = setOf();
-            context.open(event, set.heading ?? item.diskName, set.groups, set.heading);
-          }}
-          aria-current={shown || undefined}
-          onClick={(event) => {
-            if (event.ctrlKey || event.shiftKey) onCheck(event, item.id);
-            else showInPane(item.id, from);
-          }}
-          // Folded or hidden, the pane has no header to hold the control, so the tile is the way in.
-          onDoubleClick={(event) => {
-            if (event.ctrlKey || event.shiftKey) return;
-            showInPane(item.id, from);
-            setFullScreen(true);
-          }}
-          className={`focus-ring block w-full ${THUMB_FRAME}`}
-          style={{ height }}
+    // biome-ignore lint/a11y/useSemanticElements lint/a11y/useFocusableInteractive: the tile inside takes the focus, and a table row cannot be placed by the layout.
+    <div role="row" aria-rowindex={at} aria-posinset={at} aria-setsize={of} aria-selected={checked}>
+      {/* biome-ignore lint/a11y/useSemanticElements lint/a11y/useFocusableInteractive: as its row. */}
+      <div role="gridcell">
+        {/* Outside the figure, so moving over the menu does not scrub the tile under it. */}
+        {context.menu}
+        <figure
+          title={item.diskName}
+          className="group/tile absolute m-0"
+          style={{ left, top, width, height: height + below }}
+          {...handlers}
         >
-          <ThumbFace
-            src={item.thumb ? convertFileSrc(item.thumb) : undefined}
-            current={shown}
-            duration={
-              item.kind === "video" && item.durationMs !== null
-                ? formatDuration(item.durationMs)
-                : undefined
-            }
-            scrub={scrub}
-          />
-        </button>
-        {/* Clicking the picture shows it; the box is the other target. Components › Selection checkbox. */}
-        <SelectBox
-          label={`Check ${item.diskName}`}
-          checked={checked}
-          shown={boxes}
-          onClick={(event) => onCheck(event, item.id)}
-        />
-        {origin && (
-          // The folder's name only; its whole path is the tooltip, and the pane's From row.
-          <figcaption
-            title={origin.path.join(" › ")}
-            className="flex h-tile-caption items-end gap-1 px-0.5 text-small"
+          <button
+            type="button"
+            aria-label={item.diskName}
+            data-item={item.id}
+            tabIndex={ringed ? 0 : -1}
+            onFocus={() => onRing(item.id)}
+            onPointerDown={onPress && ((event) => onPress(event, item))}
+            onKeyDown={onKeyDown}
+            onContextMenu={(event) => {
+              if (!checked) {
+                context.open(
+                  event,
+                  item.diskName,
+                  itemMenu(item, () => showInPane(item.id, from)),
+                );
+                return;
+              }
+              const set = setOf();
+              context.open(event, set.heading ?? item.diskName, set.groups, set.heading);
+            }}
+            aria-current={shown || undefined}
+            onClick={(event) => {
+              if (event.ctrlKey || event.shiftKey) onCheck(event, item.id);
+              else showInPane(item.id, from);
+            }}
+            // Folded or hidden, the pane has no header to hold the control, so the tile is the way in.
+            onDoubleClick={(event) => {
+              if (event.ctrlKey || event.shiftKey) return;
+              showInPane(item.id, from);
+              setFullScreen(true);
+            }}
+            className={`focus-ring block w-full ${THUMB_FRAME}`}
+            style={{ height }}
           >
-            {fromTrash && (
-              <Glyph name="trash" className="shrink-0 pb-0.5 text-fg-dim text-glyph-small" />
-            )}
-            <span className="truncate text-fg-mid">
-              {fromTrash && "from "}
-              {origin.path.at(-1)}
-              {origin.gone && <span className="text-fg-dim"> · gone</span>}
-            </span>
-          </figcaption>
-        )}
-      </figure>
-    </>
+            <ThumbFace
+              src={item.thumb ? convertFileSrc(item.thumb) : undefined}
+              current={shown}
+              duration={
+                item.kind === "video" && item.durationMs !== null
+                  ? formatDuration(item.durationMs)
+                  : undefined
+              }
+              scrub={scrub}
+            />
+          </button>
+          {/* Clicking the picture shows it; the box is the other target. Components › Selection checkbox. */}
+          <SelectBox
+            label={`Select ${item.diskName}`}
+            checked={checked}
+            shown={boxes}
+            onClick={(event) => onCheck(event, item.id)}
+          />
+          {origin && (
+            // The folder's name only; its whole path is the tooltip, and the pane's From row.
+            <figcaption
+              title={origin.path.join(" › ")}
+              className="flex h-tile-caption items-end gap-1 px-0.5 text-small"
+            >
+              {fromTrash && (
+                <Glyph name="trash" className="shrink-0 pb-0.5 text-fg-dim text-glyph-small" />
+              )}
+              <span className="truncate text-fg-mid">
+                {fromTrash && "from "}
+                {origin.path.at(-1)}
+                {origin.gone && <span className="text-fg-dim"> · gone</span>}
+              </span>
+            </figcaption>
+          )}
+        </figure>
+      </div>
+    </div>
   );
 }
 

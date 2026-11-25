@@ -208,7 +208,7 @@ function Body({ onClose, section, asking }: Omit<Props, "open">) {
               disabled={held}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Find a setting"
-              className="focus-ring h-control w-full min-w-0 rounded-nested bg-ground pr-2 pl-7 text-fg text-ui inset-ring inset-ring-line-control placeholder:text-fg-dim disabled:text-fg-faint disabled:placeholder:text-fg-faint"
+              className="focus-ring h-control w-full min-w-0 rounded-nested bg-ground pr-2 pl-7 text-fg text-ui inset-ring inset-ring-line-control placeholder:text-fg-dim disabled:text-fg-dim disabled:placeholder:text-fg-dim"
             />
           </label>
           {groups.map((group) => (
@@ -225,7 +225,7 @@ function Body({ onClose, section, asking }: Omit<Props, "open">) {
                       aria-current={current || undefined}
                       disabled={held}
                       onClick={() => setChosen(section.id)}
-                      className={`focus-ring flex h-row shrink-0 items-center gap-2 rounded-nested px-2 text-left text-ui transition-colors duration-(--motion-quick) motion-reduce:transition-none ${current ? "bg-raised-hi text-fg-hi" : "text-fg-mid enabled:hover:bg-wash enabled:hover:text-fg disabled:text-fg-faint"}`}
+                      className={`focus-ring flex h-row shrink-0 items-center gap-2 rounded-nested px-2 text-left text-ui transition-colors duration-(--motion-quick) motion-reduce:transition-none ${current ? "bg-raised-hi text-fg-hi" : "text-fg-mid enabled:hover:bg-wash enabled:hover:text-fg disabled:text-fg-dim"}`}
                     >
                       <Glyph
                         name={section.glyph}

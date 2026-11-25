@@ -108,8 +108,8 @@ test("a tile dragged onto a folder says the move before the drop, and the drop i
 test("a checked tile carries the whole set, and an unchecked one only itself", async () => {
   await renderBoth();
   const [felucca, pyramid] = [await idOf("felucca.mp4"), await idOf("pyramid.jpg")];
-  await userEvent.click(page.getByRole("checkbox", { name: "Check felucca.mp4" }));
-  await userEvent.click(page.getByRole("checkbox", { name: "Check pyramid.jpg" }));
+  await userEvent.click(page.getByRole("checkbox", { name: "Select felucca.mp4" }));
+  await userEvent.click(page.getByRole("checkbox", { name: "Select pyramid.jpg" }));
 
   await dragOnto("pyramid.jpg", "People 0 of 0");
   expect(ghost()?.textContent).toBe("Move 2 files to People");
@@ -179,8 +179,8 @@ test("held on a closed folder for the hold, the ghost opens it", async () => {
 
 test("a set dragged by a later-checked tile wears the pressed tile's picture", async () => {
   await renderBoth();
-  await userEvent.click(page.getByRole("checkbox", { name: "Check pyramid.jpg" }));
-  await userEvent.click(page.getByRole("checkbox", { name: "Check sphinx.jpg" }));
+  await userEvent.click(page.getByRole("checkbox", { name: "Select pyramid.jpg" }));
+  await userEvent.click(page.getByRole("checkbox", { name: "Select sphinx.jpg" }));
   const pictureOf = (name: string) =>
     tile(name).element().querySelector("img")?.getAttribute("src");
   const sphinx = pictureOf("sphinx.jpg");
@@ -266,8 +266,8 @@ test("over the pane at the window's right edge the ghost sits to the pointer's l
 test("over an empty pane a set is shown in its place, in the order carried", async () => {
   await renderWithPane();
   const [felucca, sphinx] = [await idOf("felucca.mp4"), await idOf("sphinx.jpg")];
-  await userEvent.click(page.getByRole("checkbox", { name: "Check sphinx.jpg" }));
-  await userEvent.click(page.getByRole("checkbox", { name: "Check felucca.mp4" }));
+  await userEvent.click(page.getByRole("checkbox", { name: "Select sphinx.jpg" }));
+  await userEvent.click(page.getByRole("checkbox", { name: "Select felucca.mp4" }));
   await dragToPane("sphinx.jpg");
   expect(ghost()?.textContent).toBe("Show 2 files in the pane");
   letGo();
@@ -315,7 +315,7 @@ test("past the limit what fits goes in, and the line says how many of how many",
     CAIRO,
   );
   for (const name of ["felucca.mp4", "pyramid.jpg", "sphinx.jpg"]) {
-    await userEvent.click(page.getByRole("checkbox", { name: `Check ${name}` }));
+    await userEvent.click(page.getByRole("checkbox", { name: `Select ${name}` }));
   }
   expect(getSelection().ids).toEqual([felucca, pyramid, sphinx]);
   await dragToPane("pyramid.jpg");

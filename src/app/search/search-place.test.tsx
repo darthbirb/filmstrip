@@ -121,7 +121,7 @@ test("Escape goes back once nothing checked is left to clear", async () => {
   setPlace(searching("path:Pictures/Trips cairo"));
   const screen = await renderPlace();
   await expect.element(screen.getByRole("button", { name: "pyramid.jpg" })).toBeVisible();
-  await screen.getByRole("checkbox", { name: "Check pyramid.jpg" }).click();
+  await screen.getByRole("checkbox", { name: "Select pyramid.jpg" }).click();
   await userEvent.keyboard("{Escape}");
   expect(getPlace()?.kind).toBe("search");
   await userEvent.keyboard("{Escape}");
@@ -196,7 +196,7 @@ test("a trashed file among results says where it came from and goes only by Rest
   const caption = tile.element().closest("figure")?.querySelector("figcaption");
   expect(caption?.textContent).toContain("from Cairo");
 
-  await screen.getByRole("checkbox", { name: "Check felucca.mp4" }).click();
+  await screen.getByRole("checkbox", { name: "Select felucca.mp4" }).click();
   const bar = screen.getByRole("toolbar", { name: "Selection" });
   await expect.element(bar.getByText("Restore", { exact: true }).last()).toBeVisible();
   expect(bar.getByText("Move to…", { exact: true }).elements()).toHaveLength(0);

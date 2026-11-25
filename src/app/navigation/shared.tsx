@@ -25,7 +25,7 @@ export function sourcePlace(source: SourceSummary): Place {
 }
 
 /** The Sorting Box: every sorting source shown as one place, counted together. */
-export function sortingRow(sources: SourceSummary[], onNominate?: () => void): TreeRow {
+export function sortingRow(sources: SourceSummary[]): TreeRow {
   const waiting = sources
     .filter((source) => source.kind === "sorting")
     .reduce((sum, source) => sum + source.itemCount, 0);
@@ -36,10 +36,6 @@ export function sortingRow(sources: SourceSummary[], onNominate?: () => void): T
     expandable: false,
     glyph: "sortingBox",
     ...pill(waiting, waiting),
-    // Which + was pressed is what decides a source's kind, so this one is never hidden.
-    action: onNominate
-      ? { glyph: "plus", label: "Add Sorting Source…", onClick: onNominate }
-      : undefined,
   };
 }
 
