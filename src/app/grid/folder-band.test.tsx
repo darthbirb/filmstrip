@@ -101,7 +101,7 @@ test("the band reads in the pane's rhythm: status, labels, then tags, its own na
   await expect.poll(() => row(screen.container, "Note")?.textContent).toMatch(/^Four mornings/);
 
   await expect.element(screen.getByRole("radio", { name: "Working" })).toBeChecked();
-  expect(row(screen.container, "Status")?.textContent).toMatch(/set (today|yesterday|\d)/);
+  expect(row(screen.container, "Status")?.textContent).toMatch(/set (today|yesterday)$/);
   expect(chipTexts(row(screen.container, "Labels"))).toEqual(["locationcairo", "tripegypt 2024"]);
   expect(chipTexts(row(screen.container, "Tags"))).toEqual([
     "cairo",

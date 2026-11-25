@@ -146,6 +146,7 @@ export function Backups() {
 
   const row = (backup: Backup, at: number) => {
     const when = formatWhen(backup.takenAt);
+    const said = midSentence(when);
     const how = !backup.readable
       ? "unreadable"
       : going(at)
@@ -155,7 +156,7 @@ export function Backups() {
     let under: ReactNode = null;
     if (here && restoring) {
       under = (
-        <RowProgress sentence={`Restoring the index from ${when}…`} percent={restoring.percent} />
+        <RowProgress sentence={`Restoring the index from ${said}…`} percent={restoring.percent} />
       );
     } else if (asking === backup.name) {
       under = (
@@ -171,7 +172,7 @@ export function Backups() {
             </>
           }
         >
-          Restore the index from <Term>{when}</Term>? Tags, labels, notes, statuses, covers,
+          Restore the index from <Term>{said}</Term>? Tags, labels, notes, statuses, covers,
           favourites, keys and the undo journal go back to then.
           <Forgotten forgets={forgets} /> The index as it is now is kept as a backup first.
           {stopping(

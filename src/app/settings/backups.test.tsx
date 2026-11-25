@@ -123,6 +123,17 @@ test("a restore holds Settings open, then keeps the way back on top with the foc
   expect((await listBackups()).backups).toHaveLength(7);
 });
 
+test("a backup from yesterday is named in lower case in the question, the progress and the end", async () => {
+  await opened();
+  await expect.poll(() => rows().length).toBe(7);
+  expect(rowText(1)).toMatch(/^Yesterday, 09:41\s/);
+  await userEvent.click(restoreOn(1) as HTMLElement);
+  await expect.poll(() => rowText(1)).toContain("Restore the index from yesterday, 09:41?");
+  await userEvent.click(page.getByRole("button", { name: "Restore Index" }));
+  await expect.poll(() => rowText(1)).toContain("Restoring the index from yesterday, 09:41…");
+  await expect.element(page.getByText("Restored the index from yesterday, 09:41.")).toBeVisible();
+});
+
 test("leaving Backups mid-restore and coming back finds it running, and only then is the rail let go", async () => {
   const first = await opened();
   await expect.poll(() => rows().length).toBe(7);
