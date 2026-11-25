@@ -65,9 +65,12 @@ export function Sources({ asking }: { asking?: number }) {
         />
       )}
       {!refused && ended && <Band sentence={ended.sentence} onDismiss={() => finishRemove(null)} />}
-      <div className="flex">
+      <div className="flex gap-1.5">
         <Button glyph="plus" onClick={() => void addFolder("library")}>
           Add Source…
+        </Button>
+        <Button glyph="plus" onClick={() => void addFolder("sorting")}>
+          Add Sorting Source…
         </Button>
       </div>
       <DeleteDefault sources={held} />

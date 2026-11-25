@@ -31,7 +31,7 @@ function readable(element: Element, on: string, pseudo?: string) {
 }
 
 test("Move to…'s current folder says its name and 'current' in ink that can be read", async () => {
-  render(
+  await render(
     <Picker
       label="Move to"
       placeholder="Find a folder"

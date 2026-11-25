@@ -262,19 +262,6 @@ export function Grid({ mode }: { mode: LayoutMode }) {
             ),
           }}
         >
-          {/* First, so the folders and headings drawn over its empty stretches stay in reach. */}
-          {items && items.length > 0 && (
-            // biome-ignore lint/a11y/useSemanticElements: tiles placed by the layout are no table's rows and columns.
-            <div
-              role="grid"
-              aria-label="Files"
-              aria-multiselectable="true"
-              aria-rowcount={items.length}
-              className="absolute inset-0"
-            >
-              {tiles}
-            </div>
-          )}
           {found.length > 0 && (
             <div
               ref={setBlock}
@@ -331,6 +318,17 @@ export function Grid({ mode }: { mode: LayoutMode }) {
                 {day}
               </h3>
             ))}
+          {items && items.length > 0 && (
+            // biome-ignore lint/a11y/useSemanticElements: tiles placed by the layout are no table's rows and columns.
+            <div
+              role="grid"
+              aria-label="Files"
+              aria-multiselectable="true"
+              aria-rowcount={items.length}
+            >
+              {tiles}
+            </div>
+          )}
         </div>
       )}
       {ground.menu}

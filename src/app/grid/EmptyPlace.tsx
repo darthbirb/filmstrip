@@ -5,6 +5,7 @@ import { formatCount } from "../../lib/format";
 import { Button } from "../../ui/Button";
 import { countText } from "../../ui/Count";
 import { EmptyState } from "../../ui/EmptyState";
+import { addFolder } from "../navigation/add-source";
 import { ensureChildren, useIndex } from "../navigation/index-store";
 import { type Place, setPlace } from "../place";
 import { NothingMatched } from "../search/NothingMatched";
@@ -20,7 +21,13 @@ export function EmptyPlace({ place }: { place: Place }) {
   }, [folderId]);
 
   if (place.kind === "sorting") {
-    return <EmptyState glyph="checkCircle" title="Nothing to Sort" />;
+    return (
+      <EmptyState glyph="checkCircle" title="Nothing to Sort">
+        <Button glyph="plus" onClick={() => void addFolder("sorting")}>
+          Add Sorting Source…
+        </Button>
+      </EmptyState>
+    );
   }
   if (place.kind === "trash") {
     return <EmptyState glyph="trash" title="Trash Is Empty" />;

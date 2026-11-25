@@ -208,7 +208,7 @@ function Body({ onClose, section, asking }: Omit<Props, "open">) {
               disabled={held}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Find a setting"
-              className="focus-ring h-control w-full min-w-0 rounded-nested bg-ground pr-2 pl-7 text-fg text-ui inset-ring inset-ring-line-control placeholder:text-fg-dim disabled:text-fg-dim disabled:placeholder:text-fg-dim"
+              className="focus-ring h-control w-full min-w-0 rounded-nested bg-ground pr-2 pl-7 text-fg text-ui inset-ring inset-ring-line-control placeholder:text-fg-dim disabled:text-fg-dim"
             />
           </label>
           {groups.map((group) => (

@@ -23,7 +23,8 @@ The sheets still draw text in `fg-faint`, which is under 3:1: the count's slash 
 "current", the note box's "Ctrl+Enter saves · Escape abandons", and placeholders. The app sets
 each in `fg-dim`, and on the plate the slash in `on-plate-dim`, as DESIGN.md "Colors" says. The
 sheets also draw the Sorting Box's + as a button on its row, inside the tree's one tab stop; the
-app has Add Sorting Source… on the row's menu and its grid's ground instead, after Paste, as
+app has Add Sorting Source… beside Add Source… in Settings › Sources and as the empty Sorting
+Box's one move, with the row's menu and its grid's ground repeating it after Paste, as
 DECISIONS.md "Places, not queries" says. Redraw both, and take `on-plate-faint` off the token sheet.
 
 ## The grid's ground in Components › Right-click · DEFECT
