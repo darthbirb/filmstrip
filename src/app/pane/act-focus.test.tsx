@@ -3,6 +3,7 @@ import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { resetBin } from "../../dev/mock";
+import { recording } from "../../dev/recording";
 import { folderItems, trashItems, undoLast } from "../../ipc/commands";
 import { setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex } from "../navigation/index-store";
@@ -76,6 +77,17 @@ function Harness() {
 
 const shown = () => document.querySelector("aside h2")?.textContent ?? null;
 
+/** Whether the pane's picture holds the focus. */
+const onPicture = () =>
+  document.activeElement?.parentElement?.tagName === "FIGURE" &&
+  document.activeElement.closest("aside") !== null;
+
+type Invoke = (cmd: string, args?: unknown) => Promise<unknown>;
+
+/** The dev mock's own answer to a command, for a test that holds one back. */
+const invoke = (): Invoke =>
+  (window as unknown as { __TAURI_INTERNALS__: { invoke: Invoke } }).__TAURI_INTERNALS__.invoke;
+
 async function showing(file: number, place: Place) {
   setPlace(place);
   showInPane(file, place);
@@ -133,10 +145,40 @@ test("restored inside a search, the file's bar has no Restore, so its picture ta
 
   await expect.element(bar.getByRole("button", { name: "Move to…" })).toBeVisible();
   expect(getPaneItem()).toBe(pyramid);
-  await expect
-    .poll(() => document.activeElement?.parentElement?.closest("figure") !== null)
-    .toBe(true);
-  expect(document.activeElement?.closest("aside")).not.toBeNull();
+  await expect.poll(onPicture).toBe(true);
+});
+
+test("restored inside a search whose list comes back after the file's detail, the picture still ends with the focus", async () => {
+  const pyramid = await id("pyramid.jpg");
+  await trashItems([pyramid, await id("sphinx.jpg"), await id("felucca.mp4")]);
+  const { screen, bar } = await showing(pyramid, TRASHED);
+  const frame = screen
+    .getByRole("listbox", { name: "Filmstrip" })
+    .getByRole("option", { name: "pyramid.jpg" });
+  await expect.element(frame).toBeVisible();
+
+  const real = invoke();
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let restoring = false;
+  await recording(
+    async () => {
+      await bar.getByRole("button", { name: "Restore", exact: true }).click();
+      // The detail lands first: the library's bar, and the strip still on its old list.
+      await expect.element(bar.getByRole("button", { name: "Move to…" })).toBeVisible();
+      await expect.element(frame).toHaveFocus();
+      release();
+      await expect.element(frame).not.toBeInTheDocument();
+      await expect.poll(onPicture).toBe(true);
+    },
+    (cmd, args) => {
+      if (cmd === "restore_items") restoring = true;
+      if (!restoring || cmd !== "search") return undefined;
+      return held.then(() => real(cmd, args));
+    },
+  );
 });
 
 test("with no such button on the next bar, the strip's shown frame takes the focus once drawn", async () => {
