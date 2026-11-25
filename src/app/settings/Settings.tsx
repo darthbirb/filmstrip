@@ -1,10 +1,12 @@
 import { Fragment, type ReactNode, useLayoutEffect, useRef, useState } from "react";
 
+import { Band } from "../../ui/Band";
 import { Dropdown } from "../../ui/Dropdown";
 import { Glyph } from "../../ui/Glyph";
 import { GlyphButton } from "../../ui/GlyphButton";
 import type { GlyphName } from "../../ui/glyphs";
 import { DEFAULT_LAYOUT, type LayoutMode } from "../grid/layout";
+import { setNews, useNews } from "../navigation/foot-slot";
 import { SCALES, updatePreferences, usePreferences } from "../preferences";
 import { Backups } from "./Backups";
 import { Keys } from "./Keys";
@@ -161,6 +163,13 @@ export function Settings({ open, onClose, section, asking }: Props) {
   );
 }
 
+/** What an act asked from Settings could not do, at the foot of the panel it was asked from. */
+function Failed() {
+  const news = useNews();
+  if (news?.kind !== "failed") return null;
+  return <Band sentence={news.line} onDismiss={() => setNews(null)} />;
+}
+
 function Body({ onClose, section, asking }: Omit<Props, "open">) {
   const [query, setQuery] = useState("");
   const [chosen, setChosen] = useState<string | null>(section ?? null);
@@ -239,19 +248,24 @@ function Body({ onClose, section, asking }: Omit<Props, "open">) {
             </Fragment>
           ))}
         </nav>
-        <div className={`min-w-0 flex-1 ${shown?.fill ? "flex flex-col" : "overflow-auto p-3.5"}`}>
-          {shown?.fill ? (
-            <section aria-label={shown.title} className="flex min-h-0 flex-1 flex-col">
-              {shown.body}
-            </section>
-          ) : shown ? (
-            <section aria-label={shown.title} className="flex flex-col gap-1.5">
-              {shown.caption && <Caption>{shown.caption}</Caption>}
-              {shown.body ?? <Rows rows={shown.rows} />}
-            </section>
-          ) : (
-            <p className="m-0 text-fg-dim text-ui">No setting matches “{query.trim()}”.</p>
-          )}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div
+            className={`min-h-0 flex-1 ${shown?.fill ? "flex flex-col" : "overflow-auto p-3.5"}`}
+          >
+            {shown?.fill ? (
+              <section aria-label={shown.title} className="flex min-h-0 flex-1 flex-col">
+                {shown.body}
+              </section>
+            ) : shown ? (
+              <section aria-label={shown.title} className="flex flex-col gap-1.5">
+                {shown.caption && <Caption>{shown.caption}</Caption>}
+                {shown.body ?? <Rows rows={shown.rows} />}
+              </section>
+            ) : (
+              <p className="m-0 text-fg-dim text-ui">No setting matches “{query.trim()}”.</p>
+            )}
+          </div>
+          <Failed />
         </div>
       </div>
     </div>

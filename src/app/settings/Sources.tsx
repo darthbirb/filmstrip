@@ -11,13 +11,14 @@ import { EmptyState } from "../../ui/EmptyState";
 import { Glyph } from "../../ui/Glyph";
 import { GlyphButton } from "../../ui/GlyphButton";
 import { Segmented } from "../../ui/Segmented";
+import { failed, unasked } from "../failure";
 import { libraryChanged } from "../library";
 import { addFolder, refusalSentence } from "../navigation/add-source";
 import { loadIndex, useIndex } from "../navigation/index-store";
 import { setRefused, useRefused } from "../navigation/refusal-store";
 import { useWork } from "../navigation/work-store";
 import { updatePreferences, usePreferences } from "../preferences";
-import { whyFailed } from "../undo/lines";
+import { shownFailed, whyFailed } from "../undo/lines";
 import { settleLine } from "../undo/undo";
 import { Caption, Rows } from "./Rows";
 import { binStays } from "./recycle-words";
@@ -77,6 +78,9 @@ export function Sources({ asking }: { asking?: number }) {
     </div>
   );
 }
+
+const kindFailed = (title: string, kind: SourceKind) =>
+  `Could not make ${title} a ${kind === "library" ? "library" : "sorting"} source.`;
 
 const ASK = "ask";
 
@@ -141,8 +145,10 @@ function Settled({ source, onRemove }: { source: SourceSummary; onRemove: () => 
   const rename = async (title: string) => {
     setNaming(false);
     if (title.trim() && title.trim() !== source.title) {
-      await renameSource(source.id, title.trim()).catch(() => undefined);
-      await loadIndex().catch(() => undefined);
+      await renameSource(source.id, title.trim()).catch(
+        failed(`Could not rename ${source.title}.`),
+      );
+      await loadIndex().catch(unasked);
     }
   };
 
@@ -191,7 +197,7 @@ function Settled({ source, onRemove }: { source: SourceSummary; onRemove: () => 
             onChange={(kind) => {
               void setSourceKind(source.id, kind)
                 .then(() => loadIndex())
-                .catch(() => undefined);
+                .catch(failed(kindFailed(source.title, kind)));
             }}
           />
         )}
@@ -199,7 +205,7 @@ function Settled({ source, onRemove }: { source: SourceSummary; onRemove: () => 
           <GlyphButton
             glyph="folderOpen"
             label={`Show ${source.title} in Explorer`}
-            onClick={() => void revealSource(source.id).catch(() => undefined)}
+            onClick={() => void revealSource(source.id).catch(failed(shownFailed(source.title)))}
           />
         ) : (
           <span aria-hidden className="size-control shrink-0" />
@@ -290,7 +296,7 @@ async function removeNow(source: SourceSummary, onKept: () => void) {
   } catch (error) {
     ended = { sentence: `${source.title} was not removed. ${whyFailed(error)}` };
   }
-  await libraryChanged().catch(() => undefined);
+  await libraryChanged().catch(unasked);
   if (ended) onKept();
   else await settleLine();
   finishRemove(ended);

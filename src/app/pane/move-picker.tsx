@@ -13,12 +13,13 @@ import {
 } from "../../ipc/commands";
 import type { MenuAnchor } from "../../ui/Menu";
 import { Picker, type PickerRow, type PickerSection } from "../../ui/Picker";
+import { failed, sayFailed, unasked } from "../failure";
 import { libraryChanged } from "../library";
 import { setNews } from "../navigation/foot-slot";
 import { getIndex, refreshIndex, useIndex } from "../navigation/index-store";
 import type { Place } from "../place";
 import { getPreferences, RECENT, updatePreferences, usePreferences } from "../preferences";
-import { movedBannerLine, moveStoppedLine, reasonSentence } from "../undo/lines";
+import { movedBannerLine, movedFailed, moveStoppedLine, reasonSentence } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
 import { keepFocusThrough } from "./act-focus";
@@ -163,7 +164,7 @@ function MovePicker({ request }: { request: MoveRequest }) {
         if ("binding" in request) {
           return void setDestinationKey(request.binding, to.id)
             .then(() => refreshIndex())
-            .catch(() => undefined);
+            .catch(failed(`Could not give ${to.title} key ${request.binding}.`));
         }
         if (!("folder" in request)) return act(moveFiles(request.itemIds, to));
         const from = { folderId: request.folderId, path: pathOf(byId, request.folderId) };
@@ -260,7 +261,10 @@ type Into = Pick<FolderEntry, "id" | "title">;
  */
 export async function moveFiles(itemIds: number[], to: Into) {
   const pane = await moveOnFrom(itemIds);
-  const moved = await moveItems(itemIds, to.id).catch(() => null);
+  const moved = await moveItems(itemIds, to.id).catch((error: unknown) => {
+    sayFailed(movedFailed(itemIds.length, to.title), error);
+    return null;
+  });
   if (!moved) return null;
   remember(to);
   if (moved.kind === "started") {
@@ -315,7 +319,7 @@ const landing = new Map<number, MoveOn>();
  */
 async function leavesAhead(origin: Place | null, to: Into) {
   if (origin?.kind !== "sorting") return true;
-  const into = await folderDetail(to.id).catch(() => null);
+  const into = await folderDetail(to.id).catch(unasked);
   return getIndex().sources?.find((one) => one.id === into?.sourceId)?.kind !== "sorting";
 }
 
@@ -335,7 +339,10 @@ export async function moveFolderTo(
     showReport(null);
   } catch (error) {
     const { kind, reason } = (error ?? {}) as Partial<AppError>;
-    if (kind !== "refused" || !reason) return;
+    if (kind !== "refused" || !reason) {
+      sayFailed(`Could not move ${folder.name} to ${to.title}.`, error);
+      return;
+    }
     const at = { kind: "folder" as const, ...from };
     showReport({
       sentence: movedBannerLine(0, 1, to.title, folder.name),
@@ -388,9 +395,7 @@ export async function afterMoved(moved: Moved) {
 
 /** Hears how each move between drives ended. */
 export async function watchMoves() {
-  await listen<Moved>("move-done", ({ payload }) => void afterMoved(payload)).catch(
-    () => undefined,
-  );
+  await listen<Moved>("move-done", ({ payload }) => void afterMoved(payload)).catch(unasked);
 }
 
 /** The picker's Recent: the newest place first, files and folders alike. */

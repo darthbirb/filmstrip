@@ -15,6 +15,7 @@ import { Dropdown } from "../../ui/Dropdown";
 import { Glyph } from "../../ui/Glyph";
 import type { GlyphName } from "../../ui/glyphs";
 import { autoPopoverOpen } from "../../ui/Menu";
+import { unasked } from "../failure";
 import { getPreferences, updatePreferences, usePreferences } from "../preferences";
 import { SPEEDS, type Speed, setSpeed, speedLabel, stepSpeed, useSpeed } from "./speed";
 
@@ -225,7 +226,7 @@ export function VideoPlate({ video, durationMs, frameUs = null, near = true }: P
   }, [video, volume, muted]);
 
   const toggle = () => {
-    if (video.paused) void video.play().catch(() => undefined);
+    if (video.paused) void video.play().catch(unasked);
     else video.pause();
     playback.refresh();
   };

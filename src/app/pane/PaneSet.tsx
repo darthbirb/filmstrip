@@ -13,6 +13,7 @@ import {
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import { BadgeButton } from "../../ui/BadgeButton";
 import { autoPopoverOpen, useContextMenu } from "../../ui/Menu";
+import { unasked } from "../failure";
 import { dragging } from "../grid/drag";
 import { getSelection } from "../grid/selection";
 import { itemMenu } from "../menus/item-menu";
@@ -209,7 +210,7 @@ function SetFile(props: FileProps) {
   useEffect(() => {
     const clip = video.current;
     if (!clip) return;
-    if (playing) void clip.play().catch(() => undefined);
+    if (playing) void clip.play().catch(unasked);
     else clip.pause();
   }, [playing]);
 

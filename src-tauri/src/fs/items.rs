@@ -230,6 +230,7 @@ pub(super) fn rename_unjournalled(
     }
     let file =
         items::file_of(conn, item_id)?.ok_or_else(|| AppError::refused(Reason::NotIndexed))?;
+    sanitize::refuse_forbidden(name)?;
     let name = sanitize::file_name(name.trim());
     if name == file.disk_name {
         return Ok(false);
@@ -388,6 +389,22 @@ mod tests {
             .collect();
         assert!(names.contains(&"Pyramid.jpg".to_string()), "{names:?}");
         assert!(!rename(&conn, pyramid, "Pyramid.jpg", &journal::new_batch()).unwrap());
+    }
+
+    #[test]
+    fn a_rename_holding_a_character_windows_refuses_is_refused_with_it_named() {
+        let (conn, root, cairo, _) = library("rename-forbidden");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+
+        let err = rename(&conn, pyramid, "giza: day 2.jpg", &journal::new_batch()).unwrap_err();
+        assert_eq!(
+            Reason::of(&err),
+            Reason::ForbiddenCharacter {
+                character: ":".into()
+            }
+        );
+        assert!(root.join("Trips/Cairo/pyramid.jpg").is_file());
+        assert_eq!(id_of(&conn, cairo, "pyramid.jpg"), pyramid);
     }
 
     #[cfg(windows)]

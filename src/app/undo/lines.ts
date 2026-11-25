@@ -497,9 +497,44 @@ export function reasonText(reason: Reason): string {
       return "Could not be read";
     case "noFfmpeg":
       return "ffmpeg not found";
+    case "forbiddenCharacter":
+      return `A name cannot contain ${character(reason.character)}`;
     case "other":
       return "Something went wrong";
   }
+}
+
+/** A character Windows refuses in a name, quoted, or said in words when it cannot be seen. */
+const character = (one: string) => (/\p{Cc}/u.test(one) ? "a control character" : `“${one}”`);
+
+/** A file, by its name when the act knew it. */
+type Named = { id: number; diskName?: string };
+
+/** Files by the one name, or counted when there are more or it is not known. */
+const named = (items: readonly Named[]) => {
+  const [first] = items;
+  return items.length === 1 && first?.diskName ? first.diskName : files(items.length);
+};
+
+/** What an act that failed says before why: what it could not do, to what. */
+export const shownFailed = (name: string) => `Could not show ${name} in Explorer.`;
+export const openFailed = (name: string) => `Could not open ${name}.`;
+export const copiedFailed = (items: readonly Named[]) => `Could not copy ${named(items)}.`;
+export const pathsFailed = (items: readonly Named[]) =>
+  items.length === 1
+    ? `Could not copy the path of ${named(items)}.`
+    : `Could not copy the paths of ${named(items)}.`;
+
+export const movedFailed = (count: number, to: string) =>
+  `Could not move ${files(count)} to ${to}.`;
+export const deletedFailed = (count: number) => `Could not delete ${files(count)}.`;
+export const restoredFailed = (count: number, to: string | null) =>
+  to ? `Could not restore ${files(count)} to ${to}.` : `Could not restore ${files(count)}.`;
+
+/** What a favourite that failed says, before why: `what` is a name, or files counted when unnamed. */
+export function favouriteFailed(what: string | number, was: boolean) {
+  const named = typeof what === "number" ? files(what) : what;
+  return was ? `Could not remove ${named} from favourites.` : `Could not favourite ${named}.`;
 }
 
 /** Why, as the sentence after the one that says what failed. */

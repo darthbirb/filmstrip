@@ -1,6 +1,8 @@
 //! Names a filesystem will accept. A folder title and a `disk_name` are real
 //! names on disk, so Windows' rules are the app's rules.
 
+use crate::error::{AppError, Reason, Result};
+
 /// What Windows refuses in a path component, plus the control range. NTFS
 /// rejects both, and neither belongs in a name typed or arriving from outside.
 const FORBIDDEN: &[char] = &['<', '>', ':', '"', '/', '\\', '|', '?', '*'];
@@ -59,6 +61,23 @@ fn component(raw: &str, fallback: &str, max: usize) -> String {
     cleaned
 }
 
+/// The first character a typed name holds that Windows refuses.
+fn forbidden(raw: &str) -> Option<char> {
+    raw.chars()
+        .find(|c| FORBIDDEN.contains(c) || c.is_control())
+}
+
+/// A typed name holding a character Windows refuses is refused with it named, as Explorer does,
+/// rather than written without it.
+pub fn refuse_forbidden(typed: &str) -> Result<()> {
+    match forbidden(typed) {
+        Some(character) => Err(AppError::refused(Reason::ForbiddenCharacter {
+            character: character.to_string(),
+        })),
+        None => Ok(()),
+    }
+}
+
 /// A folder title as a directory name. Case is preserved exactly; this only
 /// removes what a directory name cannot hold at all.
 pub fn folder_title(raw: &str) -> String {
@@ -113,6 +132,13 @@ mod tests {
         assert_eq!(folder_title("A/B:C*D?"), "ABCD");
         assert_eq!(folder_title("Vacation. "), "Vacation");
         assert_eq!(folder_title("///"), "Untitled");
+    }
+
+    #[test]
+    fn names_the_first_character_windows_refuses() {
+        assert_eq!(forbidden("Cairo: day 2?"), Some(':'));
+        assert_eq!(forbidden("tab\there"), Some('\t'));
+        assert_eq!(forbidden("Giza (2).jpg"), None);
     }
 
     #[test]

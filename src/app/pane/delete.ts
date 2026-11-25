@@ -1,10 +1,12 @@
 import { binlessItems, deleteForGood, trashItems } from "../../ipc/commands";
+import { sayFailed } from "../failure";
 import { libraryChanged } from "../library";
 import { setNews } from "../navigation/foot-slot";
 import {
   binRefusedDetail,
   binRefusedLine,
   deletedBannerLine,
+  deletedFailed,
   forGoodKeptLine,
   forGoodLine,
 } from "../undo/lines";
@@ -19,7 +21,10 @@ import { askNoBin } from "./no-bin";
  */
 export async function deleteFiles(itemIds: number[]) {
   const back = document.activeElement;
-  const drives = await binlessItems(itemIds).catch(() => null);
+  const drives = await binlessItems(itemIds).catch((error: unknown) => {
+    sayFailed(deletedFailed(itemIds.length), error);
+    return null;
+  });
   if (!drives) return;
   const asked = new Set(drives.flatMap((drive) => drive.files.map((file) => file.id)));
   const rest = itemIds.filter((id) => !asked.has(id));
@@ -47,7 +52,10 @@ export async function deleteFiles(itemIds: number[]) {
  */
 async function sendToBin(itemIds: number[], asked: number) {
   const pane = await moveOnFrom(itemIds);
-  const done = await trashItems(itemIds).catch(() => null);
+  const done = await trashItems(itemIds).catch((error: unknown) => {
+    sayFailed(deletedFailed(itemIds.length), error);
+    return null;
+  });
   if (!done) return 0;
   const { batch, report } = done;
   const binOnly =
@@ -83,7 +91,10 @@ async function deleteFilesForGood(
 ) {
   const itemIds = files.map((file) => file.id);
   const pane = await moveOnFrom(itemIds);
-  const report = await deleteForGood(itemIds).catch(() => null);
+  const report = await deleteForGood(itemIds).catch((error: unknown) => {
+    sayFailed(deletedFailed(itemIds.length), error);
+    return null;
+  });
   if (!report) return;
   const [first] = report.refused;
   if (first) setNews({ kind: "kept", line: forGoodKeptLine(report.refused, report.deleted) });

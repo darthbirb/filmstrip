@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 
 import { renameItem } from "../../ipc/commands";
+import { sayFailed } from "../failure";
 import { libraryChanged } from "../library";
 import { updatePreferences } from "../preferences";
 import { refusedName } from "../undo/lines";
@@ -26,10 +27,13 @@ export function useRenaming() {
   return useSyncExternalStore(subscribe, () => renaming);
 }
 
-/** Renames the file on disk; the refusal's sentence when the name is taken, else nothing. */
-export async function renameFile(itemId: number, name: string): Promise<string | null> {
+/**
+ * Renames the file on disk; the refusal's sentence when the name cannot be had, else nothing, and
+ * the foot says any other failure.
+ */
+export async function renameFile(item: { id: number; diskName: string }, name: string) {
   try {
-    const batch = await renameItem(itemId, name);
+    const batch = await renameItem(item.id, name);
     stopRename();
     if (batch) {
       afterAct(batch);
@@ -38,8 +42,10 @@ export async function renameFile(itemId: number, name: string): Promise<string |
     return null;
   } catch (error) {
     const refused = refusedName(error);
-    if (!refused) stopRename();
-    return refused;
+    if (refused) return refused;
+    stopRename();
+    sayFailed(`Could not rename ${item.diskName}.`, error);
+    return null;
   }
 }
 

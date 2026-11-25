@@ -4,6 +4,7 @@ import type { Naming } from "../ipc/bindings/Naming";
 import type { Sort } from "../ipc/bindings/Sort";
 import { setUiPreferences, uiPreferences } from "../ipc/commands";
 import { isSortKey } from "../ipc/sort";
+import { failed, unasked } from "./failure";
 import type { LayoutMode } from "./grid/layout";
 
 // The interface's own preferences, kept in filmstrip.config.json. DECISIONS.md "The interface size".
@@ -52,7 +53,7 @@ const listeners = new Set<() => void>();
 
 /** Reads what was saved; anything missing or malformed falls back to the defaults. */
 export async function loadPreferences() {
-  const stored = await uiPreferences().catch(() => null);
+  const stored = await uiPreferences().catch(unasked);
   current = { ...DEFAULTS, ...validated(stored) };
   applyScale();
   notify();
@@ -68,7 +69,7 @@ export function updatePreferences(change: Partial<Preferences>) {
   notify();
   clearTimeout(pendingSave);
   pendingSave = setTimeout(() => {
-    void setUiPreferences(current).catch(() => undefined);
+    void setUiPreferences(current).catch(failed("The settings were not saved."));
   }, SAVE_DELAY_MS);
 }
 

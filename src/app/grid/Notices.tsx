@@ -4,8 +4,9 @@ import type { Failure } from "../../ipc/bindings/Failure";
 import { revealFolder, revealItem } from "../../ipc/commands";
 import { formatCount } from "../../lib/format";
 import { Banner, LIST_HEADING, LIST_ROW, listRow } from "../../ui/Banner";
+import { failed } from "../failure";
 import { retryFailures, useWork } from "../navigation/work-store";
-import { reasonText } from "../undo/lines";
+import { reasonText, shownFailed } from "../undo/lines";
 import { ShowInExplorer } from "../undo/ReportBanner";
 
 const COLUMNS = listRow("figureControl");
@@ -61,5 +62,7 @@ function Look({ failure }: { failure: Failure }) {
         ? () => revealFolder(folderId)
         : null;
   if (!reveal || !name) return <span />;
-  return <ShowInExplorer name={name} onClick={() => void reveal().catch(() => undefined)} />;
+  return (
+    <ShowInExplorer name={name} onClick={() => void reveal().catch(failed(shownFailed(name)))} />
+  );
 }

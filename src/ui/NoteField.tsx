@@ -1,4 +1,11 @@
-import { type FocusEvent, type KeyboardEvent, useLayoutEffect, useRef, useState } from "react";
+import {
+  type FocusEvent,
+  type KeyboardEvent,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { ChipButton } from "./ChipButton";
 import { Glyph } from "./Glyph";
@@ -8,9 +15,15 @@ type Props = {
   note: string | null;
   /** What it is a note on, for its field's name. */
   of: string;
-  /** The text kept, or `null` once it is emptied. */
-  onSave: (note: string | null) => void;
+  /**
+   * The text kept, or `null` once it is emptied; resolves to why it was not saved when it was
+   * not, and the box comes back holding what was written.
+   */
+  onSave: (note: string | null) => Promise<string | null>;
 };
+
+/** What was written and not saved, and why. */
+type Unsaved = { text: string; why: string };
 
 /**
  * A note as prose where it stands, and the box it becomes. Enter is a new line; Ctrl+Enter, Save
@@ -18,14 +31,27 @@ type Props = {
  */
 export function NoteField({ note, of, onSave }: Props) {
   const [writing, setWriting] = useState(false);
+  const [unsaved, setUnsaved] = useState<Unsaved | null>(null);
+  const [focus, setFocus] = useState(true);
   if (writing) {
     return (
       <Box
-        note={note}
+        note={unsaved ? unsaved.text : note}
         of={of}
+        why={unsaved?.why ?? null}
+        focus={focus}
         onDone={(kept) => {
           setWriting(false);
-          if (kept !== undefined && kept !== note) onSave(kept);
+          setUnsaved(null);
+          setFocus(true);
+          if (kept === undefined || (kept === note && !unsaved)) return;
+          void onSave(kept).then((why) => {
+            if (why === null) return;
+            const active = document.activeElement;
+            setFocus(active === null || active === document.body);
+            setUnsaved({ text: kept ?? "", why });
+            setWriting(true);
+          });
         }}
       />
     );
@@ -59,19 +85,24 @@ export function NoteField({ note, of, onSave }: Props) {
 type BoxProps = {
   note: string | null;
   of: string;
+  /** Why what it holds was not saved, said in place of the keys. */
+  why: string | null;
+  /** Whether it takes the caret as it opens. */
+  focus: boolean;
   /** What to keep, or `undefined` to keep the note as it was. */
   onDone: (kept: string | null | undefined) => void;
 };
 
-function Box({ note, of, onDone }: BoxProps) {
+function Box({ note, of, why, focus, onDone }: BoxProps) {
   const field = useRef<HTMLTextAreaElement>(null);
   const settled = useRef(false);
+  const unsavedId = useId();
 
   // A box opened in a band still arriving is hidden for its first frame, so the caret is asked
   // for again each frame until it lands, at the end of what is written.
   useLayoutEffect(() => {
     const element = field.current;
-    if (!element) return;
+    if (!element || !focus) return;
     let frame = 0;
     let asking = 0;
     const take = () => {
@@ -84,7 +115,7 @@ function Box({ note, of, onDone }: BoxProps) {
     };
     take();
     return () => cancelAnimationFrame(asking);
-  }, []);
+  }, [focus]);
 
   const finish = (keep: boolean) => {
     if (settled.current) return;
@@ -115,10 +146,18 @@ function Box({ note, of, onDone }: BoxProps) {
         defaultValue={note ?? ""}
         placeholder="Write a note"
         onKeyDown={onKeyDown}
-        className="focus-ring field-sizing-content min-h-[calc(3*var(--text-ui--line-height)+2*var(--pad))] w-full resize-none rounded-nested bg-ground px-2 py-(--pad) text-fg-hi [--pad:--spacing(1)] text-ui inset-ring inset-ring-line-control placeholder:text-fg-dim"
+        aria-invalid={why !== null || undefined}
+        aria-describedby={why !== null ? unsavedId : undefined}
+        className={`focus-ring field-sizing-content min-h-[calc(3*var(--text-ui--line-height)+2*var(--pad))] w-full resize-none rounded-nested bg-ground px-2 py-(--pad) text-fg-hi [--pad:--spacing(1)] text-ui inset-ring placeholder:text-fg-dim ${why !== null ? "inset-ring-line-danger" : "inset-ring-line-control"}`}
       />
       <span className="flex items-center gap-1.5">
-        <span className="flex-1 text-fg-dim text-key">Ctrl+Enter saves · Escape abandons</span>
+        {why !== null ? (
+          <span id={unsavedId} role="alert" className="flex-1 text-danger text-key">
+            {why}
+          </span>
+        ) : (
+          <span className="flex-1 text-fg-dim text-key">Ctrl+Enter saves · Escape abandons</span>
+        )}
         <ChipButton look="secondary" onClick={() => finish(false)}>
           Cancel
         </ChipButton>

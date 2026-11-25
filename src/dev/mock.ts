@@ -436,6 +436,16 @@ function refusedName(parent: number, name: string, folder: boolean) {
   });
 }
 
+/** A name holding a character Windows refuses, refused with it named as the Rust side does. */
+function forbidden(name: string) {
+  const character = [...name].find((one) => /[<>:"/\\|?*\p{Cc}]/u.test(one));
+  if (character === undefined) return null;
+  return Promise.reject<AppError>({
+    kind: "refused",
+    reason: { kind: "forbiddenCharacter", character },
+  });
+}
+
 const pathOf = (folderId: number) => crumbs(folderId).folders.map((crumb) => crumb.title);
 
 function stayedIn(item: ItemRow, reason: Reason): Stayed {
@@ -1616,6 +1626,21 @@ let binRefuses = new Set<number>();
 /** Trashed files emptied from the bin outside the app, which an undo still finds gone. */
 const emptiedOutside = new Set<number>();
 
+// Commands made to fail with a reason, for tests and for looking: `?fails=reveal_item` has each
+// one named fail as Windows refusing access.
+const failing = new Map<string, Reason>();
+
+/** Has a command fail with this reason, or work again with `null`. */
+export function failCommand(cmd: string, reason: Reason | null) {
+  if (reason) failing.set(cmd, reason);
+  else failing.delete(cmd);
+}
+
+function failureOf(cmd: string): Reason | undefined {
+  const named = new URLSearchParams(location.search).get("fails")?.split(",") ?? [];
+  return failing.get(cmd) ?? (named.includes(cmd) ? { kind: "permissionDenied" } : undefined);
+}
+
 /** Has every undo fail, or succeed again, as `?undo-fails` does; and the look for its act, too. */
 export function failUndo(failing: boolean, lookupToo = false) {
   undoFailing = failing;
@@ -1872,6 +1897,8 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   create_folder: ({ parentId, title }) => {
     const parent = parentId as number;
     const name = (title as string).trim();
+    const refused = forbidden(name);
+    if (refused) return refused;
     if (folderTaken(parent, name)) return refusedName(parent, name, true);
     const node = folder(nextFolderId++, name, 0, 0);
     attach(node, parent);
@@ -1882,6 +1909,8 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     if (!found) return invalid();
     const { node, parent } = found;
     const name = (title as string).trim();
+    const refused = forbidden(name);
+    if (refused) return refused;
     if (name === node.title) return null;
     if (folderTaken(parent, name, node)) return refusedName(parent, name, true);
     const from = node.title;
@@ -1914,6 +1943,8 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   rename_item: ({ itemId, name }) => {
     const item = everyItem().find((one) => one.id === itemId);
     const wanted = (name as string).trim();
+    const refused = forbidden(wanted);
+    if (refused) return refused;
     if (!item || wanted === item.diskName) return null;
     if (taken(item.folderId, wanted, item)) return refusedName(item.folderId, wanted, false);
     const from = item.diskName;
@@ -2513,6 +2544,8 @@ mockIPC(
     if (cmd.startsWith("plugin:")) return undefined;
     const command = COMMANDS[cmd];
     if (!command) throw new Error(`the dev mock does not know the command "${cmd}"`);
+    const reason = failureOf(cmd);
+    if (reason) return Promise.reject<AppError>({ kind: "io", reason });
     return command((payload ?? {}) as Args);
   },
   { shouldMockEvents: true },

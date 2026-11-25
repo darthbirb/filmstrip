@@ -9,6 +9,7 @@ import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import type { Stayed } from "../../ipc/bindings/Stayed";
 import { dropFiles, pasteFiles } from "../../ipc/commands";
 import type { MenuAnchor } from "../../ui/Menu";
+import { sayFailed, unasked } from "../failure";
 import { libraryChanged, RELOAD_WINDOW_MS } from "../library";
 import { type FootNews, sayOnce, setNews } from "../navigation/foot-slot";
 import { refreshIndex } from "../navigation/index-store";
@@ -25,13 +26,21 @@ export type Into = { id: number; title: string };
 
 /** Copies what the clipboard holds into a folder. */
 export async function pasteInto(to: Into) {
-  answer(await pasteFiles(to.id).catch(() => null), "paste");
+  answer(await pasteFiles(to.id).catch(failing(`Could not paste into ${to.title}.`)), "paste");
 }
 
 /** Copies what was dropped from Explorer into a folder. */
 export async function dropInto(to: Into, paths: readonly string[]) {
-  answer(await dropFiles(to.id, [...paths]).catch(() => null), "drop");
+  answer(
+    await dropFiles(to.id, [...paths]).catch(failing(`Could not copy into ${to.title}.`)),
+    "drop",
+  );
 }
+
+const failing = (what: string) => (error: unknown) => {
+  sayFailed(what, error);
+  return null;
+};
 
 /** A copy that starts says so at the foot as it runs; one refused whole says why in the band. */
 function answer(start: CopyStart | null, how: "paste" | "drop") {
@@ -136,12 +145,10 @@ export async function watchCopies() {
     if (moved && recount === undefined)
       recount = setTimeout(() => {
         recount = undefined;
-        void refreshIndex().catch(() => undefined);
+        void refreshIndex().catch(unasked);
       }, RELOAD_WINDOW_MS);
-  }).catch(() => undefined);
-  await listen<Copied>("copy-done", ({ payload }) => void afterCopied(payload)).catch(
-    () => undefined,
-  );
+  }).catch(unasked);
+  await listen<Copied>("copy-done", ({ payload }) => void afterCopied(payload)).catch(unasked);
 }
 
 /** The Sorting Box's sorting sources, each a place a copy can go. */

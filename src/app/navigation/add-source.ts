@@ -1,6 +1,8 @@
 import type { Refusal } from "../../ipc/bindings/Refusal";
 import type { SourceKind } from "../../ipc/bindings/SourceKind";
 import { addSource, pickFolder } from "../../ipc/commands";
+import { sayFailed, unasked } from "../failure";
+import { dirName } from "../undo/lines";
 import { loadIndex } from "./index-store";
 import { setRefused } from "./refusal-store";
 
@@ -23,14 +25,21 @@ export function refusalSentence(why: Refusal, clash: string | null) {
  * asked afterwards. DECISIONS.md "Places, not queries".
  */
 export async function addFolder(kind: SourceKind) {
-  const root = await pickFolder().catch(() => null);
+  const root = await pickFolder().catch((error: unknown) => {
+    sayFailed("Could not open the folder picker.", error);
+    return null;
+  });
   // A cancelled picker is not an error and is not reported: they know they cancelled.
   if (root === null) return;
-  const outcome = await addSource(root, kind);
+  const outcome = await addSource(root, kind).catch((error: unknown) => {
+    sayFailed(`Could not add ${dirName(root)}.`, error);
+    return null;
+  });
+  if (!outcome) return;
   if (outcome.kind === "refused") {
     setRefused({ why: outcome.why, clash: outcome.clash, path: root });
     return;
   }
   setRefused(null);
-  await loadIndex().catch(() => undefined);
+  await loadIndex().catch(unasked);
 }

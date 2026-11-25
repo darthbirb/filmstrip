@@ -26,8 +26,10 @@ import { Line } from "../../ui/Line";
 import { keepEscape, SURFACE } from "../../ui/Menu";
 import { PushDown } from "../../ui/PushDown";
 import { Tallies, type TallyNote, type TallyRow } from "../../ui/Tallies";
+import { failed } from "../failure";
 import { showInPane } from "../pane/pane-store";
 import { setPlace } from "../place";
+import { dirName, shownFailed } from "../undo/lines";
 import { undo } from "../undo/undo";
 import { refusalSentence } from "./add-source";
 import { type FootNews, setNews, useNews } from "./foot-slot";
@@ -116,14 +118,14 @@ function wordings({ count, bytes }: Tally) {
  * folded. DECISIONS.md "Navigation".
  */
 function Baseline({ rail, anchor }: { rail: boolean; anchor: string }) {
-  const { sources, totals } = useIndex();
+  const { sources, totals, unopened } = useIndex();
   const id = useId();
   const own = `--baseline-${id.replace(/[^\w-]/g, "")}`;
   const trigger = useRef<HTMLButtonElement>(null);
   const surface = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [fit, setFit] = useState(0);
-  const texts = wordings((totals ?? NOTHING).all);
+  const texts = unopened === null ? wordings((totals ?? NOTHING).all) : [];
   const whole = texts[0] ?? "";
 
   return (
@@ -134,10 +136,11 @@ function Baseline({ rail, anchor }: { rail: boolean; anchor: string }) {
         popoverTarget={id}
         aria-haspopup="dialog"
         aria-expanded={open}
-        aria-label={whole}
-        title={rail || fit > 0 ? whole : "Library · what it holds"}
+        aria-label={whole || "Library"}
+        disabled={unopened !== null}
+        title={(rail || fit > 0) && whole ? whole : "Library · what it holds"}
         style={rail ? ({ anchorName: own } as CSSProperties) : undefined}
-        className={`focus-ring-inset flex h-foot w-full items-center border-line border-t text-small transition-colors duration-(--motion-quick) motion-reduce:transition-none ${rail ? "justify-center" : "gap-2 px-2.5 text-left"} ${open ? "bg-raised text-fg-mid" : "text-fg-dim hover:bg-wash hover:text-fg-mid"}`}
+        className={`focus-ring-inset flex h-foot w-full items-center border-line border-t text-small transition-colors duration-(--motion-quick) motion-reduce:transition-none ${rail ? "justify-center" : "gap-2 px-2.5 text-left"} ${open ? "bg-raised text-fg-mid" : "text-fg-dim enabled:hover:bg-wash enabled:hover:text-fg-mid disabled:text-fg-faint"}`}
       >
         <Glyph name="source" className="text-glyph" />
         {!rail && <FirstFit texts={texts} onFit={setFit} className="flex-1 tabular-nums" />}
@@ -231,7 +234,7 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
   if (news.kind === "binRefused") {
     return <Band sentence={news.line} detail={news.detail} onDismiss={dismiss} />;
   }
-  if (news.kind === "kept") {
+  if (news.kind === "kept" || news.kind === "failed") {
     return <Band sentence={news.line} onDismiss={dismiss} />;
   }
   if (news.kind === "skipped") {
@@ -266,7 +269,9 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
           <GlyphButton
             glyph="folderOpen"
             label={`Show in Explorer · ${news.line}`}
-            onClick={() => void revealPath(news.path).catch(() => undefined)}
+            onClick={() =>
+              void revealPath(news.path).catch(failed(shownFailed(dirName(news.path))))
+            }
           />
         ) : (
           <OutOfRail news={news} sentence={news.kind === "noFiles" ? NO_FILES : "Nothing to undo."}>
@@ -313,7 +318,9 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
         action={
           <Button
             glyph="folderOpen"
-            onClick={() => void revealPath(news.path).catch(() => undefined)}
+            onClick={() =>
+              void revealPath(news.path).catch(failed(shownFailed(dirName(news.path))))
+            }
           >
             Show in Explorer
           </Button>

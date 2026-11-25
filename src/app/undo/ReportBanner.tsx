@@ -4,10 +4,11 @@ import type { Stayed } from "../../ipc/bindings/Stayed";
 import { revealFolder, revealHeld, revealItem, revealPath } from "../../ipc/commands";
 import { Banner, LIST_HEADING, LIST_ROW, listRow } from "../../ui/Banner";
 import { Glyph } from "../../ui/Glyph";
+import { failed } from "../failure";
 import { openMovePicker } from "../pane/move-picker";
 import { showInPane } from "../pane/pane-store";
 import { setPlace } from "../place";
-import { reasonText, stayedGroups } from "./lines";
+import { reasonText, shownFailed, stayedGroups } from "./lines";
 import { type Report, showReport, useReport } from "./report-store";
 
 const COLUMNS = listRow("control");
@@ -83,7 +84,10 @@ function Row({ row, inTrash }: { row: Stayed; inTrash: "show" | "restoreTo" }) {
       </span>
       <span className="truncate text-fg-dim">{reasonText(row.reason)}</span>
       {showable ? (
-        <ShowInExplorer name={row.name} onClick={() => void reveal(row).catch(() => undefined)} />
+        <ShowInExplorer
+          name={row.name}
+          onClick={() => void reveal(row).catch(failed(shownFailed(row.name)))}
+        />
       ) : row.at.kind === "trash" ? (
         <InTrash row={row} offers={inTrash} />
       ) : (

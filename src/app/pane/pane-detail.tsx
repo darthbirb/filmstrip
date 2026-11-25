@@ -5,6 +5,7 @@ import type { FolderDetail } from "../../ipc/bindings/FolderDetail";
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { folderDetail, itemsDetail } from "../../ipc/commands";
+import { unasked } from "../failure";
 import { diskPath, useDetailVersion } from "../grid/folder-detail";
 import { whenLibraryChanges } from "../library";
 import { useIndex } from "../navigation/index-store";
@@ -62,7 +63,7 @@ function useFolderShown(folder: PaneFolder | null): FolderShown {
       );
     };
     load();
-    const unlisten = listen("job-progress", load).catch(() => undefined);
+    const unlisten = listen("job-progress", load).catch(unasked);
     const stop = whenLibraryChanges(load);
     return () => {
       live = false;
@@ -135,7 +136,7 @@ function useSetDetail(ids: readonly number[]) {
         });
     };
     load();
-    const unlisten = listen("job-progress", load).catch(() => undefined);
+    const unlisten = listen("job-progress", load).catch(unasked);
     const stop = whenLibraryChanges(load);
     return () => {
       live = false;

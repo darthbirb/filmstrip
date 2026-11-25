@@ -2,8 +2,9 @@ import type { FolderEntry } from "../../ipc/bindings/FolderEntry";
 import type { Reason } from "../../ipc/bindings/Reason";
 import type { Stayed } from "../../ipc/bindings/Stayed";
 import { restoreItems } from "../../ipc/commands";
+import { sayFailed } from "../failure";
 import { libraryChanged } from "../library";
-import { restoredBannerLine } from "../undo/lines";
+import { restoredBannerLine, restoredFailed } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
 import { moveOn, moveOnFrom } from "./move-on";
@@ -19,7 +20,10 @@ export async function restoreFiles(
   earlier: readonly Stayed[] = [],
 ) {
   const pane = await moveOnFrom(itemIds);
-  const done = await restoreItems(itemIds, to?.id ?? null).catch(() => null);
+  const done = await restoreItems(itemIds, to?.id ?? null).catch((error: unknown) => {
+    sayFailed(restoredFailed(itemIds.length, to?.title ?? null), error);
+    return null;
+  });
   if (!done) return;
   const { batch, report } = done;
   if (batch) afterAct(batch, report.refused.length);

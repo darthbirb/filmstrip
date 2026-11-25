@@ -48,5 +48,11 @@
     "formatter": {
       "enabled": false
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["src/app/**", "src/ui/**"],
+      "plugins": ["./lint/no-quiet-catch.grit"]
+    }
+  ]
 }

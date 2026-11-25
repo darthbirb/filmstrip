@@ -5,6 +5,7 @@ import { tagOffers } from "../../ipc/commands";
 import { labelTerm, tagTerm } from "../../lib/queryTerm";
 import { Chip } from "../../ui/Chip";
 import { type Refusal, TagField } from "../../ui/TagField";
+import { failed, sayFailed } from "../failure";
 import { addToSearch, searchFor } from "../search/search";
 
 /** What a chip's tooltip says: whose it is when it comes from above, else what a click searches. */
@@ -19,13 +20,16 @@ export function stopsIn(row: HTMLElement | null) {
   return [...(row?.querySelectorAll<HTMLElement>("button:not([tabindex='-1'])") ?? [])];
 }
 
-/** Takes a tag or a label off; one taken off with the keyboard hands the focus to the next. */
-export function takeOff(remove: () => Promise<unknown>, stops: () => HTMLElement[]) {
+/**
+ * Takes a tag or a label off; one taken off with the keyboard hands the focus to the next. `what`
+ * is what the foot says when it could not be.
+ */
+export function takeOff(remove: () => Promise<unknown>, stops: () => HTMLElement[], what: string) {
   const at = stops().indexOf(document.activeElement as HTMLElement);
   void remove()
     // What was after it now stands where it stood.
     .then(() => at >= 0 && requestAnimationFrame(() => stops()[at]?.focus()))
-    .catch(() => undefined);
+    .catch(failed(what));
 }
 
 type ChipsProps = {
@@ -103,6 +107,7 @@ export function TagsRow({ owner, tags, nameTitle, onAdd, onRemove }: TagsRowProp
           takeOff(
             () => onRemove(tag.tagId),
             () => stopsIn(row.current),
+            `Could not take ${tag.value} off ${owner}.`,
           )
         }
       />
@@ -110,7 +115,12 @@ export function TagsRow({ owner, tags, nameTitle, onAdd, onRemove }: TagsRowProp
         of={owner}
         offers={tagOffers}
         refuse={refuse}
-        onAdd={(value) => onAdd(value).catch(() => undefined)}
+        onAdd={(value) =>
+          onAdd(value).catch((error: unknown) => {
+            sayFailed(`Could not add ${value} to ${owner}.`, error);
+            throw error;
+          })
+        }
         onEcho={setEcho}
         onBackOut={backOut}
       />

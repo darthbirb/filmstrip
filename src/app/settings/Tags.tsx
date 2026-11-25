@@ -39,6 +39,7 @@ import { ContextMenu, type MenuAnchor, type MenuGroups } from "../../ui/Menu";
 import type { OfferRow } from "../../ui/OfferList";
 import { TermField, TypedTerm } from "../../ui/TermField";
 import { MoreButton, RowQuestion, TermGroup, TermRow, type TermSort } from "../../ui/TermTable";
+import { failed, sayFailed } from "../failure";
 import { libraryChanged, whenLibraryChanges } from "../library";
 import { setNews, useNews } from "../navigation/foot-slot";
 import { addToSearch, searchFor } from "../search/search";
@@ -115,9 +116,7 @@ export function Tags() {
   const news = useNews();
 
   const load = useCallback(() => {
-    void listTags()
-      .then(setVocabulary)
-      .catch(() => undefined);
+    void listTags().then(setVocabulary).catch(failed("Could not read the tags."));
   }, []);
   useEffect(() => {
     load();
@@ -143,20 +142,26 @@ export function Tags() {
     if (editing) back.current = editing.row;
     setEditing(null);
   };
-  const act = async (run: () => Promise<Batch | null>) => {
+  /** Runs a rename, a merge or a delete; `what` is what the foot says when it could not be. */
+  const act = async (run: () => Promise<Batch | null>, what: string) => {
     const row = editing?.row ?? null;
     setEditing(null);
+    let batch: Batch | null;
     try {
-      const batch = await run();
-      if (batch) {
-        mine.current.add(batch.batchId);
-        afterAct(batch);
-        await libraryChanged();
-      }
-      setVocabulary(await listTags());
-    } catch {
+      batch = await run();
+    } catch (error) {
+      sayFailed(what, error);
       load();
+      back.current = row;
+      return;
     }
+    if (batch) {
+      mine.current.add(batch.batchId);
+      afterAct(batch);
+      await libraryChanged();
+    }
+    const read = await listTags().catch(failed("Could not read the tags."));
+    if (read) setVocabulary(read);
     back.current = row;
   };
 
@@ -265,7 +270,9 @@ export function Tags() {
     const [files, folders] = named ? [tag.ownFiles, tag.handFolders] : [tag.files, tag.folders];
     const rename = () => setEditing({ row, mode: "rename" });
     const remove = () =>
-      unused ? void act(() => deleteTag(tag.tagId)) : setEditing({ row, mode: "askDelete" });
+      unused
+        ? void act(() => deleteTag(tag.tagId), `Could not delete ${tag.value}.`)
+        : setEditing({ row, mode: "askDelete" });
     const into = (value: string) => tags.find((other) => other.value === value);
     const offers = (typed: string): OfferRow[] =>
       tags
@@ -296,7 +303,7 @@ export function Tags() {
           onCommit={(to, typed) => {
             if (to === tag.value) return stop();
             if (into(to)) return setEditing({ row, mode: "askMerge", into: to, typed });
-            void act(() => renameTag(tag.tagId, to));
+            void act(() => renameTag(tag.tagId, to), `Could not rename ${tag.value} to ${to}.`);
           }}
         />
       );
@@ -336,7 +343,12 @@ export function Tags() {
             <>
               <Button
                 glyph="merge"
-                onClick={() => void act(() => mergeTags(tag.tagId, target.tagId))}
+                onClick={() =>
+                  void act(
+                    () => mergeTags(tag.tagId, target.tagId),
+                    `Could not merge ${tag.value} into ${target.value}.`,
+                  )
+                }
               >
                 Merge Tags
               </Button>
@@ -363,7 +375,9 @@ export function Tags() {
               <Button
                 tone="danger"
                 glyph="trash"
-                onClick={() => void act(() => deleteTag(tag.tagId))}
+                onClick={() =>
+                  void act(() => deleteTag(tag.tagId), `Could not delete ${tag.value}.`)
+                }
               >
                 Delete Tag
               </Button>
@@ -443,7 +457,7 @@ export function Tags() {
     };
     const remove = () =>
       key.folders === 0
-        ? void act(() => deleteLabelKey(key.key))
+        ? void act(() => deleteLabelKey(key.key), `Could not delete ${key.key}.`)
         : setEditing({ row, mode: "askDelete" });
     const existing = (to: string) =>
       keys.find((other) => other.key === to && other.key !== key.key);
@@ -510,7 +524,7 @@ export function Tags() {
                   typed: merging ? undefined : typed,
                 });
               }
-              void act(() => renameLabelKey(key.key, to));
+              void act(() => renameLabelKey(key.key, to), `Could not rename ${key.key} to ${to}.`);
             }}
           />
         </>
@@ -549,7 +563,12 @@ export function Tags() {
             <>
               <Button
                 glyph="merge"
-                onClick={() => void act(() => mergeLabelKeys(key.key, target.key))}
+                onClick={() =>
+                  void act(
+                    () => mergeLabelKeys(key.key, target.key),
+                    `Could not merge ${key.key} into ${target.key}.`,
+                  )
+                }
               >
                 Merge Keys
               </Button>
@@ -571,7 +590,9 @@ export function Tags() {
               <Button
                 tone="danger"
                 glyph="trash"
-                onClick={() => void act(() => deleteLabelKey(key.key))}
+                onClick={() =>
+                  void act(() => deleteLabelKey(key.key), `Could not delete ${key.key}.`)
+                }
               >
                 Delete Key
               </Button>
@@ -621,7 +642,7 @@ export function Tags() {
     const rename = () => setEditing({ row, mode: "rename" });
     const remove = () =>
       value.folders === 0
-        ? void act(() => deleteLabelValue(value.tagId))
+        ? void act(() => deleteLabelValue(value.tagId), `Could not delete ${label}.`)
         : setEditing({ row, mode: "askDelete" });
     const existing = (to: string) =>
       key.values.find((other) => other.value === to && other.tagId !== value.tagId);
@@ -670,7 +691,10 @@ export function Tags() {
                   typed: merging ? undefined : typed,
                 });
               }
-              void act(() => renameLabelValue(value.tagId, to));
+              void act(
+                () => renameLabelValue(value.tagId, to),
+                `Could not rename ${label} to ${key.key}: ${to}.`,
+              );
             }}
           />
         </>
@@ -688,7 +712,12 @@ export function Tags() {
             <>
               <Button
                 glyph="merge"
-                onClick={() => void act(() => mergeLabelValues(value.tagId, target.tagId))}
+                onClick={() =>
+                  void act(
+                    () => mergeLabelValues(value.tagId, target.tagId),
+                    `Could not merge ${label} into ${into}.`,
+                  )
+                }
               >
                 Merge Values
               </Button>
@@ -709,7 +738,9 @@ export function Tags() {
               <Button
                 tone="danger"
                 glyph="trash"
-                onClick={() => void act(() => deleteLabelValue(value.tagId))}
+                onClick={() =>
+                  void act(() => deleteLabelValue(value.tagId), `Could not delete ${label}.`)
+                }
               >
                 Delete Value
               </Button>

@@ -1,12 +1,13 @@
 import { beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { failCommand } from "../../dev/mock";
 import { recording } from "../../dev/recording";
 import { withoutGlyphs } from "../../dev/words";
 import { folderItems, trashItems, undoLast } from "../../ipc/commands";
 import { formatBytes } from "../../lib/format";
 import { setFavourites } from "../favourites";
-import { setNews } from "../navigation/foot-slot";
+import { getNews, setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { MovePickerHost } from "../pane/move-picker";
 import { getPaneItem, showInPane } from "../pane/pane-store";
@@ -38,10 +39,7 @@ beforeEach(async () => {
   clearChecked();
   showInPane(null);
   // Through the app's own store, which remembers what was set before the index reads it again.
-  setFavourites(
-    (await folderItems(6)).map((row) => row.id),
-    false,
-  );
+  setFavourites(await folderItems(6), false);
 });
 
 async function renderGrid(width = 900) {
@@ -118,7 +116,7 @@ test("Move to… moves the whole set, and the files that went leave it", async (
 test("Favourite on a mixed set makes every one a favourite, then offers to take it off all", async () => {
   await renderGrid();
   const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
-  setFavourites([pyramid], true);
+  setFavourites([{ id: pyramid }], true);
   await expect
     .poll(async () => (await folderItems(6)).find((row) => row.id === pyramid)?.favorite)
     .toBe(true);
@@ -132,6 +130,24 @@ test("Favourite on a mixed set makes every one a favourite, then offers to take 
     });
   });
   await expect.element(bar().getByRole("button", { name: "Remove Favourite" })).toBeVisible();
+});
+
+test("a Favourite that fails on one checked file names it at the foot, and the star goes back", async () => {
+  await renderGrid();
+  await userEvent.click(box("pyramid.jpg"));
+  failCommand("set_item_favorite", { kind: "permissionDenied" });
+  try {
+    await userEvent.click(bar().getByRole("button", { name: "Favourite", exact: true }));
+    await expect.poll(getNews).toEqual({
+      kind: "failed",
+      line: "Could not favourite pyramid.jpg. Windows refused access.",
+    });
+    await expect
+      .element(bar().getByRole("button", { name: "Favourite", exact: true }))
+      .toBeVisible();
+  } finally {
+    failCommand("set_item_favorite", null);
+  }
 });
 
 test("Copy puts the whole set on the clipboard", async () => {

@@ -8,6 +8,7 @@ import type { Scope } from "../../ipc/bindings/Scope";
 import type { ZipPick } from "../../ipc/bindings/ZipPick";
 import { exportPlan, pickExportZip, startExport } from "../../ipc/commands";
 import { formatCount } from "../../lib/format";
+import { sayFailed, unasked } from "../failure";
 import { type FootNews, setNews } from "../navigation/foot-slot";
 import { getPlace } from "../place";
 import { getPreferences, updatePreferences } from "../preferences";
@@ -77,6 +78,13 @@ export function takenNews({ zip, place }: { zip: string; place: string }): FootN
   };
 }
 
+/** What an export that could not start says before why. */
+function exportFailed(asked: Asked) {
+  const what =
+    asked.folder ?? (asked.scope.kind === "files" ? files(asked.scope.itemIds.length) : asked.name);
+  return `Could not export ${what}.`;
+}
+
 /** What a checked set's zip is named after: the place it was checked in. */
 export function setName() {
   const place = getPlace();
@@ -118,7 +126,11 @@ export async function exportFiles(asked: Asked) {
   if (asking) return;
   asking = true;
   try {
-    const plan = await exportPlan(asked.scope).catch(() => null);
+    const failing = (error: unknown) => {
+      sayFailed(exportFailed(asked), error);
+      return null;
+    };
+    const plan = await exportPlan(asked.scope).catch(failing);
     if (!plan) return;
     if (plan.kind === "empty") {
       setNews({
@@ -131,9 +143,7 @@ export async function exportFiles(asked: Asked) {
       setNews({ kind: "keyRefused", line: awayLine(plan.offline, plan.files) });
       return;
     }
-    const pick = await pickExportZip(asked.name, getPreferences().exportDir ?? null).catch(
-      () => null,
-    );
+    const pick = await pickExportZip(asked.name, getPreferences().exportDir ?? null).catch(failing);
     const anchor = asked.anchor();
     if (!pick || pick.kind === "cancelled") {
       anchor?.focus({ preventScroll: true });
@@ -163,7 +173,10 @@ export async function exportFiles(asked: Asked) {
 /** Export on the sheet: the job is queued, and the place and the naming kept for next time. */
 export async function startSheet(sheet: Sheet, naming: Naming) {
   updatePreferences({ exportDir: sheet.zip.dir, exportNaming: naming });
-  const start = await startExport(sheet.scope, naming, sheet.zip.path).catch(() => null);
+  const start = await startExport(sheet.scope, naming, sheet.zip.path).catch((error: unknown) => {
+    sayFailed(`Could not export to ${sheet.zip.zip}.`, error);
+    return null;
+  });
   if (start?.kind === "taken") setNews(takenNews(start));
 }
 
@@ -217,9 +230,7 @@ export function afterExported(done: Exported) {
 
 /** Hears each export end. */
 export async function watchExports() {
-  await listen<Exported>("export-done", ({ payload }) => afterExported(payload)).catch(
-    () => undefined,
-  );
+  await listen<Exported>("export-done", ({ payload }) => afterExported(payload)).catch(unasked);
 }
 
 let open: Sheet | null = null;

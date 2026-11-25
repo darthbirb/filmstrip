@@ -4,6 +4,7 @@ import { countText } from "../../ui/Count";
 import { DismissButton } from "../../ui/DismissButton";
 import { KeyChip } from "../../ui/KeyChip";
 import { PlaceButton } from "../../ui/PlaceButton";
+import { failed } from "../failure";
 import { DIGITS } from "../keys";
 import { refreshIndex, useIndex } from "../navigation/index-store";
 import { MovePickerHost, openMovePicker } from "../pane/move-picker";
@@ -66,7 +67,7 @@ function KeyRow({ digit, held }: { digit: string; held?: DestinationKey }) {
           onClick={() =>
             void removeDestinationKey(digit)
               .then(() => refreshIndex())
-              .catch(() => undefined)
+              .catch(failed(`Could not take key ${digit} off ${name}.`))
           }
         />
       ) : (

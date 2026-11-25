@@ -5,7 +5,8 @@ import { revealItem } from "../../ipc/commands";
 import { formatBytes } from "../../lib/format";
 import { LIST_HEADING, LIST_ROW, listRow } from "../../ui/Banner";
 import { Question } from "../../ui/Question";
-import { noBinDetail, noBinHead } from "../undo/lines";
+import { failed } from "../failure";
+import { noBinDetail, noBinHead, shownFailed } from "../undo/lines";
 import { ShowInExplorer } from "../undo/ReportBanner";
 import { setFullScreen } from "./full-screen";
 
@@ -107,7 +108,7 @@ function DriveList({ drives }: { drives: readonly BinlessDrive[] }) {
           <span className="truncate text-fg-dim tabular-nums">{formatBytes(file.bytes)}</span>
           <ShowInExplorer
             name={file.name}
-            onClick={() => void revealItem(file.id).catch(() => undefined)}
+            onClick={() => void revealItem(file.id).catch(failed(shownFailed(file.name)))}
           />
         </div>
       ))}

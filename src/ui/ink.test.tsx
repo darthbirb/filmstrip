@@ -73,7 +73,9 @@ test("a count's slash is read with its figures, at rest and on a row that cannot
 });
 
 test("a note's box says its keys and its placeholder in ink that can be read", async () => {
-  const screen = await render(<NoteField note={null} of="cover.jpg" onSave={() => undefined} />);
+  const screen = await render(
+    <NoteField note={null} of="cover.jpg" onSave={() => Promise.resolve(null)} />,
+  );
   await userEvent.click(screen.getByRole("button", { name: "Add Note…" }));
   const box = screen.getByRole("textbox", { name: "Note on cover.jpg" });
   await expect.element(box).toBeVisible();

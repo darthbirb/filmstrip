@@ -1,6 +1,8 @@
 import { useSyncExternalStore } from "react";
 
 import { setItemFavorite } from "../ipc/commands";
+import { sayFailed } from "./failure";
+import { favouriteFailed } from "./undo/lines";
 
 // What was just set wins over what was last read, so the pane's bar and every menu show a change at
 // once rather than at the next read of the index.
@@ -29,22 +31,32 @@ export function useEveryFavourite(items: readonly { id: number; favorite: boolea
   return items.length > 0 && items.every((item) => isFavourite(item.id, item.favorite));
 }
 
-export function setFavourite(itemId: number, favourite: boolean) {
-  setFavourites([itemId], favourite);
+export function setFavourite(item: { id: number; diskName: string }, favourite: boolean) {
+  setFavourites([item], favourite);
 }
 
-/** Every one of them made a favourite, or none; a mixed set is never half-toggled. */
-export function setFavourites(itemIds: readonly number[], favourite: boolean) {
+/**
+ * Every one of them made a favourite, or none; a mixed set is never half-toggled. One that fails
+ * goes back as it was, and the foot says so.
+ */
+export function setFavourites(
+  items: readonly { id: number; diskName?: string }[],
+  favourite: boolean,
+) {
+  const itemIds = items.map((item) => item.id);
+  const [first] = items;
+  const what = items.length === 1 && first?.diskName ? first.diskName : items.length;
   const before = itemIds.map((id) => chosen.get(id));
   for (const id of itemIds) chosen.set(id, favourite);
   changed();
-  void setItemFavorite([...itemIds], favourite).catch(() => {
+  void setItemFavorite([...itemIds], favourite).catch((error: unknown) => {
     itemIds.forEach((id, at) => {
       const was = before[at];
       if (was === undefined) chosen.delete(id);
       else chosen.set(id, was);
     });
     changed();
+    sayFailed(favouriteFailed(what, !favourite), error);
   });
 }
 

@@ -23,6 +23,7 @@ import {
 } from "../../ui/Menu";
 import { Tree, type TreeRow } from "../../ui/Tree";
 import { exportFiles } from "../export/export";
+import { failed, sayFailed, unasked } from "../failure";
 import { type Landing, type Resolver, setDropResolver, useDrag } from "../grid/drag";
 import { type CheckedFile, checkBranch } from "../grid/selection";
 import { DIGITS } from "../keys";
@@ -42,11 +43,11 @@ import {
 import { type Place, placeFolder, setPlace, usePlace } from "../place";
 import { searchIn } from "../search/SearchField";
 import { openSettings } from "../settings/settings-store";
-import { refusedName } from "../undo/lines";
+import { favouriteFailed, refusedName, shownFailed } from "../undo/lines";
 import { afterAct } from "../undo/undo";
 import { addFolder } from "./add-source";
 import { deleteFolderAsking } from "./delete-folder";
-import { ensureChildren, loadIndex, refreshIndex, useIndex } from "./index-store";
+import { ensureChildren, loadIndex, openIndex, refreshIndex, useIndex } from "./index-store";
 import { openFolders, setOpenFolders, useOpenFolders } from "./open-folders";
 import {
   addFolderRows,
@@ -66,11 +67,12 @@ import {
   sourceRow,
   TRASH_ID,
   trashRow,
+  Unopened,
 } from "./shared";
 
 /** The Sorting Box and the Trash, then each library source with its folders opening in place. DECISIONS.md "Navigation". */
 export function Navigation() {
-  const { sources, children, totals, favourites, keys } = useIndex();
+  const { sources, unopened, children, totals, favourites, keys } = useIndex();
   const [keying, setKeying] = useState<Keying | null>(null);
   const place = usePlace();
   const expanded = useOpenFolders();
@@ -106,7 +108,7 @@ export function Navigation() {
     };
   }, []);
 
-  if (!sources) return null;
+  if (!sources) return unopened && <Unopened why={unopened} onRetry={() => void openIndex()} />;
   if (sources.length === 0) return <NoSources onAdd={() => void addFolder("library")} />;
 
   const rows: TreeRow[] = [sortingRow(sources), trashRow(totals?.trash)];
@@ -288,6 +290,7 @@ export function Navigation() {
       : [];
     // A favourite changes nothing on disk, so it is there whether the drive is or not.
     const favourite = favourites.some((one) => one.folderId === folder);
+    const title = path.at(-1)?.title ?? source.title;
     const star: MenuAction = {
       id: "favourite",
       label: favourite ? "Remove Favourite" : "Favourite",
@@ -296,7 +299,7 @@ export function Navigation() {
       onSelect: () =>
         void setFolderFavorite(folder, !favourite)
           .then(() => refreshIndex())
-          .catch(() => undefined),
+          .catch(failed(favouriteFailed(title, favourite))),
     };
     if (source.kind === "sorting") return { groups: [[...pasteHere, star]] };
     // It only looks, as Full Screen heads a tile's menu; the pane reads the index, so offline too.
@@ -307,7 +310,6 @@ export function Navigation() {
       flip: true,
       onSelect: () => showFolderInPane(folder, source.id),
     };
-    const title = path.at(-1)?.title ?? source.title;
     const assign: MenuAction = {
       id: "assign-key",
       label: "Assign Key…",
@@ -329,7 +331,7 @@ export function Navigation() {
       glyph: "checkAll",
       onSelect: () => {
         setPlace(place);
-        void checkBranch().catch(() => undefined);
+        void checkBranch().catch(failed(`Could not select everything inside ${title}.`));
       },
     };
     const exportHere: MenuAction = {
@@ -388,10 +390,10 @@ export function Navigation() {
         [
           searchHere("Search in Folder"),
           inside,
-          revealFolderRow(folder),
+          revealFolderRow(folder, title),
           exportHere,
           renameRow(rename),
-          readAgainRow(folder),
+          readAgainRow(folder, title),
         ],
         [remove],
       ],
@@ -425,8 +427,9 @@ export function Navigation() {
       stopRenaming();
     } catch (error) {
       const refused = refusedName(error);
-      if (refused) setTaken(refused);
-      else stopRenaming();
+      if (refused) return setTaken(refused);
+      stopRenaming();
+      sayFailed(`Could not create ${name.trim()}.`, error);
     }
   };
   // A source's name is the app's own label; a folder's is its directory's, so it can be taken.
@@ -436,8 +439,8 @@ export function Navigation() {
     if (!source || folder === undefined) return stopRenaming();
     if (folder === source.rootFolderId) {
       stopRenaming();
-      await renameSource(source.id, name).catch(() => undefined);
-      await loadIndex().catch(() => undefined);
+      await renameSource(source.id, name).catch(failed(`Could not rename ${source.title}.`));
+      await loadIndex().catch(unasked);
       return;
     }
     try {
@@ -447,8 +450,12 @@ export function Navigation() {
       stopRenaming();
     } catch (error) {
       const refused = refusedName(error);
-      if (refused) setTaken(refused);
-      else stopRenaming();
+      if (refused) return setTaken(refused);
+      stopRenaming();
+      sayFailed(
+        `Could not rename ${placeFolderPath(places.get(id)).at(-1)?.title ?? name}.`,
+        error,
+      );
     }
   };
 
@@ -458,7 +465,7 @@ export function Navigation() {
         <ContextMenu
           label={`Key for ${keying.title}`}
           heading={`Key for ${keying.title}`}
-          groups={keyGroups(keys, keying.folder)}
+          groups={keyGroups(keys, keying)}
           anchor={keying.anchor}
           onClose={() => setKeying(null)}
         />
@@ -511,9 +518,10 @@ type Keying = { folder: number; title: string; anchor: MenuAnchor };
  * The ten keys, each with the folder it is on, this folder's own on the plate, then No Key.
  * Picking a key another folder holds moves it, with no question. Artboards › Destination keys.
  */
-function keyGroups(keys: readonly DestinationKey[], folder: number): MenuGroups {
+function keyGroups(keys: readonly DestinationKey[], { folder, title }: Keying): MenuGroups {
   const own = keys.find((one) => one.folderId === folder);
-  const bind = (work: Promise<void>) => void work.then(() => refreshIndex()).catch(() => undefined);
+  const bind = (work: Promise<void>, what: string) =>
+    void work.then(() => refreshIndex()).catch(failed(what));
   const digits: MenuAction[] = DIGITS.map((digit) => {
     const held = keys.find((one) => one.key === digit);
     const name = held?.path.at(-1)?.title;
@@ -523,7 +531,8 @@ function keyGroups(keys: readonly DestinationKey[], folder: number): MenuGroups 
       chip: digit,
       chosen: held?.folderId === folder,
       quiet: !held || held.gone,
-      onSelect: () => bind(setDestinationKey(digit, folder)),
+      onSelect: () =>
+        bind(setDestinationKey(digit, folder), `Could not give ${title} key ${digit}.`),
     };
   });
   const none: MenuAction = {
@@ -531,7 +540,7 @@ function keyGroups(keys: readonly DestinationKey[], folder: number): MenuGroups 
     label: "No Key",
     glyph: "close",
     onSelect: () => {
-      if (own) bind(removeDestinationKey(own.key));
+      if (own) bind(removeDestinationKey(own.key), `Could not take key ${own.key} off ${title}.`);
     },
   };
   return [digits, [none]];
@@ -557,14 +566,14 @@ function sourceMenu(
     id: "reveal",
     label: "Show in Explorer",
     glyph: "folderOpen",
-    onSelect: () => void revealSource(source.id).catch(() => undefined),
+    onSelect: () => void revealSource(source.id).catch(failed(shownFailed(source.title))),
   };
   const naming = renameRow(rename);
   // New Folder is on it because a source's row is the only row that stands for its top level.
   return [
     source.reachable ? [showInPane, newFolder, ...paste, star, assign] : [showInPane, star, assign],
     source.reachable
-      ? [search, inside, reveal, exportHere, naming, readAgainRow(folder)]
+      ? [search, inside, reveal, exportHere, naming, readAgainRow(folder, source.title)]
       : [inside, naming],
     [
       {
@@ -586,12 +595,12 @@ function sourceMenu(
 
 const placeFolderPath = (place: Place | undefined) => (place?.kind === "folder" ? place.path : []);
 
-function revealFolderRow(folder: number): MenuAction {
+function revealFolderRow(folder: number, title: string): MenuAction {
   return {
     id: "reveal",
     label: "Show in Explorer",
     glyph: "folderOpen",
-    onSelect: () => void revealFolder(folder).catch(() => undefined),
+    onSelect: () => void revealFolder(folder).catch(failed(shownFailed(title))),
   };
 }
 
@@ -599,11 +608,11 @@ function renameRow(rename: () => void): MenuAction {
   return { id: "rename", label: "Rename", glyph: "rename", onSelect: rename };
 }
 
-function readAgainRow(folder: number): MenuAction {
+function readAgainRow(folder: number, title: string): MenuAction {
   return {
     id: "read-again",
     label: "Refresh",
     glyph: "readAgain",
-    onSelect: () => void readFolderAgain(folder).catch(() => undefined),
+    onSelect: () => void readFolderAgain(folder).catch(failed(`Could not refresh ${title}.`)),
   };
 }

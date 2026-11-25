@@ -2,6 +2,7 @@ import { beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
+import { recording } from "../../dev/recording";
 import { withoutGlyphs } from "../../dev/words";
 import {
   addItemTag,
@@ -11,7 +12,7 @@ import {
   setFolderLabel,
   undoLast,
 } from "../../ipc/commands";
-import { setNews } from "../navigation/foot-slot";
+import { getNews, setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { getPlace, setPlace } from "../place";
 import { Settings } from "./Settings";
@@ -89,6 +90,30 @@ test("Rename… renames a tag everywhere, its line has Undo, and Undo puts it ba
   await userEvent.click(page.getByRole("button", { name: "Undo" }));
   await expect.poll(values).toContain("egypt");
   await expect.element(page.getByText("nile valley is egypt again.")).toBeVisible();
+});
+
+test("a rename that worked keeps its line when the list cannot be read again after it", async () => {
+  await opened();
+  await userEvent.click(more("egypt"));
+  await userEvent.click(menuRow("Rename…"));
+  let renamed = false;
+  await recording(
+    async () => {
+      await userEvent.keyboard("nile{Enter}");
+      await expect.poll(() => getNews()?.kind === "failed").toBe(true);
+    },
+    (cmd) => {
+      if (cmd === "rename_tag") renamed = true;
+      if (cmd === "list_tags" && renamed)
+        return Promise.reject({ kind: "io", reason: { kind: "busy" } });
+      return undefined;
+    },
+  );
+  expect(getNews()).toEqual({
+    kind: "failed",
+    line: "Could not read the tags. The index is busy. Try again in a moment.",
+  });
+  await expect.poll(values).toContain("nile");
 });
 
 test("renaming onto a tag that exists asks to merge on the row, and Escape puts the row back", async () => {
