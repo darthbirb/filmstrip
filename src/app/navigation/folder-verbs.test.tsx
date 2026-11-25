@@ -157,8 +157,8 @@ test("Move to… on a folder cannot pick its own branch, and moves it with what 
   const picker = screen.getByRole("dialog", { name: "Move to" });
   await expect.element(picker).toBeVisible();
   const option = (name: string) => picker.getByRole("option", { name, exact: true });
-  // The tree's rows carry navigation's pill; a filtered row names its parent instead.
-  await expect.element(option("Pictures 1 of 6 current")).toHaveAttribute("aria-disabled", "true");
+  // The tree's rows carry navigation's pill, but for the current one; a filtered row names its parent.
+  await expect.element(option("Pictures current")).toHaveAttribute("aria-disabled", "true");
   await expect.element(option("Trips 2 of 5")).toHaveAttribute("aria-disabled", "true");
   await picker.getByRole("combobox").fill("cai");
   await expect.element(option("Cairo Trips")).toHaveAttribute("aria-disabled", "true");

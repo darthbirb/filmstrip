@@ -85,7 +85,7 @@ test("the tree's rows carry navigation's pill, and a recent row names its parent
     ["Pictures", "1/6"],
     ["People", "0/0"],
     ["Trips", "2/5"],
-    ["Cairo", "3/3"],
+    ["Cairo", undefined],
     ["Incoming", "3/3"],
   ]);
 
@@ -95,6 +95,23 @@ test("the tree's rows carry navigation's pill, and a recent row names its parent
   const recent = screen.getByRole("dialog", { name: "Move to" }).getByRole("option").first();
   expect(recent.element().querySelector(".rounded-badge")).toBeNull();
   expect(withoutGlyphs(recent.element().textContent)).toBe("PeoplePictures");
+});
+
+test("the current row says current in its pill's place, and its name is not cut", async () => {
+  const screen = await render(<Harness item={await inCairo("pyramid.jpg")} />);
+  await screen.getByRole("button", { name: "Move to…" }).click();
+  const picker = screen.getByRole("dialog", { name: "Move to" });
+  const cairo = picker.getByRole("option", { name: /Cairo/ });
+  await expect.element(cairo).toBeVisible();
+
+  const row = cairo.element();
+  const name = row.querySelector(".truncate") as HTMLElement;
+  expect(name.textContent).toBe("Cairo");
+  expect(name.scrollWidth).toBeLessThanOrEqual(name.clientWidth);
+  expect(row.querySelector(".rounded-badge")).toBeNull();
+  expect(row.getBoundingClientRect().right).toBeLessThanOrEqual(
+    picker.element().getBoundingClientRect().right,
+  );
 });
 
 test("picking a folder moves the file there and says so at the foot, and it joins Recent", async () => {

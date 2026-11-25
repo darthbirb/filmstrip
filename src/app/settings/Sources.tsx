@@ -195,12 +195,14 @@ function Settled({ source, onRemove }: { source: SourceSummary; onRemove: () => 
             }}
           />
         )}
-        {source.reachable && (
+        {source.reachable ? (
           <GlyphButton
             glyph="folderOpen"
             label={`Show ${source.title} in Explorer`}
             onClick={() => void revealSource(source.id).catch(() => undefined)}
           />
+        ) : (
+          <span aria-hidden className="size-control shrink-0" />
         )}
         <GlyphButton
           glyph="minusCircle"
