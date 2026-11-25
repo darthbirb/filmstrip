@@ -5,6 +5,7 @@ import type { FolderEntry } from "../../ipc/bindings/FolderEntry";
 import type { Moved } from "../../ipc/bindings/Moved";
 import {
   type AppError,
+  folderDetail,
   listFolders,
   moveFolder,
   moveItems,
@@ -14,11 +15,13 @@ import type { MenuAnchor } from "../../ui/Menu";
 import { Picker, type PickerRow, type PickerSection } from "../../ui/Picker";
 import { libraryChanged } from "../library";
 import { setNews } from "../navigation/foot-slot";
-import { refreshIndex, useIndex } from "../navigation/index-store";
+import { getIndex, refreshIndex, useIndex } from "../navigation/index-store";
 import { getPreferences, RECENT, updatePreferences, usePreferences } from "../preferences";
 import { movedBannerLine, moveStoppedLine, reasonText } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
+import { keepFocusThrough } from "./act-focus";
+import { type MoveOn, moveOn, moveOnFrom } from "./move-on";
 import { restoreFiles } from "./restore";
 
 /** A folder to move, with everything in it. */
@@ -38,6 +41,8 @@ export type MoveRequest = (
   anchor: MenuAnchor;
   /** Asked for from inside Settings, whose dialog holds the only part of the window not inert. */
   inDialog?: boolean;
+  /** The pane's button that asked, whose namesake on the next file's bar takes the focus. */
+  keepFocus?: string;
 };
 
 // One picker at a time, opened from the bar or a menu and drawn once at the app's root.
@@ -150,13 +155,16 @@ function MovePicker({ request }: { request: MoveRequest }) {
       onPick={(id) => {
         const to = byId.get(id);
         if (!to) return;
-        if ("restoring" in request) return void restoreFiles(request.restoring, to);
+        const act = (done: Promise<unknown>) => {
+          if (request.keepFocus) keepFocusThrough(request.keepFocus, done);
+        };
+        if ("restoring" in request) return act(restoreFiles(request.restoring, to));
         if ("binding" in request) {
           return void setDestinationKey(request.binding, to.id)
             .then(() => refreshIndex())
             .catch(() => undefined);
         }
-        if (!("folder" in request)) return void moveFiles(request.itemIds, to);
+        if (!("folder" in request)) return act(moveFiles(request.itemIds, to));
         const from = { folderId: request.folderId, path: pathOf(byId, request.folderId) };
         void moveFolderTo(request.folder, to, from);
       }}
@@ -243,14 +251,19 @@ type Into = Pick<FolderEntry, "id" | "title">;
 
 /**
  * Moves the files and says what happened: the line at the foot for what went, the banner over
- * the grid for what did not; and hands back the report. A move between drives is a job, which
- * says so when it ends, and hands back only that it started. DECISIONS.md "Undo".
+ * the grid for what did not; and hands back the report. When the pane's file leaves its place
+ * the pane moves on, as after a delete. A move between drives is a job, which says so when it
+ * ends, and hands back only that it started. DECISIONS.md "Undo".
  */
 export async function moveFiles(itemIds: number[], to: Into) {
+  const pane = await moveOnFrom(itemIds);
   const moved = await moveItems(itemIds, to.id).catch(() => null);
   if (!moved) return null;
   remember(to);
-  if (moved.kind === "started") return "started" as const;
+  if (moved.kind === "started") {
+    await moveOnOut(pane, to, []);
+    return "started" as const;
+  }
   const { batch, report } = moved;
   if (batch) afterAct(batch, report.refused.length);
   const whole = report.moved + report.refused.length;
@@ -274,8 +287,23 @@ export async function moveFiles(itemIds: number[], to: Into) {
         }
       : null,
   );
+  await moveOnOut(pane, to, report.refused);
   await libraryChanged();
   return report;
+}
+
+/**
+ * The pane moves on from a file moved out of its place. Only the Sorting Box keeps a file moved
+ * inside it, to a folder of a sorting source. DECISIONS.md "The pane".
+ */
+async function moveOnOut(pane: MoveOn, to: Into, stayed: readonly { id: number }[]) {
+  if (pane.next === pane.shown) return;
+  if (pane.origin?.kind === "sorting") {
+    const into = await folderDetail(to.id).catch(() => null);
+    const source = getIndex().sources?.find((one) => one.id === into?.sourceId);
+    if (source?.kind === "sorting") return;
+  }
+  moveOn(pane, stayed);
 }
 
 /**

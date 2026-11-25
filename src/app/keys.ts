@@ -5,9 +5,9 @@ import { inTrash } from "./grid/place-items";
 import { getChecked } from "./grid/selection";
 import { setNews } from "./navigation/foot-slot";
 import { getIndex } from "./navigation/index-store";
-import { deleteFiles, neighbour } from "./pane/delete";
+import { deleteFiles } from "./pane/delete";
 import { moveFiles } from "./pane/move-picker";
-import { getPaneItem, getPaneOrigin, getPaneSet, showInPane } from "./pane/pane-store";
+import { getPaneItem, getPaneSet } from "./pane/pane-store";
 import { copyFiles } from "./paste/clipboard";
 import { getPlace } from "./place";
 
@@ -89,14 +89,14 @@ async function actOn(key: FileKey) {
 /** What is checked, else the pane's one file; none when the pane shows several and none is checked. */
 async function chosenFiles() {
   const { checked, listed } = getChecked();
-  if (checked.length > 0) return { files: checked, fromPane: false };
+  if (checked.length > 0) return { files: checked };
   if (getPaneSet().length > 1) return null;
   const shown = getPaneItem();
   const file =
     shown === null
       ? null
       : (listed.find((row) => row.id === shown) ?? (await itemDetail(shown).catch(() => null)));
-  return { files: file ? [file] : [], fromPane: true };
+  return { files: file ? [file] : [] };
 }
 
 /** A press of one key, answered as Artboards › Destination keys draws each case. */
@@ -132,27 +132,8 @@ export async function press(digit: string) {
     return;
   }
   const to = { id: bound.folderId, title: name };
-  if (!chosen.fromPane) {
-    await moveFiles(
-      going.map((file) => file.id),
-      to,
-    );
-    return;
-  }
-  const shown = going[0]?.id;
-  if (shown === undefined) return;
-  // The pane's file went, so the pane moves on to the tile that took its place, as after a delete.
-  const origin = getPaneOrigin();
-  const next = await neighbour(origin, [shown]);
-  const report = await moveFiles([shown], to);
-  const stayed =
-    report === null || (report !== "started" && report.refused.some((one) => one.id === shown));
-  if (!stayed && leaves(origin, bound.sourceId)) showInPane(next, origin);
-}
-
-/** Whether a file moved into this source leaves the place it was shown in. */
-function leaves(origin: ReturnType<typeof getPaneOrigin>, sourceId: number) {
-  if (origin?.kind !== "sorting") return true;
-  const source = getIndex().sources?.find((one) => one.id === sourceId);
-  return source?.kind !== "sorting";
+  await moveFiles(
+    going.map((file) => file.id),
+    to,
+  );
 }

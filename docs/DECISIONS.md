@@ -714,10 +714,20 @@ all of them are absent rather than greyed. Nothing purges: emptying the Trash is
 details say where it came from and when it went, in place of where it is, and the Name row is only
 its name. Restored from the Trash, the pane moves on as it does after a delete.
 
+**A move takes the pane on as a delete does**, settled on 25 November 2026: Move to…, a drop on a
+row of navigation and a destination key are one act, and each moved the pane's file out of its
+place while the pane stayed on it, the strip running through files with none of them ringed.
+Triage tools advance after a move as after a delete. Only the Sorting Box keeps a file moved to a
+folder of a sorting source, so there the pane stays. **A move between drives moves the pane on as
+it starts**, not when its job ends: the file is already on its way, a press per picture would
+otherwise wait out each copy, and the pane jumping seconds later would take the picture from
+under whatever is being looked at by then. One the job leaves where it was is named by its banner.
+
 **The focus stays where the act was taken**, settled on 25 November 2026. Delete and Restore take
 their file's bar with them, which dropped the focus to the page and sent a keyboard or screen
 reader back to the top. The next file's bar gives the same button the focus, so Delete pressed
-again deletes the next; when that bar has no such button, as a file restored inside a search
+again deletes the next, and Move to… and Restore to… are back on their button once the picker
+has done its work; when that bar has no such button, as a file restored inside a search
 shows the library's bar, the strip's frame for the file takes it, or its picture once the strip
 no longer runs through it, as a restored file leaves a search of the Trash. Only a focus that fell
 to the page is taken back: one the act moved on purpose, as the question about a drive with no
@@ -1124,9 +1134,9 @@ beside the count; the rail, which holds no folders, carries none.
 **A press is Move to… that folder**, for what is checked, or for the file in the pane when nothing
 is: the same act, the same line after it and the same banner, since the key is how it was asked
 for and not a different act. When the pane's file goes, the pane moves on to the tile that took
-its place, as after a delete, so sorting a place is a press per picture. Files already in the
-folder are passed over without a word and only what moved is counted; when nothing would move,
-the foot says "Already in Lisbon." in the refusal band. A free key is silent, like any key the app
+its place, as after any move (DECISIONS.md "The pane"), so sorting a place is a press per
+picture. Files already in the folder are passed over without a word and only what moved is
+counted; when nothing would move, the foot says "Already in Lisbon." in the refusal band. A free key is silent, like any key the app
 does not use, but a key whose folder has gone did mean something, so its press says which key and
 where the folder was. A key does nothing in a field, over a menu, a question or Settings, or in
 the Trash, whose only way out is Restore. The top row and the number pad are the same keys.

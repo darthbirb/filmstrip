@@ -6,8 +6,7 @@ import { libraryChanged } from "../library";
 import { restoredBannerLine } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
-import { neighbour } from "./delete";
-import { getPaneItem, getPaneOrigin, paneMovesOn, showInPane } from "./pane-store";
+import { moveOn, moveOnFrom } from "./move-on";
 
 /**
  * Takes files out of the Trash, to where each came from or to a folder picked, and says what
@@ -19,9 +18,7 @@ export async function restoreFiles(
   to: FolderEntry | null = null,
   earlier: readonly Stayed[] = [],
 ) {
-  const shown = getPaneItem();
-  const origin = getPaneOrigin();
-  const next = paneMovesOn(itemIds) ? await neighbour(origin, itemIds) : shown;
+  const pane = await moveOnFrom(itemIds);
   const done = await restoreItems(itemIds, to?.id ?? null).catch(() => null);
   if (!done) return;
   const { batch, report } = done;
@@ -54,10 +51,7 @@ export async function restoreFiles(
   } else {
     showReport(null);
   }
-  const stayed = report.refused.some((row) => row.id === shown);
-  if (shown !== null && origin?.kind === "trash" && !stayed && next !== shown) {
-    showInPane(next, origin);
-  }
+  if (pane.origin?.kind === "trash") moveOn(pane, report.refused);
   await libraryChanged();
 }
 

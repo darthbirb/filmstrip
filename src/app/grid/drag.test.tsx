@@ -105,6 +105,29 @@ test("a tile dragged onto a folder says the move before the drop, and the drop i
   expect(ghost()).toBeNull();
 });
 
+test("the pane's own tile dropped on a folder moves the pane on to the next file", async () => {
+  await renderBoth();
+  const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
+  showInPane(pyramid, CAIRO);
+  await dragOnto("pyramid.jpg", "People 0 of 0");
+  letGo();
+
+  await expect.poll(getPaneItem).toBe(sphinx);
+  expect(getPaneOrigin()).toEqual(CAIRO);
+  expect((await folderItems(5)).map((file) => file.id)).toEqual([pyramid]);
+});
+
+test("the pane's tile dropped as the last of its place gives the pane the one before it", async () => {
+  await renderBoth();
+  const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
+  showInPane(sphinx, CAIRO);
+  await dragOnto("sphinx.jpg", "People 0 of 0");
+  letGo();
+
+  await expect.poll(getPaneItem).toBe(pyramid);
+  expect((await folderItems(5)).map((file) => file.id)).toEqual([sphinx]);
+});
+
 test("a checked tile carries the whole set, and an unchecked one only itself", async () => {
   await renderBoth();
   const [felucca, pyramid] = [await idOf("felucca.mp4"), await idOf("pyramid.jpg")];
