@@ -1,6 +1,7 @@
 import { beforeEach, expect, test } from "vitest";
 import { render } from "vitest-browser-react";
 
+import { recording } from "../../dev/recording";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { getPlace, type Place, setPlace } from "../place";
 import { EmptyPlace } from "./EmptyPlace";
@@ -18,10 +19,15 @@ beforeEach(async () => {
 const lines = (container: HTMLElement) =>
   [...container.querySelectorAll("p")].map((line) => line.textContent);
 
-test("the app's own two places are named, and explain nothing", async () => {
+test("the app's own two places are named and explain nothing; the Sorting Box offers to grow", async () => {
   const sorting = await render(<EmptyPlace place={{ kind: "sorting" }} />);
   await expect.element(sorting.getByText("Nothing to Sort")).toBeVisible();
   expect(lines(sorting.container)).toEqual(["Nothing to Sort"]);
+  const add = sorting.getByRole("button", { name: "Add Sorting Source…" });
+  await recording(async (calls) => {
+    await add.click();
+    await expect.poll(() => calls.map(([command]) => command)).toContain("pick_folder");
+  });
 
   const trash = await render(<EmptyPlace place={{ kind: "trash" }} />);
   await expect.element(trash.getByText("Trash Is Empty")).toBeVisible();

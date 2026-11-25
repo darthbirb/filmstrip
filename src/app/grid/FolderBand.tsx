@@ -126,7 +126,7 @@ export function FolderFacts({ detail, source }: FactsProps) {
           Favourite
         </ChipButton>
         {detail.status !== null && detail.statusSetAt !== null && (
-          <span className="text-fg-faint text-key tabular-nums">
+          <span className="text-fg-dim text-key tabular-nums">
             set {formatShortDate(detail.statusSetAt)}
           </span>
         )}

@@ -94,6 +94,40 @@ test("a search's folders stand before its files, each under its heading, and a c
   });
 });
 
+test("the keyboard and a screen reader meet the folders, then the files' heading, then the files", async () => {
+  setPlace(searching("path:Pictures/Trips cairo"));
+  await page.viewport(1200, 800);
+  const screen = await render(
+    <div style={{ display: "flex", flexDirection: "column", width: 1000, height: 700 }}>
+      <input aria-label="Search" />
+      <div style={{ flex: 1, minHeight: 0 }}>
+        <Grid mode="uniform" />
+      </div>
+    </div>,
+  );
+  const card = screen.getByRole("button", { name: /^Cairo/ });
+  const files = screen.getByRole("heading", { name: "Files · 3" });
+  await expect.element(screen.getByRole("button", { name: "pyramid.jpg" })).toBeVisible();
+
+  const before = (a: Element, b: Element) =>
+    Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+  const grid = screen.getByRole("grid", { name: "Files" }).element();
+  expect(
+    before(screen.getByRole("heading", { name: "Folders · 1" }).element(), card.element()),
+  ).toBe(true);
+  expect(before(card.element(), files.element())).toBe(true);
+  expect(before(files.element(), grid)).toBe(true);
+
+  (screen.getByRole("textbox", { name: "Search" }).element() as HTMLElement).focus();
+  const met: Element[] = [];
+  for (let step = 0; step < 6 && !document.activeElement?.closest("[role=grid]"); step++) {
+    await userEvent.tab();
+    if (document.activeElement) met.push(document.activeElement);
+  }
+  expect(met[0]).toBe(card.element());
+  expect(met.at(-1)?.closest("[role=grid]")).toBe(grid);
+});
+
 test("a card's glass asks the same question inside its folder, in place of the old scope", async () => {
   setPlace(searching("path:Pictures cairo"));
   const screen = await renderPlace();
@@ -121,7 +155,7 @@ test("Escape goes back once nothing checked is left to clear", async () => {
   setPlace(searching("path:Pictures/Trips cairo"));
   const screen = await renderPlace();
   await expect.element(screen.getByRole("button", { name: "pyramid.jpg" })).toBeVisible();
-  await screen.getByRole("checkbox", { name: "Check pyramid.jpg" }).click();
+  await screen.getByRole("checkbox", { name: "Select pyramid.jpg" }).click();
   await userEvent.keyboard("{Escape}");
   expect(getPlace()?.kind).toBe("search");
   await userEvent.keyboard("{Escape}");
@@ -196,7 +230,7 @@ test("a trashed file among results says where it came from and goes only by Rest
   const caption = tile.element().closest("figure")?.querySelector("figcaption");
   expect(caption?.textContent).toContain("from Cairo");
 
-  await screen.getByRole("checkbox", { name: "Check felucca.mp4" }).click();
+  await screen.getByRole("checkbox", { name: "Select felucca.mp4" }).click();
   const bar = screen.getByRole("toolbar", { name: "Selection" });
   await expect.element(bar.getByText("Restore", { exact: true }).last()).toBeVisible();
   expect(bar.getByText("Move to…", { exact: true }).elements()).toHaveLength(0);

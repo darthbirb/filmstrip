@@ -76,7 +76,7 @@ const idOf = async (name: string) =>
 const sent = (calls: [string, unknown][], cmd: string) => calls.find(([one]) => one === cmd)?.[1];
 
 async function check({ grid }: Regions, name: string) {
-  await userEvent.click(grid.getByRole("checkbox", { name: `Check ${name}` }));
+  await userEvent.click(grid.getByRole("checkbox", { name: `Select ${name}` }));
 }
 
 const never = (calls: [string, unknown][], ...cmds: string[]) =>

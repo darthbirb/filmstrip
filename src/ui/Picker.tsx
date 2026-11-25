@@ -169,7 +169,7 @@ export function Picker({
                 }}
                 className={`flex h-control shrink-0 items-center gap-2 rounded-nested pr-2 text-ui ${
                   row.disabled
-                    ? "text-fg-faint"
+                    ? "text-fg-dim"
                     : `cursor-default text-fg hover:bg-raised-hi ${key === current?.key ? "bg-raised-hi" : ""}`
                 }`}
                 style={{

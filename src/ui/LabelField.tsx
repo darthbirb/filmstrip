@@ -36,7 +36,7 @@ type Props = {
 const HALVES =
   "m-0 inline-flex h-chip max-w-full overflow-hidden rounded-nested border-0 p-0 text-small inset-ring inset-ring-line-control focus-ring-within";
 const HALF =
-  "field-sizing-content h-full px-2 outline-none placeholder:text-fg-faint selection:bg-plate selection:text-on-plate";
+  "field-sizing-content h-full px-2 outline-none placeholder:text-fg-dim selection:bg-plate selection:text-on-plate";
 
 const folders = (count: number) => `on ${formatCount(count)} ${count === 1 ? "folder" : "folders"}`;
 

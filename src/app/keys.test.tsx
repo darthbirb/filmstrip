@@ -77,8 +77,8 @@ const moved = (calls: [string, unknown][]) => calls.find(([cmd]) => cmd === "mov
 test("a key moves what is checked to its folder, and says so as Move to… would", async () => {
   await renderIt();
   const ids = [await idOf("felucca.mp4"), await idOf("sphinx.jpg")];
-  await userEvent.click(page.getByRole("checkbox", { name: "Check felucca.mp4" }));
-  await userEvent.click(page.getByRole("checkbox", { name: "Check sphinx.jpg" }));
+  await userEvent.click(page.getByRole("checkbox", { name: "Select felucca.mp4" }));
+  await userEvent.click(page.getByRole("checkbox", { name: "Select sphinx.jpg" }));
   await recording(async (calls) => {
     await userEvent.keyboard("1");
     await expect.poll(() => moved(calls)).toEqual({ itemIds: ids, folderId: 5 });
@@ -138,7 +138,7 @@ test("with a set in the pane a key still moves what is checked", async () => {
   ];
   showInPane(pyramid, CAIRO);
   addToPane([sphinx], CAIRO);
-  await userEvent.click(page.getByRole("checkbox", { name: "Check felucca.mp4" }));
+  await userEvent.click(page.getByRole("checkbox", { name: "Select felucca.mp4" }));
   await recording(async (calls) => {
     await userEvent.keyboard("1");
     await expect.poll(() => moved(calls)).toEqual({ itemIds: [felucca], folderId: 5 });

@@ -138,16 +138,19 @@ test("a right-click on a tile is still the tile's", async () => {
   expect(read().rows).not.toContain("New Folder");
 });
 
-test("the Sorting Box's ground has Paste alone, and only while the clipboard holds files", async () => {
+test("the Sorting Box's ground has its row's menu, Paste only while the clipboard holds files", async () => {
   await renderAt({ kind: "sorting" });
   await expect.poll(() => document.querySelector("[data-item]")).not.toBeNull();
   await rightClickGround();
-  expect(document.querySelector("[role=menu]")).toBeNull();
+  await expect.element(menu()).toBeVisible();
+  expect(read()).toEqual({ heading: "Sorting Box", rows: ["Add Sorting Source…"] });
+  await userEvent.keyboard("{Escape}");
+  await expect.element(menu()).not.toBeInTheDocument();
 
   await copyCover();
   await rightClickGround();
   await expect.element(menu()).toBeVisible();
-  expect(read()).toEqual({ heading: "Sorting Box", rows: ["Paste 1 File"] });
+  expect(read()).toEqual({ heading: "Sorting Box", rows: ["Paste 1 File", "Add Sorting Source…"] });
   await recording(async (calls) => {
     await page.getByRole("menuitem", { name: "Paste 1 File" }).click();
     await expect.poll(() => calls).toContainEqual(["paste_files", { folderId: 2 }]);

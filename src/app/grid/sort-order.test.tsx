@@ -118,8 +118,8 @@ test("the menu lists the five keys, and a key picked starts the way it reads fir
 
 test("with files checked, Escape closes the list first though a click on its edge took the focus", async () => {
   const screen = await render(<Harness />);
-  await screen.getByRole("checkbox", { name: "Check pyramid.jpg" }).click();
-  await screen.getByRole("checkbox", { name: "Check sphinx.jpg" }).click();
+  await screen.getByRole("checkbox", { name: "Select pyramid.jpg" }).click();
+  await screen.getByRole("checkbox", { name: "Select sphinx.jpg" }).click();
   const checked = getSelection().ids;
   expect(checked).toHaveLength(2);
 

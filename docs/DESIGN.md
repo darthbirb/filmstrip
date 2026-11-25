@@ -26,7 +26,6 @@ colors:
   fg-faint: "#5c5a56"
   on-plate: "#17181a"
   on-plate-dim: "rgb(23 24 26 / 0.62)"
-  on-plate-faint: "rgb(23 24 26 / 0.4)"
   on-plate-wash: "rgb(23 24 26 / 0.14)"
   focus: "#c25a4a"
   in-pane: "#f2f2f2"
@@ -502,12 +501,12 @@ thing and is never decoration:** where the keyboard is, and close.
 | `panel` | The bar, navigation, the pane, the grid's header row, the filmstrip, Settings. |
 | `inset` | A sunk trough: a disabled control, an inherited chip, a group of settings, a tile still being read. |
 | `raised`, `raised-hi` | A control at rest, and its hover, open or chosen state. |
-| `plate`, `on-plate`, `on-plate-dim`, `on-plate-faint`, `on-plate-wash` | Selection, and only selection: a chosen place or option, its ink, its count, the count's slash, and the count pill's sunk plate. |
+| `plate`, `on-plate`, `on-plate-dim`, `on-plate-wash` | Selection, and only selection: a chosen place or option, its ink, its count, and the count pill's sunk plate. |
 | `hatch`, `hatch-alt` | The stand-in for a picture whose thumbnail is not made yet. |
 | `line`, `line-control`, `line-control-hi` | A panel's edge and the rule under a header; a control's ring; a ring on a raised-hi control. |
 | `line-strong` | The ring a tile shows under the pointer; a strip step's under the pointer. |
 | `fg-hi`, `fg`, `fg-mid`, `fg-dim` | Ink: titles; body; a control's label at rest; counts and captions. |
-| `fg-faint` | Separators, a disabled glyph, an offline source's glyph, an unfocused window's caption glyphs; never text to be read. |
+| `fg-faint` | Glyphs and separators alone: a chevron between steps, a disabled glyph, an offline source's glyph, an unfocused window's caption glyphs, an empty place's glyph. Never text, not even a placeholder, a hint, a zero or a row that cannot be picked: those are `fg-dim`, since it is under 3:1 on every surface. |
 | `focus` | Where the keyboard is, and only that: a 2px ring, 2px clear of the element. |
 | `in-pane`, `on-mark` | The item the pane shows: the ring drawn on its tile and frame, its plate, and the plate's ink. |
 | `wash` | White at 9%, laid over something already filled when the pointer is on it. |
@@ -521,7 +520,8 @@ thing and is never decoration:** where the keyboard is, and close.
 **Contrast is measured, not asserted.** `fg-hi`, `fg`, `fg-mid` and `fg-dim` reach 4.5:1 on
 `well`, `ground`, `panel` and `raised`; `focus` and `in-pane` reach 3:1 on each; `on-plate`
 reaches 4.5:1 on the plate and `on-mark` on the in-pane plate. `src/styles/tokens.test.ts`
-paints each and fails below.
+paints each and fails below, and `src/ui/ink.test.tsx` holds a hint, a placeholder, a count's
+slash and a row that cannot be picked to 4.5:1 where each is drawn.
 
 ## Typography
 
@@ -622,9 +622,10 @@ toward the rest surface.
 - **Glyph button.** A `control` square on `raised` with a `line-control` ring. Disabled, it sinks
   to `inset` on a `line` ring, its glyph `fg-faint`. The one that destroys or forgets takes the
   button's `danger` colours.
-- **Tree row.** Chevron, glyph, name and count. At rest the name is `fg-mid`; under the pointer a
-  `wash`; selected, a `plate` with `on-plate` ink. An offline source is `fg-dim` with an
-  `fg-faint` glyph. The app's own places sit above a `line` rule. Renamed in place, the name
+- **Tree row.** Chevron, glyph, name and count, and nothing to press: what a row can do is on
+  its menu, the Sorting Box's Add Sorting Source… included. At rest the name is `fg-mid`; under
+  the pointer a `wash`; selected, a `plate` with `on-plate` ink. An offline source is `fg-dim`
+  with an `fg-faint` glyph. The app's own places sit above a `line` rule. Renamed in place, the name
   becomes a `chip`-tall field on `well` at the `nested` corner with a `line-strong` hairline, the
   whole name selected in `plate` with `on-plate` ink; the row keeps everything else. A folder's
   name that is taken turns the hairline `line-danger`, and where it is taken comes down under the
@@ -635,14 +636,14 @@ toward the rest surface.
   than the name, and the count pill at the end. A source's has no parent. The group
   stands between the app's two places and the sources, a `line` rule either side. Where you are,
   it wears the plate, and so does the place's own row.
-- **Count pill.** A place's files, always both figures: its own, then everything at or below it,
-  as `3/9`, `3/3` or `0/0`. `badge` tall at the `badge` corner, on `raised` with a `line-control`
-  ring, figures `fg-mid` and the slash `fg-faint`; on a selected row it sinks to `on-plate-wash`,
-  figures `on-plate-dim` and the slash `on-plate-faint`. A folded row and the same row opened
-  show the same pill. Every row carries one, the Sorting Box and the Trash included; an offline
-  source shows its word instead. Move to…'s tree rows and a matched folder's card carry it too;
-  Settings' key rows and No Pictures Here print the same figures as text. The folded rail's
-  badges keep one figure.
+- **Count pill.** A place's files, always both figures: its own, then everything at or below it, as
+  `3/9`, `3/3` or `0/0`. `badge` tall at the `badge` corner, on `raised` with a `line-control` ring,
+  figures `fg-mid` and the slash `fg-dim`; on a selected row it sinks to `on-plate-wash`, figures
+  and slash `on-plate-dim`; on a row that cannot be picked, figures and slash `fg-dim`. A folded row
+  and the same row opened show the same pill. Every row carries one, the Sorting Box and the Trash
+  included; an offline source shows its word instead. Move to…'s tree rows and a matched folder's
+  card carry it too; Settings' key rows and No Pictures Here print the same figures as text. The
+  folded rail's badges keep one figure.
 - **Rail button.** A folded panel's place: a `control` square holding a filled glyph, `plate` with
   `on-plate` ink when it is where you are, a `wash` under the pointer otherwise. Its count rides the
   glyph's top-right corner as a `mark-badge` plate in `micro` figures, ringed in the panel's own
@@ -759,7 +760,7 @@ toward the rest surface.
   the `control` corner beside the folder's Facts, Path, Status, Labels, Tags and Note. Path is the
   source's directory then each folder down, each a way there, the folder itself in `fg`. Status
   is a chip-sized Segmented, then Favourite as a chip button, then when it was set in `key`
-  `fg-faint`. The cover is the chosen one, a *Cover* plate on it, or the first picture standing
+  `fg-dim`. The cover is the chosen one, a *Cover* plate on it, or the first picture standing
   in; a frame on a `line` ring holds no-picture in `line-control-hi` for a folder with nothing at
   or below it, or the unplugged glyph in `fg-faint` while the drive is away, when the path is
   text followed by when it was last indexed in `--font-mono` `key`. It is capped at half the
@@ -850,13 +851,13 @@ toward the rest surface.
   At rest the row is the name, and the `rename` glyph in `fg-dim` shows beside it under the
   pointer. A name that is taken turns the ring `line-danger` and says where under the field, in
   `small` `danger`.
-- **Picker.** A place to send something: the menu's surface and width, opened against what asked
-  for it, with a filter field on `ground` at its head, Recent under an `eyebrow` heading, a rule,
-  then the tree. Rows are `control` tall, indented a `chevron` a level with the chevron's square
-  kept on every row, a filled glyph in `fg-dim`, the name, and quieter words at the end in
-  `small`: a folder's parent, or "current" on the one the file is in, drawn in `fg-faint`
-  and never picked. Moving a folder, its own branch is drawn the same way. The field keeps the focus; the arrows move a `raised-hi` row, Enter picks it,
-  Right and Left open and shut it.
+- **Picker.** A place to send something: the menu's surface and width, opened against what asked for
+  it, with a filter field on `ground` at its head, Recent under an `eyebrow` heading, a rule, then
+  the tree. Rows are `control` tall, indented a `chevron` a level with the chevron's square kept on
+  every row, a filled glyph in `fg-dim`, the name, and quieter words at the end in `small`: a
+  folder's parent, or "current" on the one the file is in, drawn in `fg-dim` and never picked.
+  Moving a folder, its own branch is drawn the same way. The field keeps the focus; the arrows move
+  a `raised-hi` row, Enter picks it, Right and Left open and shut it.
 - **Full screen.** The pane takes the frame below the bar, keeping its header, picture and
   filmstrip and losing only the columns beside it. Its control is a glyph button at the header's
   left end, an arrow pointing along the edge that moves: left going in, right coming out, where it
@@ -872,7 +873,8 @@ toward the rest surface.
   nothing clicked or a file gone. A line under the title carries a count, a name, a path or a
   query — `small`, held to a `note` measure, a path in `--font-mono` — or there is no line; it
   never explains the app. Where there is one move worth offering it follows as `control`-tall
-  buttons on `raised`; most places have none.
+  buttons on `raised`: a folder's folders, and Add Sorting Source… under Nothing to Sort; most
+  places have none.
 - **Stand-in.** A tile still being read: `inset` at the `control` corner, in rows of photograph
   shapes at the tile size, filling the view until the place's tiles arrive. Never a spinner.
 - **Plate.** A small fact laid over a picture: `badge`-tall at the `badge` corner on `veil`, `small`
@@ -979,12 +981,13 @@ toward the rest surface.
   row's rename glyph comes after it, and a click anywhere in it opens it. Opened, it is a box on
   `ground` at the `nested` corner in a `line-control` ring, three lines tall to begin with and
   growing as it fills, `fg-hi` text with a sentence-case placeholder, and under it "Ctrl+Enter
-  saves · Escape abandons" in `key` `fg-faint` before Cancel and Save.
+  saves · Escape abandons" in `key` `fg-dim` before Cancel and Save.
 - **Settings.** A dialog over the `scrim`: a header with its `title` and a close button; a rail of
   sections grouped under `eyebrow` captions, with a filter field on `ground` above them, the one
   shown on `raised-hi`; and the section's settings as rows in an `inset` group, each a label and
   its control. A section whose body is its own, as Sources is, can close with a caption of its
-  own over such rows. One that heads itself, as Tags does, fills the section: its name in semibold
+  own over such rows. Sources' rows end in its two doorways side by side, raised buttons with the
+  plus glyph: Add Source… and Add Sorting Source…. One that heads itself, as Tags does, fills the section: its name in semibold
   `row` with what it holds after it in `small` `fg-dim`, and a list that scrolls inside it, so the
   dialog never grows; its Line stands at the section's foot. Backups heads itself the same way,
   with Back Up Now at the head's end, and its Band stands where the Line does. Trash heads itself
@@ -1002,7 +1005,7 @@ toward the rest surface.
   `eyebrow` capitals over a `line` rule, each heading a button that sorts, the one it is on in
   `fg-mid` with its direction's glyph; then rows `row` tall, each the chip, the files and the
   folders right-aligned in `count` columns in `small` `fg-mid` tabular figures, a zero in
-  `fg-faint`, and a `bar-field` square for ⋯. ⋯ stands at rest in `fg-dim`; under the pointer the
+  `fg-dim`, and a `bar-field` square for ⋯. ⋯ stands at rest in `fg-dim`; under the pointer the
   row takes the `wash`, and while its menu is open ⋯ is `raised-hi` and the menu opens a tile-gap
   under it, right edges met. A folder's name is the sunk name chip, "name of Cairo" after it in
   `small` `fg-dim`, and has no ⋯; a tag nothing carries says "unused". A label's key is the key
@@ -1026,7 +1029,7 @@ toward the rest surface.
   files, which stay there; when what it forgets cannot be read, it says any source added since is
   forgotten and its files stay in the bin, with no names or count, and while it restores the answers give way to the walk's line and bar inside the same
   ring, and Settings holds still: the rail's sections and its filter field are disabled, those
-  not shown in `fg-faint`, and Escape and the close wait. The list scrolls inside the group, and No Backups Yet takes its place when there are none.
+  not shown in `fg-dim`, and Escape and the close wait. The list scrolls inside the group, and No Backups Yet takes its place when there are none.
 - **Row question.** A question on the row it is about, in the source row's remove shape: the row
   and the question inside one `line-danger` ring, the `warning` glyph in `danger` at `icon` and the
   question in `ui` `fg-mid` with the terms it names in `fg`, over its answers at the question's

@@ -30,15 +30,15 @@ type Props = Figures & {
 const TONES = {
   rest: {
     pill: "bg-raised text-fg-mid inset-ring inset-ring-line-control",
-    slash: "text-fg-faint",
+    slash: "text-fg-dim",
   },
-  plated: { pill: "bg-on-plate-wash text-on-plate-dim", slash: "text-on-plate-faint" },
-  barred: { pill: "bg-raised text-fg-faint inset-ring inset-ring-line-control", slash: "" },
+  plated: { pill: "bg-on-plate-wash text-on-plate-dim", slash: "" },
+  barred: { pill: "bg-raised text-fg-dim inset-ring inset-ring-line-control", slash: "" },
 };
 
 /**
- * A place's own files, then everything at or below it, the slash in separator ink so the pair
- * reads as one count. DESIGN.md "Components".
+ * A place's own files, then everything at or below it, the slash a step quieter where the ink
+ * allows so the pair reads as one count. DESIGN.md "Components".
  */
 export function CountPill({ own, all = own, tone = "rest" }: Props) {
   const { pill, slash } = TONES[tone];

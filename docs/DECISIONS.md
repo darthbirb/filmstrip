@@ -55,13 +55,16 @@ restore to put anything back.
 The Sorting Box is the one that is plural. It is several real folders the user nominates, shown
 as one surface — not one directory, and not a view over the index.
 
-**Which `+` was pressed is the kind.** A folder becomes a source through one of two doorways —
-navigation's Library caption, or the Sorting Box's own row — and nothing is asked once the picker
-closes, because the answer was the button. Asking afterwards would mean a dialog after the picker's
-dialog, and asking someone to choose between two words before they have seen either behave;
-Settings › Sources is where a kind is corrected instead. The Sorting Box's `+` rests on its row
-rather than appearing under the pointer, since it is the only way to nominate a sorting folder and a
-hover-only control has no keyboard.
+**Which doorway was taken is the kind.** A folder becomes a source through Add Source… or Add
+Sorting Source…, and nothing is asked once the picker closes, because the answer was the doorway.
+Asking afterwards would mean a dialog after the picker's dialog, and asking someone to choose
+between two words before they have seen either behave; Settings › Sources is where a kind is
+corrected instead. Add Source… is navigation's Library caption and the empty library's one move.
+Add Sorting Source… stands on screen beside Add Source… in Settings › Sources and as the empty
+Sorting Box's one move, and the Sorting Box's row menu and its grid's ground repeat it as a
+shortcut, as a right-click repeats what the interface already does. It is never a button on the
+row: a control inside a tree row is a second tab stop in a tree that is one, and a screen reader
+names it in the row's name or not at all.
 
 **A refused folder is an answer, not an error.** Four folders are turned away — the same one twice,
 one inside a source, one holding a source, and the app's own — and each says so in a band at the
@@ -478,9 +481,11 @@ videos too while ffmpeg is missing, so listing a place does not look for 40,000 
 the day after. A cleared Sorting Box, an emptied Trash, a folder holding only folders, a folder
 holding nothing and a source that cannot be reached are five situations, and only the fourth is
 really "no pictures here". They keep one shape so they do not read as five designs, and each
-names the folder or source it is talking about. **Only a folder of folders offers an action**,
-listing them as buttons, because going into one is the obvious next move and the counts are
-already known; a button that only restates the situation is worse than no button. A place whose
+names the folder or source it is talking about. **Only a folder of folders and the Sorting Box
+offer an action**: the first lists its folders as buttons, because going into one is the obvious
+next move and the counts are already known, and an empty Sorting Box offers Add Sorting Source…,
+the one way it fills, as "Places, not queries" says; a button that only restates the situation
+is worse than no button. A place whose
 folders are not known yet says nothing at all rather than guessing at "empty", and an unreachable
 source says what it last held — see "A walk only judges what it read".
 
@@ -522,6 +527,13 @@ move checks from the last one checked, and Enter shows the ringed tile in the pa
 the tile's menu or a double-click. Ctrl+A checks the whole place, the tiles scrolled away too, and
 Escape clears it, after whatever else is open has closed. The ringed tile is drawn wherever the
 scroll is, so the focus is never dropped with it.
+
+**A screen reader hears where a tile stands and whether it is checked.** The files are an ARIA
+grid, multi-selectable, of one-cell rows, one per file: each row says its place among all the
+place's files, since only the rows near the view are drawn, and is selected while its file is
+checked. The cell holds the tile and its box, a real checkbox named Select and the file's name,
+as the acts say Select. A multi-select listbox would tell a tile the same way, but its option
+cannot hold a checkbox, and the box is the pointer's way to check a file.
 
 **A tile dragged onto a row in navigation is Move to… that row**, drawn by Claude Design and built
 on 26 September 2026, since the tree is always on screen: the same act, the same line after it and
@@ -1057,13 +1069,13 @@ Shift+F10 did nothing at all.
   Escape closes it and puts the focus back; a verb that takes the focus, as Rename does, keeps it.
 - **The grid's ground opens its place's menu, under the place's name**, since it is not on the
   place's row: a folder's or a source's grid has the rows its row has, the Sorting Box's has Paste
-  alone while the clipboard holds files, and a search and the Trash open nothing. A sorting
-  source's folder, on its ground and on its favourite row, has Paste alone, plus its favourite
-  verb, as its band does. A tile keeps its own. What a verb there opens, the keys, the picker or
-  the Sorting Box's pick, opens where the menu did; Export…'s sheet hangs under the place's
-  header, and Rename opens the place's own row in the tree, the folders above it opening first. A
-  click on the ground keeps the focus there for the menu key, and a grid with no tile is a tab
-  stop of its own, so the keyboard reaches the menu too.
+  while the clipboard holds files and Add Sorting Source… after it, and a search and the Trash open
+  nothing. A sorting source's folder, on its ground and on its favourite row, has Paste alone, plus
+  its favourite verb, as its band does. A tile keeps its own. What a verb there opens, the keys, the
+  picker or the Sorting Box's pick, opens where the menu did; Export…'s sheet hangs under the
+  place's header, and Rename opens the place's own row in the tree, the folders above it opening
+  first. A click on the ground keeps the focus there for the menu key, and a grid with no tile is a
+  tab stop of its own, so the keyboard reaches the menu too.
 - **A source is renamed on its own row**, with the same keys as its name field in Settings:
   sending someone to Settings to rename the row they are on would be the menu pointing at a place
   instead of doing the act. It edits the app's label for the source, never the folder.

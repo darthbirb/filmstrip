@@ -183,7 +183,7 @@ test("moving onto the selection box goes on scrubbing the tile", async () => {
   await across(tile.element() as HTMLElement, 0.5);
   await expect.poll(() => strips().length).toBe(1);
 
-  await userEvent.hover(screen.getByRole("checkbox", { name: "Check clip-1.mp4" }));
+  await userEvent.hover(screen.getByRole("checkbox", { name: "Select clip-1.mp4" }));
   expect(strips()).toHaveLength(1);
   expect(withoutGlyphs(tile.element().textContent)).not.toBe("1:12");
 });

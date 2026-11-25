@@ -60,7 +60,7 @@ async function renderGrid(width = 900) {
   await expect.element(page.getByRole("button", { name: "sphinx.jpg" })).toBeVisible();
 }
 
-const box = (name: string) => page.getByRole("checkbox", { name: `Check ${name}` });
+const box = (name: string) => page.getByRole("checkbox", { name: `Select ${name}` });
 const bar = () => page.getByRole("toolbar", { name: "Selection" });
 // The bar draws its line twice, once out of sight to measure it; the one on screen is the last.
 const said = (text: string) => bar().getByText(text, { exact: true }).last();

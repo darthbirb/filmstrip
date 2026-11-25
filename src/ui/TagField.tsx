@@ -168,7 +168,7 @@ function Field({
         onPointerDown={standing ? () => setQuiet(true) : undefined}
         onBlur={standing ? () => setQuiet(false) : () => onClose()}
         style={{ anchorName: anchor } as CSSProperties}
-        className={`h-chip max-w-full rounded-full bg-ground px-2.5 text-fg-hi text-small inset-ring placeholder:text-fg-faint ${standing ? `w-full ${quiet ? "outline-none" : "focus-ring"}` : "focus-ring field-sizing-content min-w-24"} ${refused ? "inset-ring-line-danger" : "inset-ring-line-control"}`}
+        className={`h-chip max-w-full rounded-full bg-ground px-2.5 text-fg-hi text-small inset-ring placeholder:text-fg-dim ${standing ? `w-full ${quiet ? "outline-none" : "focus-ring"}` : "focus-ring field-sizing-content min-w-24"} ${refused ? "inset-ring-line-danger" : "inset-ring-line-control"}`}
       />
       {refused && <RefusalLine>{refused.line}</RefusalLine>}
       <OfferList

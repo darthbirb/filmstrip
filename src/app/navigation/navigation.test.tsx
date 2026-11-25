@@ -3,6 +3,7 @@ import { beforeEach, expect, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
+import { recording } from "../../dev/recording";
 import { getPlace, setPlace } from "../place";
 import { Breadcrumb } from "./Breadcrumb";
 import { loadIndex, resetIndex } from "./index-store";
@@ -106,13 +107,15 @@ test("a pill reads its own files, then everything at or below it, even where the
   expect(shown("Trips 2 of 5")).toBe("2/5");
   expect(row("Cairo 3 of 3").elements()).toHaveLength(0);
 
-  // The slash is the separator ink at rest, and the plate's on the row you stand in.
-  const slash = (name: string) =>
-    getComputedStyle(
-      row(name).element().querySelector(".rounded-badge [aria-hidden] span") as Element,
-    ).color;
-  expect(slash("Pictures 1 of 6")).toBe("rgb(92, 90, 86)");
-  expect(slash("Trips 2 of 5")).toBe("rgba(23, 24, 26, 0.4)");
+  // At rest the slash is fg-dim, a step under the figures; on the plate it takes the figures' ink.
+  const ink = (name: string, part: string) =>
+    getComputedStyle(row(name).element().querySelector(part) as Element).color;
+  const slash = (name: string) => ink(name, ".rounded-badge [aria-hidden] span");
+  const figures = (name: string) => ink(name, ".rounded-badge [aria-hidden]");
+  expect(slash("Pictures 1 of 6")).toBe("rgb(144, 140, 134)");
+  expect(figures("Pictures 1 of 6")).toBe("rgb(168, 165, 160)");
+  expect(slash("Trips 2 of 5")).toBe("rgba(23, 24, 26, 0.62)");
+  expect(figures("Trips 2 of 5")).toBe("rgba(23, 24, 26, 0.62)");
 });
 
 test("the breadcrumb goes back up to any folder on the path", async () => {
@@ -132,20 +135,31 @@ test("the breadcrumb goes back up to any folder on the path", async () => {
   expect(titles()).toEqual(["Pictures"]);
 });
 
-test("the Sorting Box keeps its own way in, reachable after the row it sits on", async () => {
-  const screen = await render(<Navigation />);
+test("the Sorting Box's way in is its row's menu, and the tree holds nothing else to tab to", async () => {
+  const screen = await render(
+    <>
+      <Navigation />
+      <button type="button">After</button>
+    </>,
+  );
   const row = screen.getByRole("treeitem", { name: "Sorting Box 3 of 3" });
   await expect.element(row).toBeVisible();
 
-  // Drawn at rest, not on hover: it is the only way to nominate a sorting folder.
-  const nominate = screen.getByRole("button", { name: "Add Sorting Source…" });
-  await expect.element(nominate).toBeVisible();
-  expect(row.element().contains(nominate.element())).toBe(true);
-
-  // The row is one tab stop and its + is the next.
-  (row.element() as HTMLElement).focus();
+  const tree = screen.getByRole("tree").element();
+  const stops = tree.querySelectorAll<HTMLElement>("button, input, a[href], [tabindex='0']");
+  expect(stops).toHaveLength(1);
+  stops[0]?.focus();
   await userEvent.tab();
-  expect(document.activeElement).toBe(nominate.element());
+  await expect.element(screen.getByRole("button", { name: "After" })).toHaveFocus();
+
+  (row.element() as HTMLElement).focus();
+  await userEvent.keyboard("{Shift>}{F10}{/Shift}");
+  const add = screen.getByRole("menuitem", { name: "Add Sorting Source…" });
+  await expect.element(add).toBeVisible();
+  await recording(async (calls) => {
+    await add.click();
+    await expect.poll(() => calls.map(([command]) => command)).toContain("pick_folder");
+  });
 });
 
 test("a refused folder says so and changes nothing, and a second refusal replaces the first", async () => {
