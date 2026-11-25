@@ -101,15 +101,12 @@ test("the current row says current in its pill's place, and its name is not cut"
   const screen = await render(<Harness item={await inCairo("pyramid.jpg")} />);
   await screen.getByRole("button", { name: "Move to…" }).click();
   const picker = screen.getByRole("dialog", { name: "Move to" });
-  const cairo = picker.getByRole("option", { name: /Cairo/ });
+  const cairo = picker.getByRole("option", { name: "Cairo current", exact: true });
   await expect.element(cairo).toBeVisible();
 
-  const row = cairo.element();
-  const name = row.querySelector(".truncate") as HTMLElement;
-  expect(name.textContent).toBe("Cairo");
+  const name = cairo.getByText("Cairo", { exact: true }).element();
   expect(name.scrollWidth).toBeLessThanOrEqual(name.clientWidth);
-  expect(row.querySelector(".rounded-badge")).toBeNull();
-  expect(row.getBoundingClientRect().right).toBeLessThanOrEqual(
+  expect(cairo.element().getBoundingClientRect().right).toBeLessThanOrEqual(
     picker.element().getBoundingClientRect().right,
   );
 });

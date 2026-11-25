@@ -29,17 +29,19 @@ const SHAPE =
   "focus-ring flex h-control max-w-full shrink-0 items-center gap-1.5 whitespace-nowrap rounded-control px-2.5 text-ui transition-colors duration-(--motion-quick) motion-reduce:transition-none";
 
 const SMALL =
-  "focus-ring flex h-chip max-w-full shrink-0 items-center gap-1.5 whitespace-nowrap rounded-nested bg-raised px-2 text-fg-mid text-small inset-ring inset-ring-line-control transition-colors duration-(--motion-quick) hover:bg-raised-hi hover:text-fg motion-reduce:transition-none";
+  "focus-ring flex h-chip max-w-full shrink-0 items-center gap-1.5 whitespace-nowrap rounded-nested bg-raised px-2 text-fg-mid text-small inset-ring inset-ring-line-control transition-colors duration-(--motion-quick) enabled:hover:bg-raised-hi enabled:hover:text-fg motion-reduce:transition-none";
 
 const TONES = {
   raised:
-    "bg-raised text-fg inset-ring inset-ring-line-control hover:bg-raised-hi aria-expanded:bg-raised-hi aria-expanded:inset-ring-line-control-hi",
-  quiet: "text-fg-mid hover:bg-wash hover:text-fg aria-expanded:bg-raised-hi aria-expanded:text-fg",
+    "bg-raised text-fg inset-ring inset-ring-line-control enabled:hover:bg-raised-hi aria-expanded:bg-raised-hi aria-expanded:inset-ring-line-control-hi",
+  quiet:
+    "text-fg-mid enabled:hover:bg-wash enabled:hover:text-fg aria-expanded:bg-raised-hi aria-expanded:text-fg",
   danger:
-    "bg-danger-tint text-danger inset-ring inset-ring-line-danger hover:bg-danger hover:text-on-danger active:bg-danger-press",
+    "bg-danger-tint text-danger inset-ring inset-ring-line-danger enabled:hover:bg-danger enabled:hover:text-on-danger enabled:active:bg-danger-press",
 };
 
-const DISABLED = "bg-inset text-fg-dim inset-ring inset-ring-line";
+const DISABLED =
+  "disabled:bg-inset disabled:text-fg-dim disabled:inset-ring disabled:inset-ring-line";
 
 /** A named move, in words. Every text button in the app is one of these. DESIGN.md "Shapes". */
 export function Button({
@@ -63,7 +65,7 @@ export function Button({
       aria-expanded={expanded}
       disabled={disabled}
       onClick={onClick}
-      className={small ? SMALL : `${SHAPE} ${disabled ? DISABLED : TONES[tone]}`}
+      className={`${small ? SMALL : `${SHAPE} ${TONES[tone]}`} ${DISABLED}`}
     >
       {glyph && (
         <Glyph

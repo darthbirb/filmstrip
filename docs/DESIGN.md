@@ -618,8 +618,9 @@ toward the rest surface.
   A label never wraps: too little room ends it in an ellipsis, and the panel it sits in stops
   before it comes to that. DECISIONS.md "The frame". A row's own button, as a backup's Restore…
   is, is the small raised one: `chip`-tall at the `nested` corner, `small` text in `fg-mid` until
-  the pointer brings `fg`. Disabled, a worded one sinks to `inset` on a `line` ring, its label
-  `fg-dim` and its glyph `fg-faint`, as Empty Trash… does while its question is open.
+  the pointer brings `fg`. Disabled, either size of any tone sinks to `inset` on a `line` ring,
+  its label `fg-dim` and its glyph `fg-faint`, and the pointer lights nothing, as Empty Trash…
+  does while its question is open.
 - **Glyph button.** A `control` square on `raised` with a `line-control` ring. Disabled, it sinks
   to `inset` on a `line` ring, its glyph `fg-faint`. The one that destroys or forgets takes the
   button's `danger` colours.
@@ -1025,9 +1026,9 @@ toward the rest surface.
   Restore… in a `row-action` column, which a row without one keeps empty. The heading row keeps
   the list's scrollbar gutter, so Size stands over its figures whether the list scrolls or not.
   A row that will go at the next backup says so where how it was taken goes, its time in
-  `fg-mid`; one that cannot be read says unreadable and has no Restore…; one being written arrives at the top as a push-down,
-  "backing up…" and the `progress` bar in place of its size. Restore… asks in the row question's
-  shape, naming in `fg` each source it forgets with files in the Recycle Bin and counting the
+  `fg-mid`; one that cannot be read says unreadable and has no Restore…; one being written
+  arrives at the top as a push-down, "backing up…" and the `progress` bar in place of its size.
+  Restore… asks in the row question's shape, naming in `fg` each source it forgets with files in the Recycle Bin and counting the
   files, which stay there; when what it forgets cannot be read, it says any source added since is
   forgotten and its files stay in the bin, with no names or count, and while it restores the answers give way to the walk's line and bar inside the same
   ring, and Settings holds still: the rail's sections and its filter field are disabled, those

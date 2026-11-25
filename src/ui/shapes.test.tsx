@@ -190,13 +190,22 @@ test("a disabled button sinks to inset in fg-dim and takes no click", async () =
       <Button tone="danger" disabled onClick={clicked}>
         Empty Trash…
       </Button>
+      <Button tone="quiet" disabled onClick={clicked}>
+        Cancel
+      </Button>
+      <Button small disabled onClick={clicked}>
+        Restore…
+      </Button>
     </>,
   );
-  const button = screen.getByRole("button", { name: "Empty Trash…" });
-  await expect.element(button).toBeDisabled();
   const sunk = getComputedStyle(screen.getByTestId("sunk").element());
-  const drawn = getComputedStyle(button.element());
-  expect([drawn.backgroundColor, drawn.color]).toEqual([sunk.backgroundColor, sunk.color]);
-  await userEvent.click(button, { force: true });
+  for (const name of ["Empty Trash…", "Cancel", "Restore…"]) {
+    const button = screen.getByRole("button", { name });
+    await expect.element(button).toBeDisabled();
+    await userEvent.hover(button, { force: true });
+    const drawn = getComputedStyle(button.element());
+    expect([drawn.backgroundColor, drawn.color], name).toEqual([sunk.backgroundColor, sunk.color]);
+    await userEvent.click(button, { force: true });
+  }
   expect(clicked).not.toHaveBeenCalled();
 });
