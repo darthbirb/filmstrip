@@ -1,9 +1,6 @@
-import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { binlessItems, deleteForGood, trashItems } from "../../ipc/commands";
-import { placeItems } from "../grid/place-items";
 import { libraryChanged } from "../library";
 import { setNews } from "../navigation/foot-slot";
-import type { Place } from "../place";
 import {
   binRefusedDetail,
   binRefusedLine,
@@ -13,8 +10,8 @@ import {
 } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
+import { moveOn, moveOnFrom } from "./move-on";
 import { askNoBin } from "./no-bin";
-import { getPaneItem, getPaneOrigin, paneMovesOn, showInPane } from "./pane-store";
 
 /**
  * Deletes files: those on a drive with no Recycle Bin are asked about, once for them all, and the
@@ -49,10 +46,7 @@ export async function deleteFiles(itemIds: number[]) {
  * DECISIONS.md "Undo".
  */
 async function sendToBin(itemIds: number[], asked: number) {
-  const shown = getPaneItem();
-  const origin = getPaneOrigin();
-  // Worked out before the list changes, from the order the grid shows it in.
-  const next = paneMovesOn(itemIds) ? await neighbour(origin, itemIds) : shown;
+  const pane = await moveOnFrom(itemIds);
   const done = await trashItems(itemIds).catch(() => null);
   if (!done) return 0;
   const { batch, report } = done;
@@ -74,8 +68,7 @@ async function sendToBin(itemIds: number[], asked: number) {
         }
       : null,
   );
-  const stayed = report.refused.some((one) => one.id === shown);
-  if (shown !== null && !stayed && next !== shown) showInPane(next, origin);
+  moveOn(pane, report.refused);
   await libraryChanged();
   return report.trashed;
 }
@@ -89,9 +82,7 @@ async function deleteFilesForGood(
   drives: readonly string[],
 ) {
   const itemIds = files.map((file) => file.id);
-  const shown = getPaneItem();
-  const origin = getPaneOrigin();
-  const next = paneMovesOn(itemIds) ? await neighbour(origin, itemIds) : shown;
+  const pane = await moveOnFrom(itemIds);
   const report = await deleteForGood(itemIds).catch(() => null);
   if (!report) return;
   const [first] = report.refused;
@@ -100,19 +91,6 @@ async function deleteFilesForGood(
     const one = files.length === 1 ? files[0]?.name : undefined;
     setNews({ kind: "said", line: forGoodLine(report.deleted, drives, one) });
   }
-  const stayed = report.refused.some((one) => one.id === shown);
-  if (shown !== null && !stayed && next !== shown) showInPane(next, origin);
+  moveOn(pane, report.refused);
   await libraryChanged();
-}
-
-/**
- * The file after the last of these in their place, or the nearest before it when none follows, or
- * none. For one file, the one after it or before it. Artboards › Selecting.
- */
-export async function neighbour(place: Place | null, going: number[]) {
-  const rows: ItemRow[] = await placeItems(place).catch(() => []);
-  const last = rows.findLastIndex((row) => going.includes(row.id));
-  if (last < 0) return null;
-  const stays = (row: ItemRow) => !going.includes(row.id);
-  return rows.slice(last + 1).find(stays)?.id ?? rows.slice(0, last).findLast(stays)?.id ?? null;
 }

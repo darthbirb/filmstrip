@@ -45,7 +45,12 @@ function InTrash({ item }: { item: ItemDetail }) {
         onClick={() => {
           const element = restoreTo.current;
           if (!element) return;
-          openMovePicker({ restoring: [item.id], folderId: item.folderId, anchor: { element } });
+          openMovePicker({
+            restoring: [item.id],
+            folderId: item.folderId,
+            anchor: { element },
+            keepFocus: "Restore to…",
+          });
         }}
       >
         Restore to…
@@ -117,7 +122,12 @@ function InLibrary({ item }: { item: ItemDetail }) {
           onClick={() => {
             const element = moveTo.current;
             if (element) {
-              openMovePicker({ itemIds: [item.id], folderId: item.folderId, anchor: { element } });
+              openMovePicker({
+                itemIds: [item.id],
+                folderId: item.folderId,
+                anchor: { element },
+                keepFocus: "Move to…",
+              });
             }
           }}
         >

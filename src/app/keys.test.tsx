@@ -99,6 +99,42 @@ test("with nothing checked it moves the pane's file, and the pane moves on to th
   await expect.element(page.getByText("Moved pyramid.jpg to People.")).toBeVisible();
 });
 
+test("a checked set holding the pane's file moves the pane past the last of them", async () => {
+  await renderIt();
+  const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
+  showInPane(pyramid, CAIRO);
+  await userEvent.click(page.getByRole("checkbox", { name: "Select felucca.mp4" }));
+  await userEvent.click(page.getByRole("checkbox", { name: "Select pyramid.jpg" }));
+  await userEvent.keyboard("1");
+
+  await expect.element(page.getByText("Moved 2 files to People.")).toBeVisible();
+  await expect.poll(getPaneItem).toBe(sphinx);
+});
+
+test("a checked set ending the place with the pane's file gives the pane the one before", async () => {
+  await renderIt();
+  const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
+  showInPane(sphinx, CAIRO);
+  await userEvent.click(page.getByRole("checkbox", { name: "Select felucca.mp4" }));
+  await userEvent.click(page.getByRole("checkbox", { name: "Select sphinx.jpg" }));
+  await userEvent.keyboard("1");
+
+  await expect.element(page.getByText("Moved 2 files to People.")).toBeVisible();
+  await expect.poll(getPaneItem).toBe(pyramid);
+});
+
+test("with the pane on the first of a checked set, the pane goes past the last, not the next", async () => {
+  await renderIt();
+  const [felucca, sphinx] = [await idOf("felucca.mp4"), await idOf("sphinx.jpg")];
+  showInPane(felucca, CAIRO);
+  await userEvent.click(page.getByRole("checkbox", { name: "Select felucca.mp4" }));
+  await userEvent.click(page.getByRole("checkbox", { name: "Select pyramid.jpg" }));
+  await userEvent.keyboard("1");
+
+  await expect.element(page.getByText("Moved 2 files to People.")).toBeVisible();
+  await expect.poll(getPaneItem).toBe(sphinx);
+});
+
 test("a move of the pane's file that runs as a job between drives moves the pane on too", async () => {
   await renderIt();
   const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];

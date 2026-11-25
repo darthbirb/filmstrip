@@ -5,6 +5,7 @@ import type { FolderEntry } from "../../ipc/bindings/FolderEntry";
 import type { Moved } from "../../ipc/bindings/Moved";
 import {
   type AppError,
+  folderDetail,
   listFolders,
   moveFolder,
   moveItems,
@@ -14,11 +15,14 @@ import type { MenuAnchor } from "../../ui/Menu";
 import { Picker, type PickerRow, type PickerSection } from "../../ui/Picker";
 import { libraryChanged } from "../library";
 import { setNews } from "../navigation/foot-slot";
-import { refreshIndex, useIndex } from "../navigation/index-store";
+import { getIndex, refreshIndex, useIndex } from "../navigation/index-store";
+import type { Place } from "../place";
 import { getPreferences, RECENT, updatePreferences, usePreferences } from "../preferences";
 import { movedBannerLine, moveStoppedLine, reasonText } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
+import { keepFocusThrough } from "./act-focus";
+import { type MoveOn, moveOn, moveOnFrom, moveOnLanded, stillListed } from "./move-on";
 import { restoreFiles } from "./restore";
 
 /** A folder to move, with everything in it. */
@@ -38,6 +42,8 @@ export type MoveRequest = (
   anchor: MenuAnchor;
   /** Asked for from inside Settings, whose dialog holds the only part of the window not inert. */
   inDialog?: boolean;
+  /** The pane's button that asked, whose namesake on the next file's bar takes the focus. */
+  keepFocus?: string;
 };
 
 // One picker at a time, opened from the bar or a menu and drawn once at the app's root.
@@ -150,13 +156,16 @@ function MovePicker({ request }: { request: MoveRequest }) {
       onPick={(id) => {
         const to = byId.get(id);
         if (!to) return;
-        if ("restoring" in request) return void restoreFiles(request.restoring, to);
+        const act = (done: Promise<unknown>) => {
+          if (request.keepFocus) keepFocusThrough(request.keepFocus, done);
+        };
+        if ("restoring" in request) return act(restoreFiles(request.restoring, to));
         if ("binding" in request) {
           return void setDestinationKey(request.binding, to.id)
             .then(() => refreshIndex())
             .catch(() => undefined);
         }
-        if (!("folder" in request)) return void moveFiles(request.itemIds, to);
+        if (!("folder" in request)) return act(moveFiles(request.itemIds, to));
         const from = { folderId: request.folderId, path: pathOf(byId, request.folderId) };
         void moveFolderTo(request.folder, to, from);
       }}
@@ -243,14 +252,21 @@ type Into = Pick<FolderEntry, "id" | "title">;
 
 /**
  * Moves the files and says what happened: the line at the foot for what went, the banner over
- * the grid for what did not; and hands back the report. A move between drives is a job, which
- * says so when it ends, and hands back only that it started. DECISIONS.md "Undo".
+ * the grid for what did not; and hands back the report. When the pane's file leaves its place
+ * the pane moves on, as after a delete. A move between drives is a job, which says so when it
+ * ends, and hands back only that it started. DECISIONS.md "Undo".
  */
 export async function moveFiles(itemIds: number[], to: Into) {
+  const pane = await moveOnFrom(itemIds);
   const moved = await moveItems(itemIds, to.id).catch(() => null);
   if (!moved) return null;
   remember(to);
-  if (moved.kind === "started") return "started" as const;
+  if (moved.kind === "started") {
+    if (pane.next === pane.shown) return "started" as const;
+    if (pane.origin?.kind === "search") landing.set(moved.jobId, pane);
+    else if (await leavesAhead(pane.origin, to)) moveOn(pane, []);
+    return "started" as const;
+  }
   const { batch, report } = moved;
   if (batch) afterAct(batch, report.refused.length);
   const whole = report.moved + report.refused.length;
@@ -274,8 +290,31 @@ export async function moveFiles(itemIds: number[], to: Into) {
         }
       : null,
   );
+  await moveOnOut(pane);
   await libraryChanged();
   return report;
+}
+
+/**
+ * The pane moves on once its file has left the place it was shown in: one the place still lists
+ * keeps it, as a search still finding it, the Sorting Box holding it or a file already where it
+ * was sent does. DECISIONS.md "The pane".
+ */
+async function moveOnOut(pane: MoveOn) {
+  if (pane.next !== pane.shown && !(await stillListed(pane))) moveOn(pane, []);
+}
+
+// Moves between drives out of a search, by job, waiting to land before the search is asked.
+const landing = new Map<number, MoveOn>();
+
+/**
+ * Whether a move between drives takes the file out of its place, judged as it starts: out of a
+ * folder always, out of the Sorting Box unless into a sorting source.
+ */
+async function leavesAhead(origin: Place | null, to: Into) {
+  if (origin?.kind !== "sorting") return true;
+  const into = await folderDetail(to.id).catch(() => null);
+  return getIndex().sources?.find((one) => one.id === into?.sourceId)?.kind !== "sorting";
 }
 
 /**
@@ -312,6 +351,9 @@ export async function moveFolderTo(
  */
 export async function afterMoved(moved: Moved) {
   await libraryChanged();
+  const pane = landing.get(moved.jobId);
+  landing.delete(moved.jobId);
+  if (pane) await moveOnLanded(pane);
   const { batch, refused, whole, to, stopped } = moved;
   const into = { id: moved.folderId, title: to };
   const [only] = refused;
