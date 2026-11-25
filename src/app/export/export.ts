@@ -191,7 +191,7 @@ export function afterExported(done: Exported) {
       return;
     }
     case "cancelled":
-      setNews({ kind: "exported", line: `Stopped exporting ${zip}. Nothing was written.` });
+      setNews({ kind: "said", line: `Stopped exporting ${zip}. Nothing was written.` });
       return;
     case "nothing": {
       const [only] = skipped;

@@ -64,6 +64,8 @@ pub struct Progress {
     pub moves: Vec<Moving>,
     /// Walks finished since launch.
     pub walks: u64,
+    /// The source a walk is reading, while one is.
+    pub walked_source: Option<i64>,
     /// Items whose thumbnail or scrub frames were made since the last report.
     pub thumbed: Vec<i64>,
 }
@@ -176,6 +178,7 @@ pub struct QueueInner {
     /// Each job runs holding it to read; a hold takes it to write, so it waits out the jobs in flight.
     gate: RwLock<()>,
     walking: AtomicBool,
+    walked_source: Mutex<Option<i64>>,
     walks: AtomicU64,
     completed: AtomicU64,
     thumbed: Mutex<Vec<i64>>,
@@ -207,6 +210,7 @@ impl QueueInner {
             held: AtomicBool::new(false),
             gate: RwLock::new(()),
             walking: AtomicBool::new(false),
+            walked_source: Mutex::new(None),
             walks: AtomicU64::new(0),
             completed: AtomicU64::new(0),
             thumbed: Mutex::new(Vec::new()),
@@ -240,6 +244,7 @@ impl QueueInner {
             exports: exports(conn, &lock(&self.exports))?,
             moves: moves(conn, &lock(&self.moves))?,
             walks: self.walks.load(Ordering::Relaxed),
+            walked_source: *lock(&self.walked_source),
             thumbed: Vec::new(),
         })
     }

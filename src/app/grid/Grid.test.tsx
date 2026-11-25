@@ -223,6 +223,7 @@ const QUIET: Progress = {
   exports: [],
   moves: [],
   walks: 1,
+  walkedSource: null,
   thumbed: [],
 };
 

@@ -49,6 +49,22 @@ pub fn can_undo(conn: &Connection, batch_id: &str) -> Result<bool> {
     Ok(!journal::batch(conn, batch_id)?.is_empty() && !journal::below_floor(conn, batch_id)?)
 }
 
+/// The act an undo would take back: the batch named, or the newest; none when nothing is left of
+/// it, so an undo that failed can say which act it failed on.
+pub fn act_to_undo(conn: &Connection, batch_id: Option<&str>) -> Result<Option<Batch>> {
+    let batch_id = match batch_id {
+        Some(batch_id) => batch_id.to_string(),
+        None => match journal::latest_batch(conn)? {
+            Some(batch_id) => batch_id,
+            None => return Ok(None),
+        },
+    };
+    if !can_undo(conn, &batch_id)? {
+        return Ok(None);
+    }
+    acts::describe(conn, &batch_id).map(Some)
+}
+
 /// Reverses whatever was done last, in this session or an earlier one; nothing when nothing is left.
 pub fn undo_last(conn: &Connection) -> Result<Option<UndoReport>> {
     let _turn = super::turn();
@@ -292,6 +308,31 @@ mod tests {
         assert!(!can_undo(&conn, &batch).unwrap());
         assert!(undo_batch(&conn, &batch).is_err());
         assert!(dir.join("library/Trips/Giza").is_dir());
+    }
+
+    #[test]
+    fn the_act_to_undo_is_the_one_named_or_the_newest_while_anything_is_left_of_it() {
+        let dir = scratch("to-undo");
+        let (conn, trips) = library(&dir);
+        assert_eq!(act_to_undo(&conn, None).unwrap(), None);
+        let made = journal::new_batch();
+        folders::create(&conn, trips, "Lisbon", &made).unwrap();
+        let cairo = rows::child_id(&conn, trips, "Cairo").unwrap().unwrap();
+        let renamed = journal::new_batch();
+        folders::rename(&conn, cairo, "Giza", &renamed).unwrap();
+
+        let newest = act_to_undo(&conn, None).unwrap().unwrap();
+        assert_eq!(newest.batch_id, renamed);
+        let named = act_to_undo(&conn, Some(&made)).unwrap().unwrap();
+        assert_eq!(
+            named.act,
+            Act::CreateFolder {
+                name: "Lisbon".into(),
+                parent: "Trips".into()
+            }
+        );
+        undo_batch(&conn, &renamed).unwrap();
+        assert_eq!(act_to_undo(&conn, Some(&renamed)).unwrap(), None);
     }
 
     #[test]

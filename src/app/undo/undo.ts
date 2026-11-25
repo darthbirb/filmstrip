@@ -3,10 +3,10 @@ import { useEffect } from "react";
 import type { Batch } from "../../ipc/bindings/Batch";
 import type { Stayed } from "../../ipc/bindings/Stayed";
 import type { UndoReport } from "../../ipc/bindings/UndoReport";
-import { canUndo, undoBatch, undoLast } from "../../ipc/commands";
+import { actToUndo, canUndo, undoBatch, undoLast } from "../../ipc/commands";
 import { libraryChanged } from "../library";
 import { getNews, sayOnce, setNews } from "../navigation/foot-slot";
-import { actLine, letGo, undoBannerLine, undoneLine } from "./lines";
+import { actLine, letGo, undoBannerLine, undoFailedLine, undoneLine } from "./lines";
 import { showReport } from "./report-store";
 
 // What follows an act, and the way back from it. DECISIONS.md "Undo".
@@ -38,9 +38,9 @@ export async function undo(batchId?: string, earlier: readonly Stayed[] = []) {
     let report: UndoReport | null;
     try {
       report = batchId ? await undoBatch(batchId) : await undoLast();
-    } catch {
-      // A batch already taken back has nothing left in it.
-      report = null;
+    } catch (error) {
+      await failed(batchId, error);
+      return;
     }
     if (!report) {
       sayNothing();
@@ -64,6 +64,26 @@ export async function undo(batchId?: string, earlier: readonly Stayed[] = []) {
   } finally {
     undoing = false;
   }
+}
+
+/**
+ * An undo that failed names its act and why, and keeps its Undo; one whose act is already taken
+ * back had nothing left to undo. What came back before it failed is drawn.
+ */
+async function failed(batchId: string | undefined, error: unknown) {
+  await libraryChanged();
+  let batch: Batch | null;
+  try {
+    batch = await actToUndo(batchId ?? null);
+  } catch {
+    setNews({ kind: "undoFailed", line: undoFailedLine(null, error), batchId });
+    return;
+  }
+  if (!batch) {
+    sayNothing();
+    return;
+  }
+  setNews({ kind: "undoFailed", line: undoFailedLine(batch, error), batchId: batch.batchId });
 }
 
 /** "Nothing to undo." answers a key, not an act, so it goes at the next key or click. */

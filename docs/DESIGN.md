@@ -683,7 +683,8 @@ toward the rest surface.
   an undo could not finish is grouped under a heading per place it is still in, "Reason" said over
   the first; a file emptied from the Recycle Bin outside the app is under Gone from the Recycle
   Bin, last, and one the index forgot under Gone from the folder or source it was last in, neither
-  with a way to look, and Retry stays only while a row of neither kind could succeed.
+  with a way to look, and Retry stays only while a row of neither kind could succeed. Its toggle is
+  Show Files and Hide Files, or Show All and Hide All once a folder is among the rows.
 - **Question.** The notice's shape, asking: the `danger` glyph, the question and × to answer none
   on one line; under the question its answers as buttons, the one that destroys last in `danger`;
   under them, where an answer can be kept, a checkbox. The answers hold the line or all fold into
@@ -1051,7 +1052,12 @@ toward the rest surface.
   folder's path under it in `--font-mono` or why in `small` `fg-dim`, and a dismiss, on a
   `danger-wash` ground, as when the Recycle Bin would not take a file Delete sent it. A way to go
   and look stands under why as a Button. There is only ever one, and a second refusal replaces it rather
-  than stacking.
+  than stacking. An undo that failed is the Band, naming its act and why, with Undo under it to try
+  again. Folded, the rail keeps the Undo glyph button, and the sentence comes out beside it as
+  "Nothing to undo." does, in the Band's alarm: the `warning` glyph in `danger` on `danger-wash`
+  inside a `line-danger` ring. A long one wraps a `tile-gap` short of the window's edge, growing
+  up from the slot, so its reason is never cut off. It goes at the next key or click, and the
+  button, the same one the act's Undo was, keeps it in its tooltip.
 - **Line.** What an act did, in the Band's slot and shape without its alarm: a `glyph` in `fg-dim`
   (a check after an act, the undo arrow after an undo), the sentence in `ui`, the way back under it
   as a raised Undo button, and a dismiss. An act that changed nothing in the library, as a drop on
@@ -1084,8 +1090,8 @@ toward the rest surface.
   row of the details it is a `chip` high, its segments at the `badge` corner in `small`, `fg-dim`
   until chosen. In a sheet it fills the width, its segments sharing it, each label centred.
 - **Source row.** In Settings, two lines: the source's glyph, its name as a field where it stands,
-  its count — or the walk, while one runs — its kind as a segmented group, then reveal and remove;
-  its path beneath in `--font-mono`. One that cannot be read keeps its remove and loses its reveal,
+  its count — or the walk, while one reads this source — its kind as a segmented group, then
+  reveal and remove; its path beneath in `--font-mono`. One that cannot be read keeps its remove and loses its reveal,
   whose `control` square stays empty so its kind and remove keep the column of the rows above.
   Remove asks on the row: a `line-danger` ring, the glyph becomes the warning, the kind and the
   buttons give up their space, and the path gives way to what removing forgets, over **Remove

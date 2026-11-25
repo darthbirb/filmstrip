@@ -1436,6 +1436,16 @@ const FAILURES: Failure[] = [
 ];
 const failures = () => (new URLSearchParams(location.search).has("failures") ? FAILURES : []);
 
+// `?walking` has a walk reading the first source, so its row in Settings says so.
+const walkingSource = () =>
+  new URLSearchParams(location.search).has("walking") ? (SOURCES[0]?.id ?? null) : null;
+
+// `?undo-fails` has every undo fail on a full disk, its act left in the journal.
+let undoFailing = false;
+let lookupFailing = false;
+const undoFails = () => undoFailing || new URLSearchParams(location.search).has("undo-fails");
+const diskFull = () => Promise.reject<AppError>({ kind: "io", reason: { kind: "diskFull" } });
+
 // `?across` makes every move of files one between drives: a job with its line, so its Cancel
 // can be reached.
 const movesAcross = () => new URLSearchParams(location.search).has("across");
@@ -1605,6 +1615,12 @@ export function forgetOnRestore(next: Forgetting | null) {
 let binRefuses = new Set<number>();
 /** Trashed files emptied from the bin outside the app, which an undo still finds gone. */
 const emptiedOutside = new Set<number>();
+
+/** Has every undo fail, or succeed again, as `?undo-fails` does; and the look for its act, too. */
+export function failUndo(failing: boolean, lookupToo = false) {
+  undoFailing = failing;
+  lookupFailing = failing && lookupToo;
+}
 
 /** Has the Recycle Bin refuse these files when Delete sends them there. */
 export function refuseRecycling(itemIds: readonly number[]) {
@@ -2035,13 +2051,21 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       report: { deleted: refused.length === 0, refused, outright },
     };
   },
-  undo_last: () => (journal.length > 0 ? takeBack(journal.length - 1) : null),
+  undo_last: () => {
+    if (journal.length === 0) return null;
+    return undoFails() ? diskFull() : takeBack(journal.length - 1);
+  },
   undo_batch: ({ batchId }) => {
     const at = journal.findIndex((batch) => batch.batchId === batchId);
-    if (at >= 0) return takeBack(at);
-    return invalid();
+    if (at < 0) return invalid();
+    return undoFails() ? diskFull() : takeBack(at);
   },
   can_undo: ({ batchId }) => journal.some((batch) => batch.batchId === batchId),
+  act_to_undo: ({ batchId }) => {
+    if (lookupFailing) return diskFull();
+    const one = batchId ? journal.find((batch) => batch.batchId === batchId) : journal.at(-1);
+    return one ? describeBatch(one.batchId, one.steps) : null;
+  },
   folder_children: ({ folderId }) => FOLDERS[folderId as number] ?? [],
   // A source's favourite is its own folder's, as the Rust side keeps it.
   set_folder_favorite: ({ folderId, favorite }) => {
@@ -2451,18 +2475,23 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   reveal_path: () => null,
   copy_item_paths: () => null,
   start_index: () => null,
-  index_progress: (): Progress => ({
-    phase: "idle",
-    pending: 0,
-    running: 0,
-    failed: failures().length,
-    completed: 0,
-    copies: [],
-    exports: [...exporting.values()],
-    moves: [...moving.values()],
-    walks: 0,
-    thumbed: [],
-  }),
+  index_progress: (): Progress => {
+    const walkedSource = walkingSource();
+    const walking = walkedSource !== null;
+    return {
+      phase: walking ? "walking" : "idle",
+      pending: walking ? 4119 : 0,
+      running: walking ? 1 : 0,
+      failed: failures().length,
+      completed: walking ? 2526 : 0,
+      copies: [],
+      exports: [...exporting.values()],
+      moves: [...moving.values()],
+      walks: 0,
+      walkedSource,
+      thumbed: [],
+    };
+  },
   index_failures: () => failures(),
   retry_failed_jobs: () => 0,
   list_backups: () => shelved(),

@@ -31,7 +31,8 @@ import { RowQuestion } from "../../ui/TermTable";
 import { libraryChanged } from "../library";
 import { setNews } from "../navigation/foot-slot";
 import { useWork } from "../navigation/work-store";
-import { howTaken, notBackedUp, whyFailed } from "./backup-words";
+import { whyFailed } from "../undo/lines";
+import { howTaken, notBackedUp } from "./backup-words";
 import { Rows } from "./Rows";
 import { binStays, listed } from "./recycle-words";
 import {

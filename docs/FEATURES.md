@@ -31,7 +31,7 @@ drawn. **Not started** — neither.
 | Capability | Filmstrip | Where |
 | --- | --- | --- |
 | Walk every source in the background | Built | `start_index`, the job queue; a directory it cannot read, or a drive lost mid-walk, retires nothing, and hidden or system entries are never read: DECISIONS.md "A walk only judges what it read" |
-| Report progress | Built | the foot's indexing line |
+| Report progress | Built | the foot's indexing line, and in Settings › Sources the row of the source the walk is reading |
 | Report per-file failures, each by its path and reason, and retry them | Built | the notices above the grid, with Show in Explorer |
 | Thumbnails for pictures | Built | `thumb` jobs |
 | Thumbnails for video, through ffmpeg | Built | the ffmpeg in `tools\` beside the app, else one on PATH |
@@ -122,7 +122,7 @@ drawn. **Not started** — neither.
 | --- | --- | --- |
 | Export a folder's subtree or a selection as a zip, as a job | Built | `export_plan`, `pick_export_zip`, `start_export`, `cancel_export`; DECISIONS.md "Exporting a zip". Filmstrip's own change: renaming the files or keeping their own names is chosen at export |
 | An undo journal that survives a restart | Built | `journal`, DECISIONS.md "Undo"; the line at the foot of navigation, Ctrl+Z |
-| Undo the last batch, or a named one | Built | Ctrl+Z takes the last, the line's Undo its own batch; no list of batches yet |
+| Undo the last batch, or a named one | Built | Ctrl+Z takes the last, the line's Undo its own batch; an undo that fails names its act and why in the Band and keeps Undo, `act_to_undo`; no list of batches yet |
 
 ## The interface
 

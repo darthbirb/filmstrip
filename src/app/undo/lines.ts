@@ -514,6 +514,26 @@ export function reasonSentence(reason: Reason): string {
   }
 }
 
+/** Why anything failed, as the sentence after the one that says so: never the error's own text. */
+export function whyFailed(error: unknown): string {
+  const failed = error as Partial<AppError> | null;
+  return reasonSentence(failed?.reason ?? { kind: "other" });
+}
+
+/**
+ * What the foot says when an undo failed, its Undo kept to try again: the act by its line's one
+ * sentence, when the act could be read.
+ */
+export function undoFailedLine(batch: Batch | null, error: unknown): string {
+  if (!batch) return `Could not undo. ${whyFailed(error)}`;
+  const { act } = batch;
+  const line =
+    act.kind === "deleteFolder" && act.into && batch.files > 0
+      ? `Deleted ${act.name}`
+      : actLine(batch).replace(/\.$/, "");
+  return `Could not undo “${line}”. ${whyFailed(error)}`;
+}
+
 /**
  * A row its undo let go of, the file gone from the bin or the index, its way back in a removed
  * source, or its way to the bin on a drive with none: nothing is left to retry.

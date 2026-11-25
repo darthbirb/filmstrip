@@ -125,6 +125,7 @@ pub fn run() {
             commands::undo_last,
             commands::undo_batch,
             commands::can_undo,
+            commands::act_to_undo,
             commands::clipboard_files,
             commands::count_carried,
             commands::paste_files,

@@ -10,6 +10,8 @@ type Props = {
   /** Whether the list under the line is showing. */
   open: boolean;
   onToggle: () => void;
+  /** The list holds folders, so its toggle names neither files nor folders alone. */
+  all?: boolean;
   onDismiss: () => void;
   /** The list: a heading row and the rows under it, laid out by `listRow`. */
   children: ReactNode;
@@ -19,7 +21,7 @@ type Props = {
  * Something only you can settle, above the grid until it is: a line, its buttons, and the files
  * it is about, in a list that opens under it. DESIGN.md "Components".
  */
-export function Banner({ sentence, retry, open, onToggle, onDismiss, children }: Props) {
+export function Banner({ sentence, retry, open, onToggle, all, onDismiss, children }: Props) {
   return (
     <div className="shrink-0 px-3 pb-2">
       <div className="flex flex-col rounded-control bg-panel inset-ring inset-ring-line-danger">
@@ -29,7 +31,7 @@ export function Banner({ sentence, retry, open, onToggle, onDismiss, children }:
           <Glyph name="warning" className="shrink-0 text-danger text-icon" />
           <span className="min-w-0 flex-1 text-fg text-ui tabular-nums">{sentence}</span>
           {retry && <Button onClick={retry}>Retry</Button>}
-          <FilesToggle open={open} onToggle={onToggle} />
+          <FilesToggle open={open} onToggle={onToggle} all={all} />
           <button
             type="button"
             aria-label="Dismiss"
@@ -46,8 +48,16 @@ export function Banner({ sentence, retry, open, onToggle, onDismiss, children }:
   );
 }
 
-/** Show Files or Hide Files: opens and closes the list under a notice. */
-export function FilesToggle({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+/** Show Files or Hide Files, or Show All and Hide All over folders: opens and closes the list. */
+export function FilesToggle({
+  open,
+  onToggle,
+  all = false,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  all?: boolean;
+}) {
   return (
     <Button
       tone="quiet"
@@ -55,7 +65,7 @@ export function FilesToggle({ open, onToggle }: { open: boolean; onToggle: () =>
       detail={open && <Glyph name="chevronDown" className="rotate-180 text-glyph-small" />}
       onClick={onToggle}
     >
-      {open ? "Hide Files" : "Show Files"}
+      {`${open ? "Hide" : "Show"} ${all ? "All" : "Files"}`}
     </Button>
   );
 }

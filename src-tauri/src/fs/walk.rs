@@ -282,13 +282,19 @@ fn record_new(
 
 /// Brings the index back in line with what is on disk.
 pub fn reconcile(conn: &Connection) -> Result<WalkReport> {
-    reconcile_list(conn, sources::list(conn)?, &|| false, &read_tree).map(Option::unwrap_or_default)
+    reconcile_list(conn, sources::list(conn)?, &|| false, &|_| {}, &read_tree)
+        .map(Option::unwrap_or_default)
 }
 
 /// As [`reconcile`], stopping before the next source or directory once `halt` says so, having
-/// retired nothing in the source it stopped in; `None` when it stopped.
-pub fn reconcile_until(conn: &Connection, halt: &dyn Fn() -> bool) -> Result<Option<WalkReport>> {
-    reconcile_list(conn, sources::list(conn)?, halt, &read_tree)
+/// retired nothing in the source it stopped in; `None` when it stopped. `reading` is told each
+/// source as its walk begins.
+pub fn reconcile_until(
+    conn: &Connection,
+    halt: &dyn Fn() -> bool,
+    reading: &dyn Fn(i64),
+) -> Result<Option<WalkReport>> {
+    reconcile_list(conn, sources::list(conn)?, halt, reading, &read_tree)
 }
 
 /// A source the pass read, and the folders in it at or under one it could not read in full.
@@ -309,6 +315,7 @@ fn reconcile_list(
     conn: &Connection,
     listed: Vec<sources::Source>,
     halt: &dyn Fn() -> bool,
+    reading: &dyn Fn(i64),
     read: Reader,
 ) -> Result<Option<WalkReport>> {
     let mut report = WalkReport::default();
@@ -322,6 +329,7 @@ fn reconcile_list(
         if !root.is_dir() {
             continue; // unreachable, so nothing here can be judged
         }
+        reading(source.id);
         let turn = super::turn();
         let walked_one = walk_source(conn, &source, &mut report, halt, read);
         drop(turn);
@@ -427,11 +435,21 @@ fn keep_unread(conn: &Connection, file: &Path, folder_id: i64) -> Result<()> {
 
 /// One folder read again, as the whole walk reads a source, judging nothing outside its subtree.
 /// A folder in an unreachable source is left as it is; one whose own directory is gone retires.
-pub fn reconcile_folder(conn: &Connection, folder_id: i64) -> Result<WalkReport> {
-    reconcile_folder_with(conn, folder_id, &read_tree)
+/// `reading` is told its source as the walk begins.
+pub fn reconcile_folder(
+    conn: &Connection,
+    folder_id: i64,
+    reading: &dyn Fn(i64),
+) -> Result<WalkReport> {
+    reconcile_folder_with(conn, folder_id, reading, &read_tree)
 }
 
-fn reconcile_folder_with(conn: &Connection, folder_id: i64, read: Reader) -> Result<WalkReport> {
+fn reconcile_folder_with(
+    conn: &Connection,
+    folder_id: i64,
+    reading: &dyn Fn(i64),
+    read: Reader,
+) -> Result<WalkReport> {
     let _turn = super::turn();
     let mut report = WalkReport::default();
     if !folders::is_live(conn, folder_id)? {
@@ -445,6 +463,7 @@ fn reconcile_folder_with(conn: &Connection, folder_id: i64, read: Reader) -> Res
     if !root.is_dir() {
         return Ok(report);
     }
+    reading(source_id);
     let dir = paths::folder_dir(conn, folder_id)?;
     items::begin_sweep(conn)?;
     let unread = if dir.is_dir() {
@@ -609,7 +628,7 @@ pub(crate) mod tests {
         let listed = sources::list(&conn).unwrap();
         sources::remove(&conn, doomed.id).unwrap();
 
-        let report = reconcile_list(&conn, listed, &|| false, &read_tree)
+        let report = reconcile_list(&conn, listed, &|| false, &|_| {}, &read_tree)
             .unwrap()
             .unwrap();
         assert_eq!(report.indexed, 1);
@@ -633,7 +652,7 @@ pub(crate) mod tests {
             asked.get() > 2
         };
 
-        assert_eq!(reconcile_until(&conn, &halt).unwrap(), None);
+        assert_eq!(reconcile_until(&conn, &halt, &|_| {}).unwrap(), None);
         assert_eq!(
             live_items(&conn),
             [(
@@ -641,8 +660,41 @@ pub(crate) mod tests {
                 folders::source_root_folder(&conn, 1).unwrap()
             )]
         );
-        assert!(reconcile_until(&conn, &|| false).unwrap().is_some());
+        assert!(
+            reconcile_until(&conn, &|| false, &|_| {})
+                .unwrap()
+                .is_some()
+        );
         assert_eq!(live_items(&conn).len(), 2);
+    }
+
+    #[test]
+    fn each_source_is_told_as_its_walk_begins_and_one_away_is_not() {
+        let (conn, root) = library("told");
+        write(&root.join("first.jpg"), "a");
+        let away = scratch("told-away");
+        let away = sources::add(&conn, &away, "Away", SourceKind::Library).unwrap();
+        std::fs::remove_dir_all(&away.root).unwrap();
+        let third = scratch("told-third");
+        write(&third.join("third.jpg"), "c");
+        let third = sources::add(&conn, &third, "Third", SourceKind::Library).unwrap();
+        let told = std::cell::RefCell::new(Vec::new());
+
+        reconcile_until(&conn, &|| false, &|id| told.borrow_mut().push(id)).unwrap();
+        assert_eq!(*told.borrow(), [1, third.id]);
+    }
+
+    #[test]
+    fn reading_a_folder_again_tells_its_source() {
+        let (conn, root) = library("told-folder");
+        write(&root.join("Trips/a.jpg"), "a");
+        reconcile(&conn).unwrap();
+        let top = folders::source_root_folder(&conn, 1).unwrap();
+        let trips = folder_under(&conn, top, "Trips");
+        let told = std::cell::Cell::new(None);
+
+        reconcile_folder(&conn, trips, &|id| told.set(Some(id))).unwrap();
+        assert_eq!(told.get(), Some(1));
     }
 
     #[test]
@@ -660,7 +712,7 @@ pub(crate) mod tests {
             asked.get() > 2
         };
 
-        assert_eq!(reconcile_until(&conn, &halt).unwrap(), None);
+        assert_eq!(reconcile_until(&conn, &halt, &|_| {}).unwrap(), None);
         let names: Vec<String> = live_items(&conn).into_iter().map(|(n, _)| n).collect();
         assert_eq!(
             names,
@@ -836,9 +888,15 @@ pub(crate) mod tests {
         std::fs::remove_dir_all(root.join("Trips/Cairo")).unwrap();
         std::fs::remove_file(root.join("People/c.jpg")).unwrap();
         let read = failing_at(root.join("Trips"));
-        let report = reconcile_list(&conn, sources::list(&conn).unwrap(), &|| false, &read)
-            .unwrap()
-            .unwrap();
+        let report = reconcile_list(
+            &conn,
+            sources::list(&conn).unwrap(),
+            &|| false,
+            &|_| {},
+            &read,
+        )
+        .unwrap()
+        .unwrap();
 
         assert_eq!(names(&conn), ["a.jpg", "b.jpg"], "People was read in full");
         assert!(live(&conn, trips) && live(&conn, cairo));
@@ -856,9 +914,15 @@ pub(crate) mod tests {
         let read = |dir: &Path| -> Box<dyn Iterator<Item = Read>> {
             Box::new(read_tree(dir).chain([Read::Unread(None)]))
         };
-        let report = reconcile_list(&conn, sources::list(&conn).unwrap(), &|| false, &read)
-            .unwrap()
-            .unwrap();
+        let report = reconcile_list(
+            &conn,
+            sources::list(&conn).unwrap(),
+            &|| false,
+            &|_| {},
+            &read,
+        )
+        .unwrap()
+        .unwrap();
 
         assert_eq!(names(&conn), ["a.jpg"]);
         assert_eq!((report.items_retired, report.folders_retired), (0, 0));
@@ -886,7 +950,7 @@ pub(crate) mod tests {
             }
             false
         };
-        let report = reconcile_until(&conn, &halt).unwrap().unwrap();
+        let report = reconcile_until(&conn, &halt, &|_| {}).unwrap().unwrap();
 
         assert_eq!(live_items(&conn), before);
         assert!(live(&conn, trips) && live(&conn, cairo));
@@ -910,7 +974,7 @@ pub(crate) mod tests {
             }
             false
         };
-        reconcile_until(&conn, &halt).unwrap().unwrap();
+        reconcile_until(&conn, &halt, &|_| {}).unwrap().unwrap();
         assert_eq!(names(&conn), ["a.jpg", "b.jpg"]);
 
         reconcile(&conn).unwrap();
@@ -937,7 +1001,7 @@ pub(crate) mod tests {
             }
             false
         };
-        let report = reconcile_until(&conn, &halt).unwrap().unwrap();
+        let report = reconcile_until(&conn, &halt, &|_| {}).unwrap().unwrap();
 
         assert!(live(&conn, trips));
         assert_eq!(names(&conn), ["a.jpg", "b.jpg"]);
@@ -1043,7 +1107,7 @@ pub(crate) mod tests {
         write(&root.join("People/elsewhere.jpg"), "e");
         std::fs::remove_file(root.join("Trips/a.jpg")).unwrap();
         std::fs::remove_file(root.join("People/c.jpg")).unwrap();
-        let report = reconcile_folder(&conn, trips).unwrap();
+        let report = reconcile_folder(&conn, trips, &|_| {}).unwrap();
 
         // Outside Trips nothing is judged: c.jpg stays, elsewhere.jpg waits for a whole walk.
         assert_eq!(names(&conn), ["b.jpg", "c.jpg", "deeper.jpg", "new.jpg"]);
@@ -1063,7 +1127,7 @@ pub(crate) mod tests {
 
         std::fs::remove_dir_all(root.join("Trips/Cairo")).unwrap();
         std::fs::remove_dir_all(root.join("People")).unwrap();
-        reconcile_folder(&conn, trips).unwrap();
+        reconcile_folder(&conn, trips, &|_| {}).unwrap();
 
         assert!(!live(&conn, cairo));
         assert!(live(&conn, trips) && live(&conn, people));
@@ -1080,7 +1144,7 @@ pub(crate) mod tests {
         let trips = folder_under(&conn, top, "Trips");
 
         std::fs::remove_dir_all(root.join("Trips")).unwrap();
-        reconcile_folder(&conn, trips).unwrap();
+        reconcile_folder(&conn, trips, &|_| {}).unwrap();
 
         assert!(!live(&conn, trips));
         assert_eq!(names(&conn), ["c.jpg"]);
@@ -1095,7 +1159,7 @@ pub(crate) mod tests {
         let trips = folder_under(&conn, top, "Trips");
 
         std::fs::remove_dir_all(&root).unwrap();
-        reconcile_folder(&conn, trips).unwrap();
+        reconcile_folder(&conn, trips, &|_| {}).unwrap();
 
         assert!(live(&conn, trips));
         assert_eq!(names(&conn), ["a.jpg"]);
@@ -1118,7 +1182,7 @@ pub(crate) mod tests {
         std::fs::remove_dir_all(root.join("Trips/Cairo/Day 1")).unwrap();
         std::fs::remove_dir_all(root.join("Trips/Luxor")).unwrap();
         let read = failing_at(root.join("Trips/Cairo"));
-        let report = reconcile_folder_with(&conn, trips, &read).unwrap();
+        let report = reconcile_folder_with(&conn, trips, &|_| {}, &read).unwrap();
 
         assert_eq!(names(&conn), ["a.jpg", "b.jpg"], "Luxor was read in full");
         assert!(live(&conn, cairo) && live(&conn, day_1));
@@ -1146,7 +1210,7 @@ pub(crate) mod tests {
             std::fs::remove_dir_all(&gone).unwrap();
             Box::new(listed.into_iter())
         };
-        let report = reconcile_folder_with(&conn, trips, &read).unwrap();
+        let report = reconcile_folder_with(&conn, trips, &|_| {}, &read).unwrap();
 
         assert_eq!(names(&conn), ["a.jpg", "b.jpg"]);
         assert!(live(&conn, trips) && live(&conn, cairo));

@@ -1,4 +1,12 @@
-import { type CSSProperties, useId, useLayoutEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import type { Copying } from "../../ipc/bindings/Copying";
 import type { Exporting } from "../../ipc/bindings/Exporting";
@@ -32,12 +40,7 @@ export function Foot({ rail = false }: { rail?: boolean }) {
   const news = useNews();
   const anchor = `--foot-${useId().replace(/[^\w-]/g, "")}`;
   // Folded, a line that has been answered leaves: the grid is what shows the files are back.
-  const shown =
-    news !== null &&
-    !(
-      rail &&
-      (news.kind === "undone" || news.kind === "said" || (news.kind === "exported" && !news.path))
-    );
+  const shown = news !== null && !(rail && (news.kind === "undone" || news.kind === "said"));
 
   // Newest highest, above the walk, as the foot is ordered by permanence from the bottom.
   const jobs: Job[] = [
@@ -247,26 +250,30 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
       />
     );
   }
-  const exported = news.kind === "exported" ? news : null;
-  const reveal = exported?.path;
-
   if (rail) {
     return (
       <div className="grid place-items-center border-line border-t py-1.5">
-        {news.kind === "done" ? (
-          <GlyphButton
-            glyph="undo"
-            label={`Undo · ${news.line} · Ctrl+Z`}
-            onClick={() => void undo(news.batchId)}
-          />
-        ) : reveal ? (
+        {news.kind === "done" || news.kind === "undoFailed" ? (
+          // One button for both, so a failed press keeps the focus on it.
+          <OutOfRail news={news} sentence={news.kind === "undoFailed" ? news.line : null} alarm>
+            <GlyphButton
+              glyph="undo"
+              label={`Undo · ${news.line} · Ctrl+Z`}
+              onClick={() => void undo(news.batchId)}
+            />
+          </OutOfRail>
+        ) : news.kind === "exported" ? (
           <GlyphButton
             glyph="folderOpen"
-            label={`Show in Explorer · ${exported?.line}`}
-            onClick={() => void revealPath(reveal).catch(() => undefined)}
+            label={`Show in Explorer · ${news.line}`}
+            onClick={() => void revealPath(news.path).catch(() => undefined)}
           />
         ) : (
-          <Nothing noFiles={news.kind === "noFiles"} />
+          <OutOfRail news={news} sentence={news.kind === "noFiles" ? NO_FILES : "Nothing to undo."}>
+            <span className="grid size-control place-items-center text-fg-dim text-icon">
+              <Glyph name={news.kind === "noFiles" ? "paste" : "undo"} />
+            </span>
+          </OutOfRail>
         )}
       </div>
     );
@@ -285,20 +292,31 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
       />
     );
   }
+  if (news.kind === "undoFailed") {
+    return (
+      <Band
+        sentence={news.line}
+        action={
+          <Button glyph="undo" title="Undo · Ctrl+Z" onClick={() => void undo(news.batchId)}>
+            Undo
+          </Button>
+        }
+        onDismiss={dismiss}
+      />
+    );
+  }
   if (news.kind === "exported") {
     return (
       <Line
         glyph="done"
         sentence={news.line}
         action={
-          reveal && (
-            <Button
-              glyph="folderOpen"
-              onClick={() => void revealPath(reveal).catch(() => undefined)}
-            >
-              Show in Explorer
-            </Button>
-          )
+          <Button
+            glyph="folderOpen"
+            onClick={() => void revealPath(news.path).catch(() => undefined)}
+          >
+            Show in Explorer
+          </Button>
         }
         onDismiss={dismiss}
       />
@@ -328,30 +346,77 @@ function showInTrash(itemId: number) {
   showInPane(itemId, trash);
 }
 
-/** Folded, the rail has no room for the sentence, so it comes out beside the slot. */
-function Nothing({ noFiles = false }: { noFiles?: boolean }) {
+/**
+ * Folded, the rail has no room for the sentence, so it comes out beside the slot, and goes at the
+ * next key or click; a failure comes out in the Band's alarm, wrapping short of the window's edge.
+ */
+function OutOfRail({
+  news,
+  sentence,
+  alarm = false,
+  children,
+}: {
+  news: FootNews;
+  sentence: string | null;
+  alarm?: boolean;
+  children: ReactNode;
+}) {
   const line = useRef<HTMLDivElement>(null);
-  const anchor = `--nothing-${useId().replace(/[^\w-]/g, "")}`;
+  const anchor = `--out-${useId().replace(/[^\w-]/g, "")}`;
   // The top layer escapes the folded face's hiding, so it shows only while the rail is the face shown.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each new piece of news comes out afresh.
   useLayoutEffect(() => {
     if (!line.current?.closest("[inert]")) line.current?.showPopover();
-  }, []);
+  }, [news]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each new piece of news comes out afresh.
+  useEffect(() => {
+    const said = performance.now();
+    const go = (event: Event) => {
+      // The key or click that said it may still be on its way through the page.
+      if (event.timeStamp < said || !line.current?.matches(":popover-open")) return;
+      line.current.hidePopover();
+    };
+    window.addEventListener("keydown", go, true);
+    window.addEventListener("pointerdown", go, true);
+    return () => {
+      window.removeEventListener("keydown", go, true);
+      window.removeEventListener("pointerdown", go, true);
+    };
+  }, [news]);
   return (
-    <span
-      style={{ anchorName: anchor } as CSSProperties}
-      className="grid size-control place-items-center text-fg-dim text-icon"
-    >
-      <Glyph name={noFiles ? "paste" : "undo"} />
-      <div
-        ref={line}
-        popover="manual"
-        style={
-          { positionAnchor: anchor, left: "anchor(right)", top: "anchor(top)" } as CSSProperties
-        }
-        className="m-0 ml-1.5 flex h-control items-center whitespace-nowrap rounded-control border-0 bg-panel px-2.5 text-fg text-ui shadow-overlay inset-ring inset-ring-line-control"
-      >
-        {noFiles ? NO_FILES : "Nothing to undo."}
-      </div>
+    <span style={{ anchorName: anchor } as CSSProperties} className="grid">
+      {children}
+      {sentence !== null && alarm && (
+        <div
+          ref={line}
+          popover="manual"
+          style={
+            {
+              positionAnchor: anchor,
+              left: "anchor(right)",
+              top: "auto",
+              bottom: "anchor(bottom)",
+              right: "var(--spacing-tile-gap)",
+            } as CSSProperties
+          }
+          className="m-0 ml-1.5 flex min-h-control items-center gap-2 rounded-control border-0 bg-[linear-gradient(var(--color-danger-wash),var(--color-danger-wash))] bg-panel px-2.5 py-1.5 text-fg text-ui shadow-overlay inset-ring inset-ring-line-danger"
+        >
+          <Glyph name="warning" className="shrink-0 text-danger text-glyph" />
+          <span className="min-w-0 text-pretty wrap-anywhere">{sentence}</span>
+        </div>
+      )}
+      {sentence !== null && !alarm && (
+        <div
+          ref={line}
+          popover="manual"
+          style={
+            { positionAnchor: anchor, left: "anchor(right)", top: "anchor(top)" } as CSSProperties
+          }
+          className="m-0 ml-1.5 flex h-control items-center whitespace-nowrap rounded-control border-0 bg-panel px-2.5 text-fg text-ui shadow-overlay inset-ring inset-ring-line-control"
+        >
+          {sentence}
+        </div>
+      )}
     </span>
   );
 }

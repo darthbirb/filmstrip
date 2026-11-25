@@ -30,6 +30,7 @@ import {
   restoredBannerLine,
   stayedGroups,
   undoBannerLine,
+  undoFailedLine,
   undoneLine,
 } from "./lines";
 
@@ -530,4 +531,18 @@ test("what went for good is said with no Undo, and what would not go is named", 
   expect(folderKeptBanner("Lisbon", 0, 214, 214)).toBe(
     "Lisbon could not go · its 214 files are gone for good",
   );
+});
+
+test("a failed undo names its act in one sentence, or says only why when the act could not be read", () => {
+  const full = { kind: "io", reason: { kind: "diskFull" } };
+  expect(undoFailedLine(batch(MOVE, 3), full)).toBe(
+    "Could not undo “Moved 3 files to Cairo”. The disk is full.",
+  );
+  expect(undoFailedLine(batch(INTO_INBOX, 4), full)).toBe(
+    "Could not undo “Deleted Lisbon”. The disk is full.",
+  );
+  expect(undoFailedLine(batch(TO_TRASH, 4), new Error("database is locked"))).toBe(
+    "Could not undo “Deleted Lisbon and its 4 files”. Something went wrong.",
+  );
+  expect(undoFailedLine(null, full)).toBe("Could not undo. The disk is full.");
 });

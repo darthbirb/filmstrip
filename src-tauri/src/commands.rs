@@ -467,6 +467,18 @@ pub async fn undo_batch(state: State<'_, AppState>, batch_id: String) -> Result<
     run(&state, move |conn| undo::undo_batch(conn, &batch_id)).await
 }
 
+/// The act an undo would take back, the one named or the newest, while anything is left of it.
+#[tauri::command]
+pub async fn act_to_undo(
+    state: State<'_, AppState>,
+    batch_id: Option<String>,
+) -> Result<Option<Batch>> {
+    run(&state, move |conn| {
+        undo::act_to_undo(conn, batch_id.as_deref())
+    })
+    .await
+}
+
 /// Whether the act a line offers Undo for is still in the journal.
 #[tauri::command]
 pub async fn can_undo(state: State<'_, AppState>, batch_id: String) -> Result<bool> {

@@ -219,6 +219,7 @@ test("a copy under way has its own line at the foot, and its dismiss cancels it"
     exports: [],
     moves: [],
     walks: 0,
+    walkedSource: null,
     thumbed: [],
   };
   await emit("job-progress", progress);
@@ -248,6 +249,7 @@ test("a copy's reports recount navigation once, a window after they start", asyn
     exports: [],
     moves: [],
     walks: 0,
+    walkedSource: null,
     thumbed: [],
   };
   const copying = (done: number) => [{ jobId: 9, folderId: 5, to: "People", done, whole: 40 }];
