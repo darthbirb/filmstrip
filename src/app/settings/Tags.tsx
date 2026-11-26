@@ -27,7 +27,7 @@ import {
   renameLabelValue,
   renameTag,
 } from "../../ipc/commands";
-import { formatCount } from "../../lib/format";
+import { files, formatCount, formatCounted } from "../../lib/format";
 import { fold, labelTerm, tagTerm } from "../../lib/queryTerm";
 import { Button } from "../../ui/Button";
 import { Chip, KeyOnlyChip } from "../../ui/Chip";
@@ -57,16 +57,14 @@ type Editing = { row: string; mode: Mode; into?: string; typed?: string };
 type Clashes = { from: string; lines: Record<string, string> };
 type Menu = { row: string; label: string; anchor: MenuAnchor; groups: MenuGroups };
 
-const plural = (n: number, one: string, many = `${one}s`) =>
-  `${formatCount(n)} ${n === 1 ? one : many}`;
 const article = (word: string) => (/^[aeiou]/.test(word) ? "an" : "a");
 const Term = ({ children }: { children: ReactNode }) => <span className="text-fg">{children}</span>;
 
 /** "2 folders and the 38 files that carry it", or either alone. */
-function comesOff(folders: number, files: number, carry: string) {
+function comesOff(folders: number, fileCount: number, carry: string) {
   const parts = [
-    ...(folders > 0 ? [plural(folders, "folder")] : []),
-    ...(files > 0 ? [`the ${plural(files, "file")} ${carry}`] : []),
+    ...(folders > 0 ? [formatCounted(folders, "folder")] : []),
+    ...(fileCount > 0 ? [`the ${files(fileCount)} ${carry}`] : []),
   ];
   return parts.join(" and ");
 }
@@ -169,8 +167,8 @@ export function Tags() {
   const { tags, keys } = vocabulary;
   const values = keys.reduce((sum, key) => sum + key.values.length, 0);
   const headCount = [
-    plural(tags.length, "tag"),
-    ...(keys.length > 0 ? [plural(keys.length, "key")] : []),
+    formatCounted(tags.length, "tag"),
+    ...(keys.length > 0 ? [formatCounted(keys.length, "key")] : []),
   ].join(" · ");
   if (tags.length === 0 && keys.length === 0) {
     return (
@@ -261,13 +259,17 @@ export function Tags() {
     const unused = tag.files === 0 && tag.folders === 0;
     const named = tag.named.length > 0;
     const whose =
-      tag.named.length === 1 ? (tag.named[0]?.title ?? "") : plural(tag.named.length, "folder");
+      tag.named.length === 1
+        ? (tag.named[0]?.title ?? "")
+        : formatCounted(tag.named.length, "folder");
     const keeps = named
       ? tag.named.length === 1
         ? ` ${whose} keeps it as its name.`
         : ` ${whose} keep it as their name.`
       : "";
-    const [files, folders] = named ? [tag.ownFiles, tag.handFolders] : [tag.files, tag.folders];
+    const [fileCount, folderCount] = named
+      ? [tag.ownFiles, tag.handFolders]
+      : [tag.files, tag.folders];
     const rename = () => setEditing({ row, mode: "rename" });
     const remove = () =>
       unused
@@ -281,7 +283,7 @@ export function Tags() {
         .map((other) => ({
           value: other.value,
           said: other.value,
-          count: `on ${plural(other.files, "file")}`,
+          count: `on ${files(other.files)}`,
         }));
     const chip = (
       <Chip
@@ -336,7 +338,7 @@ export function Tags() {
     let asking: ReactNode = null;
     const target = now?.mode === "askMerge" && now.into ? into(now.into) : undefined;
     if (target) {
-      const what = filesAndFolders(files, folders);
+      const what = filesAndFolders(fileCount, folderCount);
       asking = (
         <RowQuestion
           answers={
@@ -356,7 +358,7 @@ export function Tags() {
             </>
           }
         >
-          <Term>{target.value}</Term> is already a tag, on {plural(target.files, "file")}. Merge{" "}
+          <Term>{target.value}</Term> is already a tag, on {files(target.files)}. Merge{" "}
           <Term>{tag.value}</Term> into it?
           {what && (
             <>
@@ -386,7 +388,8 @@ export function Tags() {
           }
         >
           Delete <Term>{tag.value}</Term>? It comes off{" "}
-          {comesOff(folders, files, named ? "that carry it themselves" : "that carry it")}.{keeps}
+          {comesOff(folderCount, fileCount, named ? "that carry it themselves" : "that carry it")}.
+          {keeps}
         </RowQuestion>
       );
     }
@@ -448,8 +451,8 @@ export function Tags() {
     const listed = term !== "" && key.matching.length > 0 ? key.matching : key.values;
     const counted =
       listed.length < key.values.length
-        ? `${formatCount(listed.length)} of ${plural(key.values.length, "value")}`
-        : plural(key.values.length, "value");
+        ? `${formatCount(listed.length)} of ${formatCounted(key.values.length, "value")}`
+        : formatCounted(key.values.length, "value");
     const keyTerm = `${key.key}:*`;
     const rename = () => {
       loadClashes(key.key);
@@ -508,7 +511,7 @@ export function Tags() {
                       .map((other) => ({
                         value: other.key,
                         said: other.key,
-                        count: `on ${plural(other.folders, "folder")}`,
+                        count: `on ${formatCounted(other.folders, "folder")}`,
                       }))
                 : undefined
             }
@@ -576,8 +579,8 @@ export function Tags() {
             </>
           }
         >
-          <Term>{target.key}</Term> is already a key, on {plural(target.folders, "folder")}. Merge{" "}
-          <Term>{key.key}</Term> into it? Its {plural(key.folders, "folder")}{" "}
+          <Term>{target.key}</Term> is already a key, on {formatCounted(target.folders, "folder")}.
+          Merge <Term>{key.key}</Term> into it? Its {formatCounted(key.folders, "folder")}{" "}
           {key.folders === 1 ? "keeps its value" : "keep their values"}
           {as ? <>, as {as}</> : <>, under {target.key}</>}.
         </RowQuestion>
@@ -676,7 +679,7 @@ export function Tags() {
                       .map((other) => ({
                         value: other.value,
                         said: other.value,
-                        count: `on ${plural(other.folders, "folder")}`,
+                        count: `on ${formatCounted(other.folders, "folder")}`,
                       }))
                 : undefined
             }
@@ -725,8 +728,8 @@ export function Tags() {
             </>
           }
         >
-          <Term>{into}</Term> is already a value, on {plural(target.folders, "folder")}. Merge{" "}
-          <Term>{label}</Term> into it? Its {plural(value.folders, "folder")}{" "}
+          <Term>{into}</Term> is already a value, on {formatCounted(target.folders, "folder")}.
+          Merge <Term>{label}</Term> into it? Its {formatCounted(value.folders, "folder")}{" "}
           {value.folders === 1 ? "takes" : "take"} <Term>{into}</Term>.
         </RowQuestion>
       );

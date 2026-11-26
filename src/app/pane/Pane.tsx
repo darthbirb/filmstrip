@@ -1,5 +1,5 @@
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
-import { formatBytes, formatCount, formatDimensions, formatDuration } from "../../lib/format";
+import { Files, formatBytes, formatDimensions, formatDuration } from "../../lib/format";
 import { EmptyState } from "../../ui/EmptyState";
 import { GlyphButton } from "../../ui/GlyphButton";
 import { PushDown } from "../../ui/PushDown";
@@ -108,9 +108,8 @@ function Empty({ gone }: { gone: { path: string | null } | null }) {
 
 /** How many files a set holds, and once they are read, what they weigh together. */
 function setSummary(count: number, items: readonly ItemDetail[] | null) {
-  const files = `${formatCount(count)} Files`;
-  if (!items) return files;
-  return `${files} · ${formatBytes(items.reduce((sum, item) => sum + item.sizeBytes, 0))}`;
+  if (!items) return Files(count);
+  return `${Files(count)} · ${formatBytes(items.reduce((sum, item) => sum + item.sizeBytes, 0))}`;
 }
 
 /** Shape, length and size: what the header row says before the details are opened. */

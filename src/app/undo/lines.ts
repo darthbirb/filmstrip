@@ -4,11 +4,10 @@ import type { Reason } from "../../ipc/bindings/Reason";
 import type { Stayed } from "../../ipc/bindings/Stayed";
 import type { UndoReport } from "../../ipc/bindings/UndoReport";
 import type { AppError } from "../../ipc/commands";
-import { formatBytes, formatCount } from "../../lib/format";
+import { files, formatBytes, formatCount, formatCounted } from "../../lib/format";
 
 // Every sentence an act and its undo say, as Artboards › Undo words them. DECISIONS.md "Undo".
 
-const files = (n: number) => `${formatCount(n)} ${n === 1 ? "file" : "files"}`;
 const are = (n: number) => (n === 1 ? "is" : "are");
 /** Lisbon’s, and Trips’: a name that ends in s takes the apostrophe alone. */
 const whose = (name: string) => (name.endsWith("s") ? `${name}’` : `${name}’s`);
@@ -162,7 +161,7 @@ export function undoBannerLine({ batch, filesBack, stayed }: UndoReport): string
   }
 }
 
-const folders = (n: number) => `${formatCount(n)} ${n === 1 ? "folder" : "folders"}`;
+const folders = (n: number) => formatCounted(n, "folder");
 
 /** "38 files and 2 folders", either alone, or nothing when the act touched neither. */
 export function filesAndFolders(fileCount: number, folderCount: number): string | null {
@@ -372,7 +371,7 @@ export function folderNoBinDetail(
   const size = formatBytes(bytes);
   const its =
     asked < held
-      ? `${formatCount(asked)} of its files go`
+      ? `${formatCount(asked)} of its files ${asked === 1 ? "goes" : "go"}`
       : held === 1
         ? "its file goes"
         : "its files go";
@@ -467,7 +466,7 @@ export function reasonText(reason: Reason): string {
       return "No longer on disk";
     case "holds":
       return reason.more > 0
-        ? `Holds ${reason.name} and ${reason.more} more`
+        ? `Holds ${reason.name} and ${formatCount(reason.more)} more`
         : `Holds ${reason.name}`;
     case "alreadyIn":
       return `Already in ${reason.place}`;

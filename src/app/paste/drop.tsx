@@ -4,7 +4,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import type { Carried } from "../../ipc/bindings/Carried";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { countCarried } from "../../ipc/commands";
-import { formatCount } from "../../lib/format";
+import { formatCounted } from "../../lib/format";
 import { DragGhost } from "../../ui/DragGhost";
 import { ContextMenu } from "../../ui/Menu";
 import { unasked } from "../failure";
@@ -260,8 +260,7 @@ export function PickHost() {
 
 /** What Explorer carries before its paths are read: neither files nor folders yet. */
 function items(count: number, title = false) {
-  const word = count === 1 ? "item" : "items";
-  return `${formatCount(count)} ${title ? word.charAt(0).toUpperCase() + word.slice(1) : word}`;
+  return formatCounted(count, title ? "Item" : "item");
 }
 
 function subscribe(listener: () => void) {

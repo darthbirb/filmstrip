@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 
-import { formatCount } from "../lib/format";
+import { files } from "../lib/format";
 import { fold } from "../lib/queryTerm";
 import { ChipButton } from "./ChipButton";
 import { useFocusBack } from "./focus-back";
@@ -106,7 +106,7 @@ function Field({
           .map((offer) => ({
             value: offer.value,
             said: offer.value,
-            count: `on ${formatCount(offer.files)} ${offer.files === 1 ? "file" : "files"}`,
+            count: `on ${files(offer.files)}`,
           })),
         ...(value && !found.some((offer) => offer.value === value)
           ? [{ value, said: `New tag “${value}”` }]

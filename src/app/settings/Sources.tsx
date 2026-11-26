@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { SourceKind } from "../../ipc/bindings/SourceKind";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { removeSource, renameSource, revealSource, setSourceKind } from "../../ipc/commands";
-import { formatCount } from "../../lib/format";
+import { files, formatCount } from "../../lib/format";
 import { Band } from "../../ui/Band";
 import { Button } from "../../ui/Button";
 import { Dropdown } from "../../ui/Dropdown";
@@ -185,7 +185,7 @@ function Settled({ source, onRemove }: { source: SourceSummary; onRemove: () => 
               Indexing {formatCount(left)}…<span className="text-fg">{percent}%</span>
             </>
           ) : (
-            `${formatCount(source.itemCount)} items`
+            files(source.itemCount)
           )}
         </span>
         {/* A kind has nothing to move while the walk is still finding out what is in the folder. */}
@@ -253,7 +253,7 @@ function Asking({ source, onCancel }: { source: SourceSummary; onCancel: () => v
         <Glyph name="warning" className="shrink-0 text-danger text-icon" />
         <span className="min-w-0 flex-1 truncate px-1 text-fg text-ui">{source.title}</span>
         <span className="shrink-0 text-fg-mid text-small tabular-nums">
-          {formatCount(source.itemCount)} items
+          {files(source.itemCount)}
         </span>
       </div>
       <p className="m-0 pl-7 text-fg-mid text-small">

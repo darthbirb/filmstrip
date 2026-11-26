@@ -7,7 +7,7 @@ import type { Plan } from "../../ipc/bindings/Plan";
 import type { Scope } from "../../ipc/bindings/Scope";
 import type { ZipPick } from "../../ipc/bindings/ZipPick";
 import { exportPlan, pickExportZip, startExport } from "../../ipc/commands";
-import { formatCount } from "../../lib/format";
+import { Files, files, formatCount } from "../../lib/format";
 import { sayFailed, unasked } from "../failure";
 import { type FootNews, setNews } from "../navigation/foot-slot";
 import { getPlace } from "../place";
@@ -18,8 +18,6 @@ import { showReport } from "../undo/report-store";
 // A branch or a set out of the library as one zip: Windows' save dialog, then the sheet, then a
 // job with its line. DECISIONS.md "Exporting a zip".
 
-const files = (n: number) => `${formatCount(n)} ${n === 1 ? "file" : "files"}`;
-const Files = (n: number) => `${formatCount(n)} ${n === 1 ? "File" : "Files"}`;
 const are = (n: number) => (n === 1 ? "is" : "are");
 
 /** "Archive", "Archive and Scans", "Archive, Scans and Card". */

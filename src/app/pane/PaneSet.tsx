@@ -11,6 +11,7 @@ import {
 } from "react";
 
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
+import { formatCounted } from "../../lib/format";
 import { BadgeButton } from "../../ui/BadgeButton";
 import { autoPopoverOpen, useContextMenu } from "../../ui/Menu";
 import { unasked } from "../failure";
@@ -113,7 +114,7 @@ export function PaneSet({ items }: { items: readonly ItemDetail[] }) {
     <div
       ref={area}
       role="group"
-      aria-label={`${items.length} Files`}
+      aria-label={formatCounted(items.length, "File")}
       className="relative min-h-0 min-w-0 flex-1 overflow-auto"
     >
       <span aria-hidden="true" className="invisible absolute top-0 left-0 h-0">

@@ -10,7 +10,7 @@ import {
 
 import type { Coverage } from "../../ipc/bindings/Coverage";
 import { addItemsTag, removeItemsTag, selectionTagCoverage, tagOffers } from "../../ipc/commands";
-import { formatCount } from "../../lib/format";
+import { Files, files, formatCount } from "../../lib/format";
 import { keepEscape, SURFACE } from "../../ui/Menu";
 import { SetChip } from "../../ui/SetChip";
 import { StandingTagField } from "../../ui/TagField";
@@ -46,8 +46,6 @@ type Props = {
 
 const HEADING = "m-0 flex h-chip shrink-0 items-center px-2 text-eyebrow text-fg-dim uppercase";
 const RULE = "mx-2 my-1 h-px shrink-0 border-0 bg-line";
-const files = (n: number) => `${formatCount(n)} ${n === 1 ? "File" : "Files"}`;
-const lower = (n: number) => `${formatCount(n)} ${n === 1 ? "file" : "files"}`;
 
 /**
  * Tag…: what a set of checked files carries and whose each tag is, with the shared tag field to
@@ -123,7 +121,7 @@ export function TagSheet({ itemIds, anchor, maxHeight, onClose }: Props) {
     return true;
   };
   const wanted = () => itemIds.slice();
-  const them = () => lower(itemIds.length);
+  const them = () => files(itemIds.length);
   const added = (value: string) =>
     act(() => addItemsTag(wanted(), value), `Could not add ${value} to ${them()}.`);
   const add = async (value: string) => {
@@ -157,7 +155,7 @@ export function TagSheet({ itemIds, anchor, maxHeight, onClose }: Props) {
       ref={sheet}
       popover="auto"
       role="dialog"
-      aria-label={`Tag ${files(itemIds.length)}`}
+      aria-label={`Tag ${Files(itemIds.length)}`}
       onToggle={(event) => {
         // The offers under the field are a popover too, and their toggle reaches this one.
         if (event.target !== event.currentTarget || event.newState !== "closed") return;
@@ -180,11 +178,11 @@ export function TagSheet({ itemIds, anchor, maxHeight, onClose }: Props) {
       }
       className={`mb-tile-gap overflow-y-auto ${SURFACE}`}
     >
-      <p className={`${HEADING} truncate`}>{files(itemIds.length)}</p>
+      <p className={`${HEADING} truncate`}>{Files(itemIds.length)}</p>
       <div className="flex flex-wrap gap-1 px-2 pt-0.5 pb-2">
         {shown && (
           <StandingTagField
-            of={files(itemIds.length)}
+            of={Files(itemIds.length)}
             offers={tagOffers}
             refuse={(value) => (coverage ? refusal(coverage, value) : null)}
             onAdd={add}
@@ -265,7 +263,7 @@ type ChipProps = {
 /** The set's own take + and ×; what a folder gives has neither, since it comes off at the folder. */
 function Chip({ tag, of, own, gathered, echoed, onAdd, onRemove }: ChipProps) {
   const others = of - tag.files;
-  const holding = files(tag.files);
+  const holding = Files(tag.files);
   return (
     <SetChip
       value={tag.value}

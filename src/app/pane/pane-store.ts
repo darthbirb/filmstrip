@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 
+import { formatCount } from "../../lib/format";
 import type { Place } from "../place";
 
 // The item the pane shows, and the place it was chosen in, which the filmstrip runs through.
@@ -137,7 +138,7 @@ export function paneDrop(carried: readonly number[], limit = paneSetLimit()): Pa
   const fresh = [...new Set(carried)].filter((id) => !held.has(id));
   if (fresh.length === 0) return { kind: "refuse", why: "Already in the pane" };
   const room = limit - held.size;
-  if (room <= 0) return { kind: "refuse", why: `The pane shows ${limit} at most` };
+  if (room <= 0) return { kind: "refuse", why: `The pane shows ${formatCount(limit)} at most` };
   return { kind: "add", adds: fresh.slice(0, room), of: fresh.length, replaces };
 }
 

@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 
 import type { Carried } from "../../ipc/bindings/Carried";
 import { clipboardFiles, copyItems } from "../../ipc/commands";
-import { formatCount } from "../../lib/format";
+import { formatCounted } from "../../lib/format";
 import { unasked } from "../failure";
 
 // What the clipboard holds that Paste would bring in, read whenever it may have changed, since a
@@ -66,8 +66,7 @@ export function counted({ files, folders }: Carried, title = false) {
       : folders > 0
         ? [folders, "folder"]
         : [files, "file"];
-  const words = count === 1 ? word : `${word}s`;
-  return `${formatCount(count)} ${title ? words.charAt(0).toUpperCase() + words.slice(1) : words}`;
+  return formatCounted(count, title ? word.charAt(0).toUpperCase() + word.slice(1) : word);
 }
 
 /** Forgets what was read, for tests. */

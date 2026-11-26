@@ -1,4 +1,4 @@
-// How the interface words sizes, lengths, shapes and dates.
+// How the interface words counts, sizes, lengths, shapes and dates.
 
 const UNITS = ["KB", "MB", "GB", "TB"];
 
@@ -7,9 +7,24 @@ export function formatCount(count: number) {
   return count.toLocaleString();
 }
 
+/** A count and its noun, singular for one: 1 file, 1,204 folders. DESIGN.md "Words". */
+export function formatCounted(count: number, one: string) {
+  return `${formatCount(count)} ${count === 1 ? one : `${one}s`}`;
+}
+
+/** Files counted mid-sentence: 1 file, 38 files. */
+export function files(count: number) {
+  return formatCounted(count, "file");
+}
+
+/** Files counted in a Title Case label: 1 File, 38 Files. */
+export function Files(count: number) {
+  return formatCounted(count, "File");
+}
+
 /** Bytes as Windows counts them: steps of 1024, under the familiar names. */
 export function formatBytes(bytes: number) {
-  if (bytes < 1024) return `${bytes} bytes`;
+  if (bytes < 1024) return formatCounted(bytes, "byte");
   let value = bytes / 1024;
   let unit = 0;
   while (value >= 1024 && unit < UNITS.length - 1) {

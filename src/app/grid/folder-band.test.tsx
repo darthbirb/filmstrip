@@ -575,7 +575,7 @@ test("a folder below an offline source counts what it held when last indexed", a
   const screen = await render(
     <EmptyPlace place={folderAt(3, ARCHIVE, { id: 7, title: "Scans" })} />,
   );
-  await expect.element(screen.getByText("0 items in Scans when last indexed.")).toBeVisible();
+  await expect.element(screen.getByText("0 files in Scans when last indexed.")).toBeVisible();
 });
 
 test("the Sorting Box and the Trash keep a plain header with nothing to open", async () => {

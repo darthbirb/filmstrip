@@ -174,7 +174,7 @@ const SOURCES = [
     addedAt: 0,
     rootFolderId: 2,
     reachable: false,
-    itemCount: 0,
+    itemCount: 1,
     totalBytes: 0,
     trashCount: 0,
   },
@@ -207,7 +207,8 @@ test("Sources lists every folder read, and an offline one keeps remove but loses
 
   // Its path, its count and its kind: what only a source has.
   await expect.element(section.getByText("D:Pictures")).toBeVisible();
-  await expect.element(section.getByText("6 items")).toBeVisible();
+  await expect.element(section.getByText("6 files")).toBeVisible();
+  await expect.element(section.getByText("1 file", { exact: true })).toBeVisible();
   await expect.element(section.getByRole("radio", { name: "Library" }).first()).toBeChecked();
 
   await expect
@@ -290,7 +291,7 @@ test("pressing remove asks on the row, and Cancel or Escape puts the row back", 
   await expect.element(question.getByText(/The folder stays on disk\./)).toBeVisible();
   // The name and the count stay; the kind, reveal and remove give up their space.
   await expect.element(question.getByText("Pictures", { exact: true })).toBeVisible();
-  await expect.element(question.getByText("6 items")).toBeVisible();
+  await expect.element(question.getByText("6 files")).toBeVisible();
   expect(
     section.getByRole("button", { name: "Show Pictures in Explorer" }).elements(),
   ).toHaveLength(0);

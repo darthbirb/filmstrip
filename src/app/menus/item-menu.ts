@@ -1,5 +1,5 @@
 import { copyItemPaths, openItem, revealItem } from "../../ipc/commands";
-import { formatCount } from "../../lib/format";
+import { formatCounted } from "../../lib/format";
 import type { HeadedMenu, MenuAction, MenuGroups } from "../../ui/Menu";
 import { exportChecked } from "../export/export";
 import { failed } from "../failure";
@@ -35,7 +35,7 @@ const anchor = () => {
  */
 export function setMenu(items: readonly Item[], trash: boolean): HeadedMenu {
   const ids = items.map((item) => item.id);
-  const count = `${formatCount(ids.length)} ${ids.length === 1 ? "File" : "Files"}`;
+  const count = formatCounted(ids.length, "File");
   const folderId = oneFolder(items);
   if (trash) {
     return {

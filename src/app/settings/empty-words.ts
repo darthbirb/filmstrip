@@ -1,13 +1,11 @@
 import type { Emptied } from "../../ipc/bindings/Emptied";
 import type { Tally } from "../../ipc/bindings/Tally";
-import { formatBytes, formatCount } from "../../lib/format";
+import { files, formatBytes, formatCount } from "../../lib/format";
 
 // How Empty Trash… asks, counts and ends. Artboards › The Trash in the Recycle Bin.
 
 /** A sentence in pieces, each term it names set apart to be drawn in `fg`. */
 export type Said = readonly (string | { term: string })[];
-
-const files = (n: number) => `${formatCount(n)} ${n === 1 ? "file" : "files"}`;
 
 /** The section's head: what the Trash holds, or nothing. */
 export function heldLine(held: Tally) {

@@ -1,7 +1,7 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { type PointerEvent as ReactPointerEvent, useSyncExternalStore } from "react";
 
-import { formatCount } from "../../lib/format";
+import { files, formatCount } from "../../lib/format";
 import { DragGhost } from "../../ui/DragGhost";
 import { setNews } from "../navigation/foot-slot";
 import { moveFiles } from "../pane/move-picker";
@@ -58,8 +58,6 @@ export function dragging() {
 export function useDrag() {
   return useSyncExternalStore(subscribe, () => drag);
 }
-
-const files = (count: number) => `${formatCount(count)} ${count === 1 ? "file" : "files"}`;
 
 /** A token's length in pixels, or a duration's milliseconds. */
 function token(name: string) {
@@ -185,7 +183,7 @@ export function pressTile(
       addToPane(landing.adds, getPlace());
       if (landing.adds.length < landing.of) {
         const limit = paneSetLimit();
-        const line = `Added ${landing.adds.length} of ${files(landing.of)} to the pane. It shows ${limit} at most.`;
+        const line = `Added ${formatCount(landing.adds.length)} of ${files(landing.of)} to the pane. It shows ${formatCount(limit)} at most.`;
         setNews({ kind: "said", line });
       }
     }

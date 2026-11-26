@@ -1,7 +1,10 @@
 import { expect, test } from "vitest";
 
 import {
+  Files,
+  files,
   formatBytes,
+  formatCounted,
   formatDate,
   formatDimensions,
   formatDuration,
@@ -12,9 +15,21 @@ import {
 
 test("sizes step by 1024, as Windows counts them", () => {
   expect(formatBytes(512)).toBe("512 bytes");
+  expect(formatBytes(1)).toBe("1 byte");
+  expect(formatBytes(0)).toBe("0 bytes");
   expect(formatBytes(1024)).toBe("1 KB");
   expect(formatBytes(2_400_000)).toMatch(/^2[.,]3 MB$/);
   expect(formatBytes(50 * 1024 ** 3)).toBe("50 GB");
+});
+
+test("a count takes its noun's singular for one alone, and groups its figures", () => {
+  expect(files(1)).toBe("1 file");
+  expect(files(0)).toBe("0 files");
+  expect(files(41_236)).toBe(`${(41_236).toLocaleString()} files`);
+  expect(formatCounted(1, "folder")).toBe("1 folder");
+  expect(formatCounted(2, "File")).toBe("2 Files");
+  expect(Files(1)).toBe("1 File");
+  expect(Files(38)).toBe("38 Files");
 });
 
 test("lengths read as a clock does", () => {
