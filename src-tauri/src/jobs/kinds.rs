@@ -115,11 +115,21 @@ pub struct DeleteFolderPayload {
     pub name: String,
     /// The files it held as it was asked.
     pub whole: u32,
+    /// How many files runs before a restart deleted for good, which no journal row counts.
+    #[serde(default)]
+    pub outright: u32,
 }
 
-/// The files Empty Trash… counted.
+/// The files Empty Trash… counted, and what runs before a restart did with them, which no journal
+/// row counts.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EmptyPayload {
     pub counted: Vec<crate::fs::empty::Counted>,
+    #[serde(default)]
+    pub deleted: u32,
+    #[serde(default)]
+    pub bytes: i64,
+    #[serde(default)]
+    pub gone: u32,
 }

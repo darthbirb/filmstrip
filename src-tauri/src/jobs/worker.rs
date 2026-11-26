@@ -24,7 +24,6 @@ use crate::jobs::{
     Copied, Copying, DeleteKind, Deleted, Deleting, Exporting, Moved, Moving, QueueInner,
     enqueue_scrub, enqueue_thumb, exported, lock, thumbed,
 };
-
 use crate::media::ffmpeg::Ffmpeg;
 use crate::media::probe::Probe;
 use crate::media::{scrub, thumbs};
@@ -288,7 +287,14 @@ fn delete_folder(
         ..Default::default()
     });
     drop(control);
+    let mut report = outcome.report;
+    report.outright += payload.outright;
     if outcome.halted == Some(Halt::Stop) {
+        let carried = DeleteFolderPayload {
+            outright: report.outright,
+            ..payload.clone()
+        };
+        table::carry(conn, job_id, &serde_json::to_string(&carried)?)?;
         return Ok(Done::Paused);
     }
     announce_folder(
@@ -296,7 +302,7 @@ fn delete_folder(
         conn,
         job_id,
         payload,
-        outcome.report,
+        report,
         outcome.halted == Some(Halt::Cancel),
         outcome.stopped,
     )
@@ -337,11 +343,23 @@ fn empty(
     let control = DeleteControl::start(inner, job_id, DeleteKind::Empty, "", whole);
     let emptied = crate::fs::empty::empty(conn, &payload.counted, &control);
     drop(control);
-    let (emptied, stopped) = match emptied {
-        Ok(emptied) if emptied.stopped => return Ok(Done::Paused),
+    let (mut emptied, stopped) = match emptied {
         Ok(emptied) => (emptied, None),
         Err(err) => (Emptied::default(), Some(Reason::of(&err))),
     };
+    emptied.deleted += payload.deleted;
+    emptied.bytes += payload.bytes;
+    emptied.gone += payload.gone;
+    if emptied.stopped {
+        let carried = EmptyPayload {
+            counted: payload.counted.clone(),
+            deleted: emptied.deleted,
+            bytes: emptied.bytes,
+            gone: emptied.gone,
+        };
+        table::carry(conn, job_id, &serde_json::to_string(&carried)?)?;
+        return Ok(Done::Paused);
+    }
     (inner.deleted)(&Deleted::Empty {
         job_id,
         emptied,
@@ -378,23 +396,27 @@ pub fn deleted_waiting(
         }
         kinds::DELETE_FOLDER => {
             let payload: DeleteFolderPayload = serde_json::from_str(payload)?;
-            announce_folder(
-                inner,
-                conn,
-                job_id,
-                &payload,
-                DeleteReport::default(),
-                true,
-                None,
-            )?;
+            let report = DeleteReport {
+                outright: payload.outright,
+                ..DeleteReport::default()
+            };
+            announce_folder(inner, conn, job_id, &payload, report, true, None)?;
             return Ok(());
         }
-        _ => Deleted::Empty {
-            job_id,
-            emptied: Emptied::default(),
-            cancelled: true,
-            stopped: None,
-        },
+        _ => {
+            let payload: EmptyPayload = serde_json::from_str(payload)?;
+            Deleted::Empty {
+                job_id,
+                emptied: Emptied {
+                    deleted: payload.deleted,
+                    bytes: payload.bytes,
+                    gone: payload.gone,
+                    ..Emptied::default()
+                },
+                cancelled: true,
+                stopped: None,
+            }
+        }
     };
     (inner.deleted)(&ended);
     Ok(())

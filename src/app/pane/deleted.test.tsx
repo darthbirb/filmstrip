@@ -6,12 +6,16 @@ import { recording } from "../../dev/recording";
 import type { Batch } from "../../ipc/bindings/Batch";
 import type { Deleted } from "../../ipc/bindings/Deleted";
 import type { Progress } from "../../ipc/bindings/Progress";
+import { listSources } from "../../ipc/commands";
 import { afterDeleted } from "../deleted";
+import { deleteFolderAsking } from "../navigation/delete-folder";
 import { Foot } from "../navigation/Foot";
 import { getNews, setNews } from "../navigation/foot-slot";
 import { watchWork } from "../navigation/work-store";
+import { updatePreferences } from "../preferences";
 import { getEmptying, startEmptying } from "../settings/settings-store";
 import { getReport, showReport } from "../undo/report-store";
+import { getPaneFolder, showFolderInPane, showInPane } from "./pane-store";
 
 // How a delete on the queue shows at the foot and says how it ended. DECISIONS.md "Background work".
 
@@ -63,7 +67,7 @@ test("a delete on the queue has its own line at the foot, and its dismiss cancel
   await expect.poll(() => document.body.textContent).not.toContain("Deleting");
 });
 
-test("emptying the Trash has its line at the foot with no Cancel, and its tooltip says why", async () => {
+test("emptying the Trash has its line at the foot with no Cancel, and its description says why", async () => {
   const screen = await render(<Foot />);
   await emit("job-progress", {
     ...IDLE,
@@ -71,13 +75,8 @@ test("emptying the Trash has its line at the foot with no Cancel, and its toolti
   });
   await expect.element(screen.getByText("Emptying the Trash…")).toBeVisible();
   await expect
-    .element(
-      screen.getByTitle(
-        "Emptying the Trash · 9 of 12 left · It cannot be cancelled: what has gone has gone.",
-        { exact: true },
-      ),
-    )
-    .toBeInTheDocument();
+    .element(screen.getByTitle("Emptying the Trash · 9 of 12 left", { exact: true }))
+    .toHaveAttribute("aria-description", "It cannot be cancelled: what has gone has gone.");
   expect(screen.getByRole("button", { name: "Cancel Delete" }).query()).toBeNull();
   await emit("job-progress", IDLE);
 });
@@ -181,6 +180,21 @@ test("a folder's delete cancelled partway says what went and that the folder sta
     line: "Moved 5 of Cairo’s 12 files to the Recycle Bin. Cairo stays.",
     batchId: "f2",
   });
+});
+
+test("a folder put in the pane while the folder above it is deleted leaves the pane once it has gone", async () => {
+  showInPane(null);
+  updatePreferences({ deleteInto: 2 });
+  await recording(
+    async () => {
+      await deleteFolderAsking({ id: 4, name: "Trips" }, await listSources());
+    },
+    (cmd) => (cmd === "delete_folder" ? { kind: "started", jobId: 77 } : undefined),
+  );
+  showFolderInPane(6, 1);
+  await afterDeleted({ ...folder, jobId: 77, folderId: 4, name: "Trips" });
+  expect(getPaneFolder()).toBeNull();
+  updatePreferences({ deleteInto: undefined });
 });
 
 test("emptying the Trash on the queue ends the head's count and says what went", async () => {

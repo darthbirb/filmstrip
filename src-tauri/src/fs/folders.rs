@@ -280,7 +280,10 @@ pub fn delete_watched(
             .push(stayed::folder(conn, folder_id, &holds)?);
         return Ok(outcome);
     }
-    take_away_folder(conn, folder_id, batch_id, &mut outcome.report)?;
+    let undoable = contents != Contents::Permanently
+        || !binless::is_binless_folder(conn, folder_id)?
+        || !journal::batch(conn, batch_id)?.is_empty();
+    take_away_folder(conn, folder_id, batch_id, undoable, &mut outcome.report)?;
     Ok(outcome)
 }
 
@@ -378,20 +381,21 @@ fn delete_held(
         }
     }
     if report.refused.is_empty() {
-        take_away_folder(conn, folder_id, batch_id, &mut report)?;
+        let undoable = report.outright == 0 || !journal::batch(conn, batch_id)?.is_empty();
+        take_away_folder(conn, folder_id, batch_id, undoable, &mut report)?;
     }
     Ok(report)
 }
 
-/// Takes away a folder its delete has emptied, journalled under `batch_id` unless its files went
-/// for good and nothing of it can be undone; one that still holds a file is reported.
+/// Takes away a folder its delete has emptied, journalled under `batch_id` when it is `undoable`;
+/// one that still holds a file is reported.
 fn take_away_folder(
     conn: &Connection,
     folder_id: i64,
     batch_id: &str,
+    undoable: bool,
     report: &mut DeleteReport,
 ) -> Result<()> {
-    let undoable = report.outright == 0 || !journal::batch(conn, batch_id)?.is_empty();
     match take_away_emptied(conn, folder_id, now(), undoable.then_some(batch_id)) {
         Ok(()) => report.deleted = true,
         Err(holds @ AppError::Refused(Reason::Holds { .. })) => {
@@ -404,7 +408,7 @@ fn take_away_folder(
     Ok(())
 }
 
-// Deletes a folder again, as a redo does once what it held has gone again: under the stamp its
+/// Deletes a folder again, as a redo does once what it held has gone again: under the stamp its
 /// delete first retired it with, so an undo finds it once more.
 pub(super) fn redelete(conn: &Connection, folder_id: i64, retired_at: i64) -> Result<()> {
     if !folders::is_live(conn, folder_id)? {

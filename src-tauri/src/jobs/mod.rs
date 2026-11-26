@@ -20,11 +20,10 @@ use crate::db::{self, jobs as table};
 use crate::error::{Reason, Result};
 use crate::fs::acts::Batch;
 use crate::fs::empty::{Counted, Emptied};
-use crate::fs::folders::{Contents, DeleteReport};
-use crate::fs::trash::TrashReport;
-
 use crate::fs::export::{self, End, Naming, Scope};
+use crate::fs::folders::{Contents, DeleteReport};
 use crate::fs::stayed::Stayed;
+use crate::fs::trash::TrashReport;
 use crate::media::ffmpeg::Ffmpeg;
 
 pub const PROGRESS_EVENT: &str = "job-progress";
@@ -825,6 +824,7 @@ pub fn enqueue_delete_folder(
         contents,
         name: crate::db::folders::title(conn, folder_id)?.unwrap_or_default(),
         whole: u32::try_from(held).unwrap_or(u32::MAX),
+        outright: 0,
     };
     table::enqueue(
         conn,
@@ -839,7 +839,12 @@ pub fn enqueue_empty(conn: &Connection, counted: Vec<Counted>) -> Result<i64> {
     table::enqueue(
         conn,
         kinds::EMPTY,
-        &serde_json::to_string(&kinds::EmptyPayload { counted })?,
+        &serde_json::to_string(&kinds::EmptyPayload {
+            counted,
+            deleted: 0,
+            bytes: 0,
+            gone: 0,
+        })?,
         kinds::PRIORITY_COPY,
     )
 }
@@ -1467,8 +1472,24 @@ mod tests {
         let mut conn = db::open(&dir.join("library.db")).unwrap();
         let job = table::claim(&mut conn).unwrap().unwrap();
         let done = worker::execute(inner, &mut conn, &job).unwrap();
-        table::complete(&conn, job.id).unwrap();
+        match done {
+            worker::Done::Finished => table::complete(&conn, job.id).unwrap(),
+            worker::Done::Paused => table::release(&conn, job.id).unwrap(),
+        }
         done
+    }
+
+    /// Closes the app, as far as the queue knows, as this thread asks for its `nth` turn of the
+    /// disk from now on.
+    fn stop_at_turn(inner: &Arc<QueueInner>, nth: u32) {
+        let inner = Arc::clone(inner);
+        let mut asked = 0;
+        crate::fs::just_after_queueing(move || {
+            asked += 1;
+            if asked == nth {
+                inner.stop.store(true, Ordering::Relaxed);
+            }
+        });
     }
 
     #[test]
@@ -1621,14 +1642,16 @@ mod tests {
     fn a_hold_takes_each_waiting_delete_off_the_queue_and_ends_its_line() {
         let (conn, dir, trips, ids) = library_to_delete("delete-held", kinds::AT_ONCE + 1);
         let trash = enqueue_trash(&conn, &ids).unwrap();
-        let folder = enqueue_delete_folder(&conn, trips, Contents::Trash, ids.len()).unwrap();
-        let empty = enqueue_empty(&conn, Vec::new()).unwrap();
+        enqueue_delete_folder(&conn, trips, Contents::Trash, ids.len()).unwrap();
+        enqueue_empty(&conn, Vec::new()).unwrap();
         let (said, heard) = mpsc::channel();
-        let inner = hearing_deletes(&dir, said);
+        let queue = JobQueue {
+            inner: Arc::new(hearing_deletes(&dir, said)),
+            threads: Mutex::new(Vec::new()),
+        };
+        let inner = &*queue.inner;
 
-        for job in [trash, folder, empty] {
-            assert!(inner.cancel_delete(&conn, job).unwrap());
-        }
+        let hold = queue.hold().unwrap();
         let ended: Vec<bool> = heard
             .try_iter()
             .map(|deleted| match deleted {
@@ -1647,6 +1670,57 @@ mod tests {
             !inner.cancel_delete(&conn, trash).unwrap(),
             "nothing is left"
         );
+        assert_eq!(table::counts(&conn).unwrap().pending, 0);
+        drop(hold);
+    }
+
+    #[test]
+    fn an_empty_trash_going_on_after_a_restart_counts_what_its_first_run_deleted() {
+        let (conn, dir, _, ids) = library_to_delete("empty-resumed", 4);
+        crate::fs::trash::trash_items(&conn, &ids, &crate::db::journal::new_batch()).unwrap();
+        enqueue_empty(&conn, crate::fs::empty::to_empty(&conn).unwrap().files).unwrap();
+        let (said, heard) = mpsc::channel();
+        let inner = Arc::new(hearing_deletes(&dir, said));
+        stop_at_turn(&inner, 2);
+
+        assert!(matches!(run_here(&inner, &dir), worker::Done::Paused));
+        assert!(heard.try_recv().is_err());
+        assert_eq!(crate::fs::empty::to_empty(&conn).unwrap().files.len(), 2);
+
+        inner.stop.store(false, Ordering::Relaxed);
+        assert!(matches!(run_here(&inner, &dir), worker::Done::Finished));
+        let Deleted::Empty { emptied, .. } = heard.try_recv().unwrap() else {
+            panic!("the Trash was emptied");
+        };
+        assert_eq!((emptied.deleted, emptied.bytes), (4, 20));
+        assert!(crate::fs::empty::to_empty(&conn).unwrap().files.is_empty());
+    }
+
+    #[test]
+    fn a_folder_delete_going_on_after_a_restart_counts_what_its_first_run_deleted_for_good() {
+        use crate::fs::recycle::tests::{Fake, Stand, stand_in_as};
+
+        let (conn, dir, trips, ids) = library_to_delete("delete-folder-resumed", 4);
+        let mut bin = Fake::new(Stand::Recycles(dir.join("bin")));
+        bin.binless = vec![(dir.join("library/Trips"), "USB Drive (E:)".into())];
+        stand_in_as(bin);
+        enqueue_delete_folder(&conn, trips, Contents::Permanently, ids.len()).unwrap();
+        let (said, heard) = mpsc::channel();
+        let inner = Arc::new(hearing_deletes(&dir, said));
+        stop_at_turn(&inner, 3);
+
+        assert!(matches!(run_here(&inner, &dir), worker::Done::Paused));
+        assert!(heard.try_recv().is_err());
+        assert_eq!(crate::db::items::live_under(&conn, trips).unwrap().len(), 2);
+
+        inner.stop.store(false, Ordering::Relaxed);
+        assert!(matches!(run_here(&inner, &dir), worker::Done::Finished));
+        let Deleted::Folder { report, batch, .. } = heard.try_recv().unwrap() else {
+            panic!("a folder was deleted");
+        };
+        assert!(report.deleted, "{report:?}");
+        assert_eq!((report.outright, batch), (4, None));
+        assert!(!dir.join("library/Trips").exists());
     }
 
     /// Starting the queue on a fresh library walks it and thumbnails its pictures, off this thread.

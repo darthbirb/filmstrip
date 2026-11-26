@@ -114,6 +114,15 @@ pub fn release(conn: &Connection, id: i64) -> Result<()> {
     Ok(())
 }
 
+/// Rewrites a job's payload, for one stopped partway that carries what it did into its next run.
+pub fn carry(conn: &Connection, id: i64, payload: &str) -> Result<()> {
+    conn.execute(
+        "UPDATE job SET payload = ?1 WHERE id = ?2",
+        params![payload, id],
+    )?;
+    Ok(())
+}
+
 /// Takes a copy, a move or an export off the queue while it waits, and returns its payload; nothing when
 /// it is running or gone.
 pub fn cancel_pending(conn: &Connection, id: i64, kind: &str) -> Result<Option<String>> {

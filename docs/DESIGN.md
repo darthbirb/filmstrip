@@ -1123,8 +1123,8 @@ toward the rest surface.
   Cancelled, the Line counts what went against what it carried.
 - **Delete line.** A delete on the queue has the move's line: "Deleting 1,204 files…" or
   "Deleting Lisbon…", its figure, Cancel Delete on its dismiss, and the bar; Empty Trash's is
-  "Emptying the Trash…" with no dismiss, its tooltip saying it cannot be cancelled, its figure at
-  the line's end and its bar the full width. They stack with copies, moves and exports, the newest
+  "Emptying the Trash…" with no dismiss, its description saying it cannot be cancelled, its figure
+  at the line's end and its bar the full width. They stack with copies, moves and exports, the newest
   highest. Each ends as its act does inside the command; cancelled, the Line counts what went
   against what was asked, and a folder's says the folder stays.
 - **Export line.** An export's line is the copy's: "Exporting Trips.zip…", its figure, Cancel

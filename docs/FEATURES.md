@@ -116,7 +116,6 @@ drawn. **Not started** — neither.
 | Restore from the trash, or restore to another folder | Built | `restore_items`, journalled, taking the file out of the Recycle Bin; Restore and Restore to… on a trashed file's bar and menu, refused into the banner, a file emptied from the bin under Gone from the Recycle Bin |
 | Empty the library's files from the Recycle Bin, which cannot be undone | Built | `trash_to_empty`, `empty_trash`: Empty Trash… in Settings › Trash asks first, then deletes for good each file it counted, found again in the bin by what it is, and nothing else in the bin; one no longer there or that would not go is skipped and said at the foot, one it cannot finish never stops the rest, each that stayed is listed in the banner with why, and Ctrl+Z passes over what went; a job whose line at the foot and Settings' head count it, with no Cancel |
 
-
 ## Export and undo
 
 | Capability | Filmstrip | Where |

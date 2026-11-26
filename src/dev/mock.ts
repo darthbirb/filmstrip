@@ -38,7 +38,6 @@ import type { ItemDetail } from "../ipc/bindings/ItemDetail";
 import type { ItemRow } from "../ipc/bindings/ItemRow";
 import type { ItemsMoved } from "../ipc/bindings/ItemsMoved";
 import type { ItemsTrashed } from "../ipc/bindings/ItemsTrashed";
-
 import type { KeyBelow } from "../ipc/bindings/KeyBelow";
 import type { KeyClash } from "../ipc/bindings/KeyClash";
 import type { KeyClashFor } from "../ipc/bindings/KeyClashFor";
@@ -1875,48 +1874,46 @@ function emptyTrash(counted: readonly Counted[]): number {
   const jobId = nextDeleteJob++;
   deleting.set(jobId, { jobId, kind: "empty", name: "", done: 0, whole: counted.length });
   setTimeout(sendExports);
-  {
-    let at = 0;
-    const step = () => {
-      const one = counted[at];
-      if (!one) {
-        deleting.delete(jobId);
-        sendExports();
-        const ended: Deleted = { kind: "empty", jobId, emptied, cancelled: false, stopped: null };
-        void emit("delete-done", ended);
-        return;
-      }
-      const item = (ITEMS[TRASH] ?? []).find((held) => held.id === one.itemId);
-      if (item && binPathOf(item) === one.binPath) {
-        if (emptiedOutside.has(item.id)) {
-          dropFromJournal(item);
-          retireGone(item);
-          emptied.gone += 1;
-        } else if (undeletable.has(item.id)) {
-          emptied.kept += 1;
-          emptied.stayed.push({
-            kind: "file",
-            id: item.id,
-            name: item.diskName,
-            at: { kind: "trash" },
-            reason: { kind: "inUse" },
-          });
-        } else {
-          dropFromJournal(item);
-          retireGone(item);
-          goneForGood.push(item);
-          emptied.deleted += 1;
-          emptied.bytes += item.sizeBytes;
-        }
-      }
-      at += 1;
-      const line = deleting.get(jobId);
-      if (line) deleting.set(jobId, { ...line, done: at });
+  let at = 0;
+  const step = () => {
+    const one = counted[at];
+    if (!one) {
+      deleting.delete(jobId);
       sendExports();
-      setTimeout(step, EMPTY_STEP_MS);
-    };
+      const ended: Deleted = { kind: "empty", jobId, emptied, cancelled: false, stopped: null };
+      void emit("delete-done", ended);
+      return;
+    }
+    const item = (ITEMS[TRASH] ?? []).find((held) => held.id === one.itemId);
+    if (item && binPathOf(item) === one.binPath) {
+      if (emptiedOutside.has(item.id)) {
+        dropFromJournal(item);
+        retireGone(item);
+        emptied.gone += 1;
+      } else if (undeletable.has(item.id)) {
+        emptied.kept += 1;
+        emptied.stayed.push({
+          kind: "file",
+          id: item.id,
+          name: item.diskName,
+          at: { kind: "trash" },
+          reason: { kind: "inUse" },
+        });
+      } else {
+        dropFromJournal(item);
+        retireGone(item);
+        goneForGood.push(item);
+        emptied.deleted += 1;
+        emptied.bytes += item.sizeBytes;
+      }
+    }
+    at += 1;
+    const line = deleting.get(jobId);
+    if (line) deleting.set(jobId, { ...line, done: at });
+    sendExports();
     setTimeout(step, EMPTY_STEP_MS);
-  }
+  };
+  setTimeout(step, EMPTY_STEP_MS);
   return jobId;
 }
 

@@ -227,9 +227,11 @@ the Line and Undo for what went, the banner for what stayed.
   and one moved in keeps the folder and is named, as any file that keeps a folder is.
 - **Its batch is no act until it ends**, as a move's is: Ctrl+Z passes over it while it runs. One
   the app's closing stops goes on at the next launch under the same batch, passing over what
-  already went; a restore of the index cancels it as Cancel would.
+  already went, and its job carries what no journal row counts, the files gone for good, so its
+  Line counts both runs. A folder whose files go for good on a drive with no bin is no act however
+  many runs it takes. A restore of the index cancels it as Cancel would.
 - **Empty Trash has no Cancel**: what has gone has gone, as "Emptying the Trash" says. Its line
-  has no dismiss and its tooltip says why; only the app's closing stops it, between two files, and
+  has no dismiss and its description says why; only the app's closing stops it, between two files, and
   it goes on at the next launch. One still waiting when the index is restored is taken off the
   queue, since what it counted describes the index before.
 - **Left out:** an undo of a move between drives still copies back inside `undo_batch`, with no

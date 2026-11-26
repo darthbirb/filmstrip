@@ -10,7 +10,7 @@ import { binlessUnder, deleteFolder, folderDetail, folderFileCount } from "../..
 import { Question } from "../../ui/Question";
 import { sayFailed, unasked } from "../failure";
 import { libraryChanged } from "../library";
-import { dropPaneFolder, getPaneFolder } from "../pane/pane-store";
+import { dropPaneFolder, getPaneFolder, whenShownInPane } from "../pane/pane-store";
 import { getPreferences, updatePreferences } from "../preferences";
 import { SORTING_BOX, sortingDetail } from "../sorting-box";
 import {
@@ -88,15 +88,27 @@ async function settle(folder: Doomed, contents: Contents | null, held: number) {
   });
   if (!done) return;
   if (done.kind === "started") {
-    deleting.set(done.jobId, inPane);
+    deleting.set(done.jobId, { folderId: folder.id, inPane: Promise.resolve(inPane) });
+    watchPane();
     return;
   }
   settled(folder, contents, held, inPane, done.batch, done.report);
   await libraryChanged();
 }
 
-// Folders being deleted on the queue, by job, with the folder the pane showed in them.
-const deleting = new Map<number, number | null>();
+// Folders being deleted on the queue, by job, with the folder the pane last showed in them.
+const deleting = new Map<number, { folderId: number; inPane: Promise<number | null> }>();
+let unwatchPane: (() => void) | null = null;
+
+function watchPane() {
+  unwatchPane ??= whenShownInPane(() => {
+    for (const job of deleting.values()) {
+      const was = job.inPane;
+      const now = showsInPane(job.folderId);
+      job.inPane = Promise.all([was, now]).then(([before, shown]) => shown ?? before);
+    }
+  });
+}
 
 function settled(
   folder: Doomed,
@@ -141,9 +153,14 @@ function settled(
  * Line counting what went and the folder staying. One that stopped on its own says why.
  */
 export async function afterFolderDeleted(deleted: Extract<Deleted, { kind: "folder" }>) {
-  await libraryChanged();
-  const inPane = deleting.get(deleted.jobId) ?? null;
+  const job = deleting.get(deleted.jobId);
   deleting.delete(deleted.jobId);
+  if (deleting.size === 0) {
+    unwatchPane?.();
+    unwatchPane = null;
+  }
+  const inPane = job ? await job.inPane : null;
+  await libraryChanged();
   const { batch, report, whole, name, stopped } = deleted;
   const folder = { id: deleted.folderId, name };
   const binned = batch?.files ?? 0;

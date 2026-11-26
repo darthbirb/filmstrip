@@ -552,16 +552,17 @@ function deletingWhat(job: Extract<Job, { kind: "delete" }>) {
 /**
  * A delete's own line, as a move's: what it deletes, how far, and its dismiss, which cancels it
  * after the file in hand. Emptying the Trash has none, since what has gone has gone, and its
- * tooltip says so. DECISIONS.md "Background work".
+ * description says so. DECISIONS.md "Background work".
  */
 function DeleteLine({ job, rail }: { job: Extract<Job, { kind: "delete" }>; rail: boolean }) {
   const percent = job.whole > 0 ? Math.round((job.done / job.whole) * 100) : 0;
   const what = deletingWhat(job);
   const emptying = job.deleting === "empty";
-  const left = `${what} · ${formatCount(job.whole - job.done)} of ${formatCount(job.whole)} left${emptying ? " · It cannot be cancelled: what has gone has gone." : ""}`;
+  const left = `${what} · ${formatCount(job.whole - job.done)} of ${formatCount(job.whole)} left`;
+  const why = emptying ? "It cannot be cancelled: what has gone has gone." : undefined;
   if (rail) {
     return (
-      <div title={left} className="border-line border-t px-1.5 pt-2 pb-1.5">
+      <div title={left} aria-description={why} className="border-line border-t px-1.5 pt-2 pb-1.5">
         <Bar percent={percent} />
       </div>
     );
@@ -569,6 +570,7 @@ function DeleteLine({ job, rail }: { job: Extract<Job, { kind: "delete" }>; rail
   return (
     <div
       title={left}
+      aria-description={why}
       className={`flex flex-col gap-1 border-line border-t py-1.5 pl-2.5 ${emptying ? "pr-2.5" : "pr-1.5"}`}
     >
       <span className="flex min-h-control items-center gap-2 text-fg-mid text-small">
