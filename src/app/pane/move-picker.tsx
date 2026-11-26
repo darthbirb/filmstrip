@@ -122,8 +122,12 @@ function MovePicker({ request }: { request: MoveRequest }) {
         ? []
         : [request.folderId],
   );
-  const parentName = (folder: FolderEntry) =>
-    folder.parentId === null ? undefined : byId.get(folder.parentId)?.title;
+  const parentName = (folder: FolderEntry) => {
+    if (folder.parentId === null) return undefined;
+    const source = sorting.get(folder.parentId);
+    const title = byId.get(folder.parentId)?.title;
+    return source && title ? `${title} · ${source}` : title;
+  };
   const flat = (folder: FolderEntry): PickerRow => ({
     ...row(folder, 0, barred, sorting),
     detail:

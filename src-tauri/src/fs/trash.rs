@@ -67,10 +67,7 @@ pub fn listing(conn: &Connection) -> Result<Vec<Trashed>> {
 pub fn origin(conn: &Connection, folder_id: i64) -> Result<Origin> {
     Ok(Origin {
         folder_id,
-        path: folders::ancestry(conn, folder_id)?
-            .into_iter()
-            .map(|crumb| crumb.title)
-            .collect(),
+        path: sources::place_path(conn, folder_id)?,
         gone: folders::live_at(conn, folder_id)?.is_none(),
     })
 }
@@ -461,7 +458,7 @@ fn restore_unjournalled(
             });
         }
         Found::Gone => {
-            let place = folders::title(conn, to.unwrap_or(file.folder_id))?.unwrap_or_default();
+            let place = sources::place_name(conn, to.unwrap_or(file.folder_id))?;
             in_transaction(conn, |tx| items::retire_trashed(tx, item_id, now()))?;
             return Err(AppError::refused(Reason::GoneFromBin {
                 name: file.disk_name,
@@ -488,7 +485,7 @@ fn restore_unjournalled(
     };
     let taken = || {
         AppError::refused(Reason::NameTaken {
-            place: place_name(conn, home),
+            place: sources::place_name(conn, home).unwrap_or_default(),
             name: file.disk_name.clone(),
             folder: false,
         })
@@ -541,7 +538,7 @@ pub(super) fn untrash(conn: &Connection, item_id: i64) -> Result<()> {
         }
         return Err(AppError::refused(Reason::GoneFromBin {
             name: file.disk_name,
-            place: folders::title(conn, file.folder_id)?.unwrap_or_default(),
+            place: sources::place_name(conn, file.folder_id)?,
         }));
     }
     restore_unjournalled(conn, item_id, None, None)
@@ -575,15 +572,6 @@ pub(super) fn unrestore(conn: &Connection, restored: &ItemRestored) -> Result<()
         }
         items::set_trashed_at(tx, restored.item_id, restored.trashed_at)
     })
-}
-
-/// A folder as navigation names it: a source's own folder goes by the source's title.
-fn place_name(conn: &Connection, folder_id: i64) -> String {
-    folders::ancestry(conn, folder_id)
-        .ok()
-        .and_then(|mut crumbs| crumbs.pop())
-        .map(|crumb| crumb.title)
-        .unwrap_or_default()
 }
 
 /// The title of the source a folder is in.
@@ -1035,6 +1023,60 @@ mod tests {
             crate::fs::folders::delete(&conn, cairo, contents, &journal::new_batch()).unwrap();
         assert!(report.deleted, "{:?}", report.refused);
         assert!(!root.join("Trips/Cairo").exists());
+    }
+
+    #[test]
+    fn a_sorting_sources_own_folder_is_the_sorting_box_in_the_trash_and_in_what_stays() {
+        let (conn, root, _) = library("sorting-box");
+        let incoming = root.parent().unwrap().join("incoming");
+        std::fs::create_dir_all(&incoming).unwrap();
+        std::fs::write(incoming.join("a.jpg"), "a").unwrap();
+        std::fs::write(incoming.join("b.jpg"), "b").unwrap();
+        let source = sources::add(&conn, &incoming, "Incoming", SourceKind::Sorting).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let sorting = folders::source_root_folder(&conn, source.id).unwrap();
+        let (a, b) = (
+            id_of(&conn, sorting, "a.jpg"),
+            id_of(&conn, sorting, "b.jpg"),
+        );
+        let batch = journal::new_batch();
+        trash_items(&conn, &[a, b], &batch).unwrap();
+        let from: Vec<Vec<String>> = listing(&conn)
+            .unwrap()
+            .into_iter()
+            .map(|one| one.from.path)
+            .collect();
+        assert_eq!(from, [["Sorting Box"], ["Sorting Box"]]);
+
+        std::fs::write(incoming.join("a.jpg"), "another").unwrap();
+        std::fs::remove_file(bin_file(&conn, b)).unwrap();
+        let report = restore_items(&conn, &[a, b], None, &journal::new_batch()).unwrap();
+
+        let reasons: Vec<Reason> = report.refused.into_iter().map(|one| one.reason).collect();
+        assert_eq!(
+            reasons,
+            [
+                Reason::NameTaken {
+                    place: "Sorting Box".into(),
+                    name: "a.jpg".into(),
+                    folder: false
+                },
+                Reason::GoneFromBin {
+                    name: "b.jpg".into(),
+                    place: "Sorting Box".into(),
+                },
+            ]
+        );
+
+        let undone = undo::undo_batch(&conn, &batch).unwrap();
+        let gone = undone.stayed.iter().find(|one| one.id == b).unwrap();
+        assert_eq!(
+            gone.reason,
+            Reason::GoneFromBin {
+                name: "b.jpg".into(),
+                place: "Sorting Box".into(),
+            }
+        );
     }
 
     #[test]

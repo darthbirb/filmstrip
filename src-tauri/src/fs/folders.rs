@@ -880,6 +880,24 @@ mod tests {
     }
 
     #[test]
+    fn a_folder_name_taken_in_a_sorting_sources_own_folder_is_taken_in_the_sorting_box() {
+        let (conn, root, _, _) = library("taken-sorting");
+        let (_, inbox_folder, inbox_root) = with_inbox(&conn, &root);
+        std::fs::create_dir_all(inbox_root.join("Day 2")).unwrap();
+        walk::reconcile(&conn).unwrap();
+
+        let err = create(&conn, inbox_folder, "Day 2", &journal::new_batch()).unwrap_err();
+        assert_eq!(
+            Reason::of(&err),
+            Reason::NameTaken {
+                place: "Sorting Box".into(),
+                name: "Day 2".into(),
+                folder: true
+            }
+        );
+    }
+
+    #[test]
     fn a_file_that_stays_in_a_sorting_source_is_placed_in_the_sorting_box() {
         let (conn, root, _, _) = library("stayed-sorting");
         let (_, inbox_folder, inbox_root) = with_inbox(&conn, &root);

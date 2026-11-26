@@ -5,7 +5,7 @@ import { render } from "vitest-browser-react";
 
 import { recording } from "../../dev/recording";
 import type { Progress } from "../../ipc/bindings/Progress";
-import { undoLast } from "../../ipc/commands";
+import { listSources, undoLast } from "../../ipc/commands";
 import { Grid } from "../grid/Grid";
 import { RELOAD_WINDOW_MS } from "../library";
 import { Foot } from "../navigation/Foot";
@@ -17,7 +17,7 @@ import { watchWork } from "../navigation/work-store";
 import { type Place, setPlace } from "../place";
 import { showReport } from "../undo/report-store";
 import { watchCopies } from "./copy";
-import { ExplorerGhost, useExplorerDrops } from "./drop";
+import { ExplorerGhost, PickHost, useExplorerDrops } from "./drop";
 
 // Against the dev mock: Pictures (D:\Pictures) holds People (5, empty) and Trips (4), Trips holds
 // Cairo (6), and Archive is away.
@@ -271,4 +271,31 @@ test("a copy's reports recount navigation once, a window after they start", asyn
     expect(recounts()).toBe(1);
   });
   await emit("job-progress", { ...progress, phase: "idle", running: 0 });
+});
+
+test("with several sorting sources a drop on the Sorting Box asks which, as a paste does", async () => {
+  const every = await listSources();
+  const incoming = every.find((source) => source.kind === "sorting");
+  if (!incoming) throw new Error("the mock has no sorting source");
+  const cards = { ...incoming, id: 9, title: "Cards", root: "E:\\Cards", rootFolderId: 99 };
+  await recording(
+    async () => {
+      resetIndex();
+      await loadIndex();
+      openFolders([1, 4]);
+      render(<PickHost />);
+      await renderAll();
+      const sorting = row(/^Sorting Box /).element();
+      await carryOver(DOWNLOADS, sorting);
+      await emit("tauri://drag-drop", { paths: DOWNLOADS, position: over(sorting) });
+      const pick = page.getByRole("menu", { name: /^Copy 2 \w+ Into$/ });
+      await expect.element(pick).toBeVisible();
+      expect(
+        [...pick.element().querySelectorAll("[role=menuitem]")].map((one) =>
+          one.textContent?.replace(/[\uE000-\uF8FF]/g, ""),
+        ),
+      ).toEqual(["Sorting BoxIncoming", "Sorting BoxCards"]);
+    },
+    (cmd) => (cmd === "list_sources" ? [...every, cards] : undefined),
+  );
 });

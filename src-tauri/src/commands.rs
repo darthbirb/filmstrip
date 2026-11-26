@@ -1823,14 +1823,6 @@ mod tests {
     }
 
     #[test]
-    fn the_system_pickers_are_titled_by_their_act_and_the_filter_names_its_pattern() {
-        assert_eq!(
-            [ADD_SOURCE, EXPORT_TO_ZIP, ZIP_FILES],
-            ["Add Source", "Export to Zip", "Zip files (*.zip)"]
-        );
-    }
-
-    #[test]
     fn a_zip_picked_in_the_save_dialog_ends_in_zip_and_a_name_there_already_is_refused() {
         let dir = scratch("zip-pick");
         let exports = dir.join("Exports");

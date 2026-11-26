@@ -7,7 +7,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::db::folders::{self, Crumb};
+use crate::db::folders::Crumb;
 use crate::db::journal::{self, Change, FolderUse, ItemUse, Retagged, Reworded, Term};
 use crate::db::{fold, search, tags};
 use crate::error::{AppError, Result};
@@ -316,12 +316,8 @@ pub fn key_clash(conn: &Connection, from: &str, into: &str) -> Result<Option<Key
     Ok(None)
 }
 
-/// A folder as navigation names it: a source's own folder goes by the source's title.
 fn name(conn: &Connection, folder_id: i64) -> Result<String> {
-    Ok(folders::ancestry(conn, folder_id)?
-        .pop()
-        .map(|crumb| crumb.title)
-        .unwrap_or_default())
+    crate::db::sources::place_name(conn, folder_id)
 }
 
 /// Gives a tag a new name everywhere at once. Refused onto a tag that exists, which is a merge.

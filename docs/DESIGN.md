@@ -873,7 +873,8 @@ toward the rest surface.
 - **Menu.** A `menu`-wide list of actions on `panel` at the `control` corner, with the
   `line-control` hairline and the overlay shadow. Its rows are `control` tall in `fg`, each glyph
   `glyph`-sized in `fg-dim`, and `raised-hi` under the pointer. A row that needs telling from its
-  neighbours ends in quieter words in `small` `fg-dim`, as a Sorting Box row names its source.
+  neighbours ends in quieter words in `small` `fg-dim`, as a Sorting Box row names its source;
+  they are cut before the label is.
   A rule in `line` stands between two
   groups only when both hold rows. A menu about a thing that is not the row itself, as a
   source's is, opens under a heading: `eyebrow` capitals in `fg-dim`, `chip` tall. The one row

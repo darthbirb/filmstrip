@@ -6,7 +6,7 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::db::journal::{Forgot, Gone};
-use crate::db::{folders, items};
+use crate::db::{folders, items, sources};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::acts;
 
@@ -170,14 +170,6 @@ fn folder_at(conn: &Connection, folder_id: i64) -> Result<Whereabouts> {
     Ok(Whereabouts::Folder { folder_id, path })
 }
 
-/// A folder's names from its source's own down, the source's own as navigation names it.
 fn path_of(conn: &Connection, folder_id: i64) -> Result<Vec<String>> {
-    folders::ancestry(conn, folder_id)?
-        .into_iter()
-        .enumerate()
-        .map(|(at, crumb)| match at {
-            0 => acts::name(conn, crumb.id),
-            _ => Ok(crumb.title),
-        })
-        .collect()
+    sources::place_path(conn, folder_id)
 }

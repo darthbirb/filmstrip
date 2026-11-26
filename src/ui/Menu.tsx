@@ -29,7 +29,7 @@ export type MenuAction = {
   chip?: string;
   /** Quiet words at the row's end, in the mono face: the key its subject holds now. */
   trail?: string;
-  /** Quieter words after the label, in `small` `fg-dim`: which sorting source a Sorting Box row is. */
+  /** Quieter words after the label, in `small` `fg-dim`, cut before the label is: which sorting source a Sorting Box row is. */
   detail?: string;
   /** The choice already made, on the selection plate. */
   chosen?: boolean;
@@ -92,12 +92,12 @@ function MenuList({
             />
           )}
           <span
-            className={`min-w-0 flex-1 truncate ${action.quiet && !action.chosen ? "text-fg-dim" : ""}`}
+            className={`truncate ${action.detail === undefined ? "min-w-0 flex-1" : "shrink-0"} ${action.quiet && !action.chosen ? "text-fg-dim" : ""}`}
           >
             {action.label}
           </span>
           {action.detail !== undefined && (
-            <span className="shrink-0 text-fg-dim text-small">{action.detail}</span>
+            <span className="ml-auto min-w-0 truncate text-fg-dim text-small">{action.detail}</span>
           )}
           {action.trail !== undefined && (
             <span className="shrink-0 font-mono text-fg-dim text-small">{action.trail}</span>

@@ -2277,7 +2277,9 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
         const gone = trashed.get(item.id);
         const from = {
           folderId: item.folderId,
-          path: (gone?.folders ?? []).map((crumb) => crumb.title),
+          path: (gone?.folders ?? []).map((crumb, at) =>
+            at === 0 ? placeName(crumb.id) : crumb.title,
+          ),
           gone: !liveFolder(item.folderId),
         };
         return { ...item, trashedAt: gone?.at ?? 0, from };

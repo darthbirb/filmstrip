@@ -137,3 +137,28 @@ function hexToRgb(hex: string) {
   const value = Number.parseInt(hex.replace("#", ""), 16);
   return `rgb(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255})`;
 }
+
+test("a row's quieter words are cut before its label is", async () => {
+  const screen = await render(
+    <Surface
+      groups={[
+        [
+          {
+            id: "pick",
+            label: "Sorting Box",
+            detail: "Photos from the old phone, before it was wiped and sold",
+            glyph: "sortingBox",
+            onSelect: () => {},
+          },
+        ],
+      ]}
+    />,
+  );
+  await userEvent.click(screen.getByRole("button", { name: "thing" }), { button: "right" });
+  const row = screen.getByRole("menuitem").element();
+  const [label, detail] = [...row.querySelectorAll<HTMLElement>("span.truncate")];
+  expect(label?.textContent).toBe("Sorting Box");
+  expect(label && label.scrollWidth <= label.clientWidth).toBe(true);
+  expect(detail && detail.scrollWidth > detail.clientWidth).toBe(true);
+  expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth);
+});

@@ -8,8 +8,10 @@ import { setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { Navigation } from "../navigation/Navigation";
 import { openFolders, setOpenFolders } from "../navigation/open-folders";
+import { setPlace } from "../place";
 import { readClipboard, resetClipboard } from "./clipboard";
 import { PickHost } from "./drop";
+import { pasteHere } from "./keys";
 
 // Against the dev mock: Pictures holds cover.jpg, People (5) and Trips (4); Incoming (2) is the
 // one sorting source. Its Copy puts the files' paths on the mock's clipboard.
@@ -82,7 +84,7 @@ test("with several sorting sources Paste asks which, each the Sorting Box with i
   const every = await listSources();
   const incoming = every.find((source) => source.kind === "sorting");
   if (!incoming) throw new Error("the mock has no sorting source");
-  const cards = { ...incoming, id: 9, title: "Cards", root: "E:Cards", rootFolderId: 99 };
+  const cards = { ...incoming, id: 9, title: "Cards", root: "E:\\Cards", rootFolderId: 99 };
   await recording(
     async () => {
       resetIndex();
@@ -92,6 +94,31 @@ test("with several sorting sources Paste asks which, each the Sorting Box with i
       await renderTree();
       expect(await menuOf(/^Sorting Box /)).toEqual(["Paste 1 File…", "Add Sorting Source…"]);
       await page.getByRole("menuitem", { name: "Paste 1 File…" }).click();
+      const pick = page.getByRole("menu", { name: "Copy 1 File Into" });
+      await expect.element(pick).toBeVisible();
+      expect(
+        [...pick.element().querySelectorAll("[role=menuitem]")].map((one) =>
+          one.textContent?.replace(/[\uE000-\uF8FF]/g, ""),
+        ),
+      ).toEqual(["Sorting BoxIncoming", "Sorting BoxCards"]);
+    },
+    (cmd) => (cmd === "list_sources" ? [...every, cards] : undefined),
+  );
+});
+
+test("with several sorting sources Ctrl+V in the Sorting Box asks which, in the same words", async () => {
+  await copyCover();
+  const every = await listSources();
+  const incoming = every.find((source) => source.kind === "sorting");
+  if (!incoming) throw new Error("the mock has no sorting source");
+  const cards = { ...incoming, id: 9, title: "Cards", root: "E:\\Cards", rootFolderId: 99 };
+  await recording(
+    async () => {
+      resetIndex();
+      await loadIndex();
+      setPlace({ kind: "sorting" });
+      render(<PickHost />);
+      await pasteHere();
       const pick = page.getByRole("menu", { name: "Copy 1 File Into" });
       await expect.element(pick).toBeVisible();
       expect(

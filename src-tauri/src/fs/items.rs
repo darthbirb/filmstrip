@@ -361,6 +361,29 @@ mod tests {
     }
 
     #[test]
+    fn a_rename_onto_a_name_taken_in_a_sorting_sources_own_folder_is_taken_in_the_sorting_box() {
+        let (conn, root, _, _) = library("rename-taken-sorting");
+        let incoming = root.parent().unwrap().join("incoming");
+        std::fs::create_dir_all(&incoming).unwrap();
+        std::fs::write(incoming.join("a.jpg"), "a").unwrap();
+        std::fs::write(incoming.join("b.jpg"), "b").unwrap();
+        let source = sources::add(&conn, &incoming, "Incoming", SourceKind::Sorting).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let sorting = folders::source_root_folder(&conn, source.id).unwrap();
+
+        let a = id_of(&conn, sorting, "a.jpg");
+        let err = rename(&conn, a, "b.jpg", &journal::new_batch()).unwrap_err();
+        assert_eq!(
+            Reason::of(&err),
+            Reason::NameTaken {
+                place: "Sorting Box".into(),
+                name: "b.jpg".into(),
+                folder: false
+            }
+        );
+    }
+
+    #[test]
     fn a_rename_onto_a_name_taken_is_refused_and_a_change_of_case_is_not() {
         let (conn, root, cairo, _) = library("rename-taken");
         let pyramid = id_of(&conn, cairo, "pyramid.jpg");

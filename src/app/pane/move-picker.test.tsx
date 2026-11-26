@@ -4,7 +4,14 @@ import { render } from "vitest-browser-react";
 import { recording } from "../../dev/recording";
 import { withoutGlyphs } from "../../dev/words";
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
-import { folderItems, itemDetail, listSources, renameItem, undoLast } from "../../ipc/commands";
+import {
+  createFolder,
+  folderItems,
+  itemDetail,
+  listSources,
+  renameItem,
+  undoLast,
+} from "../../ipc/commands";
 import { Foot } from "../navigation/Foot";
 import { setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex } from "../navigation/index-store";
@@ -71,11 +78,12 @@ test("Move to… opens the tree down to the file's folder, which cannot be picke
   await expect.element(cairo).toHaveAttribute("aria-disabled", "true");
 });
 
-test("with several sorting sources the Sorting Box's row names its source after it", async () => {
+test("with several sorting sources the Sorting Box's rows, and its folders' parents, name the source", async () => {
   const every = await listSources();
   const incoming = every.find((source) => source.kind === "sorting");
   if (!incoming) throw new Error("the mock has no sorting source");
   const cards = { ...incoming, id: 9, title: "Cards", root: "E:\\Cards", rootFolderId: 99 };
+  await createFolder(incoming.rootFolderId, "Day 2");
   await recording(
     async () => {
       resetIndex();
@@ -88,6 +96,8 @@ test("with several sorting sources the Sorting Box's row names its source after 
 
       await picker.getByRole("combobox").fill("sort");
       expect(rows(picker.element())).toEqual(["Sorting Box · Incoming"]);
+      await picker.getByRole("combobox").fill("day");
+      expect(rows(picker.element())).toEqual(["Day 2 · Sorting Box · Incoming"]);
     },
     (cmd) => (cmd === "list_sources" ? [...every, cards] : undefined),
   );
