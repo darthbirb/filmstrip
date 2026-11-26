@@ -59,7 +59,8 @@ Trash's.
 A file the Recycle Bin will not take, too large for it or on a drive whose bin is off, stays where
 it was, and the foot says so; nothing is deleted outright. In a set the rest go, with Undo. One
 the app never hands to the bin stays the same way and the banner says why: a path too long for
-the Recycle Bin, or a drive without hard links, named, such as an exFAT disk.
+the Recycle Bin, or a drive that would not give it the hard link the send holds it by, named. A
+fixed exFAT or FAT32 drive has a bin but no hard links, and Delete works there as anywhere else.
 
 A drive with no Recycle Bin at all, a USB stick, an SD card or a network share, asks first, once
 for the whole selection: the drive, how many files and how much space, and that they go for good

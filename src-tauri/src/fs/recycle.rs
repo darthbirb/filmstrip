@@ -10,9 +10,10 @@ use crate::fs::noclobber;
 /// What a file is handed to. The shell's [`RecycleBin`] in the app; a stand-in under test, so no
 /// test ever reaches the real one.
 pub trait Bin {
-    /// Asks for `file` to go. The shell may recycle it, delete it outright, or leave it; [`send`]
-    /// finds out which from the disk, never from what this returns.
-    fn take(&self, file: &Path) -> io::Result<()>;
+    /// Asks for `file` to go into the bin and never anywhere else, answering with the name the
+    /// shell says it gave it there, when it says. [`send`] believes the disk over this wherever it
+    /// can read the file's names.
+    fn take(&self, file: &Path) -> io::Result<Option<PathBuf>>;
 
     /// Whether `name`, one of a file's full names, is inside this bin.
     fn holds(&self, name: &Path) -> bool;
@@ -49,6 +50,9 @@ pub enum Sent {
     /// It could not be given a second name, or that name's names could not be read, so it was
     /// never handed over: the code the disk refused it with, when it gave one.
     Unheld(Option<i32>),
+    /// Sent without a second name, it left its folder, but the shell gave no name in the bin that
+    /// is still the file, so where it went cannot be told.
+    Untraced,
 }
 
 /// Sends a file to the Recycle Bin, held under a second name, kept until [`release`] once it is
@@ -61,17 +65,21 @@ pub fn send(
 ) -> io::Result<Sent> {
     let hold = hold_of(file);
     settle(file, &hold)?;
-    match std::fs::symlink_metadata(file) {
-        Ok(meta) if meta.is_file() => {}
+    let was = match std::fs::symlink_metadata(file) {
+        Ok(meta) if meta.is_file() => meta,
         Ok(_) => return Ok(Sent::Refused),
         Err(err) if err.kind() == io::ErrorKind::NotFound => return Ok(Sent::Gone),
         Err(err) => return Err(err),
-    }
+    };
     if too_long_for_shell(file) {
         return Ok(Sent::TooLong);
     }
     if let Err(err) = link(file, &hold) {
-        return Ok(Sent::Unheld(err.raw_os_error()));
+        return match err.raw_os_error() {
+            _ if err.kind() == io::ErrorKind::NotFound => Ok(Sent::Gone),
+            Some(code) if no_second_name(code) => send_unlinked(bin, file, &was),
+            code => Ok(Sent::Unheld(code)),
+        };
     }
     let (before, itself) = match (names_of(&hold), identity(&hold)) {
         (Ok(before), Ok(itself)) => (before, itself),
@@ -106,6 +114,99 @@ fn gained(bin: &dyn Bin, hold: &Path, before: &[PathBuf]) -> Option<PathBuf> {
         .into_iter()
         .find(|name| !before.contains(name) && bin.holds(name))
         .map(|name| plain(&name))
+}
+
+/// Whether the disk's `code` for a second name that could not be made says the file can never
+/// have one there: a drive without hard links, or a file with all the names NTFS allows.
+#[cfg(windows)]
+fn no_second_name(code: i32) -> bool {
+    use windows_sys::Win32::Foundation::{
+        ERROR_INVALID_FUNCTION, ERROR_NOT_SUPPORTED, ERROR_TOO_MANY_LINKS,
+    };
+
+    [
+        ERROR_INVALID_FUNCTION,
+        ERROR_NOT_SUPPORTED,
+        ERROR_TOO_MANY_LINKS,
+    ]
+    .contains(&(code as u32))
+}
+
+#[cfg(not(windows))]
+fn no_second_name(_code: i32) -> bool {
+    false
+}
+
+/// Sends a file that cannot have a second name, on what the shell says alone: refused where it
+/// is still at its path, and recycled only under a name inside the bin that the shell gave and
+/// that still has the file's size and last write.
+fn send_unlinked(bin: &dyn Bin, file: &Path, was: &std::fs::Metadata) -> io::Result<Sent> {
+    let said = bin.take(file);
+    if std::fs::symlink_metadata(file).is_ok() {
+        return Ok(Sent::Refused);
+    }
+    let found = said
+        .ok()
+        .flatten()
+        .filter(|at| bin.holds(at) && same_contents(was, at))
+        .and_then(|at| Some((file_at(&at)?, at)));
+    Ok(match found {
+        Some((itself, at)) => Sent::Recycled(Binned {
+            path: plain(&at),
+            file: itself,
+        }),
+        None => Sent::Untraced,
+    })
+}
+
+fn same_contents(was: &std::fs::Metadata, at: &Path) -> bool {
+    std::fs::symlink_metadata(at).is_ok_and(|now| {
+        now.is_file()
+            && now.len() == was.len()
+            && now
+                .modified()
+                .ok()
+                .is_some_and(|when| was.modified().ok() == Some(when))
+    })
+}
+
+/// `TSF_DELETE_RECYCLE_IF_POSSIBLE`, which the shell sets on a file it is about to recycle.
+const RECYCLES: u32 = 0x80;
+
+/// What the shell said of the one file an operation deletes, and what the app answered it.
+/// DECISIONS.md "Sending to the Recycle Bin".
+#[derive(Debug, Default)]
+struct Watch {
+    asked: bool,
+    stopped: bool,
+    placed: Option<PathBuf>,
+}
+
+impl Watch {
+    /// Before the shell deletes the file: whether it may, which is only into the bin.
+    fn before_delete(&mut self, flags: u32) -> bool {
+        let recycles = flags & RECYCLES != 0;
+        self.asked = true;
+        self.stopped |= !recycles;
+        recycles
+    }
+
+    /// Once it has, the name it gave the file in the bin, if it gave one.
+    fn after_delete(&mut self, deleted: bool, newly: Option<PathBuf>) {
+        if deleted && self.asked && !self.stopped {
+            self.placed = newly;
+        }
+    }
+
+    /// What the operation came to: refused when it failed, was stopped, or deleted without
+    /// asking first; otherwise the name the file was given in the bin, when the shell said.
+    fn outcome(self, performed: io::Result<()>, aborted: bool) -> io::Result<Option<PathBuf>> {
+        performed?;
+        if aborted || self.stopped || !self.asked {
+            return Err(io::Error::other("the Recycle Bin did not take it"));
+        }
+        Ok(self.placed)
+    }
 }
 
 /// Where the bin put `file` when a send was cut short after the shell took it: a name its second
@@ -563,7 +664,7 @@ pub struct Shell;
 
 #[cfg(not(test))]
 impl Bin for Shell {
-    fn take(&self, file: &Path) -> io::Result<()> {
+    fn take(&self, file: &Path) -> io::Result<Option<PathBuf>> {
         RecycleBin.take(file)
     }
 
@@ -582,7 +683,7 @@ impl Bin for Shell {
 
 #[cfg(test)]
 impl Bin for Shell {
-    fn take(&self, file: &Path) -> io::Result<()> {
+    fn take(&self, file: &Path) -> io::Result<Option<PathBuf>> {
         tests::stand_in().take(file)
     }
 
@@ -604,37 +705,16 @@ pub struct RecycleBin;
 
 #[cfg(windows)]
 impl Bin for RecycleBin {
-    fn take(&self, file: &Path) -> io::Result<()> {
-        use windows_sys::Win32::UI::Shell::{
-            FO_DELETE, FOF_ALLOWUNDO, FOF_NO_UI, SHFILEOPSTRUCTW, SHFileOperationW,
-        };
-
-        const FLAGS: u16 = {
-            let flags = FOF_ALLOWUNDO | FOF_NO_UI;
-            assert!(flags >> 16 == 0, "the shell's flags fit its 16 bits");
-            flags as u16
-        };
-
+    fn take(&self, file: &Path) -> io::Result<Option<PathBuf>> {
         if cfg!(test) {
             panic!("{} was handed to the real Recycle Bin", file.display());
         }
 
         let mut from = shell_form(file)?;
-        from.extend([0, 0]);
-        let mut op = SHFILEOPSTRUCTW {
-            wFunc: FO_DELETE,
-            pFrom: from.as_ptr(),
-            fFlags: FLAGS,
-            ..Default::default()
-        };
-        // SAFETY: `from` is a double-NUL-terminated wide list that outlives the call.
-        let code = unsafe { SHFileOperationW(&mut op) };
-        if code != 0 || op.fAnyOperationsAborted != 0 {
-            return Err(io::Error::other(format!(
-                "the shell did not take it ({code:#x})"
-            )));
-        }
-        Ok(())
+        from.push(0);
+        std::thread::spawn(move || operation::recycle(&from))
+            .join()
+            .map_err(|_| io::Error::other("the shell's thread stopped"))?
     }
 
     fn holds(&self, name: &Path) -> bool {
@@ -680,6 +760,204 @@ impl Bin for RecycleBin {
             DRIVE_REMOVABLE | DRIVE_REMOTE | DRIVE_CDROM | DRIVE_RAMDISK
         )
         .then(|| drive_name(&root, kind, volume_label(&root)))
+    }
+}
+
+/// The shell's `IFileOperation`, with a sink that answers [`Watch`]'s word on each callback.
+#[cfg(windows)]
+mod operation {
+    use std::cell::RefCell;
+    use std::io;
+    use std::os::windows::ffi::OsStringExt;
+    use std::path::PathBuf;
+
+    use windows::Win32::Foundation::E_ABORT;
+    use windows::Win32::System::Com::{
+        CLSCTX_INPROC_SERVER, COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE, CoCreateInstance,
+        CoInitializeEx, CoTaskMemFree, CoUninitialize,
+    };
+    use windows::Win32::UI::Shell::{
+        FOF_ALLOWUNDO, FOF_NO_UI, FOFX_RECYCLEONDELETE, FileOperation, IFileOperation,
+        IFileOperationProgressSink, IFileOperationProgressSink_Impl, IShellItem,
+        SHCreateItemFromParsingName, SIGDN_FILESYSPATH,
+    };
+    use windows_core::{ComObject, HRESULT, PCWSTR, Ref, implement};
+
+    use super::Watch;
+
+    #[implement(IFileOperationProgressSink)]
+    struct Sink(RefCell<Watch>);
+
+    /// Sends the one file `path` names, NUL-terminated, on a thread of its own: the operation needs
+    /// a single-threaded apartment, which no other thread of the app is asked to be.
+    pub(super) fn recycle(path: &[u16]) -> io::Result<Option<PathBuf>> {
+        // SAFETY: this thread is the operation's own, so its apartment is set up here first and
+        // torn down after every COM object made on it is gone.
+        unsafe {
+            CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE).ok()?;
+            let done = perform(path);
+            CoUninitialize();
+            done
+        }
+    }
+
+    fn perform(path: &[u16]) -> io::Result<Option<PathBuf>> {
+        // SAFETY: `path` is NUL-terminated and outlives every call given it.
+        unsafe {
+            let op: IFileOperation = CoCreateInstance(&FileOperation, None, CLSCTX_INPROC_SERVER)?;
+            op.SetOperationFlags(FOF_ALLOWUNDO | FOF_NO_UI | FOFX_RECYCLEONDELETE)?;
+            let item: IShellItem = SHCreateItemFromParsingName(PCWSTR(path.as_ptr()), None)?;
+            let sink = ComObject::new(Sink(RefCell::default()));
+            op.DeleteItem(&item, &sink.to_interface::<IFileOperationProgressSink>())?;
+            let performed = op.PerformOperations().map_err(io::Error::from);
+            let aborted = op
+                .GetAnyOperationsAborted()
+                .map_or(true, |any| any.as_bool());
+            sink.0.take().outcome(performed, aborted)
+        }
+    }
+
+    /// Where `item` is on disk.
+    fn path_of(item: &IShellItem) -> Option<PathBuf> {
+        // SAFETY: the name the shell allocates is read once, then freed as it asks.
+        unsafe {
+            let name = item.GetDisplayName(SIGDN_FILESYSPATH).ok()?;
+            let path = std::ffi::OsString::from_wide(name.as_wide()).into();
+            CoTaskMemFree(Some(name.0.cast_const().cast()));
+            Some(path)
+        }
+    }
+
+    impl IFileOperationProgressSink_Impl for Sink_Impl {
+        fn PreDeleteItem(&self, flags: u32, _item: Ref<IShellItem>) -> windows_core::Result<()> {
+            if self.0.borrow_mut().before_delete(flags) {
+                Ok(())
+            } else {
+                Err(E_ABORT.into())
+            }
+        }
+
+        fn PostDeleteItem(
+            &self,
+            _flags: u32,
+            _item: Ref<IShellItem>,
+            deleted: HRESULT,
+            newly: Ref<IShellItem>,
+        ) -> windows_core::Result<()> {
+            let placed = newly.as_ref().and_then(path_of);
+            self.0.borrow_mut().after_delete(deleted.is_ok(), placed);
+            Ok(())
+        }
+
+        fn StartOperations(&self) -> windows_core::Result<()> {
+            Ok(())
+        }
+
+        fn FinishOperations(&self, _result: HRESULT) -> windows_core::Result<()> {
+            Ok(())
+        }
+
+        fn PreRenameItem(
+            &self,
+            _flags: u32,
+            _item: Ref<IShellItem>,
+            _name: &PCWSTR,
+        ) -> windows_core::Result<()> {
+            Ok(())
+        }
+
+        fn PostRenameItem(
+            &self,
+            _flags: u32,
+            _item: Ref<IShellItem>,
+            _name: &PCWSTR,
+            _result: HRESULT,
+            _newly: Ref<IShellItem>,
+        ) -> windows_core::Result<()> {
+            Ok(())
+        }
+
+        fn PreMoveItem(
+            &self,
+            _flags: u32,
+            _item: Ref<IShellItem>,
+            _folder: Ref<IShellItem>,
+            _name: &PCWSTR,
+        ) -> windows_core::Result<()> {
+            Ok(())
+        }
+
+        fn PostMoveItem(
+            &self,
+            _flags: u32,
+            _item: Ref<IShellItem>,
+            _folder: Ref<IShellItem>,
+            _name: &PCWSTR,
+            _result: HRESULT,
+            _newly: Ref<IShellItem>,
+        ) -> windows_core::Result<()> {
+            Ok(())
+        }
+
+        fn PreCopyItem(
+            &self,
+            _flags: u32,
+            _item: Ref<IShellItem>,
+            _folder: Ref<IShellItem>,
+            _name: &PCWSTR,
+        ) -> windows_core::Result<()> {
+            Ok(())
+        }
+
+        fn PostCopyItem(
+            &self,
+            _flags: u32,
+            _item: Ref<IShellItem>,
+            _folder: Ref<IShellItem>,
+            _name: &PCWSTR,
+            _result: HRESULT,
+            _newly: Ref<IShellItem>,
+        ) -> windows_core::Result<()> {
+            Ok(())
+        }
+
+        fn PreNewItem(
+            &self,
+            _flags: u32,
+            _folder: Ref<IShellItem>,
+            _name: &PCWSTR,
+        ) -> windows_core::Result<()> {
+            Ok(())
+        }
+
+        fn PostNewItem(
+            &self,
+            _flags: u32,
+            _folder: Ref<IShellItem>,
+            _name: &PCWSTR,
+            _template: &PCWSTR,
+            _attributes: u32,
+            _result: HRESULT,
+            _newly: Ref<IShellItem>,
+        ) -> windows_core::Result<()> {
+            Ok(())
+        }
+
+        fn UpdateProgress(&self, _total: u32, _done: u32) -> windows_core::Result<()> {
+            Ok(())
+        }
+
+        fn ResetTimer(&self) -> windows_core::Result<()> {
+            Ok(())
+        }
+
+        fn PauseTimer(&self) -> windows_core::Result<()> {
+            Ok(())
+        }
+
+        fn ResumeTimer(&self) -> windows_core::Result<()> {
+            Ok(())
+        }
     }
 }
 
@@ -735,7 +1013,7 @@ fn volume_label(root: &Path) -> Option<String> {
 
 #[cfg(not(windows))]
 impl Bin for RecycleBin {
-    fn take(&self, _file: &Path) -> io::Result<()> {
+    fn take(&self, _file: &Path) -> io::Result<Option<PathBuf>> {
         Err(io::ErrorKind::Unsupported.into())
     }
 
@@ -806,12 +1084,17 @@ pub(crate) mod tests {
         /// Moves it as [`Stand::Recycles`] does, and another file takes its name before the send
         /// returns.
         Occupied(PathBuf, RefCell<Option<PathBuf>>),
+        /// Moves it as [`Stand::Recycles`] does, and says it gave it the second name instead.
+        Misplaces(PathBuf, PathBuf),
     }
 
     pub(crate) struct Fake {
         pub(crate) stand: Stand,
-        /// Names the shell refuses, deleting them outright, whatever it does with the rest.
+        /// Names the shell deletes outright, saying it recycles them, whatever it does with the
+        /// rest.
         pub(crate) deletes: Vec<String>,
+        /// Names the shell says it cannot recycle, as for a file too large for the bin.
+        pub(crate) unrecyclable: Vec<String>,
         pub(crate) asked: RefCell<Vec<PathBuf>>,
         /// Each name a file was taken back out of.
         pub(crate) let_go: RefCell<Vec<PathBuf>>,
@@ -824,6 +1107,7 @@ pub(crate) mod tests {
             Fake {
                 stand,
                 deletes: Vec::new(),
+                unrecyclable: Vec::new(),
                 asked: RefCell::default(),
                 let_go: RefCell::default(),
                 binless: Vec::new(),
@@ -836,7 +1120,8 @@ pub(crate) mod tests {
                 Stand::Recycles(bin)
                 | Stand::Relinks(bin)
                 | Stand::Stops(bin)
-                | Stand::Occupied(bin, _) => Some(bin),
+                | Stand::Occupied(bin, _)
+                | Stand::Misplaces(bin, _) => Some(bin),
                 _ => None,
             }
         }
@@ -855,42 +1140,70 @@ pub(crate) mod tests {
         at
     }
 
-    impl Bin for Fake {
-        fn take(&self, file: &Path) -> io::Result<()> {
-            self.asked.borrow_mut().push(file.to_path_buf());
+    impl Fake {
+        /// What the stand does with a file the shell goes on to delete, and the name it says it
+        /// gave it in the bin.
+        fn act(&self, file: &Path) -> io::Result<Option<PathBuf>> {
             let name = file.file_name().unwrap_or_default().to_string_lossy();
             if self.deletes.iter().any(|one| name.contains(one.as_str())) {
-                return std::fs::remove_file(file);
+                return std::fs::remove_file(file).map(|()| None);
             }
+            let recycle = |bin: &Path| -> io::Result<PathBuf> {
+                std::fs::create_dir_all(bin)?;
+                let at = binned_name(bin, file);
+                std::fs::rename(file, &at)?;
+                Ok(at)
+            };
             match &self.stand {
-                Stand::Recycles(bin) => {
-                    std::fs::create_dir_all(bin)?;
-                    std::fs::rename(file, binned_name(bin, file))
-                }
-                Stand::Deletes => std::fs::remove_file(file),
+                Stand::Recycles(bin) => recycle(bin).map(Some),
+                Stand::Deletes => std::fs::remove_file(file).map(|()| None),
                 Stand::Fails => Err(io::Error::other("refused")),
                 Stand::Relinks(bin) => {
                     std::fs::create_dir_all(bin)?;
                     let name = file.file_name().unwrap_or_default();
                     std::fs::rename(file, bin.join(name))?;
-                    std::fs::hard_link(bin.join(name), bin.join("another"))
+                    std::fs::hard_link(bin.join(name), bin.join("another"))?;
+                    Ok(Some(bin.join(name)))
                 }
                 Stand::DeletesWhileLinked(outside) => {
                     std::fs::remove_file(file)?;
-                    std::fs::hard_link(hold_of(file), outside)
+                    std::fs::hard_link(hold_of(file), outside).map(|()| None)
                 }
                 Stand::Stops(bin) => {
-                    std::fs::create_dir_all(bin)?;
-                    std::fs::rename(file, binned_name(bin, file))?;
+                    recycle(bin)?;
                     panic!("the app stopped");
                 }
                 Stand::Occupied(bin, taken) => {
-                    std::fs::create_dir_all(bin)?;
-                    std::fs::rename(file, binned_name(bin, file))?;
+                    let at = recycle(bin)?;
                     *taken.borrow_mut() = Some(file.to_path_buf());
-                    Ok(())
+                    Ok(Some(at))
+                }
+                Stand::Misplaces(bin, said) => {
+                    recycle(bin)?;
+                    Ok(Some(said.clone()))
                 }
             }
+        }
+    }
+
+    impl Bin for Fake {
+        /// Asks the app's own [`Watch`] before the stand acts, as the shell asks the sink, with
+        /// the flags the shell would give a file it can recycle or one it cannot.
+        fn take(&self, file: &Path) -> io::Result<Option<PathBuf>> {
+            self.asked.borrow_mut().push(file.to_path_buf());
+            let name = file.file_name().unwrap_or_default().to_string_lossy();
+            let recyclable = !self
+                .unrecyclable
+                .iter()
+                .any(|one| name.contains(one.as_str()));
+            let mut watch = Watch::default();
+            if !watch.before_delete(if recyclable { RECYCLES } else { 0 }) {
+                return watch.outcome(Ok(()), true);
+            }
+            let done = self.act(file);
+            let newly = done.as_ref().ok().cloned().flatten();
+            watch.after_delete(done.is_ok(), newly);
+            watch.outcome(done.map(|_| ()), false)
         }
 
         fn holds(&self, name: &Path) -> bool {
@@ -1100,14 +1413,21 @@ pub(crate) mod tests {
         assert!(shell.holds(&Path::new(&plain).join(r"$Recycle.Bin\S-1-5-21\$RAB12CD.jpg")));
     }
 
+    /// How long `path` is as the shell counts it, in UTF-16 units.
+    #[cfg(windows)]
+    fn units(path: &Path) -> usize {
+        use std::os::windows::ffi::OsStrExt;
+        path.as_os_str().encode_wide().count()
+    }
+
     #[cfg(windows)]
     #[test]
     fn a_file_whose_second_name_is_past_max_path_is_still_recycled() {
         let dir = scratch("long");
         let trash = dir.join("trash");
-        let room = 255 - trash.as_os_str().len();
+        let room = 255 - units(&trash);
         let file = trash.join(format!("{}.jpg", "a".repeat(room - 5)));
-        assert!(file.as_os_str().len() < 260 && hold_of(&file).as_os_str().len() >= 260);
+        assert!(units(&file) < 260 && units(&hold_of(&file)) >= 260);
         std::fs::write(&file, "one").unwrap();
         let bin = Fake::new(Stand::Recycles(dir.join("bin")));
 
@@ -1138,13 +1458,162 @@ pub(crate) mod tests {
         let dir = scratch("unlinkable");
         let file = one_with_names(&dir, 0);
         let bin = Fake::new(Stand::Recycles(dir.join("bin")));
-        links_fail(1);
+        links_fail(87);
 
-        assert_eq!(send(&bin, &file).unwrap(), Sent::Unheld(Some(1)));
+        assert_eq!(send(&bin, &file).unwrap(), Sent::Unheld(Some(87)));
         assert!(bin.asked.borrow().is_empty());
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
         settles_to(&dir.join("trash"), &["one.jpg"]);
         assert_eq!(identity(&file).unwrap().links, 1);
+    }
+
+    #[test]
+    fn a_file_gone_before_its_second_name_is_made_counts_as_gone() {
+        let dir = scratch("unlinkable-gone");
+        let file = one_with_names(&dir, 0);
+        let bin = Fake::new(Stand::Recycles(dir.join("bin")));
+        links_fail(2);
+
+        assert_eq!(send(&bin, &file).unwrap(), Sent::Gone);
+        assert!(bin.asked.borrow().is_empty());
+    }
+
+    /// What the disk says of a second name on a drive without hard links, and of one past the
+    /// names NTFS allows a file.
+    #[cfg(windows)]
+    const NO_SECOND_NAME: [i32; 3] = [1, 50, 1142];
+
+    #[cfg(windows)]
+    #[test]
+    fn a_file_that_can_never_have_a_second_name_is_recycled_where_the_shell_says() {
+        for code in NO_SECOND_NAME {
+            let dir = scratch(&format!("linkless-{code}"));
+            let file = one_with_names(&dir, 0);
+            let bin = Fake::new(Stand::Recycles(dir.join("bin")));
+            links_fail(code);
+
+            let recycled = dir.join("bin/one.jpg");
+            assert_eq!(
+                send(&bin, &file).unwrap(),
+                Sent::Recycled(Binned {
+                    path: recycled.clone(),
+                    file: file_at(&recycled).unwrap(),
+                }),
+                "{code}"
+            );
+            assert_eq!(bin.asked.borrow().as_slice(), std::slice::from_ref(&file));
+            assert_eq!(std::fs::read_to_string(&recycled).unwrap(), "one");
+            settles_to(&dir.join("trash"), &[]);
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_file_the_shell_says_it_cannot_recycle_is_never_deleted_on_any_drive() {
+        for code in [None, Some(1), Some(1142)] {
+            let at = code.map_or("linked".to_owned(), |code| code.to_string());
+            let dir = scratch(&format!("unrecyclable-{at}"));
+            let file = one_with_names(&dir, 1);
+            let mut bin = Fake::new(Stand::Deletes);
+            bin.unrecyclable.push("one".into());
+            if let Some(code) = code {
+                links_fail(code);
+            }
+
+            assert_eq!(send(&bin, &file).unwrap(), Sent::Refused, "{at}");
+            assert_eq!(bin.asked.borrow().as_slice(), std::slice::from_ref(&file));
+            assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
+            settles_to(&dir.join("trash"), &["one.jpg"]);
+            assert_eq!(identity(&file).unwrap().links, 2);
+
+            assert_eq!(
+                send(&Fake::new(Stand::Fails), &file).unwrap(),
+                Sent::Refused
+            );
+            settles_to(&dir.join("trash"), &["one.jpg"]);
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_file_without_a_second_name_is_never_recorded_under_a_name_that_is_not_it() {
+        let dir = scratch("linkless-untraced");
+        let file = dir.join("trash/one.jpg");
+        links_fail(1);
+
+        std::fs::write(&file, "one").unwrap();
+        assert_eq!(
+            send(&Fake::new(Stand::Deletes), &file).unwrap(),
+            Sent::Untraced
+        );
+
+        std::fs::create_dir_all(dir.join("bin")).unwrap();
+        let other = dir.join("bin/$Rother.jpg");
+        std::fs::write(&other, "another").unwrap();
+        let outside = dir.join("outside.jpg");
+        for said in [other.clone(), outside.clone()] {
+            std::fs::write(&file, "one").unwrap();
+            std::fs::copy(&file, &outside).unwrap();
+            let bin = Fake::new(Stand::Misplaces(dir.join("bin"), said));
+            assert_eq!(send(&bin, &file).unwrap(), Sent::Untraced);
+        }
+        assert_eq!(std::fs::read_to_string(&other).unwrap(), "another");
+        settles_to(&dir.join("bin"), &["$R1-one.jpg", "$Rother.jpg", "one.jpg"]);
+    }
+
+    #[test]
+    fn the_sink_lets_the_shell_delete_only_into_the_bin() {
+        let others = 0x1 | 0x400 | 0x2000;
+        for (flags, recycles) in [
+            (RECYCLES, true),
+            (RECYCLES | others, true),
+            (0, false),
+            (others, false),
+        ] {
+            let mut watch = Watch::default();
+            assert_eq!(watch.before_delete(flags), recycles, "{flags:#x}");
+            watch.after_delete(true, Some(PathBuf::from("bin/$R1.jpg")));
+            let outcome = watch.outcome(Ok(()), !recycles);
+            assert_eq!(
+                outcome.ok(),
+                recycles.then(|| Some(PathBuf::from("bin/$R1.jpg"))),
+                "{flags:#x}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_sink_says_where_the_file_went_only_when_the_shell_asked_first_and_it_went() {
+        let bin = || Some(PathBuf::from("bin/$R1.jpg"));
+        let asked = |deleted, newly: Option<PathBuf>| {
+            let mut watch = Watch::default();
+            assert!(watch.before_delete(RECYCLES));
+            watch.after_delete(deleted, newly);
+            watch
+        };
+        let went = |watch: Watch| watch.outcome(Ok(()), false).unwrap();
+        assert_eq!(went(asked(true, bin())), bin());
+        assert_eq!(went(asked(true, None)), None);
+        assert_eq!(went(asked(false, bin())), None);
+        assert!(asked(true, bin()).outcome(Ok(()), true).is_err());
+        let failed = Err(io::Error::other("failed"));
+        assert!(asked(true, bin()).outcome(failed, false).is_err());
+
+        let mut unasked = Watch::default();
+        unasked.after_delete(true, bin());
+        assert!(unasked.outcome(Ok(()), false).is_err());
+
+        let mut stopped = Watch::default();
+        assert!(!stopped.before_delete(0));
+        stopped.after_delete(true, bin());
+        assert!(stopped.outcome(Ok(()), false).is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn the_sink_reads_the_flag_the_shell_sets() {
+        use windows::Win32::UI::Shell::TSF_DELETE_RECYCLE_IF_POSSIBLE;
+        assert_eq!(RECYCLES, TSF_DELETE_RECYCLE_IF_POSSIBLE.0 as u32);
     }
 
     #[cfg(windows)]
@@ -1153,9 +1622,9 @@ pub(crate) mod tests {
         let dir = scratch("too-long");
         let trash = dir.join("trash");
         for (room, sent) in [(259, None), (260, Some(Sent::TooLong))] {
-            let name = format!("{}.jpg", "a".repeat(room - trash.as_os_str().len() - 5));
+            let name = format!("{}.jpg", "a".repeat(room - units(&trash) - 5));
             let file = trash.join(&name);
-            assert_eq!(file.as_os_str().len(), room);
+            assert_eq!(units(&file), room);
             std::fs::write(&file, "one").unwrap();
             let bin = Fake::new(Stand::Recycles(dir.join("bin")));
 
