@@ -4,7 +4,7 @@ import { render } from "vitest-browser-react";
 
 import { recording } from "../../dev/recording";
 import type { FolderNode } from "../../ipc/bindings/FolderNode";
-import { folderItems, undoLast } from "../../ipc/commands";
+import { folderItems, renameSource, undoLast } from "../../ipc/commands";
 import { Grid } from "../grid/Grid";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { Navigation } from "../navigation/Navigation";
@@ -86,6 +86,7 @@ async function inCairo(name: string) {
 beforeEach(async () => {
   // Whatever an earlier test did to the mock's library is taken back first.
   while (await undoLast()) {}
+  await renameSource(1, "Pictures");
   closeSettings();
   setFullScreen(false);
   showInPane(null);
@@ -343,39 +344,41 @@ test("Manage Sources opens Settings on Sources, and Remove Source opens it askin
 
 test("Rename makes the source's row a field: Escape and a blank keep the name, Enter and leaving rename", async () => {
   const screen = await render(<Harness />);
-  const source = screen.getByRole("treeitem", { name: "Pictures 1 of 6" });
-  const field = screen.getByRole("textbox", { name: "Rename Pictures" });
-  const rename = async () => {
-    const menu = await menuOn(screen, source, "Pictures");
+  const field = (name: string) => screen.getByRole("textbox", { name: `Rename ${name}` });
+  const rename = async (name: string) => {
+    const source = screen.getByRole("treeitem", { name: `${name} 1 of 6` });
+    const menu = await menuOn(screen, source, name);
     await menu.getByRole("menuitem", { name: "Rename" }).click();
-    await expect.element(field).toHaveFocus();
+    await expect.element(field(name)).toHaveFocus();
   };
   await recording(async (calls) => {
     const renames = () => calls.filter(([cmd]) => cmd === "rename_source");
 
-    await rename();
-    const input = field.element() as HTMLInputElement;
+    await rename("Pictures");
+    const input = field("Pictures").element() as HTMLInputElement;
     // The whole name is chosen, so typing replaces it.
     expect([input.selectionStart, input.selectionEnd]).toEqual([0, "Pictures".length]);
     await userEvent.keyboard("Holidays{Escape}");
-    await expect.element(field).not.toBeInTheDocument();
-    await expect.element(source).toHaveFocus();
+    await expect.element(field("Pictures")).not.toBeInTheDocument();
+    await expect.element(screen.getByRole("treeitem", { name: "Pictures 1 of 6" })).toHaveFocus();
 
-    await rename();
+    await rename("Pictures");
     await userEvent.keyboard("{Backspace}{Enter}");
-    await expect.element(field).not.toBeInTheDocument();
+    await expect.element(field("Pictures")).not.toBeInTheDocument();
     expect(renames()).toHaveLength(0);
 
-    await rename();
+    await rename("Pictures");
     await userEvent.keyboard("Holidays{Enter}");
-    await expect.element(field).not.toBeInTheDocument();
+    await expect.element(field("Pictures")).not.toBeInTheDocument();
     expect(renames()).toEqual([["rename_source", { id: 1, title: "Holidays" }]]);
+    await expect.element(screen.getByRole("treeitem", { name: "Holidays 1 of 6" })).toBeVisible();
 
-    await rename();
+    await rename("Holidays");
     await userEvent.keyboard("Summer");
     await screen.getByRole("button", { name: "pyramid.jpg" }).click();
-    await expect.element(field).not.toBeInTheDocument();
+    await expect.element(field("Holidays")).not.toBeInTheDocument();
     expect(renames().at(-1)).toEqual(["rename_source", { id: 1, title: "Summer" }]);
+    await expect.element(screen.getByRole("treeitem", { name: "Summer 1 of 6" })).toBeVisible();
   });
 });
 
