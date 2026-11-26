@@ -242,7 +242,7 @@ test("an offline source is shown from the index: its pill says offline, and noth
   const screen = await render(<Harness />);
   await showInPaneFrom(screen, "Archive offline", "Archive");
   const shown = pane(screen);
-  await expect.element(shown.getByText("Archive Is Offline")).toBeVisible();
+  await expect.element(shown.getByText("Archive is offline", { exact: true })).toBeVisible();
   await expect.element(shown.getByRole("button", { name: "Archive offline" })).toBeVisible();
   const bar = shown.getByRole("toolbar", { name: "Actions" });
   expect(bar.getByRole("button", { name: "Show in Explorer" }).query()).toBeNull();

@@ -137,7 +137,7 @@ test("the panel's baseline says what the library holds and weighs, grouped as Wi
   const foot = screen.getByRole("button", { name: LINE });
   await expect.element(foot).toBeVisible();
   expect(wordsOf(foot)).toBe(LINE);
-  await expect.element(foot).toHaveAttribute("title", "Library · what it holds");
+  await expect.element(foot).toHaveAttribute("title", "Library · Show Totals");
 });
 
 test("one file is a singular, and an empty library says nought without a size", async () => {
@@ -218,7 +218,9 @@ test("a source that is away is counted from the index, and the totals say which 
   expect(rowsOf(totals.element()).at(-1)).toEqual(["Sources", "3", "1 offline"]);
   await expect
     .element(
-      totals.getByText("Archive is offline · its 6,120 are counted from the last walk, 3 Oct 2025"),
+      totals.getByText(
+        "Archive is offline. Its 6,120 files are counted from the last walk, 3 Oct 2025.",
+      ),
     )
     .toBeVisible();
 });
@@ -240,7 +242,7 @@ test("two sources away under one name each keep their own note", async () => {
     await screen.getByRole("button", { name: LINE }).click();
     const totals = screen.getByRole("dialog", { name: "Library" });
     await expect.element(totals).toBeVisible();
-    expect(totals.getByText("Photos is offline").elements()).toHaveLength(2);
+    expect(totals.getByText("Photos is offline.").elements()).toHaveLength(2);
     expect(errors.mock.calls.flat().join(" ")).not.toMatch(/same key/);
   } finally {
     errors.mockRestore();

@@ -49,7 +49,8 @@ export function SortOrder() {
       />
       <GlyphButton
         glyph="reverse"
-        label={random ? "Reverse · a random order has no direction" : `Reverse · ${next}`}
+        label={random ? "Reverse · Not for Random" : `Reverse · ${next}`}
+        description={random ? "A random order has no direction." : undefined}
         disabled={random}
         onClick={() => reverse(kind)}
       />

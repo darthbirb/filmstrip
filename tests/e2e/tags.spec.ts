@@ -18,7 +18,7 @@ for (const width of [1440, 900, 640]) {
     await page.keyboard.type("trav");
     await page.keyboard.press("Enter");
     await settings.getByRole("button", { name: "Merge Tags" }).click();
-    const line = "Merged egypt into travel, on 3 files and 1 folder.";
+    const line = "Merged the tag egypt into travel on 3 files and 1 folder.";
     await expect(settings.getByText(line)).toBeVisible();
     await expect(settings.getByText("9 tags · 2 label keys")).toBeVisible();
 
@@ -27,7 +27,7 @@ for (const width of [1440, 900, 640]) {
     const foot = page.getByRole("navigation", { name: "Navigation" });
     await expect(foot.getByText(line)).toBeVisible();
     await page.keyboard.press("Control+z");
-    await expect(foot.getByText("egypt is back on 3 files and 1 folder.")).toBeVisible();
+    await expect(foot.getByText("The tag egypt is back on 3 files and 1 folder.")).toBeVisible();
     expect(errors).toEqual([]);
   });
 }

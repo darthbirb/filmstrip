@@ -1,4 +1,4 @@
-import { formatCount } from "../lib/format";
+import { Files, formatCount } from "../lib/format";
 import { Glyph } from "./Glyph";
 import type { GlyphName } from "./glyphs";
 
@@ -22,7 +22,7 @@ export function RailButton({ glyph, label, count, filled, selected, pressed, onC
       aria-label={label}
       aria-current={selected || undefined}
       aria-pressed={pressed}
-      title={count === undefined ? label : `${label} · ${formatCount(count)}`}
+      title={count === undefined ? label : `${label} · ${Files(count)}`}
       onClick={onClick}
       className={`focus-ring relative grid size-control shrink-0 place-items-center rounded-control text-icon transition-colors duration-(--motion-quick) motion-reduce:transition-none ${
         selected

@@ -138,7 +138,7 @@ function Baseline({ rail, anchor }: { rail: boolean; anchor: string }) {
         aria-expanded={open}
         aria-label={whole || "Library"}
         disabled={unopened !== null}
-        title={(rail || fit > 0) && whole ? whole : "Library · what it holds"}
+        title={(rail || fit > 0) && whole ? whole : "Library · Show Totals"}
         style={rail ? ({ anchorName: own } as CSSProperties) : undefined}
         className={`focus-ring-inset flex h-foot w-full items-center border-line border-t text-small transition-colors duration-(--motion-quick) motion-reduce:transition-none ${rail ? "justify-center" : "gap-2 px-2.5 text-left"} ${open ? "bg-raised text-fg-mid" : "text-fg-dim enabled:hover:bg-wash enabled:hover:text-fg-mid disabled:text-fg-faint"}`}
       >
@@ -213,11 +213,11 @@ function Totals({ totals, sources }: { totals: LibraryTotals; sources: readonly 
 /** A source that is away is still counted, from what the index last read of it. */
 function offlineNote(source: SourceSummary): TallyNote {
   const held = source.itemCount;
-  if (held === 0) return { key: source.id, text: `${source.title} is offline` };
+  if (held === 0) return { key: source.id, text: `${source.title} is offline.` };
   const when = source.indexedAt === null ? "" : `, ${midSentence(formatDate(source.indexedAt))}`;
   return {
     key: source.id,
-    text: `${source.title} is offline · its ${formatCount(held)} ${held === 1 ? "is" : "are"} counted from the last walk${when}`,
+    text: `${source.title} is offline. Its ${files(held)} ${held === 1 ? "is" : "are"} counted from the last walk${when}.`,
   };
 }
 

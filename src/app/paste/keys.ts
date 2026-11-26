@@ -29,11 +29,7 @@ export function usePasteKey() {
 export async function pasteHere() {
   const place = getPlace();
   if (place?.kind === "search") {
-    setNews({
-      kind: "keyRefused",
-      line: "Paste into a folder.",
-      detail: "A search holds no files of its own.",
-    });
+    setNews({ kind: "keyRefused", line: "Open a folder to paste into it." });
     return;
   }
   if (place?.kind === "trash") {

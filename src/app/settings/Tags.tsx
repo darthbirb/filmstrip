@@ -31,7 +31,7 @@ import { files, formatCount, formatCounted } from "../../lib/format";
 import { fold, labelTerm, tagTerm } from "../../lib/queryTerm";
 import { Button } from "../../ui/Button";
 import { Chip, KeyOnlyChip } from "../../ui/Chip";
-import { EmptyState } from "../../ui/EmptyState";
+import { EmptyState, NothingMatches } from "../../ui/EmptyState";
 import { FilterField } from "../../ui/FilterField";
 import { Glyph } from "../../ui/Glyph";
 import { Line } from "../../ui/Line";
@@ -825,7 +825,7 @@ export function Tags() {
           count={term ? `${formatCount(found)} of ${formatCount(total)}` : undefined}
         />
         {shownTags.length === 0 && shownKeys.length === 0 ? (
-          <EmptyState glyph="tag" title="No Tags Match" note={`“${filter.trim()}”`} />
+          <NothingMatches term={filter.trim()} />
         ) : (
           <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-auto">
             {shownTags.length > 0 && (

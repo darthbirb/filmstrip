@@ -181,7 +181,7 @@ test("a zoomed picture keeps the arrows for panning, and steps once it is back a
 
   // Below fit there is no room to pan, and the arrow is still the picture's.
   await userEvent.keyboard("-");
-  await expect.element(screen.getByRole("button", { name: /^Fit, from/ })).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: /^Zoom to Fit · / })).toBeVisible();
   await userEvent.keyboard(key);
   expect(getPaneItem()).toBe(pyramid);
   for (let notch = 0; notch < 10; notch++) await userEvent.keyboard("+");
@@ -190,7 +190,7 @@ test("a zoomed picture keeps the arrows for panning, and steps once it is back a
 
   await userEvent.keyboard("0");
   await expect
-    .poll(() => screen.getByRole("button", { name: /^Fit, from/ }).elements())
+    .poll(() => screen.getByRole("button", { name: /^Zoom to Fit · / }).elements())
     .toHaveLength(0);
   await userEvent.keyboard(key);
   await expect.poll(focused).toBe(next);

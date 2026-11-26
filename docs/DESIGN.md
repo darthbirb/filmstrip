@@ -548,7 +548,13 @@ Every label is Title Case: a button, a menu row, a tooltip, a segmented option, 
 a Settings row, a section's name and a caption. Each word is capitalised but *a an the and but or
 nor as at by for from in into of off on to up via with*, unless it opens or closes the label. A
 sentence stays a sentence, and so do a field's placeholder, a reason a file carries, a state word
-on a row ("offline", "current") and a name the person chose. Why something failed or stayed is its
+on a row or in an empty place ("offline", "current": "Archive is offline") and a name the person
+chose. A tooltip is a label and a short tail, "Reverse · Not for Random"; what the tail leaves out
+goes in the control's `aria-description`, a sentence. Every sentence at the foot ends with a full
+stop, the line after an act, a refusal, a failure and the library's notes alike. An act on the
+tags screen names the kind of term it touched: "Deleted the label key place from 640 files", "Renamed
+the tag dawn to first light on 38 files". A list a filter narrows to nothing says so one way,
+Nothing Matches “zebra”. Why something failed or stayed is its
 **Reason**, in every list's column and wherever it is said, never Error, and never the words the
 error came with. An ellipsis only where a choice or
 typing follows before anything happens, and figures for a count. One act has one name everywhere
@@ -560,6 +566,7 @@ there are several, the source's own name follows in `small` `fg-dim`; Settings �
 lists them by their own names. **Permanently** in a sentence ("Permanently delete pyramid.jpg,
 2 MB?"), never "for good"; Delete Permanently on a button. **Recycle Bin** in full, never "the
 bin", and a file emptied from it elsewhere is "Emptied from the Recycle Bin outside Filmstrip".
+Delete's line says where the file went: "Moved sphinx.jpg to the Recycle Bin."
 **Remove Key** takes a destination key off a folder, in its menu as in Settings › Keys. The tags
 screen's keys are **label keys** ("214 tags · 4 label keys", Rename Label Key…), so "key" alone
 is always a destination key. A paste and a drop that ask which sorting source both ask **Copy
@@ -813,7 +820,7 @@ toward the rest surface.
   direction, `sort-descending`, `sort-ascending` or `shuffle`, and its tooltip saying it in words,
   "Sort · Date Taken, Newest First". Beside it Reverse, a glyph button holding `arrows-down-up`
   whose tooltip names what a click gives, "Reverse · Oldest First"; while Random is the key it is
-  disabled in place, and Shuffle, "a new order", follows the keys in the menu. Narrower than
+  disabled in place, "Reverse · Not for Random", and Shuffle, "a new order", follows the keys in the menu. Narrower than
   `--container-header-narrow` the dropdown keeps its glyph alone too. The Trash has none.
 - **Tile.** The picture cropped to a `control`-cornered cell, over the hatch until its thumbnail
   exists. A `line-strong` ring under the pointer. The tile the pane shows carries an `in-pane`
@@ -906,10 +913,12 @@ toward the rest surface.
   `in-pane` ring, the rest sitting back at `--strip-rest` until the pointer is on one. The panel
   fades in over both ends, and a pill-shaped step floats on `veil` over each; at the first or last
   frame its step falls to `fg-faint`.
-- **Empty state.** A `glyph-large` glyph in `fg-faint` over a semibold Title Case line of `ui`.
+- **Empty state.** A `glyph-large` glyph in `fg-faint` over a semibold Title Case line of `ui`,
+  but for a state word, which keeps its own case: Archive is offline.
   One shape for every empty place, with its own glyph and its own words: a cleared Sorting Box, an
   emptied Trash, a folder of folders, an empty folder, an unreachable source, the pane with
-  nothing clicked or a file gone, and navigation when the index would not open, the `warning`
+  nothing clicked or a file gone, a list a filter narrows to nothing, the `search` glyph over
+  Nothing Matches “zebra”, and navigation when the index would not open, the `warning`
   glyph over Could Not Open the Index, why under it and Retry. A line under the title carries a
   count, a name, a path, a query or a reason — `small`, held to a `note` measure, a path in
   `--font-mono` — or there is no line; it never explains the app. Where there is one move worth offering it follows as `control`-tall

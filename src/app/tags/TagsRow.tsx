@@ -8,10 +8,13 @@ import { type Refusal, TagField } from "../../ui/TagField";
 import { failed, sayFailed } from "../failure";
 import { addToSearch, searchFor } from "../search/search";
 
+/** What the owner's own name says under the pointer, and what its tail leaves out. */
+export type NameTitle = { title: string; description: string };
+
 /** What a chip's tooltip says: whose it is when it comes from above, else what a click searches. */
-export function titleOf(tag: EffectiveTag, nameTitle?: string) {
+export function titleOf(tag: EffectiveTag, nameTitle?: NameTitle) {
   if (tag.from) return tag.name ? `The name of ${tag.from.title}` : `From ${tag.from.title}`;
-  if (tag.name && nameTitle) return nameTitle;
+  if (tag.name && nameTitle) return nameTitle.title;
   return tag.key ? `Search ${tag.key}: ${tag.value}` : `Search ${tag.value}`;
 }
 
@@ -34,8 +37,7 @@ export function takeOff(remove: () => Promise<unknown>, stops: () => HTMLElement
 
 type ChipsProps = {
   tags: EffectiveTag[];
-  /** What the owner's own name says under the pointer. */
-  nameTitle?: string;
+  nameTitle?: NameTitle;
   /** Takes off one of the owner's own; a name and what it inherits are never offered. */
   onRemove?: (tag: EffectiveTag) => void;
   /** The tag a value being typed repeats. */
@@ -56,6 +58,7 @@ export function Chips({ tags, nameTitle, onRemove, echo = null }: ChipsProps) {
         name={tag.name}
         echoed={tag.tagId === echo}
         title={titleOf(tag, nameTitle)}
+        description={tag.name && !tag.from ? nameTitle?.description : undefined}
         onSearch={(adding) => void (adding ? addToSearch(term) : searchFor(term))}
         onRemove={own && onRemove ? () => onRemove(tag) : undefined}
       />
@@ -68,7 +71,7 @@ type TagsRowProps = {
   owner: string;
   /** Its tags, never its labels: its own first, then what it inherits. */
   tags: EffectiveTag[];
-  nameTitle?: string;
+  nameTitle?: NameTitle;
   /** Resolve once the change is made; what the owner carries is read again after, unawaited. */
   onAdd: (value: string) => Promise<void>;
   onRemove: (tagId: number) => Promise<void>;

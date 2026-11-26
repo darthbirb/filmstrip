@@ -19,10 +19,10 @@ const sentence = (said: Said) =>
 test("the question names how many and how much, and that only these go, permanently", () => {
   const size = formatBytes(18_400_000_000);
   expect(sentence(emptyQuestion({ count: 312, bytes: 18_400_000_000 }))).toBe(
-    `Permanently delete the 312 files the library sent to the Recycle Bin, ${size}? Only these go; the rest of the Recycle Bin is left as it is. Undo cannot bring them back.`,
+    `Permanently delete the 312 files the library sent to the Recycle Bin, ${size}? The rest of the Recycle Bin stays. Undo cannot bring them back.`,
   );
   expect(sentence(emptyQuestion({ count: 1, bytes: 2_400_000 }))).toBe(
-    `Permanently delete the file the library sent to the Recycle Bin, ${formatBytes(2_400_000)}? Only it goes; the rest of the Recycle Bin is left as it is. Undo cannot bring it back.`,
+    `Permanently delete the file the library sent to the Recycle Bin, ${formatBytes(2_400_000)}? The rest of the Recycle Bin stays. Undo cannot bring it back.`,
   );
   expect(emptyQuestion({ count: 312, bytes: 1 })[1]).toEqual({ term: "312 files" });
 });

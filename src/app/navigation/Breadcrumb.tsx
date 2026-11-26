@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-import { formatBytes, formatCount } from "../../lib/format";
+import { files, formatBytes, formatCount } from "../../lib/format";
 import { countWords } from "../../ui/Count";
 import { Glyph } from "../../ui/Glyph";
 import { setBandOpen, useBandOpen } from "../grid/folder-detail";
@@ -30,7 +30,7 @@ function PlainHeader({ place }: { place: Place & { kind: "sorting" | "trash" } }
   const offline = place.kind === "sorting" && away.length > 0 && `${away.join(", ")} offline`;
   const count =
     place.kind === "trash"
-      ? trash && trash.count > 0 && `${formatCount(trash.count)} · ${formatBytes(trash.bytes)}`
+      ? trash && trash.count > 0 && `${files(trash.count)} · ${formatBytes(trash.bytes)}`
       : waiting > 0 && `${formatCount(waiting)} waiting`;
   return (
     <nav aria-label="Location" className="flex min-w-0 flex-1 items-center gap-1.5 pl-3">

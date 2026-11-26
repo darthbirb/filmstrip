@@ -73,7 +73,7 @@ test("its question counts the files and their space, keeps the rest of the bin, 
   await expect
     .element(
       screen.getByText(
-        `Permanently delete the 2 files the library sent to the Recycle Bin, ${formatBytes(4_800_000)}? Only these go; the rest of the Recycle Bin is left as it is. Undo cannot bring them back.`,
+        `Permanently delete the 2 files the library sent to the Recycle Bin, ${formatBytes(4_800_000)}? The rest of the Recycle Bin stays. Undo cannot bring them back.`,
       ),
     )
     .toBeVisible();

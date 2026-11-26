@@ -148,7 +148,7 @@ export function useZoom(area: RefObject<HTMLElement | null>, image: Size | null,
 export function ZoomPlate({ percent, onFit }: { percent: number; onFit: () => void }) {
   return (
     <PlateButton
-      label={`Fit, from ${percent}%`}
+      label={`Zoom to Fit · ${percent}% Now`}
       onClick={onFit}
       className="group/plate absolute bottom-tile-inset left-tile-inset"
     >

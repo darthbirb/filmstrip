@@ -63,7 +63,7 @@ const REMOVE_TAG: Act = { kind: "removeTag", tag: "felucca" };
 test("each act's line, and the line after undoing it, read as Artboards › Undo's table does", () => {
   const rows: [Act, number, string, string][] = [
     [MOVE, 3, "Moved 3 files to Cairo.", "3 files are back in Trips."],
-    [DELETE, 5, "Deleted 5 files.", "5 files are back in Cairo."],
+    [DELETE, 5, "Moved 5 files to the Recycle Bin.", "5 files are back in Cairo."],
     [RENAME, 0, "Renamed Lisbon to Lisboa.", "Lisboa is Lisbon again."],
     [CREATE, 0, "Created Egypt in Trips.", "Egypt is gone from Trips."],
     [
@@ -80,7 +80,7 @@ test("each act's line, and the line after undoing it, read as Artboards › Undo
       "Lisbon and its 214 files are back in Trips.",
     ],
     [EMPTY, 0, "Deleted Egypt.", "Egypt is back in Trips."],
-    [ADD_TAG, 5, "Added upper east side to 5 files.", "upper east side is off 5 files again."],
+    [ADD_TAG, 5, "Added upper east side to 5 files.", "Removed upper east side from 5 files."],
     [REMOVE_TAG, 3120, "Took felucca off 3,120 files.", "felucca is back on 3,120 files."],
   ];
   for (const [act, files, after, back] of rows) {
@@ -93,7 +93,9 @@ test("an act that finished in part says so, and one file is named rather than co
   expect(actLine(batch(MOVE, 3), 2)).toBe(
     "Moved 3 of 5 files to Cairo. The other 2 are in the banner.",
   );
-  expect(actLine(batch(DELETE, 3), 2)).toBe("Deleted 3 of 5 files. The other 2 are in the banner.");
+  expect(actLine(batch(DELETE, 3), 2)).toBe(
+    "Moved 3 of 5 files to the Recycle Bin. The other 2 are in the banner.",
+  );
   const one: Act = { kind: "move", from: "Trips", to: "Cairo", one: "pyramid.jpg" };
   expect(actLine(batch(one, 1))).toBe("Moved pyramid.jpg to Cairo.");
   expect(undoneLine(undone(one, 1))).toBe("pyramid.jpg is back in Trips.");
@@ -114,9 +116,11 @@ test("an undo that came back in part is counted, and one where none did is turne
 
 test("a verb's own banner counts what went, or says none did", () => {
   expect(movedBannerLine(3, 5, "Cairo")).toBe("3 of 5 files moved to Cairo");
-  expect(deletedBannerLine(3, 5)).toBe("3 of 5 files went to the Trash");
-  expect(deletedBannerLine(0, 5)).toBe("The 5 files could not go to the Trash");
-  expect(deletedBannerLine(0, 1, "IMG_0031.jpg")).toBe("IMG_0031.jpg could not go to the Trash");
+  expect(deletedBannerLine(3, 5)).toBe("3 of 5 files went to the Recycle Bin");
+  expect(deletedBannerLine(0, 5)).toBe("The 5 files could not go to the Recycle Bin");
+  expect(deletedBannerLine(0, 1, "IMG_0031.jpg")).toBe(
+    "IMG_0031.jpg could not go to the Recycle Bin",
+  );
 });
 
 test("each reason is said in the banner's own words", () => {
@@ -210,16 +214,16 @@ test("what the foot says when the Recycle Bin would not take what Delete sent it
     "The Recycle Bin would not take MVI_0412.mov, so it stays in Cairo.",
   );
   expect(binRefusedLine(one, 4)).toBe(
-    "Deleted 4 of 5 files. The Recycle Bin would not take MVI_0412.mov, so it stays in Cairo.",
+    "Moved 4 of 5 files to the Recycle Bin. It would not take MVI_0412.mov, so it stays in Cairo.",
   );
   expect(binRefusedLine(one, 4, 2)).toBe(
-    "Deleted 4 of 7 files. The Recycle Bin would not take MVI_0412.mov, so it stays in Cairo.",
+    "Moved 4 of 7 files to the Recycle Bin. It would not take MVI_0412.mov, so it stays in Cairo.",
   );
   expect(binRefusedLine(two)).toBe(
     "The Recycle Bin would not take 2 files, so they stay in Cairo.",
   );
   expect(binRefusedLine([refused("a.mov"), refused("b.mov", "Lisbon")], 1)).toBe(
-    "Deleted 1 of 3 files. The Recycle Bin would not take 2 files, so they stay where they were.",
+    "Moved 1 of 3 files to the Recycle Bin. It would not take 2 files, so they stay where they were.",
   );
   expect(binRefusedDetail(1)).toBe(
     "It may be too large for the Recycle Bin, or the Recycle Bin is turned off. Nothing was deleted.",
@@ -362,7 +366,7 @@ test("a folder's delete asks, and says what went when the folder stayed, as the 
     "Moved 211 of Lisbon’s 214 files to Inbox. Lisbon is in the banner.",
   );
   expect(folderStayedLine("Trips", 5, 5, null)).toBe(
-    "Deleted Trips’ 5 files. Trips is in the banner.",
+    "Moved Trips’ 5 files to the Recycle Bin. Trips is in the banner.",
   );
   expect(folderStayedBanner("Lisbon", 214, 214, "Inbox")).toBe(
     "Lisbon could not go · its 214 files are in Inbox",
@@ -402,37 +406,43 @@ test("an act on the tags screen says what it touched, and undoing it puts the te
       retag({ kind: "mergeTags", from: "dawn", into: "golden hour" }),
       38,
       2,
-      "Merged dawn into golden hour, on 38 files and 2 folders.",
-      "dawn is back on 38 files and 2 folders.",
+      "Merged the tag dawn into golden hour on 38 files and 2 folders.",
+      "The tag dawn is back on 38 files and 2 folders.",
     ],
     [
       retag({ kind: "renameTag", from: "dawn", to: "first light" }),
       38,
       0,
-      "Renamed dawn to first light, on 38 files.",
-      "first light is dawn again.",
+      "Renamed the tag dawn to first light on 38 files.",
+      "The tag first light is dawn again.",
     ],
-    [retag({ kind: "deleteTag", tag: "winter" }), 0, 0, "Deleted winter.", "winter is back."],
+    [
+      retag({ kind: "deleteTag", tag: "winter" }),
+      0,
+      0,
+      "Deleted the tag winter.",
+      "The tag winter is back.",
+    ],
     [
       retag({ kind: "deleteKey", key: "place" }),
       640,
       2,
-      "Deleted place, from 640 files and 2 folders.",
-      "place is back on 640 files and 2 folders.",
+      "Deleted the label key place from 640 files and 2 folders.",
+      "The label key place is back on 640 files and 2 folders.",
     ],
     [
       retag({ kind: "mergeValues", key: "trip", from: "nile 2019", into: "egypt 2024" }),
       310,
       1,
-      "Merged trip: nile 2019 into trip: egypt 2024, on 310 files and 1 folder.",
-      "trip: nile 2019 is back on 310 files and 1 folder.",
+      "Merged the label trip: nile 2019 into trip: egypt 2024 on 310 files and 1 folder.",
+      "The label trip: nile 2019 is back on 310 files and 1 folder.",
     ],
     [
       retag({ kind: "renameValue", key: "trip", from: "nile 2019", to: "nile 2020" }),
       310,
       1,
-      "Renamed trip: nile 2019 to trip: nile 2020, on 310 files and 1 folder.",
-      "trip: nile 2020 is trip: nile 2019 again.",
+      "Renamed the label trip: nile 2019 to trip: nile 2020 on 310 files and 1 folder.",
+      "The label trip: nile 2020 is trip: nile 2019 again.",
     ],
   ];
   for (const [act, files, folders, line, back] of rows) {
@@ -442,6 +452,18 @@ test("an act on the tags screen says what it touched, and undoing it puts the te
       back,
     );
   }
+});
+
+test("a label key's lines name it as a label key, never a key alone", () => {
+  const renamed: Act = { kind: "retag", change: { kind: "renameKey", from: "place", to: "where" } };
+  expect(actLine(batch(renamed, 12, 0))).toBe("Renamed the label key place to where on 12 files.");
+  expect(undoneLine(undone(renamed, 12))).toBe("The label key where is place again.");
+  const merged: Act = {
+    kind: "retag",
+    change: { kind: "mergeKeys", from: "place", into: "where" },
+  };
+  expect(actLine(batch(merged, 0, 0))).toBe("Merged the label key place into where.");
+  expect(undoBannerLine(undone(merged, 0, 0))).toBe("The label key place could not come back");
 });
 
 test("a copy's lines read as Artboards › Bringing files in has them", () => {
@@ -560,7 +582,7 @@ test("what went permanently is said with no Undo, and what would not go is named
     "Deleted 3 of Trips’ 4 files, 2 of them permanently. Trips is in the banner.",
   );
   expect(folderKeptLine("Trips", 1, 0, 4)).toBe(
-    "Deleted 1 of Trips’ 4 files. Trips is in the banner.",
+    "Moved 1 of Trips’ 4 files to the Recycle Bin. Trips is in the banner.",
   );
   expect(folderKeptLine("Lisbon", 0, 0, 1)).toBeNull();
   expect(folderKeptBanner("Lisbon", 0, 213, 214)).toBe(

@@ -133,7 +133,9 @@ test("in a mixed set the rest go to the Recycle Bin with Undo, and only the othe
     )
     .toBeVisible();
   await expect
-    .element(screen.getByText("Deleted 1 of 3 files. The other 2 are in the banner."))
+    .element(
+      screen.getByText("Moved 1 of 3 files to the Recycle Bin. The other 2 are in the banner."),
+    )
     .toBeVisible();
   await expect.element(screen.getByText("On USB Drive (E:)")).toBeVisible();
   await expect.element(screen.getByText("pyramid.jpg", { exact: true })).toBeVisible();
@@ -219,7 +221,7 @@ test("a folder none of whose files would go keeps them, and the foot keeps the a
   );
   const screen = await render(<Harness />);
   await deleteFiles([felucca as number]);
-  await expect.element(screen.getByText("Deleted felucca.mp4.")).toBeVisible();
+  await expect.element(screen.getByText("Moved felucca.mp4 to the Recycle Bin.")).toBeVisible();
   const before = getNews();
   onDriveWithoutBin([pyramid as number, sphinx as number], "USB Drive (E:)");
   refuseDeleting([pyramid as number, sphinx as number]);
@@ -230,9 +232,9 @@ test("a folder none of whose files would go keeps them, and the foot keeps the a
     .poll(() => getReport()?.sentence)
     .toBe("Cairo’s 2 files could not be deleted · Cairo stayed");
   expect(getNews()).toEqual(before);
-  await expect.element(screen.getByText("Deleted felucca.mp4.")).toBeVisible();
+  await expect.element(screen.getByText("Moved felucca.mp4 to the Recycle Bin.")).toBeVisible();
   await expect.element(screen.getByRole("button", { name: "Undo" })).toBeVisible();
-  expect(screen.getByText(/^Deleted 0 of/).query()).toBeNull();
+  expect(screen.getByText(/^Moved 0 of/).query()).toBeNull();
   expect(await names()).toEqual(["pyramid.jpg", "sphinx.jpg"]);
 });
 

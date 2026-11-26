@@ -113,7 +113,10 @@ test("the band reads in the pane's rhythm: status, labels, then tags, its own na
     "travel",
   ]);
   const titled = (title: string) => withoutGlyphs(screen.getByTitle(title).element().textContent);
-  expect(titled("The folder’s name · changes only when the folder is renamed")).toBe("cairo");
+  expect(titled("Folder Name · Rename to Change")).toBe("cairo");
+  await expect
+    .element(screen.getByTitle("Folder Name · Rename to Change", { exact: true }))
+    .toHaveAttribute("aria-description", "Only renaming the folder changes it.");
   expect(titled("The name of Trips")).toBe("trips");
   await expect.element(screen.getByTitle("From Trips").first()).toBeVisible();
 });
@@ -300,7 +303,10 @@ test("a tag that could not be added is typed in the field again, and the foot sa
 test("the pencil picks a cover from the branch, the first standing in until one is chosen", async () => {
   const screen = await renderHeader(CAIRO);
   await details(screen).click();
-  const pencil = screen.getByRole("button", { name: "Choose Cover · now the first picture" });
+  const pencil = screen.getByRole("button", { name: "Choose Cover · First Picture Now" });
+  await expect
+    .element(pencil)
+    .toHaveAttribute("aria-description", "Until one is chosen, the first picture is the cover.");
   await pencil.click();
   const picker = screen.getByRole("listbox", { name: "Cover for Cairo" });
   await expect.element(picker).toBeVisible();
@@ -529,8 +535,8 @@ test("a folder with nothing in it, or a drive that is away, has no pencil", asyn
 
   setPlace(folderAt(3, ARCHIVE));
   await expect
-    .element(screen.getByTitle("Archive is offline · its pictures are on the drive"))
-    .toBeVisible();
+    .element(screen.getByRole("img", { name: "No Cover · Drive Offline" }))
+    .toHaveAttribute("aria-description", "Archive is offline. Its pictures are on the drive.");
   expect(screen.getByRole("button", { name: /Cover/ }).elements()).toHaveLength(0);
 });
 
@@ -544,12 +550,11 @@ test("a source's own band has no steps back, its path is its folder, and nothing
   await expect.poll(() => row(screen.container, "Path")?.textContent).toBe("D:\\Pictures");
   expect(chipTexts(row(screen.container, "Tags"))).toEqual(["pictures"]);
   await expect
-    .element(
-      screen.getByTitle(
-        "The source’s name · changes when the source is renamed in Settings or on its row",
-      ),
-    )
-    .toBeVisible();
+    .element(screen.getByTitle("Source Name · Rename to Change", { exact: true }))
+    .toHaveAttribute(
+      "aria-description",
+      "Only renaming the source, in Settings or on its row, changes it.",
+    );
 });
 
 test("an offline source says so in place of its counts, and its band says when it was read", async () => {
@@ -558,14 +563,14 @@ test("an offline source says so in place of its counts, and its band says when i
   expect(screen.getByText(/ here · /).elements()).toHaveLength(0);
   await details(screen).click();
   await expect
-    .element(screen.getByTitle("Archive is offline · its pictures are on the drive"))
-    .toBeInTheDocument();
+    .element(screen.getByRole("img", { name: "No Cover · Drive Offline" }))
+    .toHaveAttribute("aria-description", "Archive is offline. Its pictures are on the drive.");
   expect(row(screen.container, "Path")?.textContent).toMatch(/^E:\\Archivelast indexed 4 Mar\b/);
 
   setPlace(folderAt(3, ARCHIVE, { id: 7, title: "Scans" }));
   await expect
-    .element(screen.getByTitle("Scans is on Archive, which is offline"))
-    .toBeInTheDocument();
+    .element(screen.getByRole("img", { name: "No Cover · Drive Offline" }))
+    .toHaveAttribute("aria-description", "Scans is on Archive, which is offline.");
   await expect
     .poll(() => row(screen.container, "Path")?.textContent)
     .toMatch(/^E:\\Archive\\Scanslast indexed/);

@@ -66,9 +66,9 @@ test("a source that cannot be reached says so, not that it is empty", async () =
   const screen = await render(
     <EmptyPlace place={{ kind: "folder", sourceId: 3, path: [{ id: 3, title: "Archive" }] }} />,
   );
-  await expect.element(screen.getByText("Archive Is Offline")).toBeVisible();
+  await expect.element(screen.getByText("Archive is offline", { exact: true })).toBeVisible();
   expect(lines(screen.container)).toEqual([
-    "Archive Is Offline",
+    "Archive is offline",
     expect.stringMatching(/^[\d,]+ files when last indexed\.$/),
   ]);
 });
@@ -76,12 +76,12 @@ test("a source that cannot be reached says so, not that it is empty", async () =
 test("an offline place counts its files, one of them singular", async () => {
   const source = { id: 3, title: "Archive" } as SourceSummary;
   const one = await render(<OfflinePlace source={source} held={{ count: 1 }} />);
-  expect(lines(one.container)).toEqual(["Archive Is Offline", "1 file when last indexed."]);
+  expect(lines(one.container)).toEqual(["Archive is offline", "1 file when last indexed."]);
   await one.unmount();
 
   const many = await render(<OfflinePlace source={source} held={{ count: 1204, in: "Trips" }} />);
   expect(lines(many.container)).toEqual([
-    "Archive Is Offline",
+    "Archive is offline",
     `${(1204).toLocaleString()} files in Trips when last indexed.`,
   ]);
 });

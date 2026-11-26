@@ -4,7 +4,7 @@ import { render } from "vitest-browser-react";
 
 import { recording } from "../../dev/recording";
 import { clipboardFiles, copyItems, folderItems, listSources, undoLast } from "../../ipc/commands";
-import { setNews } from "../navigation/foot-slot";
+import { getNews, setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { Navigation } from "../navigation/Navigation";
 import { openFolders, setOpenFolders } from "../navigation/open-folders";
@@ -129,4 +129,11 @@ test("with several sorting sources Ctrl+V in the Sorting Box asks which, in the 
     },
     (cmd) => (cmd === "list_sources" ? [...every, cards] : undefined),
   );
+});
+
+test("Ctrl+V in a search says to open a folder, in one sentence", async () => {
+  await copyCover();
+  setPlace({ kind: "search", query: "cairo", back: null });
+  await pasteHere();
+  expect(getNews()).toEqual({ kind: "keyRefused", line: "Open a folder to paste into it." });
 });

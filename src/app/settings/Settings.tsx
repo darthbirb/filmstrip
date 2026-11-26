@@ -2,6 +2,7 @@ import { Fragment, type ReactNode, useLayoutEffect, useRef, useState } from "rea
 
 import { Band } from "../../ui/Band";
 import { Dropdown } from "../../ui/Dropdown";
+import { NothingMatches } from "../../ui/EmptyState";
 import { Glyph } from "../../ui/Glyph";
 import { GlyphButton } from "../../ui/GlyphButton";
 import type { GlyphName } from "../../ui/glyphs";
@@ -262,7 +263,7 @@ function Body({ onClose, section, asking }: Omit<Props, "open">) {
                 {shown.body ?? <Rows rows={shown.rows} />}
               </section>
             ) : (
-              <p className="m-0 text-fg-dim text-ui">No setting matches “{query.trim()}”.</p>
+              <NothingMatches term={query.trim()} />
             )}
           </div>
           <Failed />

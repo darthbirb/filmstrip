@@ -136,7 +136,9 @@ test("the filter narrows Settings to the rows that match, and says when none do"
   expect(screen.getByText("Interface Size", { exact: true }).elements()).toHaveLength(0);
 
   await filter.fill("nothing like it");
-  await expect.element(screen.getByText(/No setting matches/)).toBeVisible();
+  await expect
+    .element(screen.getByText("Nothing Matches “nothing like it”", { exact: true }))
+    .toBeVisible();
   expect(screen.getByRole("button", { name: "Appearance" }).elements()).toHaveLength(0);
 });
 

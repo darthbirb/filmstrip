@@ -108,7 +108,7 @@ test("with nothing checked Delete sends the pane's file, and the pane moves on",
   const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
   showInPane(pyramid, CAIRO);
   await userEvent.keyboard("{Delete}");
-  await expect.element(at.foot.getByText("Deleted pyramid.jpg.")).toBeVisible();
+  await expect.element(at.foot.getByText("Moved pyramid.jpg to the Recycle Bin.")).toBeVisible();
   await expect.poll(getPaneItem).toBe(sphinx);
 });
 
@@ -216,7 +216,7 @@ test("a trashed file is left alone by the keys, as the Trash's bar has only Rest
   const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
   showInPane(sphinx, CAIRO);
   await userEvent.keyboard("{Delete}");
-  await expect.element(at.foot.getByText("Deleted sphinx.jpg.")).toBeVisible();
+  await expect.element(at.foot.getByText("Moved sphinx.jpg to the Recycle Bin.")).toBeVisible();
   setPlace({ kind: "trash" });
   showInPane(sphinx, { kind: "trash" });
   await recording(async (calls) => {
