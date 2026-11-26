@@ -30,7 +30,7 @@ a folder with its tree; a name already taken there is reported and left out. The
 background with a Cancel, and one Undo sends everything it brought in to the trash. On a drive
 with no Recycle Bin, a USB stick, an SD card or a network share, there is no trash to send it to:
 the Undo leaves it where it is, the banner names the drive, and the next Ctrl+Z undoes the act
-before. Restore to… into a folder on such a drive is undone the same way.
+before. Undoing Restore to… into a folder on such a drive leaves the file there the same way.
 
 A folder's branch, or any checked files, can be **exported as one zip**. Windows' save dialog says
 where, and the files keep their own names or are named from their folders and when each was
