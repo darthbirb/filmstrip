@@ -67,7 +67,7 @@ test("a search's folders stand before its files, each under its heading, and a c
   await expect.element(files).toBeVisible();
   const card = screen.getByRole("button", { name: /^Cairo/ });
   await expect.element(card).toHaveAttribute("title", "Open Cairo");
-  await expect.element(card.getByText("in Pictures / Trips")).toBeVisible();
+  await expect.element(card.getByText("in Pictures › Trips")).toBeVisible();
   await expect.element(card.getByText("Name Cairo", { exact: true })).toBeVisible();
   // Its count is navigation's: its own files, then all of it.
   expect(card.element().querySelector(".rounded-badge [aria-hidden]")?.textContent).toBe("3/3");
@@ -142,7 +142,7 @@ test("the header names the search by its terms, counts what it found, and goes b
   const screen = await renderPlace();
   const header = screen.getByRole("heading", { level: 2 });
   await expect.element(header.getByText("1 folder · 3 files", { exact: true })).toBeVisible();
-  const scope = header.getByTitle("Pictures / Trips");
+  const scope = header.getByTitle("Pictures › Trips");
   await expect.element(scope).toBeVisible();
   expect(withoutGlyphs(scope.element().textContent)).toBe("Trips");
   await expect.element(header.getByText("cairo", { exact: true })).toBeVisible();

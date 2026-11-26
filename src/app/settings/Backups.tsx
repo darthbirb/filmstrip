@@ -254,7 +254,7 @@ export function Backups() {
               {pending !== null && (
                 <BackupRow
                   when={formatWhen(pending)}
-                  how="backing up…"
+                  how="Backing up…"
                   size={<Bar percent={0} />}
                 />
               )}

@@ -13,6 +13,7 @@ use crate::db::journal::{
     Gone, ItemCopied, ItemMoved, ItemRenamed, ItemRestored, ItemTrashed, ItemsTagged,
     ItemsUntagged, Retagged,
 };
+use crate::db::sources::{self, SORTING_BOX, SourceKind};
 use crate::db::{folders, items};
 use crate::error::{AppError, Result};
 
@@ -303,12 +304,19 @@ fn copy_act(
     })
 }
 
-/// A folder as navigation names it: a source's own folder goes by the source's title.
+/// A folder as navigation names it: a source's own folder goes by the source's title, and a
+/// sorting source's by the Sorting Box it is shown in.
 pub(crate) fn name(conn: &Connection, folder_id: i64) -> Result<String> {
-    Ok(folders::ancestry(conn, folder_id)?
-        .pop()
-        .map(|crumb| crumb.title)
-        .unwrap_or_default())
+    let mut crumbs = folders::ancestry(conn, folder_id)?;
+    if crumbs.len() == 1 {
+        let location = folders::location(conn, folder_id)?;
+        if sources::get(conn, location.source_id)?
+            .is_some_and(|source| source.kind == SourceKind::Sorting)
+        {
+            return Ok(SORTING_BOX.to_owned());
+        }
+    }
+    Ok(crumbs.pop().map(|crumb| crumb.title).unwrap_or_default())
 }
 
 fn parent_name(conn: &Connection, folder_id: i64) -> Result<String> {

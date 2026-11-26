@@ -52,7 +52,7 @@ test("at rest it is the word Search; Ctrl+F puts the caret in it and offers wher
   await expect.element(field()).toHaveFocus();
   await expect.element(offer()).toBeVisible();
   expect(withoutGlyphs(offer().element().textContent)).toBe("in Trips");
-  expect(screen.getByTitle("Pictures / Trips").elements()).toHaveLength(0);
+  expect(screen.getByTitle("Pictures › Trips").elements()).toHaveLength(0);
   expect(screen.getByText("Search", { exact: true }).elements()).toHaveLength(0);
 });
 
@@ -60,7 +60,7 @@ test("Tab takes the offer as the first term, and removing that term offers it ag
   const screen = await render(<Bar />);
   await field().click();
   await userEvent.keyboard("giza{Tab}");
-  const scope = screen.getByTitle("Pictures / Trips");
+  const scope = screen.getByTitle("Pictures › Trips");
   await expect.element(scope).toBeVisible();
   await expect.element(field()).toHaveFocus();
   expect(offer().elements()).toHaveLength(0);
@@ -70,7 +70,7 @@ test("Tab takes the offer as the first term, and removing that term offers it ag
   setPlace(TRIPS);
   await field().click();
   await offer().click();
-  await expect.element(screen.getByTitle("Pictures / Trips")).toBeVisible();
+  await expect.element(screen.getByTitle("Pictures › Trips")).toBeVisible();
   await expect.element(field()).toHaveFocus();
   await screen.getByRole("button", { name: "Remove path:Pictures/Trips" }).click();
   await expect.element(offer()).toBeVisible();
@@ -135,7 +135,7 @@ test("a query that does not read runs nothing and says which character, until Es
 test("standing in results, the field holds the query that made them", async () => {
   setPlace({ kind: "search", query: "path:Pictures/Trips cairo", back: TRIPS });
   const screen = await render(<Bar />);
-  await expect.element(screen.getByTitle("Pictures / Trips")).toBeVisible();
+  await expect.element(screen.getByTitle("Pictures › Trips")).toBeVisible();
   await expect.element(field()).toHaveValue("cairo");
   setPlace(TRIPS);
   await expect.element(screen.getByText("Search", { exact: true })).toBeVisible();
@@ -158,15 +158,15 @@ test("Search in Folder writes that folder as the scope, keeps the words, and run
   await userEvent.keyboard("{ArrowRight}");
   await field().click();
   await userEvent.keyboard("giza{Tab}");
-  await expect.element(screen.getByTitle("Pictures / Trips")).toBeVisible();
+  await expect.element(screen.getByTitle("Pictures › Trips")).toBeVisible();
 
   // A right-click opens the folder's menu without going there.
   await screen.getByRole("treeitem", { name: "Cairo 3 of 3" }).click({ button: "right" });
   await page.getByRole("menuitem", { name: "Search in Folder" }).click();
 
   // The folder took the scope's place; the words stayed, the caret is in the field, nothing ran.
-  await expect.element(screen.getByTitle("Pictures / Trips / Cairo")).toBeVisible();
-  expect(screen.getByTitle("Pictures / Trips", { exact: true }).elements()).toHaveLength(0);
+  await expect.element(screen.getByTitle("Pictures › Trips › Cairo")).toBeVisible();
+  expect(screen.getByTitle("Pictures › Trips", { exact: true }).elements()).toHaveLength(0);
   await expect.element(field()).toHaveFocus();
   await expect.element(field()).toHaveValue("giza");
   expect(getPlace()?.kind).toBe("folder");

@@ -84,7 +84,7 @@ function InLibrary({ item }: { item: ItemDetail }) {
     },
     {
       id: "copy-path",
-      label: "Copy Path",
+      label: "Copy as Path",
       glyph: "copy",
       menuOnly: true,
       run: () => void copyItemPaths([item.id]).catch(failed(pathsFailed([item]))),

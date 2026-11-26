@@ -91,14 +91,22 @@ pub async fn list_sources(state: State<'_, AppState>) -> Result<Vec<SourceSummar
     run(&state, source_summaries).await
 }
 
+/// What the system's pickers are titled, and the zip filter's name, in Windows' own words.
+const ADD_SOURCE: &str = "Add Source";
+const EXPORT_TO_ZIP: &str = "Export to Zip";
+const ZIP_FILES: &str = "Zip files (*.zip)";
+
 /// The system's own picker, which the app adds no step of its own to. `None` is a
 /// cancelled picker, which is not an error and is not reported.
 #[tauri::command]
 pub async fn pick_folder(app: AppHandle) -> Result<Option<String>> {
     let (tx, rx) = std::sync::mpsc::channel();
-    app.dialog().file().pick_folder(move |picked| {
-        let _ = tx.send(picked);
-    });
+    app.dialog()
+        .file()
+        .set_title(ADD_SOURCE)
+        .pick_folder(move |picked| {
+            let _ = tx.send(picked);
+        });
     let picked = tauri::async_runtime::spawn_blocking(move || rx.recv())
         .await?
         .map_err(AppError::invalid)?;
@@ -618,8 +626,9 @@ pub async fn pick_export_zip(app: AppHandle, name: String, dir: Option<String>) 
     let mut dialog = app
         .dialog()
         .file()
+        .set_title(EXPORT_TO_ZIP)
         .set_file_name(sanitize::file_name(&format!("{name}.zip")))
-        .add_filter("Zip", &["zip"]);
+        .add_filter(ZIP_FILES, &["zip"]);
     if let Some(start) = start {
         dialog = dialog.set_directory(start);
     }
@@ -1811,6 +1820,14 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    #[test]
+    fn the_system_pickers_are_titled_by_their_act_and_the_filter_names_its_pattern() {
+        assert_eq!(
+            [ADD_SOURCE, EXPORT_TO_ZIP, ZIP_FILES],
+            ["Add Source", "Export to Zip", "Zip files (*.zip)"]
+        );
     }
 
     #[test]

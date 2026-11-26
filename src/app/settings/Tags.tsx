@@ -168,7 +168,7 @@ export function Tags() {
   const values = keys.reduce((sum, key) => sum + key.values.length, 0);
   const headCount = [
     formatCounted(tags.length, "tag"),
-    ...(keys.length > 0 ? [formatCounted(keys.length, "key")] : []),
+    ...(keys.length > 0 ? [formatCounted(keys.length, "label key")] : []),
   ].join(" · ");
   if (tags.length === 0 && keys.length === 0) {
     return (
@@ -501,7 +501,7 @@ export function Tags() {
             shape="key"
             refuse={refuse}
             ready={ready}
-            nothing={(typed) => `No key begins with ${typed}.`}
+            nothing={(typed) => `No label key begins with ${typed}.`}
             offers={
               merging
                 ? (typed) =>
@@ -579,8 +579,9 @@ export function Tags() {
             </>
           }
         >
-          <Term>{target.key}</Term> is already a key, on {formatCounted(target.folders, "folder")}.
-          Merge <Term>{key.key}</Term> into it? Its {formatCounted(key.folders, "folder")}{" "}
+          <Term>{target.key}</Term> is already a label key, on{" "}
+          {formatCounted(target.folders, "folder")}. Merge <Term>{key.key}</Term> into it? Its{" "}
+          {formatCounted(key.folders, "folder")}{" "}
           {key.folders === 1 ? "keeps its value" : "keep their values"}
           {as ? <>, as {as}</> : <>, under {target.key}</>}.
         </RowQuestion>
@@ -597,7 +598,7 @@ export function Tags() {
                   void act(() => deleteLabelKey(key.key), `Could not delete ${key.key}.`)
                 }
               >
-                Delete Key
+                Delete Label Key
               </Button>
               {cancelButton}
             </>
@@ -618,7 +619,7 @@ export function Tags() {
         onKeyDown={rowKeys(row, rename, remove)}
         more={moreFor(row, `More for ${key.key}`, [
           [
-            { id: "rename", label: "Rename Key…", glyph: "rename", onSelect: rename },
+            { id: "rename", label: "Rename Label Key…", glyph: "rename", onSelect: rename },
             {
               id: "merge",
               label: "Merge Into…",
@@ -629,7 +630,15 @@ export function Tags() {
               },
             },
           ],
-          [{ id: "delete", label: "Delete Key", glyph: "trash", tone: "danger", onSelect: remove }],
+          [
+            {
+              id: "delete",
+              label: "Delete Label Key",
+              glyph: "trash",
+              tone: "danger",
+              onSelect: remove,
+            },
+          ],
         ])}
       />,
       ...(open
@@ -810,7 +819,7 @@ export function Tags() {
       <div className="flex min-h-0 flex-1 flex-col gap-2.5 p-3.5">
         <Head count={headCount} />
         <FilterField
-          label="Filter tags and keys"
+          label="Filter tags and label keys"
           value={filter}
           onChange={setFilter}
           count={term ? `${formatCount(found)} of ${formatCount(total)}` : undefined}

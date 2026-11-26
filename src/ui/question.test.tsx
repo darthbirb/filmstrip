@@ -81,7 +81,7 @@ test("one answer stands alone under why it is asked, over the files it is about"
     <div style={{ width: "40rem" }}>
       <Question
         sentence="3 of 15 files are on a drive with no Recycle Bin"
-        detail="Delete them, 412 MB, for good? Undo cannot bring them back."
+        detail="Permanently delete them, 412 MB? Undo cannot bring them back."
         last={{ label: "Delete Permanently", onChoose: () => undefined }}
         files={{ open, onToggle: () => (open = !open), list: <span>MVI_0007.mov</span> }}
         dismiss="Cancel"
@@ -90,7 +90,7 @@ test("one answer stands alone under why it is asked, over the files it is about"
     </div>,
   );
   await expect
-    .element(screen.getByText("Delete them, 412 MB, for good? Undo cannot bring them back."))
+    .element(screen.getByText("Permanently delete them, 412 MB? Undo cannot bring them back."))
     .toBeVisible();
   await expect.element(screen.getByText("MVI_0007.mov")).toBeVisible();
   expect(shown(screen)).toEqual(["Hide Files", "Cancel", "Delete Permanently"]);

@@ -11,7 +11,7 @@ for (const width of [1440, 900, 640]) {
     await page.getByRole("button", { name: "Settings" }).click();
     const settings = page.getByRole("dialog", { name: "Settings" });
     await settings.getByRole("button", { name: "Tags" }).click();
-    await expect(settings.getByText("10 tags · 2 keys")).toBeVisible();
+    await expect(settings.getByText("10 tags · 2 label keys")).toBeVisible();
 
     await settings.getByRole("button", { name: "More for egypt" }).click();
     await page.getByRole("menuitem", { name: "Merge Into…" }).click();
@@ -20,7 +20,7 @@ for (const width of [1440, 900, 640]) {
     await settings.getByRole("button", { name: "Merge Tags" }).click();
     const line = "Merged egypt into travel, on 3 files and 1 folder.";
     await expect(settings.getByText(line)).toBeVisible();
-    await expect(settings.getByText("9 tags · 2 keys")).toBeVisible();
+    await expect(settings.getByText("9 tags · 2 label keys")).toBeVisible();
 
     await page.keyboard.press("Escape");
     await expect(page.locator("dialog[open]")).toHaveCount(0);

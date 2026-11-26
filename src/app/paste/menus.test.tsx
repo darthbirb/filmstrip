@@ -3,12 +3,13 @@ import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { recording } from "../../dev/recording";
-import { clipboardFiles, copyItems, folderItems, undoLast } from "../../ipc/commands";
+import { clipboardFiles, copyItems, folderItems, listSources, undoLast } from "../../ipc/commands";
 import { setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { Navigation } from "../navigation/Navigation";
 import { openFolders, setOpenFolders } from "../navigation/open-folders";
 import { readClipboard, resetClipboard } from "./clipboard";
+import { PickHost } from "./drop";
 
 // Against the dev mock: Pictures holds cover.jpg, People (5) and Trips (4); Incoming (2) is the
 // one sorting source. Its Copy puts the files' paths on the mock's clipboard.
@@ -74,4 +75,31 @@ test("Paste follows New Folder counting what the clipboard holds, and leads the 
     await page.getByRole("menuitem", { name: "Paste 1 File" }).click();
     await expect.poll(() => calls).toContainEqual(["paste_files", { folderId: 2 }]);
   });
+});
+
+test("with several sorting sources Paste asks which, each the Sorting Box with its source's name", async () => {
+  await copyCover();
+  const every = await listSources();
+  const incoming = every.find((source) => source.kind === "sorting");
+  if (!incoming) throw new Error("the mock has no sorting source");
+  const cards = { ...incoming, id: 9, title: "Cards", root: "E:Cards", rootFolderId: 99 };
+  await recording(
+    async () => {
+      resetIndex();
+      await loadIndex();
+      openFolders([1]);
+      render(<PickHost />);
+      await renderTree();
+      expect(await menuOf(/^Sorting Box /)).toEqual(["Paste 1 File…", "Add Sorting Source…"]);
+      await page.getByRole("menuitem", { name: "Paste 1 File…" }).click();
+      const pick = page.getByRole("menu", { name: "Copy 1 File Into" });
+      await expect.element(pick).toBeVisible();
+      expect(
+        [...pick.element().querySelectorAll("[role=menuitem]")].map((one) =>
+          one.textContent?.replace(/[\uE000-\uF8FF]/g, ""),
+        ),
+      ).toEqual(["Sorting BoxIncoming", "Sorting BoxCards"]);
+    },
+    (cmd) => (cmd === "list_sources" ? [...every, cards] : undefined),
+  );
 });

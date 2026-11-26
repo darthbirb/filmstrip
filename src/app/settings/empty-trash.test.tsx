@@ -56,7 +56,7 @@ test("Empty Trash… is absent with nothing in the Trash, and there in danger on
   await expect
     .element(
       screen.getByText(
-        "On a drive with no Recycle Bin, such as a USB stick or a network share, Delete asks first, and deletes for good.",
+        "On a drive with no Recycle Bin, such as a USB stick or a network share, Delete asks first, and deletes permanently.",
       ),
     )
     .toBeVisible();
@@ -73,7 +73,7 @@ test("its question counts the files and their space, keeps the rest of the bin, 
   await expect
     .element(
       screen.getByText(
-        `Delete the 2 files the library sent to the Recycle Bin, ${formatBytes(4_800_000)}, for good? Only these go; the rest of the Recycle Bin is left as it is. Undo cannot bring them back.`,
+        `Permanently delete the 2 files the library sent to the Recycle Bin, ${formatBytes(4_800_000)}? Only these go; the rest of the Recycle Bin is left as it is. Undo cannot bring them back.`,
       ),
     )
     .toBeVisible();
@@ -121,7 +121,7 @@ test("emptying counts as it goes, the foot says it is done, and Ctrl+Z passes ov
 
   expect(getNews()).toEqual({
     kind: "said",
-    line: `Emptied the Trash: 2 files, ${formatBytes(4_800_000)}, deleted for good.`,
+    line: `Emptied the Trash: 2 files, ${formatBytes(4_800_000)}, permanently deleted.`,
   });
   await expect.element(screen.getByText("Nothing in it")).toBeVisible();
   expect(await trashListing()).toHaveLength(0);
@@ -148,14 +148,14 @@ test("files skipped are counted in a band, with Show in Trash for the one that s
   await emptied();
 
   const line =
-    "Emptied 1 of 3 files for good. 1 was no longer in the Recycle Bin, and 1 would not go and stays in the Trash.";
+    "Permanently deleted 1 of 3 files. 1 was no longer in the Recycle Bin, and 1 would not go and stays in the Trash.";
   expect(getNews()).toEqual({ kind: "skipped", line, first: kept });
   await expect.element(screen.getByText(line)).toBeInTheDocument();
   await expect.element(screen.getByRole("button", { name: "Show in Trash" })).toBeInTheDocument();
   expect((await trashListing()).map((one) => one.id)).toEqual([kept]);
 
   const report = getReport();
-  expect(report?.sentence).toBe("1 of 3 files was deleted for good");
+  expect(report?.sentence).toBe("1 of 3 files was permanently deleted");
   expect(report?.rows.map((row) => [row.id, row.at.kind, row.reason.kind])).toEqual([
     [kept, "trash", "inUse"],
   ]);
@@ -178,7 +178,7 @@ test("the files that stayed are listed in the banner, each with why and Show in 
   await emptied();
 
   await expect
-    .element(screen.getByText("The 2 files could not be deleted for good"))
+    .element(screen.getByText("The 2 files could not be permanently deleted"))
     .toBeInTheDocument();
   await expect.element(screen.getByText("Still in the Trash")).toBeInTheDocument();
   expect(screen.getByText("Open in another app").elements()).toHaveLength(2);

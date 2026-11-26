@@ -44,7 +44,7 @@ const menuRow = (name: string) => page.getByRole("menuitem", { name });
 
 test("the list counts what carries each tag, says whose name one is and marks the unused", async () => {
   await opened();
-  await expect.element(page.getByText("10 tags · 2 keys")).toBeVisible();
+  await expect.element(page.getByText("10 tags · 2 label keys")).toBeVisible();
   await expect.poll(() => words("egypt")).toBe("egypt31");
   expect(words("cairo")).toBe("caironame of Cairo31");
   expect(words("winter")).toBe("winterunused00");
@@ -66,13 +66,16 @@ test("the headings sort, and a second click reverses; the filter counts what it 
   await userEvent.click(page.getByRole("button", { name: "Sort by Files" }).first());
   expect(names().at(-1)).toBe("pictures");
 
-  await userEvent.fill(page.getByRole("searchbox", { name: "Filter tags and keys" }), "cai");
+  await userEvent.fill(page.getByRole("searchbox", { name: "Filter tags and label keys" }), "cai");
   await expect.element(page.getByText("2 of 14")).toBeVisible();
   expect(names()).toEqual(["cairo"]);
   expect(words("location")).toBe("location1 value31");
   await expect.element(page.getByTitle("Search location:cairo")).toBeVisible();
 
-  await userEvent.fill(page.getByRole("searchbox", { name: "Filter tags and keys" }), "zebra");
+  await userEvent.fill(
+    page.getByRole("searchbox", { name: "Filter tags and label keys" }),
+    "zebra",
+  );
   await expect.element(page.getByText("No Tags Match")).toBeVisible();
 });
 
@@ -187,10 +190,10 @@ test("from the keyboard F2 renames and Delete asks, and Ctrl+Z in the section ta
   await userEvent.keyboard("{Delete}");
   await userEvent.click(page.getByRole("button", { name: "Delete Tag" }));
   await expect.poll(values).not.toContain("egypt");
-  await userEvent.fill(page.getByRole("searchbox", { name: "Filter tags and keys" }), "e");
+  await userEvent.fill(page.getByRole("searchbox", { name: "Filter tags and label keys" }), "e");
   await userEvent.keyboard("{Control>}z{/Control}");
   expect(await values()).not.toContain("egypt");
-  await userEvent.fill(page.getByRole("searchbox", { name: "Filter tags and keys" }), "");
+  await userEvent.fill(page.getByRole("searchbox", { name: "Filter tags and label keys" }), "");
   (
     document.querySelector("section[aria-label='Tags in the library'] [data-chip]") as HTMLElement
   ).focus();
@@ -211,7 +214,7 @@ test("a click on a chip closes Settings and searches for it", async () => {
 test("a key merged where a branch would hold it twice is refused in the band's words", async () => {
   await opened();
   await userEvent.click(more("trip"));
-  await userEvent.click(menuRow("Rename Key…"));
+  await userEvent.click(menuRow("Rename Label Key…"));
   await userEvent.keyboard("{Control>}a{/Control}location");
   await expect
     .element(page.getByText("Trips has a trip, and Cairo, inside Trips, already has a location."))
@@ -238,7 +241,7 @@ test("Merge Into… leaves out a key it cannot merge into, and Enter on it says 
   await expect
     .element(page.getByText("Trips has a trip, and Cairo, inside Trips, already has a location."))
     .toBeVisible();
-  expect(document.body.textContent).not.toContain("location is already a key");
+  expect(document.body.textContent).not.toContain("location is already a label key");
   expect((await listTags()).keys.map((key) => key.key)).toEqual(["location", "trip"]);
 });
 
@@ -247,7 +250,7 @@ test("Enter on a word a merge field offers nothing for says so", async () => {
   await userEvent.click(more("trip"));
   await userEvent.click(menuRow("Merge Into…"));
   await userEvent.keyboard("zz{Enter}");
-  await expect.element(page.getByText("No key begins with zz.")).toBeVisible();
+  await expect.element(page.getByText("No label key begins with zz.")).toBeVisible();
   await userEvent.keyboard("{Escape}");
 
   await userEvent.click(more("egypt"));
@@ -320,7 +323,7 @@ test("at the window's least the counts keep their columns and a long name ends i
   }
 });
 
-test("a key merged into another asks first and each folder keeps its value; Delete Key asks with its count", async () => {
+test("a key merged into another asks first and each folder keeps its value; Delete Label Key asks with its count", async () => {
   await setFolderLabel(5, "season", "winter");
   try {
     await opened();
@@ -330,7 +333,7 @@ test("a key merged into another asks first and each folder keeps its value; Dele
     await expect
       .element(
         page.getByText(
-          "location is already a key, on 1 folder. Merge season into it? Its 1 folder keeps its value, as location: winter.",
+          "location is already a label key, on 1 folder. Merge season into it? Its 1 folder keeps its value, as location: winter.",
         ),
       )
       .toBeVisible();
@@ -340,11 +343,11 @@ test("a key merged into another asks first and each folder keeps its value; Dele
       .toEqual(["location", "trip"]);
 
     await userEvent.click(more("trip"));
-    await userEvent.click(menuRow("Delete Key"));
+    await userEvent.click(menuRow("Delete Label Key"));
     await expect
       .element(page.getByText("Delete trip? It comes off 1 folder and the 5 files under it."))
       .toBeVisible();
-    await userEvent.click(page.getByRole("button", { name: "Delete Key" }));
+    await userEvent.click(page.getByRole("button", { name: "Delete Label Key" }));
     await expect
       .poll(async () => (await listTags()).keys.map((key) => key.key))
       .toEqual(["location"]);

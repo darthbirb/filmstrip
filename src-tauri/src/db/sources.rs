@@ -9,6 +9,9 @@ use ts_rs::TS;
 use crate::db::{folders, journal, now};
 use crate::error::Result;
 
+/// What every sorting source is called where the person meets it: they are one place.
+pub const SORTING_BOX: &str = "Sorting Box";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "lowercase")]
 #[ts(export)]

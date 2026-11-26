@@ -481,10 +481,7 @@ fn refuse_clash(conn: &Connection, parent_id: i64, title: &str, own: Option<i64>
 
 fn taken(conn: &Connection, parent_id: i64, title: &str) -> AppError {
     AppError::refused(Reason::NameTaken {
-        place: folders::title(conn, parent_id)
-            .ok()
-            .flatten()
-            .unwrap_or_default(),
+        place: crate::fs::acts::name(conn, parent_id).unwrap_or_default(),
         name: title.to_string(),
         folder: true,
     })
@@ -863,7 +860,7 @@ mod tests {
             crate::fs::acts::Act::DeleteFolder {
                 name: "Cairo".into(),
                 parent: "Trips".into(),
-                into: Some("Inbox".into())
+                into: Some("Sorting Box".into())
             }
         );
         assert_eq!(described.files, 2, "the file in Night counts too");
@@ -883,6 +880,31 @@ mod tests {
     }
 
     #[test]
+    fn a_file_that_stays_in_a_sorting_source_is_placed_in_the_sorting_box() {
+        let (conn, root, _, _) = library("stayed-sorting");
+        let (_, inbox_folder, inbox_root) = with_inbox(&conn, &root);
+        std::fs::create_dir_all(inbox_root.join("Day 2")).unwrap();
+        std::fs::write(inbox_root.join("Day 2/pyramid.jpg"), "p").unwrap();
+        walk::reconcile(&conn).unwrap();
+        let day = folders::child_id(&conn, inbox_folder, "Day 2")
+            .unwrap()
+            .unwrap();
+        let [item] = items::live_under(&conn, day).unwrap()[..] else {
+            panic!("Day 2 holds one file");
+        };
+
+        let stayed =
+            crate::fs::stayed::file(&conn, item, &AppError::refused(Reason::InUse)).unwrap();
+        assert_eq!(
+            stayed.at,
+            crate::fs::stayed::Whereabouts::Folder {
+                folder_id: day,
+                path: vec!["Sorting Box".into(), "Day 2".into()],
+            }
+        );
+    }
+
+    #[test]
     fn a_name_the_sorting_source_already_holds_keeps_the_folder_and_says_why() {
         let (conn, root, _, trips) = library("delete-clash");
         let (inbox, _, inbox_root) = with_inbox(&conn, &root);
@@ -896,7 +918,7 @@ mod tests {
         assert_eq!(
             report.refused[0].reason,
             Reason::NameTaken {
-                place: "Inbox".into(),
+                place: "Sorting Box".into(),
                 name: "pyramid.jpg".into(),
                 folder: false
             }

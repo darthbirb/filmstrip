@@ -746,7 +746,7 @@ the field but outside the selection, so it can be changed on purpose and not by 
 already taken is said under the field, which keeps it and holds Enter until it is edited; nothing
 is renamed behind the person's back and no suffix is invented.
 
-**Copy Path is a row, never a button**, added on 12 October 2026: the bar is drawn with three glyph
+**Copy as Path is a row, never a button**, added on 12 October 2026: the bar is drawn with three glyph
 buttons, and a second copy glyph beside the first would be two squares no one could tell apart.
 It lives in the ⋯ with Rename, directly after Copy once Copy has folded in, and in a file's menu
 and a set's directly after Copy, with Copy's glyph, since the sheets draw no glyph for a path. The
@@ -1106,7 +1106,7 @@ Shift+F10 did nothing at all.
   that is away keeps it.
 - **Assign Key… sits under Favourite**, since both mark a place to come back to, and ends with
   the key the folder holds. It opens the ten keys against the row, each with the folder it is on,
-  "Free" or "gone" in the quiet ink, the folder's own on the plate, then No Key. Picking a key
+  "Free" or "gone" in the quiet ink, the folder's own on the plate, then Remove Key. Picking a key
   another folder holds moves it without a question: the row already said whose it was.
 - **Search in Folder and Search in Source open the second group.** Each is Ctrl+F with the offer
   taken, for a place you are not standing in: it writes the place as the field's scope, replacing
@@ -1119,7 +1119,7 @@ Shift+F10 did nothing at all.
   a menu row must not do that in one press when the section that owns it asks first.
 - **A checked tile opens the set's menu, and right-clicking never changes the set.** It is counted
   at its head, since it is the one menu that acts on more than one file, and holds the verbs that
-  mean something for a set: Favourite, Move to…, Copy, Copy Path, Export…, and Delete with the
+  mean something for a set: Favourite, Move to…, Copy, Copy as Path, Export…, and Delete with the
   count again; in the Trash, Restore and Restore to…. A tile with no check opens its own menu and the set stays
   checked, as a drag from it would, and that menu acts on that tile alone, so its Delete never
   reaches a tile out of sight.

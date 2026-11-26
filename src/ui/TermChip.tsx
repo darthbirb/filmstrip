@@ -70,7 +70,7 @@ export function TermChip({ shape, text, onRemove, plated = false }: Props) {
         : (place?.title ?? "");
   return (
     <span
-      title={shape.kind === "path" ? shape.titles.join(" / ") : text}
+      title={shape.kind === "path" ? shape.titles.join(" › ") : text}
       className={`inline-flex h-badge shrink-0 items-center gap-1 whitespace-nowrap text-small inset-ring ${tone} ${ring} ${pill ? "rounded-full pl-2" : "rounded-badge pl-1.5"} ${onRemove ? "pr-0.5" : pill ? "pr-2" : "pr-1.5"}`}
     >
       {glyph && (

@@ -16,9 +16,9 @@ test("a folder deleted into the sorting source goes with its files, and Ctrl+Z b
 
   const question = page.getByRole("region", { name: "Trips holds 5 files" });
   await expect(question).toBeFocused();
-  await question.getByRole("button", { name: "Move Files to Incoming" }).click();
+  await question.getByRole("button", { name: "Move Files to Sorting Box" }).click();
 
-  await expect(page.getByText("Deleted Trips. Its 5 files are in Incoming.")).toBeVisible();
+  await expect(page.getByText("Deleted Trips. Its 5 files are in Sorting Box.")).toBeVisible();
   await expect(tree.getByRole("treeitem", { name: "Trips 2 of 5" })).toHaveCount(0);
 
   await page.keyboard.press("Control+z");

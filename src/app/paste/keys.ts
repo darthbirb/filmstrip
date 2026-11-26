@@ -64,7 +64,7 @@ export async function pasteHere() {
     document.querySelector<HTMLElement>('[data-row="sorting"]') ??
     document.querySelector<HTMLElement>('button[aria-label^="Sorting Box"]');
   openPick({
-    heading: `Paste ${counted(held, true)} Into`,
+    heading: `Copy ${counted(held, true)} Into`,
     anchor: row ? { element: row } : { x: 0, y: 0 },
     places,
     onPick: (to) => void pasteInto(to),

@@ -340,7 +340,7 @@ export function noBinHead(drives: readonly string[], asked: number, whole: numbe
   return `${formatCount(asked)} of ${files(whole)} ${are(asked)} on ${on} with no Recycle Bin`;
 }
 
-/** The question under the head: what goes for good and its size, and what went to the bin. */
+/** The question under the head: what goes permanently and its size, and what went to the Recycle Bin. */
 export function noBinDetail(
   asked: readonly { name: string; bytes: number }[],
   whole: number,
@@ -351,7 +351,7 @@ export function noBinDetail(
   const what =
     asked.length === 1 && first ? first.name : asked.length < whole ? "them" : files(asked.length);
   const it = asked.length === 1 ? "it" : "them";
-  const question = `Delete ${what}, ${formatBytes(bytes)}, for good? Undo cannot bring ${it} back.`;
+  const question = `Permanently delete ${what}, ${formatBytes(bytes)}? Undo cannot bring ${it} back.`;
   const rest = whole - asked.length;
   if (went === 0) return question;
   const others =
@@ -361,7 +361,7 @@ export function noBinDetail(
   return `${question} ${others} went to the Recycle Bin.`;
 }
 
-/** What a folder's question adds under itself when its files would go for good. */
+/** What a folder's question adds under itself when its files would go permanently. */
 export function folderNoBinDetail(
   drives: readonly string[],
   asked: number,
@@ -370,25 +370,21 @@ export function folderNoBinDetail(
 ) {
   const size = formatBytes(bytes);
   const its =
-    asked < held
-      ? `${formatCount(asked)} of its files ${asked === 1 ? "goes" : "go"}`
-      : held === 1
-        ? "its file goes"
-        : "its files go";
+    asked < held ? `${formatCount(asked)} of its files` : held === 1 ? "its file" : "its files";
   const it = asked === 1 ? "it" : "them";
-  return `${noBinDrives(drives)}. Deleted, ${its} for good, ${size}, and Undo cannot bring ${it} back.`;
+  return `${noBinDrives(drives)}. Deleting it permanently deletes ${its}, ${size}, and Undo cannot bring ${it} back.`;
 }
 
-/** The line at the foot after files went for good, with nothing to undo. */
+/** The line at the foot after files went permanently, with nothing to undo. */
 export function forGoodLine(deleted: number, drives: readonly string[], one?: string) {
   const what = one ?? files(deleted);
   const [drive] = drives;
   return drives.length === 1
-    ? `Deleted ${what} from ${drive} for good.`
-    : `Deleted ${what} for good.`;
+    ? `Permanently deleted ${what} from ${drive}.`
+    : `Permanently deleted ${what}.`;
 }
 
-/** The line at the foot when files would not go for good: what went, then where the rest stay. */
+/** The line at the foot when files would not go permanently: what went, then where the rest stay. */
 export function forGoodKeptLine(rows: readonly Stayed[], deleted: number) {
   const [first] = rows;
   const places = new Set(rows.map(folderOf));
@@ -399,21 +395,21 @@ export function forGoodKeptLine(rows: readonly Stayed[], deleted: number) {
       ? `${first.name} could not be deleted and stays${place ? ` in ${place}` : " where it was"}.`
       : `${files(rows.length)} could not be deleted and stay${where}.`;
   if (deleted === 0) return kept;
-  return `Deleted ${formatCount(deleted)} of ${files(deleted + rows.length)} for good. ${kept}`;
+  return `Permanently deleted ${formatCount(deleted)} of ${files(deleted + rows.length)}. ${kept}`;
 }
 
-/** How many of a folder's gone files went for good, when some went to the Trash instead. */
+/** How many of a folder's gone files went permanently, when some went to the Trash instead. */
 function ofThem(binned: number, outright: number) {
   if (outright === 0) return "";
-  return binned === 0 ? " for good" : `, ${formatCount(outright)} of them for good`;
+  return binned === 0 ? " permanently" : `, ${formatCount(outright)} of them permanently`;
 }
 
-/** The line at the foot after a folder and its files went, some or all of them for good. */
+/** The line at the foot after a folder and its files went, some or all of them permanently. */
 export const folderForGoodLine = (name: string, binned: number, outright: number) =>
   `Deleted ${name} and its ${files(binned + outright)}${ofThem(binned, outright)}.`;
 
 /**
- * The line at the foot after a folder's files went in part, some for good, and the folder stayed;
+ * The line at the foot after a folder's files went in part, some permanently, and the folder stayed;
  * none when nothing went, since the banner says it all.
  */
 export function folderKeptLine(name: string, binned: number, outright: number, whole: number) {
@@ -427,7 +423,7 @@ export function folderKeptLine(name: string, binned: number, outright: number, w
   return `Deleted ${what}${ofThem(binned, outright)}. ${name} is in the banner.`;
 }
 
-/** The banner's sentence for a folder that stayed while its files went for good, or would not. */
+/** The banner's sentence for a folder that stayed while its files went permanently, or would not. */
 export function folderKeptBanner(name: string, binned: number, outright: number, whole: number) {
   const gone = binned + outright;
   if (gone === 0) return `${whose(name)} ${files(whole)} could not be deleted · ${name} stayed`;
@@ -440,7 +436,7 @@ export function folderKeptBanner(name: string, binned: number, outright: number,
 /** Why it may have refused, said once, since the app cannot tell which it was. */
 export function binRefusedDetail(count: number) {
   const which = count === 1 ? "It" : "They";
-  return `${which} may be too large for the bin, or the bin is turned off. Nothing was deleted.`;
+  return `${which} may be too large for the Recycle Bin, or the Recycle Bin is turned off. Nothing was deleted.`;
 }
 
 /** What a name field says under itself when the name was refused; nothing for any other failure. */
@@ -477,7 +473,7 @@ export function reasonText(reason: Reason): string {
     case "diskFull":
       return "The disk is full";
     case "goneFromBin":
-      return "Emptied outside the app";
+      return "Emptied from the Recycle Bin outside Filmstrip";
     case "binRefused":
       return "The Recycle Bin would not take it";
     case "noBin":
@@ -587,7 +583,7 @@ export type StayedGroup = { heading: string; rows: Stayed[] };
 
 /**
  * The rows under the place each is still in, one heading per place. Places are named from the
- * nearest folder they share, so "Inbox" and "Inbox › Day 2" read as where they are. What an export
+ * nearest folder they share, so "Trips" and "Trips › Cairo" read as where they are. What an export
  * `skipped` is placed from its source, since an export reaches across the library.
  */
 export function stayedGroups(stayed: readonly Stayed[], skipped = false): StayedGroup[] {

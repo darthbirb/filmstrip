@@ -87,7 +87,7 @@ export function setMenu(items: readonly Item[], trash: boolean): HeadedMenu {
         },
         {
           id: "copy-path",
-          label: "Copy Path",
+          label: "Copy as Path",
           glyph: "copy",
           onSelect: () => void copyItemPaths(ids).catch(failed(pathsFailed(items))),
         },
@@ -183,7 +183,7 @@ export function itemMenu(item: Item & { diskName: string }, show: () => void): M
       },
       {
         id: "copy-path",
-        label: "Copy Path",
+        label: "Copy as Path",
         glyph: "copy",
         onSelect: () => saying(copyItemPaths([item.id]), pathsFailed([item])),
       },

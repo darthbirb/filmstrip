@@ -173,10 +173,7 @@ fn move_one(
 
     let taken = || {
         AppError::refused(Reason::NameTaken {
-            place: folders::title(conn, folder_id)
-                .ok()
-                .flatten()
-                .unwrap_or_default(),
+            place: crate::fs::acts::name(conn, folder_id).unwrap_or_default(),
             name: file.disk_name.clone(),
             folder: false,
         })
@@ -237,10 +234,7 @@ pub(super) fn rename_unjournalled(
     }
     let taken = || {
         AppError::refused(Reason::NameTaken {
-            place: folders::title(conn, file.folder_id)
-                .ok()
-                .flatten()
-                .unwrap_or_default(),
+            place: crate::fs::acts::name(conn, file.folder_id).unwrap_or_default(),
             name: name.clone(),
             folder: false,
         })

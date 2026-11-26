@@ -194,7 +194,7 @@ test("a row that refuses says why, after the prohibit, and a drop there moves no
 test("with one sorting source the Sorting Box takes a drop, and names it", async () => {
   await renderBoth();
   await dragOnto("sphinx.jpg", "Sorting Box 3 of 3");
-  expect(ghost()?.textContent).toBe("Move 1 file to Incoming");
+  expect(ghost()?.textContent).toBe("Move 1 file to Sorting Box");
   window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
 });
 

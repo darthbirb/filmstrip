@@ -51,7 +51,7 @@ test("the gear opens Settings, and says so while it is open", async () => {
 test("a maximised window offers Restore instead", async () => {
   recordIPC({ maximized: true });
   const screen = await render(<WindowBar />);
-  await expect.element(screen.getByRole("button", { name: "Restore" })).toBeInTheDocument();
+  await expect.element(screen.getByRole("button", { name: "Restore Down" })).toBeInTheDocument();
 });
 
 test("the bar dims while another window has focus", async () => {

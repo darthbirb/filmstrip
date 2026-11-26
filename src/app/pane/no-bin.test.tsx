@@ -76,7 +76,9 @@ test("a file on a drive with no Recycle Bin is asked about, and Cancel, with the
     (await folderItems(6)).find((row) => row.id === pyramid)?.sizeBytes ?? 0,
   );
   await expect
-    .element(screen.getByText(`Delete pyramid.jpg, ${size}, for good? Undo cannot bring it back.`))
+    .element(
+      screen.getByText(`Permanently delete pyramid.jpg, ${size}? Undo cannot bring it back.`),
+    )
     .toBeVisible();
   const cancel = screen.getByRole("button", { name: "Cancel" });
   await expect.element(cancel).toHaveFocus();
@@ -105,7 +107,7 @@ test("Delete Permanently deletes it outright, and the foot says so with no Undo"
   await screen.getByRole("button", { name: "Delete Permanently" }).click();
 
   await expect
-    .element(screen.getByText("Deleted pyramid.jpg from USB Drive (E:) for good."))
+    .element(screen.getByText("Permanently deleted pyramid.jpg from USB Drive (E:)."))
     .toBeVisible();
   expect(screen.getByRole("button", { name: "Undo" }).query()).toBeNull();
   expect(await names()).toEqual(["felucca.mp4", "sphinx.jpg"]);
@@ -126,7 +128,7 @@ test("in a mixed set the rest go to the Recycle Bin with Undo, and only the othe
   await expect
     .element(
       screen.getByText(
-        /^Delete them, .+, for good\? Undo cannot bring them back\. The other 1 went to the Recycle Bin\.$/,
+        /^Permanently delete them, .+\? Undo cannot bring them back\. The other 1 went to the Recycle Bin\.$/,
       ),
     )
     .toBeVisible();
@@ -159,7 +161,7 @@ test("a selection wholly on two such drives names both, and one that would not g
   await expect
     .element(
       screen.getByText(
-        "Deleted 1 of 2 files for good. sphinx.jpg could not be deleted and stays in Cairo.",
+        "Permanently deleted 1 of 2 files. sphinx.jpg could not be deleted and stays in Cairo.",
       ),
     )
     .toBeVisible();
@@ -179,7 +181,7 @@ test("a folder on such a drive says it once: its files go permanently, and × ha
   await expect
     .element(
       screen.getByText(
-        /^USB Drive \(E:\) has no Recycle Bin\. Deleted, its files go for good, .+, and Undo cannot bring them back\.$/,
+        /^USB Drive \(E:\) has no Recycle Bin\. Deleting it permanently deletes its files, .+, and Undo cannot bring them back\.$/,
       ),
     )
     .toBeVisible();
@@ -190,11 +192,13 @@ test("a folder on such a drive says it once: its files go permanently, and × ha
   expect(screen.getByRole("button", { name: "Delete Files Too" }).query()).toBeNull();
 
   await screen.getByRole("button", { name: "Delete Files Permanently" }).click();
-  await expect.element(screen.getByText("Deleted Cairo and its 3 files for good.")).toBeVisible();
+  await expect
+    .element(screen.getByText("Deleted Cairo and its 3 files permanently."))
+    .toBeVisible();
   expect(screen.getByRole("button", { name: "Undo" }).query()).toBeNull();
 });
 
-test("a folder with files on two drives counts those gone for good apart, and Undo is offered", async () => {
+test("a folder with files on two drives counts those gone permanently apart, and Undo is offered", async () => {
   onDriveWithoutBin(
     (await folderItems(6)).map((row) => row.id),
     "USB Drive (E:)",
@@ -204,7 +208,7 @@ test("a folder with files on two drives counts those gone for good apart, and Un
   await screen.getByRole("button", { name: "Delete Files Permanently" }).click();
 
   await expect
-    .element(screen.getByText(/^Deleted Trips and its \d+ files, 3 of them for good\.$/))
+    .element(screen.getByText(/^Deleted Trips and its \d+ files, 3 of them permanently\.$/))
     .toBeVisible();
   await expect.element(screen.getByRole("button", { name: "Undo" })).toBeVisible();
 });

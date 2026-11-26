@@ -43,6 +43,7 @@ import {
 import { type Place, placeFolder, setPlace, usePlace } from "../place";
 import { searchIn } from "../search/SearchField";
 import { openSettings } from "../settings/settings-store";
+import { SORTING_BOX } from "../sorting-box";
 import { favouriteFailed, refusedName, shownFailed } from "../undo/lines";
 import { afterAct } from "../undo/undo";
 import { addFolder } from "./add-source";
@@ -181,7 +182,7 @@ export function Navigation() {
       const sorting = sources.filter((source) => source.kind === "sorting");
       const [one] = sorting;
       if (sorting.length > 1) return refuse("Use Move to… to pick one");
-      return one ? into(one.rootFolderId, one.title, one) : null;
+      return one ? into(one.rootFolderId, SORTING_BOX, one) : null;
     }
     const folder = rowFolder(id);
     const source = sourceOf(id);
@@ -233,7 +234,7 @@ export function Navigation() {
     // The pick takes the menu's place, against what it was opened on.
     const ask = () => {
       openPick({
-        heading: `Paste ${what} Into`,
+        heading: `Copy ${what} Into`,
         anchor: against.anchor(),
         places: boxes,
         onPick: (to) => void pasteInto(to),
@@ -405,7 +406,7 @@ export function Navigation() {
   // Its row's menu under its name, since it is not on its row; what it opens, opens where it was.
   ground.current = (place, against) => {
     if (place.kind === "sorting") {
-      return { heading: "Sorting Box", groups: sortingMenu(against).groups };
+      return { heading: SORTING_BOX, groups: sortingMenu(against).groups };
     }
     const folder = placeFolder(place);
     if (!folder) return { groups: [] };
@@ -537,7 +538,7 @@ function keyGroups(keys: readonly DestinationKey[], { folder, title }: Keying): 
   });
   const none: MenuAction = {
     id: "no-key",
-    label: "No Key",
+    label: "Remove Key",
     glyph: "close",
     onSelect: () => {
       if (own) bind(removeDestinationKey(own.key), `Could not take key ${own.key} off ${title}.`);

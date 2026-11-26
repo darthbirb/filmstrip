@@ -29,6 +29,8 @@ export type MenuAction = {
   chip?: string;
   /** Quiet words at the row's end, in the mono face: the key its subject holds now. */
   trail?: string;
+  /** Quieter words after the label, in `small` `fg-dim`: which sorting source a Sorting Box row is. */
+  detail?: string;
   /** The choice already made, on the selection plate. */
   chosen?: boolean;
   /** Words that say nothing is there yet, or what was there has gone, in `fg-dim`. */
@@ -94,6 +96,9 @@ function MenuList({
           >
             {action.label}
           </span>
+          {action.detail !== undefined && (
+            <span className="shrink-0 text-fg-dim text-small">{action.detail}</span>
+          )}
           {action.trail !== undefined && (
             <span className="shrink-0 font-mono text-fg-dim text-small">{action.trail}</span>
           )}

@@ -11,6 +11,7 @@ import { unasked } from "../failure";
 import { scrollTreeNear } from "../grid/drag";
 import { getIndex } from "../navigation/index-store";
 import { type Crumb, getPlace } from "../place";
+import { SORTING_BOX } from "../sorting-box";
 import { counted } from "./clipboard";
 import { dropInto, type Into, openPick, sortingPlaces, usePick } from "./copy";
 
@@ -94,7 +95,7 @@ export function sortingLanding(
   const [one] = sorting;
   if (!one) return null;
   if (sorting.length > 1) return { kind: "pick", places: sortingPlaces(sorting) };
-  return landingInto(one, [{ id: one.rootFolderId, title: one.title }], paths);
+  return landingInto(one, [{ id: one.rootFolderId, title: SORTING_BOX }], paths);
 }
 
 /** The grid is the place it shows: a folder's or the Sorting Box's; a search and the Trash take nothing. */
@@ -159,7 +160,7 @@ function land(x: number, y: number) {
   if (landing.kind === "pick") {
     const what = was.carried ? counted(was.carried, true) : items(was.paths.length, true);
     openPick({
-      heading: `Copy ${what} To`,
+      heading: `Copy ${what} Into`,
       anchor: { x, y },
       places: landing.places,
       onPick: (to) => void dropInto(to, was.paths),
@@ -248,6 +249,7 @@ export function PickHost() {
         pick.places.map((place) => ({
           id: `pick-${place.id}`,
           label: place.title,
+          detail: place.detail,
           glyph: "sortingBox" as const,
           filled: true,
           onSelect: () => pick.onPick(place),

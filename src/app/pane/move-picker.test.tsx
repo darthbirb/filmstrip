@@ -1,10 +1,10 @@
 import { beforeEach, expect, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
-
+import { recording } from "../../dev/recording";
 import { withoutGlyphs } from "../../dev/words";
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
-import { folderItems, itemDetail, renameItem, undoLast } from "../../ipc/commands";
+import { folderItems, itemDetail, listSources, renameItem, undoLast } from "../../ipc/commands";
 import { Foot } from "../navigation/Foot";
 import { setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex } from "../navigation/index-store";
@@ -65,10 +65,32 @@ test("Move to… opens the tree down to the file's folder, which cannot be picke
     "People",
     "Trips",
     "Cairo · current",
-    "Incoming",
+    "Sorting Box",
   ]);
   const cairo = picker.getByRole("option", { name: /Cairo/ });
   await expect.element(cairo).toHaveAttribute("aria-disabled", "true");
+});
+
+test("with several sorting sources the Sorting Box's row names its source after it", async () => {
+  const every = await listSources();
+  const incoming = every.find((source) => source.kind === "sorting");
+  if (!incoming) throw new Error("the mock has no sorting source");
+  const cards = { ...incoming, id: 9, title: "Cards", root: "E:\\Cards", rootFolderId: 99 };
+  await recording(
+    async () => {
+      resetIndex();
+      await loadIndex();
+      const screen = await render(<Harness item={await inCairo("pyramid.jpg")} />);
+      await screen.getByRole("button", { name: "Move to…" }).click();
+      const picker = screen.getByRole("dialog", { name: "Move to" });
+      await expect.element(picker.getByRole("option", { name: /Sorting Box/ })).toBeVisible();
+      expect(rows(picker.element()).at(-1)).toBe("Sorting Box · Incoming");
+
+      await picker.getByRole("combobox").fill("sort");
+      expect(rows(picker.element())).toEqual(["Sorting Box · Incoming"]);
+    },
+    (cmd) => (cmd === "list_sources" ? [...every, cards] : undefined),
+  );
 });
 
 test("the tree's rows carry navigation's pill, and a recent row names its parent instead", async () => {
@@ -86,7 +108,7 @@ test("the tree's rows carry navigation's pill, and a recent row names its parent
     ["People", "0/0"],
     ["Trips", "2/5"],
     ["Cairo", undefined],
-    ["Incoming", "3/3"],
+    ["Sorting Box", "3/3"],
   ]);
 
   await picker.getByRole("option", { name: /People/ }).click();
