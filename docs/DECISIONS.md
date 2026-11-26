@@ -1440,7 +1440,23 @@ it. Two acts delete for good, and both ask first: Empty Trash…, and Delete on 
   deleted 200 files to a transaction, under the turn of the last of them. The bounds, each
   with its timing test against a journal of 200,000 rows: 10,000 files let go of the journal at
   once well inside a second; a look in the bin that finds 10,000 emptied inside five seconds;
-  Empty Trash… of 10,000 inside ten, one turn of the disk per file as it always was.
+  Empty Trash… of 10,000 inside ten, one turn of the disk per file as it always was. The Trash's
+  listing names the folder each file left, and whether a live one stands at its place, for all of
+  them in three statements, never two queries a file: 10,000 trashed files from 1,000 folders
+  inside a second (#264).
+- **Undo reaches back 1,000 acts** (#264). Each launch deletes every act older than the newest
+  1,000, counted by each act's newest row, so the journal and `journal_subject` stop growing
+  with every act ever made; Ctrl+Z walks the acts in that same order, so it simply finds nothing
+  further back, as it finds nothing past a restore's floor. A count rather than an age, since an
+  age bounds nothing for someone who makes thousands of acts a week; and a thousand is deeper
+  than anyone walks back with Ctrl+Z. An act
+  goes whole or not at all, never a part of one; and the newest act always stays, so a row
+  written after a restore is never numbered under its floor. Three kinds of act stay whatever
+  their age: one the redo holds any of, one a job on the queue still names, since a copy, move or
+  delete going on writes under its batch, and one a send to the Recycle Bin the app was stopped
+  during will settle into. Pruning deletes rows of the journal and nothing else: a file in the
+  Trash is restored from its own row and the bin, never from the act that sent it there, so every
+  trashed file stays restorable however old its act.
 - **A move between drives is a copy, checked, and only then the original's removal.** ggallery
   renamed, which cannot cross from one drive to another. A copy cut short is removed and the
   original stays whole; an original that will not go once its copy is whole is left for the next

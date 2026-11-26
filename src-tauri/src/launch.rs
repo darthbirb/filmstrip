@@ -48,6 +48,9 @@ pub fn open_index(path: &Path) -> Result<Connection, Failure> {
         db::jobs::requeue_running(&conn)?;
         jobs::enqueue_index(&conn)?;
         fs::trash::settle_unfinished_send(&conn)?;
+        if let Err(err) = db::journal::prune(&conn) {
+            eprintln!("journal: not pruned: {err}");
+        }
         Ok(conn)
     };
     open().map_err(|err| Failure {
@@ -177,6 +180,32 @@ mod tests {
             );
             assert_eq!(schema(&path), (12, 2), "nothing in the index changed");
         }
+    }
+
+    #[test]
+    fn a_launch_prunes_the_journal_to_the_acts_it_keeps() {
+        let path = scratch("prune");
+        let conn = open_index(&path).unwrap();
+        let tx = db::begin(&conn).unwrap();
+        let acts: Vec<String> = (0..=db::journal::KEPT_ACTS)
+            .map(|item_id| {
+                let act = db::journal::new_batch();
+                db::journal::record_item_move(&tx, &act, item_id, 1, 2).unwrap();
+                act
+            })
+            .collect();
+        tx.commit().unwrap();
+        drop(conn);
+
+        let conn = open_index(&path).unwrap();
+        let left: i64 = conn
+            .query_row("SELECT COUNT(DISTINCT batch_id) FROM journal", [], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(left, db::journal::KEPT_ACTS);
+        assert!(db::journal::batch(&conn, &acts[0]).unwrap().is_empty());
+        assert_eq!(db::journal::batch(&conn, &acts[1]).unwrap().len(), 1);
     }
 
     #[test]
