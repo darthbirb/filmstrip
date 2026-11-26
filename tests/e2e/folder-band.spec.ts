@@ -29,13 +29,13 @@ test("a folder's band opens from its header, keeps a status, a tag and a cover, 
   await page.keyboard.press("Escape");
   await expect(grid.getByRole("button", { name: "felucca", exact: true })).toBeVisible();
 
-  await grid.getByRole("button", { name: "Choose Cover · now the first picture" }).click();
+  await grid.getByRole("button", { name: "Choose Cover · First Picture Now", exact: true }).click();
   await page.getByRole("option", { name: "Picture 3" }).click();
   await expect(grid.getByText("Cover", { exact: true }).first()).toBeVisible();
   await grid.getByRole("button", { name: "Change Cover" }).click();
   await page.getByRole("button", { name: /^Clear Cover/ }).click();
   await expect(
-    grid.getByRole("button", { name: "Choose Cover · now the first picture" }),
+    grid.getByRole("button", { name: "Choose Cover · First Picture Now", exact: true }),
   ).toBeVisible();
 
   // The band stays open on the next folder, and the tag searches for the files that carry it.

@@ -303,7 +303,10 @@ test("a tag that could not be added is typed in the field again, and the foot sa
 test("the pencil picks a cover from the branch, the first standing in until one is chosen", async () => {
   const screen = await renderHeader(CAIRO);
   await details(screen).click();
-  const pencil = screen.getByRole("button", { name: "Choose Cover · now the first picture" });
+  const pencil = screen.getByRole("button", { name: "Choose Cover · First Picture Now" });
+  await expect
+    .element(pencil)
+    .toHaveAttribute("aria-description", "Until one is chosen, the first picture is the cover.");
   await pencil.click();
   const picker = screen.getByRole("listbox", { name: "Cover for Cairo" });
   await expect.element(picker).toBeVisible();
@@ -532,8 +535,8 @@ test("a folder with nothing in it, or a drive that is away, has no pencil", asyn
 
   setPlace(folderAt(3, ARCHIVE));
   await expect
-    .element(screen.getByTitle("Archive is offline · its pictures are on the drive"))
-    .toBeVisible();
+    .element(screen.getByRole("img", { name: "No Cover · Drive Offline" }))
+    .toHaveAttribute("aria-description", "Archive is offline. Its pictures are on the drive.");
   expect(screen.getByRole("button", { name: /Cover/ }).elements()).toHaveLength(0);
 });
 
@@ -560,14 +563,14 @@ test("an offline source says so in place of its counts, and its band says when i
   expect(screen.getByText(/ here · /).elements()).toHaveLength(0);
   await details(screen).click();
   await expect
-    .element(screen.getByTitle("Archive is offline · its pictures are on the drive"))
-    .toBeInTheDocument();
+    .element(screen.getByRole("img", { name: "No Cover · Drive Offline" }))
+    .toHaveAttribute("aria-description", "Archive is offline. Its pictures are on the drive.");
   expect(row(screen.container, "Path")?.textContent).toMatch(/^E:\\Archivelast indexed 4 Mar\b/);
 
   setPlace(folderAt(3, ARCHIVE, { id: 7, title: "Scans" }));
   await expect
-    .element(screen.getByTitle("Scans is on Archive, which is offline"))
-    .toBeInTheDocument();
+    .element(screen.getByRole("img", { name: "No Cover · Drive Offline" }))
+    .toHaveAttribute("aria-description", "Scans is on Archive, which is offline.");
   await expect
     .poll(() => row(screen.container, "Path")?.textContent)
     .toMatch(/^E:\\Archive\\Scanslast indexed/);

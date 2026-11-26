@@ -23,8 +23,11 @@ export function faultSentence(why: Fault): string | null {
   }
 }
 
+/** The keys `query::parser::keyed` refuses a value for: every other key takes any value. */
+type Faulting = "year" | "date" | "dur" | "size" | "w" | "h" | "is" | "status";
+
 /** What a key takes, said with one that it would: never the value it could not read. */
-const TAKES: Record<string, string> = {
+const TAKES: Record<Faulting, string> = {
   year: "needs a number, like year:2024",
   date: "needs a date, like date:2024-06 or date:2024-06..2024-08",
   dur: "needs a length, like dur:>30s",
@@ -35,9 +38,12 @@ const TAKES: Record<string, string> = {
   status: "takes wip, complete or none",
 };
 
+const faulting = (key: string): key is Faulting => Object.hasOwn(TAKES, key);
+
+/** The fault's key crosses IPC as a string, so one the parser gains before this list is said plainly. */
 function badValue(key: string) {
-  const takes = TAKES[key.toLowerCase()];
-  return takes ? `${key} ${takes}.` : `${key} cannot take that value.`;
+  const lower = key.toLowerCase();
+  return faulting(lower) ? `${key} ${TAKES[lower]}.` : `${key} cannot take that value.`;
 }
 
 /** Whether the fault is one character the field can mark where it stands. */

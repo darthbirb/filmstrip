@@ -64,7 +64,10 @@ export function CoverPicker({ folderId, title, chosen, anchor }: Props) {
       <BadgeButton
         ref={pencil}
         glyph="pencil"
-        label={chosen === null ? "Choose Cover · now the first picture" : "Change Cover"}
+        label={chosen === null ? "Choose Cover · First Picture Now" : "Change Cover"}
+        aria-description={
+          chosen === null ? "Until one is chosen, the first picture is the cover." : undefined
+        }
         popoverTarget={id}
         aria-haspopup="listbox"
         aria-expanded={open}

@@ -182,8 +182,7 @@ const capital = (line: string) => line.charAt(0).toUpperCase() + line.slice(1);
 
 type Changed = {
   verb: "rename" | "merge" | "delete";
-  /** What the term is: "the tag", "the label key" or "the label". */
-  kind: string;
+  kind: "the tag" | "the label key" | "the label";
   was: string;
   is: string;
 };

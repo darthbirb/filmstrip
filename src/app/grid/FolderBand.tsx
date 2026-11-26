@@ -195,10 +195,16 @@ function Cover({
   if (!source.reachable) {
     const why =
       detail.path.length === 1
-        ? `${title} is offline · its pictures are on the drive`
-        : `${title} is on ${source.title}, which is offline`;
+        ? `${title} is offline. Its pictures are on the drive.`
+        : `${title} is on ${source.title}, which is offline.`;
     return (
-      <span title={why} className={`${frame} text-fg-faint text-icon`}>
+      <span
+        role="img"
+        aria-label={OFFLINE_COVER}
+        aria-description={why}
+        title={OFFLINE_COVER}
+        className={`${frame} text-fg-faint text-icon`}
+      >
         <Glyph name="unplugged" />
       </span>
     );
@@ -378,6 +384,8 @@ function LabelsRow({ folderId, title, labels, keysBelow }: LabelsRowProps) {
     </span>
   );
 }
+
+const OFFLINE_COVER = "No Cover · Drive Offline";
 
 /** What a folder's own name says under the pointer: only a rename changes it. */
 function nameTitle(where: Where): NameTitle {

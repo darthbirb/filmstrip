@@ -913,7 +913,8 @@ toward the rest surface.
   `in-pane` ring, the rest sitting back at `--strip-rest` until the pointer is on one. The panel
   fades in over both ends, and a pill-shaped step floats on `veil` over each; at the first or last
   frame its step falls to `fg-faint`.
-- **Empty state.** A `glyph-large` glyph in `fg-faint` over a semibold Title Case line of `ui`.
+- **Empty state.** A `glyph-large` glyph in `fg-faint` over a semibold Title Case line of `ui`,
+  but for a state word, which keeps its own case: Archive is offline.
   One shape for every empty place, with its own glyph and its own words: a cleared Sorting Box, an
   emptied Trash, a folder of folders, an empty folder, an unreachable source, the pane with
   nothing clicked or a file gone, a list a filter narrows to nothing, the `search` glyph over

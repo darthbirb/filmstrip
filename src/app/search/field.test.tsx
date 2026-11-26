@@ -184,6 +184,12 @@ test("each fault is said in its own words", () => {
   expect(faultSentence({ kind: "badValue", key: "is", value: "blue" })).toBe(
     "is takes favorite, untagged, sorting or trashed.",
   );
+  expect(faultSentence({ kind: "badValue", key: "Year", value: "abcd" })).toBe(
+    "Year needs a number, like year:2024.",
+  );
+  expect(faultSentence({ kind: "badValue", key: "hue", value: "x" })).toBe(
+    "hue cannot take that value.",
+  );
   expect(faultSentence({ kind: "missingTerm" })).toBe("Put a term after OR and after -.");
   expect(faultSentence({ kind: "empty" })).toBeNull();
 });
