@@ -1918,9 +1918,10 @@ wherever the drive has hard links.
   or FAT32 drive has a bin but no hard links, which the disk says as `ERROR_INVALID_FUNCTION` or
   `ERROR_NOT_SUPPORTED`, and a file with all the names NTFS allows one is refused another with
   `ERROR_TOO_MANY_LINKS`. Such a file is handed to the shell with the sink alone. Still at its
-  path afterwards, it was refused. Gone, it counts as sent only under the name `PostDeleteItem`
-  gave, inside the bin and still a file with the size and last write it had; its identity is read
-  there rather than before, since FAT gives a file a new index when it moves to another folder.
+  path afterwards, or when the disk cannot say, it was refused. Gone, it counts as sent only under
+  the name `PostDeleteItem` gave, inside the bin of its own volume and still a file with the size
+  and last write it had; its identity is read there rather than before, since FAT gives a file a
+  new index when it moves to another folder.
   Gone with no such name, it is said to be no longer on disk, and the log says the shell did not
   say where: the sink let it go only into the bin, so Explorer has it, but the Trash cannot list
   what it cannot find, and the next walk retires its row.
@@ -1935,6 +1936,9 @@ wherever the drive has hard links.
     changed with the move, so the look in the bin retires its row as emptied and the walk brings
     the file in again as new, without its tags. A Restore from the app moves it back as on any
     drive.
+  - A Restore whose record then fails moves the file back into the bin, which on FAT gives it a
+    new index, so its row's `bin_file` no longer names it and the next look in the bin retires
+    the row as emptied while Explorer still lists the file.
   - The one guard is the shell's word. A shell that deleted such a file outright without asking
     the sink first would leave nothing to put back, where the second name would have.
 - **What the shell is never asked is refused with its own reason** (#219). The shell is handed no

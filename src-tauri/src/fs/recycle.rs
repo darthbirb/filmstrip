@@ -137,19 +137,22 @@ fn no_second_name(_code: i32) -> bool {
     false
 }
 
-/// Sends a file that cannot have a second name, on what the shell says alone: refused where it
-/// is still at its path, and recycled only under a name inside the bin that the shell gave and
-/// that still has the file's size and last write.
+/// Sends a file that cannot have a second name, on what the shell says alone: refused unless the
+/// disk says it left its path, and recycled only under a name the shell gave in the bin of the
+/// file's own volume, with the file's size and last write.
 fn send_unlinked(bin: &dyn Bin, file: &Path, was: &std::fs::Metadata) -> io::Result<Sent> {
+    let volume = file.parent().and_then(volume_serial);
     let said = bin.take(file);
-    if std::fs::symlink_metadata(file).is_ok() {
-        return Ok(Sent::Refused);
+    match metadata_after(file) {
+        Err(err) if err.kind() == io::ErrorKind::NotFound => {}
+        _ => return Ok(Sent::Refused),
     }
     let found = said
         .ok()
         .flatten()
         .filter(|at| bin.holds(at) && same_contents(was, at))
-        .and_then(|at| Some((file_at(&at)?, at)));
+        .and_then(|at| Some((file_at(&at)?, at)))
+        .filter(|(itself, _)| volume.as_deref() == Some(serial_of(itself)));
     Ok(match found {
         Some((itself, at)) => Sent::Recycled(Binned {
             path: plain(&at),
@@ -535,6 +538,23 @@ fn volume_of(path: &Path) -> io::Result<PathBuf> {
 thread_local! {
     static UNREADABLE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
     static UNLINKABLE: std::cell::Cell<Option<i32>> = const { std::cell::Cell::new(None) };
+    static UNSEEN: std::cell::Cell<Option<i32>> = const { std::cell::Cell::new(None) };
+}
+
+/// Makes a file sent without a second name unreadable on this thread once the shell has had it,
+/// with the disk's `code`, as on a drive that stops answering.
+#[cfg(test)]
+fn unseen_after(code: i32) {
+    UNSEEN.set(Some(code));
+}
+
+/// What the disk says of `file` once the shell has had it.
+fn metadata_after(file: &Path) -> io::Result<std::fs::Metadata> {
+    #[cfg(test)]
+    if let Some(code) = UNSEEN.get() {
+        return Err(io::Error::from_raw_os_error(code));
+    }
+    std::fs::symlink_metadata(file)
 }
 
 /// Makes every file's names unreadable on this thread, as on a drive that cannot list them.
@@ -712,7 +732,8 @@ impl Bin for RecycleBin {
 
         let mut from = shell_form(file)?;
         from.push(0);
-        std::thread::spawn(move || operation::recycle(&from))
+        std::thread::Builder::new()
+            .spawn(move || operation::recycle(&from))?
             .join()
             .map_err(|_| io::Error::other("the shell's thread stopped"))?
     }
@@ -1559,6 +1580,46 @@ pub(crate) mod tests {
         }
         assert_eq!(std::fs::read_to_string(&other).unwrap(), "another");
         settles_to(&dir.join("bin"), &["$R1-one.jpg", "$Rother.jpg", "one.jpg"]);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_file_without_a_second_name_the_disk_cannot_answer_for_is_refused_not_gone() {
+        const NOT_READY: i32 = 21;
+        for code in [NOT_READY, 32] {
+            let dir = scratch(&format!("linkless-unseen-{code}"));
+            let file = one_with_names(&dir, 0);
+            links_fail(1);
+            unseen_after(code);
+
+            assert_eq!(
+                send(&Fake::new(Stand::Fails), &file).unwrap(),
+                Sent::Refused,
+                "{code}"
+            );
+            assert_eq!(std::fs::read_to_string(&file).unwrap(), "one");
+        }
+    }
+
+    #[test]
+    fn with_a_second_name_the_name_the_shell_says_it_gave_is_never_the_one_recorded() {
+        let dir = scratch("linked-misplaced");
+        let file = one_with_names(&dir, 0);
+        std::fs::create_dir_all(dir.join("bin")).unwrap();
+        let other = dir.join("bin/$Rother.jpg");
+        std::fs::write(&other, "one").unwrap();
+        let bin = Fake::new(Stand::Misplaces(dir.join("bin"), other.clone()));
+
+        let recycled = dir.join("bin/one.jpg");
+        assert_eq!(
+            send(&bin, &file).unwrap(),
+            Sent::Recycled(Binned {
+                path: recycled.clone(),
+                file: file_at(&recycled).unwrap(),
+            })
+        );
+        assert_ne!(file_at(&other), file_at(&recycled));
+        settles_to(&dir.join("trash"), &[]);
     }
 
     #[test]
