@@ -144,9 +144,11 @@ test("Random disables Reverse in place, and its order holds until Shuffle draws 
   await screen.getByRole("option", { name: "Random" }).click();
 
   await expect.element(sortButton(screen)).toHaveAttribute("title", "Sort · Random");
+  const reverse = screen.getByRole("button", { name: "Reverse · Not for Random", exact: true });
+  await expect.element(reverse).toBeDisabled();
   await expect
-    .element(screen.getByRole("button", { name: "Reverse · a random order has no direction" }))
-    .toBeDisabled();
+    .element(reverse)
+    .toHaveAttribute("aria-description", "A random order has no direction.");
   const drawn = getPreferences().sort?.folder;
   const order = (await folderItems(6, drawn)).map((row) => row.diskName);
   await expect.poll(tiles).toEqual(order);

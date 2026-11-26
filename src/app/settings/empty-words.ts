@@ -13,7 +13,7 @@ export function heldLine(held: Tally) {
   return `${files(held.count)} · ${formatBytes(held.bytes)}`;
 }
 
-/** The question under the head: how many and how much, that only they go, and permanently. */
+/** The question under the head: how many and how much, that nothing else goes, and permanently. */
 export function emptyQuestion(held: Tally): Said {
   const one = held.count === 1;
   return [
@@ -21,7 +21,7 @@ export function emptyQuestion(held: Tally): Said {
     { term: one ? "file" : files(held.count) },
     " the library sent to the Recycle Bin, ",
     { term: formatBytes(held.bytes) },
-    `? Only ${one ? "it goes" : "these go"}; the rest of the Recycle Bin is left as it is. Undo cannot bring ${one ? "it" : "them"} back.`,
+    `? The rest of the Recycle Bin stays. Undo cannot bring ${one ? "it" : "them"} back.`,
   ];
 }
 

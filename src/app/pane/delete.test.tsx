@@ -58,7 +58,7 @@ test("Delete sends the file to the trash, says so, and the pane moves on to the 
   const screen = await render(<Harness />);
   await screen.getByRole("button", { name: "Delete" }).click();
 
-  await expect.element(screen.getByText("Deleted pyramid.jpg.")).toBeVisible();
+  await expect.element(screen.getByText("Moved pyramid.jpg to the Recycle Bin.")).toBeVisible();
   expect((await folderItems(6)).map((row) => row.diskName)).toEqual(["felucca.mp4", "sphinx.jpg"]);
   await expect.poll(getPaneItem).toBe(sphinx);
 });
@@ -109,7 +109,7 @@ test("in a set, the rest are one batch with Undo and the one refused is named", 
   await expect
     .element(
       screen.getByText(
-        "Deleted 2 of 3 files. The Recycle Bin would not take pyramid.jpg, so it stays in Cairo.",
+        "Moved 2 of 3 files to the Recycle Bin. It would not take pyramid.jpg, so it stays in Cairo.",
       ),
     )
     .toBeVisible();

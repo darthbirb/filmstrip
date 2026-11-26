@@ -93,7 +93,7 @@ export function OfflinePlace({
   return (
     <EmptyState
       glyph="unplugged"
-      title={`${source.title} Is Offline`}
+      title={`${source.title} is offline`}
       note={`${files(held.count)}${where} when last indexed.`}
     />
   );

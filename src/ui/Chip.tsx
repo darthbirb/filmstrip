@@ -22,6 +22,8 @@ type Props = {
   /** A folder's name, marked with the folder glyph; only renaming the folder changes it. */
   name?: boolean;
   title?: string;
+  /** What the title's short tail leaves out, for whoever reads it aloud. */
+  description?: string;
   /** Makes the chip a control that searches for it; `adding` when Ctrl was held. */
   onSearch?: (adding: boolean) => void;
   /** A tag its owner can take off: an × under the pointer or the keyboard, and Delete. */
@@ -48,6 +50,7 @@ export function Chip({
   inherited = false,
   name = false,
   title,
+  description,
   onSearch,
   onRemove,
   echoed = false,
@@ -85,6 +88,7 @@ export function Chip({
           {...control}
           data-removable
           title={title}
+          aria-description={description}
           onKeyDown={removeKey}
           className="flex cursor-default items-center bg-well px-2 text-fg-dim outline-none hover:text-fg"
         >
@@ -113,6 +117,7 @@ export function Chip({
         {...control}
         {...(onSearch && { "data-chip": true })}
         title={title}
+        aria-description={description}
         className={`group inline-flex h-chip max-w-full overflow-hidden rounded-nested text-small ${onSearch ? SEARCHING : ""}`}
       >
         <span className="flex items-center bg-well px-2 text-fg-dim">{tagKey}</span>
@@ -136,6 +141,7 @@ export function Chip({
           {...control}
           data-removable
           title={title}
+          aria-description={description}
           onKeyDown={removeKey}
           className="flex h-full min-w-0 cursor-default items-center rounded-full pr-2.5 pl-2.5 outline-none group-hover:pr-0.5 group-has-focus-visible:pr-0.5"
         >
@@ -150,6 +156,7 @@ export function Chip({
       {...control}
       {...(onSearch && { "data-chip": true })}
       title={title}
+      aria-description={description}
       className={`inline-flex h-chip max-w-full items-center gap-1.25 rounded-full pr-2.5 text-small inset-ring ${name ? "pl-2" : "pl-2.5"} ${ground} ${onSearch ? `${SEARCHING} hover:bg-raised-hi hover:text-fg` : ""}`}
     >
       {name && (

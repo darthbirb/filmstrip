@@ -29,7 +29,7 @@ test("in full screen the wheel zooms, the figure sits in the area's corner, and 
     return Math.round(fit * 1.12 ** 6 * 100);
   });
   // The figure is a tile-inset inside the media area's bottom-left, never the picture's own corner.
-  const plate = pane.getByRole("button", { name: `Fit, from ${six}%` });
+  const plate = pane.getByRole("button", { name: `Zoom to Fit · ${six}% Now`, exact: true });
   await expect(plate).toBeVisible();
   const at = await plate.boundingBox();
   const inset = await page.evaluate(

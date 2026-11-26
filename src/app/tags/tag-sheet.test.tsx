@@ -115,7 +115,7 @@ test("Enter adds the tag to every file as one batch, with the Line, and Undo tak
 
   await undo();
   await expect.poll(own).toEqual([]);
-  expect(line()).toBe("golden hour is off 3 files again.");
+  expect(line()).toBe("Removed golden hour from 3 files.");
 });
 
 test("a chip on some of the set adds to the rest, and × takes it off every file that has it", async () => {

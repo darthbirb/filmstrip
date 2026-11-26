@@ -14,7 +14,9 @@ test("a file deleted waits in the Trash under today, and Restore puts it back wh
     .getByRole("toolbar", { name: "Actions" })
     .getByRole("button", { name: "Delete" })
     .click();
-  await expect(page.getByText("Deleted cover.jpg.")).toBeVisible();
+  await expect(
+    page.getByText("Moved cover.jpg to the Recycle Bin.", { exact: true }),
+  ).toBeVisible();
 
   const tree = page.getByRole("tree", { name: "Places" });
   await tree.getByRole("treeitem", { name: "Trash 1" }).click();

@@ -26,3 +26,8 @@ export function EmptyState({ glyph, title, note, path, children }: Props) {
     </div>
   );
 }
+
+/** What a list a filter narrowed to nothing says, the filter's words quoted as they were typed. */
+export function NothingMatches({ term }: { term: string }) {
+  return <EmptyState glyph="search" title={`Nothing Matches “${term}”`} />;
+}

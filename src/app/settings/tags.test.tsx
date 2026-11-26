@@ -76,7 +76,7 @@ test("the headings sort, and a second click reverses; the filter counts what it 
     page.getByRole("searchbox", { name: "Filter tags and label keys" }),
     "zebra",
   );
-  await expect.element(page.getByText("No Tags Match")).toBeVisible();
+  await expect.element(page.getByText("Nothing Matches “zebra”", { exact: true })).toBeVisible();
 });
 
 test("Rename… renames a tag everywhere, its line has Undo, and Undo puts it back", async () => {
@@ -88,11 +88,11 @@ test("Rename… renames a tag everywhere, its line has Undo, and Undo puts it ba
   await userEvent.keyboard("Nile  Valley{Enter}");
   await expect.poll(values).toContain("nile valley");
   await expect
-    .element(page.getByText("Renamed egypt to nile valley, on 3 files and 1 folder."))
+    .element(page.getByText("Renamed the tag egypt to nile valley on 3 files and 1 folder."))
     .toBeVisible();
   await userEvent.click(page.getByRole("button", { name: "Undo" }));
   await expect.poll(values).toContain("egypt");
-  await expect.element(page.getByText("nile valley is egypt again.")).toBeVisible();
+  await expect.element(page.getByText("The tag nile valley is egypt again.")).toBeVisible();
 });
 
 test("a rename that worked keeps its line when the list cannot be read again after it", async () => {
@@ -139,7 +139,7 @@ test("renaming onto a tag that exists asks to merge on the row, and Escape puts 
   await userEvent.click(page.getByRole("button", { name: "Merge Tags" }));
   await expect.poll(values).not.toContain("egypt");
   await expect
-    .element(page.getByText("Merged egypt into travel, on 3 files and 1 folder."))
+    .element(page.getByText("Merged the tag egypt into travel on 3 files and 1 folder."))
     .toBeVisible();
 });
 
@@ -174,7 +174,7 @@ test("Delete asks with its count first; an unused tag goes without asking", asyn
   await userEvent.click(more("winter"));
   await userEvent.click(menuRow("Delete Tag"));
   await expect.poll(values).not.toContain("winter");
-  await expect.element(page.getByText("Deleted winter.")).toBeVisible();
+  await expect.element(page.getByText("Deleted the tag winter.", { exact: true })).toBeVisible();
 });
 
 test("from the keyboard F2 renames and Delete asks, and Ctrl+Z in the section takes the act back", async () => {
@@ -199,7 +199,9 @@ test("from the keyboard F2 renames and Delete asks, and Ctrl+Z in the section ta
   ).focus();
   await userEvent.keyboard("{Control>}z{/Control}");
   await expect.poll(values).toContain("egypt");
-  await expect.element(page.getByText("egypt is back on 3 files and 1 folder.")).toBeVisible();
+  await expect
+    .element(page.getByText("The tag egypt is back on 3 files and 1 folder."))
+    .toBeVisible();
 });
 
 test("a click on a chip closes Settings and searches for it", async () => {
@@ -227,7 +229,7 @@ test("a key merged where a branch would hold it twice is refused in the band's w
     .poll(async () => (await listTags()).keys.map((key) => key.key))
     .toEqual(["journey", "location"]);
   await expect
-    .element(page.getByText("Renamed trip to journey, on 5 files and 1 folder."))
+    .element(page.getByText("Renamed the label key trip to journey on 5 files and 1 folder."))
     .toBeVisible();
 });
 

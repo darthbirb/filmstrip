@@ -33,7 +33,7 @@ import { libraryChanged } from "../library";
 import { refreshIndex, useIndex } from "../navigation/index-store";
 import { type Place, setPlace, usePlace } from "../place";
 import { addToSearch, searchFor } from "../search/search";
-import { stopsIn, TagsRow, takeOff, titleOf } from "../tags/TagsRow";
+import { type NameTitle, stopsIn, TagsRow, takeOff, titleOf } from "../tags/TagsRow";
 import { favouriteFailed, whyFailed } from "../undo/lines";
 import { CoverPicker } from "./CoverPicker";
 import { detailChanged, diskPath, useBandOpen, useFolderDetail } from "./folder-detail";
@@ -380,11 +380,20 @@ function LabelsRow({ folderId, title, labels, keysBelow }: LabelsRowProps) {
 }
 
 /** What a folder's own name says under the pointer: only a rename changes it. */
-function nameTitle(where: Where) {
+function nameTitle(where: Where): NameTitle {
   if (where.root) {
-    return "The source’s name · changes when the source is renamed in Settings or on its row";
+    return {
+      title: "Source Name · Rename to Change",
+      description: "Only renaming the source, in Settings or on its row, changes it.",
+    };
   }
   return where.offline
-    ? "The folder’s name · changes only when the folder is renamed, which needs the drive"
-    : "The folder’s name · changes only when the folder is renamed";
+    ? {
+        title: "Folder Name · Rename Needs the Drive",
+        description: "Only renaming the folder changes it, and that needs its drive.",
+      }
+    : {
+        title: "Folder Name · Rename to Change",
+        description: "Only renaming the folder changes it.",
+      };
 }

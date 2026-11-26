@@ -44,7 +44,9 @@ test("a search typed in a folder stands in its results, opens one, widens, acts 
 
   await grid.getByRole("button", { name: "sphinx.jpg" }).click({ button: "right" });
   await page.getByRole("menuitem", { name: "Delete" }).click();
-  await expect(page.getByText("Deleted sphinx.jpg.")).toBeVisible();
+  await expect(
+    page.getByText("Moved sphinx.jpg to the Recycle Bin.", { exact: true }),
+  ).toBeVisible();
   await expect(grid.getByRole("button", { name: "sphinx.jpg" })).toHaveCount(0);
   await page.keyboard.press("Control+z");
   await expect(grid.getByRole("button", { name: "sphinx.jpg" })).toBeVisible();

@@ -4,6 +4,8 @@ import type { GlyphName } from "./glyphs";
 type Props = {
   glyph: GlyphName;
   label: string;
+  /** What the label's short tail leaves out, for whoever reads it aloud. */
+  description?: string;
   onClick: () => void;
   pressed?: boolean;
   /** The filled family, for a glyph naming a state the button is in rather than an action. */
@@ -24,6 +26,7 @@ const DANGER =
 export function GlyphButton({
   glyph,
   label,
+  description,
   onClick,
   pressed,
   filled,
@@ -35,6 +38,7 @@ export function GlyphButton({
     <button
       type="button"
       aria-label={label}
+      aria-description={description}
       aria-pressed={pressed}
       title={label}
       disabled={disabled}

@@ -37,6 +37,8 @@ test("an empty Trash carries no count, and one holding files counts them on its 
   await expect.element(screen.getByRole("treeitem", { name: "Trash 2 of 2" })).toBeVisible();
   await expect
     .element(screen.getByRole("button", { name: "Trash", exact: true }))
-    .toHaveAttribute("title", "Trash · 2");
-  await expect.element(screen.getByText(`2 · ${formatBytes(4_800_000)}`)).toBeVisible();
+    .toHaveAttribute("title", "Trash · 2 Files");
+  await expect
+    .element(screen.getByText(`2 files · ${formatBytes(4_800_000)}`, { exact: true }))
+    .toBeVisible();
 });

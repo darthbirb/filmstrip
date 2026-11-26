@@ -113,7 +113,10 @@ test("the band reads in the pane's rhythm: status, labels, then tags, its own na
     "travel",
   ]);
   const titled = (title: string) => withoutGlyphs(screen.getByTitle(title).element().textContent);
-  expect(titled("The folder’s name · changes only when the folder is renamed")).toBe("cairo");
+  expect(titled("Folder Name · Rename to Change")).toBe("cairo");
+  await expect
+    .element(screen.getByTitle("Folder Name · Rename to Change", { exact: true }))
+    .toHaveAttribute("aria-description", "Only renaming the folder changes it.");
   expect(titled("The name of Trips")).toBe("trips");
   await expect.element(screen.getByTitle("From Trips").first()).toBeVisible();
 });
@@ -544,12 +547,11 @@ test("a source's own band has no steps back, its path is its folder, and nothing
   await expect.poll(() => row(screen.container, "Path")?.textContent).toBe("D:\\Pictures");
   expect(chipTexts(row(screen.container, "Tags"))).toEqual(["pictures"]);
   await expect
-    .element(
-      screen.getByTitle(
-        "The source’s name · changes when the source is renamed in Settings or on its row",
-      ),
-    )
-    .toBeVisible();
+    .element(screen.getByTitle("Source Name · Rename to Change", { exact: true }))
+    .toHaveAttribute(
+      "aria-description",
+      "Only renaming the source, in Settings or on its row, changes it.",
+    );
 });
 
 test("an offline source says so in place of its counts, and its band says when it was read", async () => {

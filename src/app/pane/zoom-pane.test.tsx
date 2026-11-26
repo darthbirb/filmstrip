@@ -59,7 +59,7 @@ function wheel(area: HTMLElement, deltaY: number, at?: { x: number; y: number })
 
 /** The figure the plate states, or null at fit, where there is no plate. */
 function figure(area: HTMLElement) {
-  const plate = area.querySelector<HTMLButtonElement>("button[aria-label^='Fit']");
+  const plate = area.querySelector<HTMLButtonElement>("button[aria-label^='Zoom to Fit']");
   return plate ? Number.parseInt(plate.textContent ?? "", 10) : null;
 }
 
@@ -106,7 +106,7 @@ test("double-click and the plate both go back to fit", async () => {
   await expect.poll(() => figure(area)).toBeNull();
 
   wheel(area, -100);
-  await screen.getByRole("button", { name: /^Fit, from \d+%$/ }).click();
+  await screen.getByRole("button", { name: /^Zoom to Fit · \d+% Now$/ }).click();
   await expect.poll(() => figure(area)).toBeNull();
 });
 
@@ -150,7 +150,7 @@ test("the next item starts at fit", async () => {
   wheel(area, -100);
   await expect.poll(() => figure(area)).not.toBeNull();
   showInPane((await inCairo("sphinx.jpg")).id);
-  await expect.poll(() => document.querySelector("button[aria-label^='Fit']")).toBeNull();
+  await expect.poll(() => document.querySelector("button[aria-label^='Zoom to Fit']")).toBeNull();
 });
 
 test("while the original loads nothing stands in for it, so no low copy ever shows", async () => {

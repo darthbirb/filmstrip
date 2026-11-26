@@ -179,7 +179,11 @@ test("each fault is said in its own words", () => {
   expect(faultSentence({ kind: "unclosedGroup", after: null })).toBe("The ( is never closed.");
   expect(faultSentence({ kind: "unopenedGroup" })).toBe("The ) closes nothing.");
   expect(faultSentence({ kind: "badValue", key: "year", value: "abcd" })).toBe(
-    "year: cannot take abcd.",
+    "year needs a number, like year:2024.",
   );
+  expect(faultSentence({ kind: "badValue", key: "is", value: "blue" })).toBe(
+    "is takes favorite, untagged, sorting or trashed.",
+  );
+  expect(faultSentence({ kind: "missingTerm" })).toBe("Put a term after OR and after -.");
   expect(faultSentence({ kind: "empty" })).toBeNull();
 });

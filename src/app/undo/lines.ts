@@ -23,8 +23,9 @@ export function actLine(batch: Batch, stayed = 0): string {
         return `Moved ${formatCount(carried)} of ${files(whole)} to ${act.to}. ${rest}`;
       return `Moved ${act.one ?? files(carried)} to ${act.to}.`;
     case "delete":
-      if (stayed > 0) return `Deleted ${formatCount(carried)} of ${files(whole)}. ${rest}`;
-      return `Deleted ${act.one ?? files(carried)}.`;
+      if (stayed > 0)
+        return `Moved ${formatCount(carried)} of ${files(whole)} to the Recycle Bin. ${rest}`;
+      return `Moved ${act.one ?? files(carried)} to the Recycle Bin.`;
     case "renameFile":
     case "renameFolder":
       return `Renamed ${act.from} to ${act.to}.`;
@@ -105,7 +106,7 @@ export function undoneLine({ batch }: UndoReport): string {
       if (carried === 0) return `${act.name} is back in ${act.parent}.`;
       return `${act.name} and its ${files(carried)} are back in ${act.parent}.`;
     case "addTag":
-      return `${act.tag} is off ${files(carried)} again.`;
+      return `Removed ${act.tag} from ${files(carried)}.`;
     case "removeTag":
       return `${act.tag} is back on ${files(carried)}.`;
     case "retag":
@@ -151,8 +152,10 @@ export function undoBannerLine({ batch, filesBack, stayed }: UndoReport): string
       return `${act.tag} could not come off ${files(carried)}`;
     case "removeTag":
       return `${act.tag} could not go back on ${files(carried)}`;
-    case "retag":
-      return `${changed(act.change).was} could not come back`;
+    case "retag": {
+      const { kind, was } = changed(act.change);
+      return `${capital(kind)} ${was} could not come back`;
+    }
     case "copy":
       if (filesBack > 0) {
         return `${formatCount(filesBack)} of ${files(carried)} left ${act.to} for the Trash`;
@@ -175,51 +178,67 @@ export function filesAndFolders(fileCount: number, folderCount: number): string 
 /** A tag by its words, a label as `key: value`. */
 const termText = (key: string | null, value: string) => (key ? `${key}: ${value}` : value);
 
-/** What a change on the tags screen was, now and before, and its verb. */
-function changed(change: Change): { verb: "rename" | "merge" | "delete"; was: string; is: string } {
+const capital = (line: string) => line.charAt(0).toUpperCase() + line.slice(1);
+
+type Changed = {
+  verb: "rename" | "merge" | "delete";
+  /** What the term is: "the tag", "the label key" or "the label". */
+  kind: string;
+  was: string;
+  is: string;
+};
+
+/** What a change on the tags screen was, now and before, its verb, and what kind of term it is. */
+function changed(change: Change): Changed {
   switch (change.kind) {
     case "renameTag":
+      return { verb: "rename", kind: "the tag", was: change.from, is: change.to };
     case "renameKey":
-      return { verb: "rename", was: change.from, is: change.to };
+      return { verb: "rename", kind: "the label key", was: change.from, is: change.to };
     case "mergeTags":
+      return { verb: "merge", kind: "the tag", was: change.from, is: change.into };
     case "mergeKeys":
-      return { verb: "merge", was: change.from, is: change.into };
+      return { verb: "merge", kind: "the label key", was: change.from, is: change.into };
     case "deleteTag":
-      return { verb: "delete", was: change.tag, is: change.tag };
+      return { verb: "delete", kind: "the tag", was: change.tag, is: change.tag };
     case "deleteKey":
-      return { verb: "delete", was: change.key, is: change.key };
+      return { verb: "delete", kind: "the label key", was: change.key, is: change.key };
     case "renameValue":
       return {
         verb: "rename",
+        kind: "the label",
         was: termText(change.key, change.from),
         is: termText(change.key, change.to),
       };
     case "mergeValues":
       return {
         verb: "merge",
+        kind: "the label",
         was: termText(change.key, change.from),
         is: termText(change.key, change.into),
       };
     case "deleteValue":
-      return { verb: "delete", was: termText(change.key, change.value), is: "" };
+      return { verb: "delete", kind: "the label", was: termText(change.key, change.value), is: "" };
   }
 }
 
 /** The line after a rename, a merge or a delete on the tags screen. Artboards › Tags. */
 function retagLine(change: Change, fileCount: number, folderCount: number) {
-  const { verb, was, is } = changed(change);
+  const { verb, kind, was, is } = changed(change);
   const what = filesAndFolders(fileCount, folderCount);
-  if (verb === "delete") return what ? `Deleted ${was}, from ${what}.` : `Deleted ${was}.`;
-  const done = verb === "rename" ? `Renamed ${was} to ${is}` : `Merged ${was} into ${is}`;
-  return what ? `${done}, on ${what}.` : `${done}.`;
+  if (verb === "delete")
+    return what ? `Deleted ${kind} ${was} from ${what}.` : `Deleted ${kind} ${was}.`;
+  const done =
+    verb === "rename" ? `Renamed ${kind} ${was} to ${is}` : `Merged ${kind} ${was} into ${is}`;
+  return what ? `${done} on ${what}.` : `${done}.`;
 }
 
 /** The line after undoing one: the term is back where it was, under its own words. */
 function retagUndone(change: Change, fileCount: number, folderCount: number) {
-  const { verb, was, is } = changed(change);
-  if (verb === "rename") return `${is} is ${was} again.`;
+  const { verb, kind, was, is } = changed(change);
+  if (verb === "rename") return `${capital(kind)} ${is} is ${was} again.`;
   const what = filesAndFolders(fileCount, folderCount);
-  return what ? `${was} is back on ${what}.` : `${was} is back.`;
+  return what ? `${capital(kind)} ${was} is back on ${what}.` : `${capital(kind)} ${was} is back.`;
 }
 
 /**
@@ -238,8 +257,8 @@ export function movedBannerLine(moved: number, whole: number, to: string, one?: 
 
 /** The banner's sentence for a delete that finished in part, or not at all. */
 export function deletedBannerLine(trashed: number, whole: number, one?: string) {
-  if (trashed > 0) return `${formatCount(trashed)} of ${files(whole)} went to the Trash`;
-  return `${one ?? `The ${files(whole)}`} could not go to the Trash`;
+  if (trashed > 0) return `${formatCount(trashed)} of ${files(whole)} went to the Recycle Bin`;
+  return `${one ?? `The ${files(whole)}`} could not go to the Recycle Bin`;
 }
 
 /**
@@ -267,7 +286,7 @@ export const holdsLine = (name: string, held: number) => `${name} holds ${files(
 
 /**
  * The line at the foot after a folder's delete that kept the folder: what went is the act, and
- * it is undone as any move or delete of files is. `into` is the sorting source, or the Trash.
+ * it is undone as any move or delete of files is. `into` is the sorting source, or the Recycle Bin.
  */
 export function folderStayedLine(
   name: string,
@@ -279,7 +298,7 @@ export function folderStayedLine(
     carried === whole
       ? `${whose(name)} ${files(whole)}`
       : `${formatCount(carried)} of ${whose(name)} ${files(whole)}`;
-  const act = into ? `Moved ${what} to ${into}.` : `Deleted ${what}.`;
+  const act = `Moved ${what} to ${into ?? "the Recycle Bin"}.`;
   return `${act} ${name} is in the banner.`;
 }
 
@@ -313,12 +332,13 @@ export function binRefusedLine(rows: readonly Stayed[], trashed = 0, asked = 0) 
   const places = new Set(rows.map(folderOf));
   const [place] = places;
   const where = places.size === 1 && place ? ` in ${place}` : " where they were";
+  const bin = trashed === 0 ? "The Recycle Bin" : "It";
   const refused =
     rows.length === 1 && first
-      ? `The Recycle Bin would not take ${first.name}, so it stays${place ? ` in ${place}` : " where it was"}.`
-      : `The Recycle Bin would not take ${files(rows.length)}, so they stay${where}.`;
+      ? `${bin} would not take ${first.name}, so it stays${place ? ` in ${place}` : " where it was"}.`
+      : `${bin} would not take ${files(rows.length)}, so they stay${where}.`;
   if (trashed === 0) return refused;
-  return `Deleted ${formatCount(trashed)} of ${files(trashed + rows.length + asked)}. ${refused}`;
+  return `Moved ${formatCount(trashed)} of ${files(trashed + rows.length + asked)} to the Recycle Bin. ${refused}`;
 }
 
 /** Drives with no Recycle Bin, as a question's head names them: one or two by name, more counted. */
