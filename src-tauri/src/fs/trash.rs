@@ -163,7 +163,7 @@ pub(super) fn trash_unjournalled(
     if let Some(drive) = Shell.binless(&from) {
         return Err(AppError::refused(Reason::NoBin { drive }));
     }
-    recycling::add(conn, &Sending::new(&from, item_id, batch_id))?;
+    recycling::add(conn, &Sending::new(&from, item_id, &file.uuid, batch_id))?;
     let sent = recycle::send(&Shell, &from, |itself, before| {
         recycling::holding(conn, &from, itself, before)
             .map_err(|err| std::io::Error::other(err.to_string()))
@@ -273,7 +273,7 @@ fn settle_send(conn: &Connection, sending: &Sending) -> Result<()> {
 }
 
 /// Whether the mark's item is still the live row at the path it sent from, and not another file
-/// given its id since.
+/// given its id since, even at the same name.
 fn still_at(conn: &Connection, sending: &Sending) -> Result<bool> {
     if !items::is_live(conn, sending.item_id)? {
         return Ok(false);
@@ -281,7 +281,8 @@ fn still_at(conn: &Connection, sending: &Sending) -> Result<bool> {
     let Some(file) = items::file_of(conn, sending.item_id)? else {
         return Ok(false);
     };
-    Ok(paths::item_path(conn, file.folder_id, &file.disk_name)? == sending.file)
+    Ok(file.uuid == sending.item_uuid
+        && paths::item_path(conn, file.folder_id, &file.disk_name)? == sending.file)
 }
 
 /// Where a trashed item's file is now.
@@ -674,6 +675,10 @@ mod tests {
             .unwrap()
             .unwrap()
             .id
+    }
+
+    fn uuid_of(conn: &Connection, id: i64) -> String {
+        items::file_of(conn, id).unwrap().unwrap().uuid
     }
 
     /// Where the bin keeps a trashed item's file.
@@ -1746,7 +1751,11 @@ mod tests {
         let (conn, root, cairo) = library("send-cut-short");
         let sphinx = id_of(&conn, cairo, "sphinx.jpg");
         let place = root.join("Trips/Cairo/sphinx.jpg");
-        recycling::add(&conn, &Sending::new(&place, sphinx, None)).unwrap();
+        recycling::add(
+            &conn,
+            &Sending::new(&place, sphinx, &uuid_of(&conn, sphinx), None),
+        )
+        .unwrap();
         std::fs::rename(&place, hold_of(&place)).unwrap();
 
         settle_unfinished_send(&conn).unwrap();
@@ -1813,6 +1822,29 @@ mod tests {
 
         assert!(items::is_live(&conn, sphinx).unwrap());
         assert_eq!(items::binned(&conn, sphinx).unwrap(), None);
+        assert_eq!(
+            std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap(),
+            "p"
+        );
+        cairo_holds(&root, &["pyramid.jpg", "sphinx.jpg"]);
+        assert!(recycling::unsettled(&conn).unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_mark_whose_item_id_and_place_are_now_another_file_records_nothing() {
+        let (conn, root, cairo) = library("send-stopped-same-name");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        stopped_during_send(&conn, cairo, &journal::new_batch());
+        conn.execute(
+            "UPDATE item SET uuid = 'another' WHERE id = ?1",
+            rusqlite::params![pyramid],
+        )
+        .unwrap();
+
+        settle_unfinished_send(&conn).unwrap();
+
+        assert!(items::is_live(&conn, pyramid).unwrap());
+        assert_eq!(items::binned(&conn, pyramid).unwrap(), None);
         assert_eq!(
             std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap(),
             "p"
@@ -1892,7 +1924,11 @@ mod tests {
         let binned = bin_file(&conn, pyramid);
         let itself = recycle::file_at(&binned).unwrap();
         std::fs::hard_link(&binned, hold_of(&place)).unwrap();
-        recycling::add(&conn, &Sending::new(&place, pyramid, None)).unwrap();
+        recycling::add(
+            &conn,
+            &Sending::new(&place, pyramid, &uuid_of(&conn, pyramid), None),
+        )
+        .unwrap();
         recycling::holding(&conn, &place, &itself, &[]).unwrap();
 
         settle_unfinished_send(&conn).unwrap();
@@ -1910,7 +1946,11 @@ mod tests {
         let place = root.join("Trips/Cairo/pyramid.jpg");
         std::fs::hard_link(&place, hold_of(&place)).unwrap();
         let itself = recycle::file_at(&place).unwrap();
-        recycling::add(&conn, &Sending::new(&place, pyramid, None)).unwrap();
+        recycling::add(
+            &conn,
+            &Sending::new(&place, pyramid, &uuid_of(&conn, pyramid), None),
+        )
+        .unwrap();
         recycling::holding(&conn, &place, &itself, &[]).unwrap();
 
         settle_unfinished_send(&conn).unwrap();
@@ -1925,7 +1965,11 @@ mod tests {
         let (conn, root, cairo) = library("send-away");
         let sphinx = id_of(&conn, cairo, "sphinx.jpg");
         let away = root.join("Away/sphinx.jpg");
-        recycling::add(&conn, &Sending::new(&away, sphinx, None)).unwrap();
+        recycling::add(
+            &conn,
+            &Sending::new(&away, sphinx, &uuid_of(&conn, sphinx), None),
+        )
+        .unwrap();
 
         settle_unfinished_send(&conn).unwrap();
 

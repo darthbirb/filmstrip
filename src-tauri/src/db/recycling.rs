@@ -10,22 +10,25 @@ use crate::error::Result;
 
 const RECYCLING: &str = "recycling";
 
-/// One send not yet settled: the file, the item it is and the act it is part of, and once its
-/// second name is made, the file itself and every name it had before the shell was asked.
+/// One send not yet settled: the file, the item it is, by id and uuid, and the act it is part of,
+/// and once its second name is made, the file itself and every name it had before the shell was
+/// asked.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Sending {
     pub file: PathBuf,
     pub item_id: i64,
+    pub item_uuid: String,
     pub batch_id: Option<String>,
     pub itself: Option<String>,
     pub before: Vec<PathBuf>,
 }
 
 impl Sending {
-    pub fn new(file: &Path, item_id: i64, batch_id: Option<&str>) -> Sending {
+    pub fn new(file: &Path, item_id: i64, item_uuid: &str, batch_id: Option<&str>) -> Sending {
         Sending {
             file: file.to_path_buf(),
             item_id,
+            item_uuid: item_uuid.to_owned(),
             batch_id: batch_id.map(str::to_owned),
             itself: None,
             before: Vec::new(),
