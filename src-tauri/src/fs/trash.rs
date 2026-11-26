@@ -50,18 +50,29 @@ pub struct Origin {
     pub gone: bool,
 }
 
-/// Everything in the trash, the most recent first.
+/// Everything in the trash, the most recent first, each folder it left read with all the others.
 pub fn listing(conn: &Connection) -> Result<Vec<Trashed>> {
-    items::in_trash(conn)?
+    let held = items::in_trash(conn)?;
+    let left: Vec<i64> = held
+        .iter()
+        .map(|(row, _)| row.folder_id)
+        .collect::<HashSet<_>>()
         .into_iter()
-        .map(|(row, trashed_at)| {
-            Ok(Trashed {
-                from: origin(conn, row.folder_id)?,
-                row,
-                trashed_at,
-            })
+        .collect();
+    let paths = sources::place_paths(conn, &left)?;
+    let live = folders::live_at_each(conn, &left)?;
+    Ok(held
+        .into_iter()
+        .map(|(row, trashed_at)| Trashed {
+            from: Origin {
+                folder_id: row.folder_id,
+                path: paths.get(&row.folder_id).cloned().unwrap_or_default(),
+                gone: !live.contains_key(&row.folder_id),
+            },
+            row,
+            trashed_at,
         })
-        .collect()
+        .collect())
 }
 
 /// A folder named from its source's own folder down, and whether it or one at its place is live.
@@ -2021,6 +2032,45 @@ mod tests {
 
     mod timing {
         use super::*;
+
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn ten_thousand_trashed_files_from_a_thousand_folders_list_inside_a_second() {
+            let (conn, _, cairo) = library("timing-listing");
+            let tx = db::begin(&conn).unwrap();
+            let left: Vec<i64> = (0..1_000)
+                .map(|n| folders::create(&tx, cairo, &format!("Day {n}")).unwrap())
+                .collect();
+            for n in (0..1_000).step_by(2) {
+                folders::retire_subtree_at(&tx, left[n], 2).unwrap();
+            }
+            for n in (0..1_000).step_by(4) {
+                folders::create(&tx, cairo, &format!("Day {n}")).unwrap();
+            }
+            let trashed: Vec<i64> = (0..10_000_i64)
+                .map(|n| {
+                    tx.execute(
+                        "INSERT INTO item (uuid, source_id, folder_id, disk_name, ext, size_bytes,
+                                           mtime, kind, added_at, deleted_at, trashed_at)
+                         VALUES ('t' || ?1, 1, ?2, ?1 || '.jpg', 'jpg', 1, 1, 'image', 1, ?1, ?1)",
+                        rusqlite::params![n, left[(n % 1_000) as usize]],
+                    )
+                    .unwrap();
+                    tx.last_insert_rowid()
+                })
+                .collect();
+            tx.commit().unwrap();
+            journal::grow_to_two_hundred_thousand(&conn, &trashed);
+
+            let started = std::time::Instant::now();
+            let held = listing(&conn).unwrap();
+            let took = started.elapsed();
+
+            assert_eq!(held.len(), 10_000);
+            assert_eq!(held.iter().filter(|one| one.from.gone).count(), 2_500);
+            assert_eq!(held[0].from.path, ["Library", "Trips", "Cairo", "Day 999"]);
+            assert!(took < std::time::Duration::from_secs(1), "took {took:?}");
+        }
 
         #[test]
         #[ignore = "timing: runs alone, one test at a time"]
