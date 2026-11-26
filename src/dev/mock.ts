@@ -1978,6 +1978,15 @@ function withTrashCount(one: SourceSummary): SourceSummary {
   return { ...one, trashCount };
 }
 
+/** Retitles a source as `sources::rename` does; its root folder and inherited tag read it off. */
+function renameSource(id: number, title: string) {
+  const one = SOURCES.find((candidate) => candidate.id === id);
+  if (!one) return invalid();
+  const name = title.trim();
+  if (name) one.title = name;
+  return null;
+}
+
 /** Forgets a source and its files in the Trash, which stay in the Recycle Bin. Its folders stay. */
 function removeSource(id: number) {
   for (const item of (ITEMS[TRASH] ?? []).filter((one) => trashed.get(one.id)?.home.id === id))
@@ -2029,7 +2038,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   add_source: () => invalid(),
   // The picker is the system's, so outside Tauri there is nothing to open and nothing chosen.
   pick_folder: () => null,
-  rename_source: () => null,
+  rename_source: ({ id, title }) => renameSource(id as number, title as string),
   set_source_kind: () => null,
   reveal_source: () => null,
   remove_source: ({ id }) => removeSource(id as number),

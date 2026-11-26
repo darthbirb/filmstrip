@@ -18,7 +18,7 @@ drawn. **Not started** — neither.
 | --- | --- | --- |
 | Register a folder as a source | Built | `add_source`, and both doorways |
 | Several sources at once, library and sorting | Built | `list_sources`, `set_source_kind` |
-| Rename a source | Built | `rename_source`, in Settings and on its tree row |
+| Rename a source | Built | `rename_source`, in Settings and on its tree row; whatever shows the source reads it again |
 | Remove a source, leaving the folder alone | Built | `remove_source`; its trashed rows are forgotten and their files stay in the Recycle Bin, so nothing is sent |
 | Reveal a source in Explorer | Built | `reveal_source` |
 | Remember the interface's own state | Built | `ui_preferences` |

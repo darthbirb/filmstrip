@@ -23,7 +23,7 @@ import {
 } from "../../ui/Menu";
 import { Tree, type TreeRow } from "../../ui/Tree";
 import { exportFiles } from "../export/export";
-import { failed, sayFailed, unasked } from "../failure";
+import { failed, sayFailed } from "../failure";
 import { type Landing, type Resolver, setDropResolver, useDrag } from "../grid/drag";
 import { type CheckedFile, checkBranch } from "../grid/selection";
 import { DIGITS } from "../keys";
@@ -48,7 +48,7 @@ import { favouriteFailed, refusedName, shownFailed } from "../undo/lines";
 import { afterAct } from "../undo/undo";
 import { addFolder } from "./add-source";
 import { deleteFolderAsking } from "./delete-folder";
-import { ensureChildren, loadIndex, openIndex, refreshIndex, useIndex } from "./index-store";
+import { ensureChildren, openIndex, refreshIndex, useIndex } from "./index-store";
 import { openFolders, setOpenFolders, useOpenFolders } from "./open-folders";
 import {
   addFolderRows,
@@ -441,7 +441,7 @@ export function Navigation() {
     if (folder === source.rootFolderId) {
       stopRenaming();
       await renameSource(source.id, name).catch(failed(`Could not rename ${source.title}.`));
-      await loadIndex().catch(unasked);
+      await libraryChanged();
       return;
     }
     try {

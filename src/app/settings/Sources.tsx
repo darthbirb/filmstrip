@@ -148,7 +148,7 @@ function Settled({ source, onRemove }: { source: SourceSummary; onRemove: () => 
       await renameSource(source.id, title.trim()).catch(
         failed(`Could not rename ${source.title}.`),
       );
-      await loadIndex().catch(unasked);
+      await libraryChanged().catch(unasked);
     }
   };
 
