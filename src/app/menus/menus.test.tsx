@@ -108,7 +108,7 @@ test("a tile's menu is the bar's verbs in the bar's order, and opening it leaves
     "Move to…",
     "Show in Explorer",
     "Copy",
-    "Copy Path",
+    "Copy as Path",
     "Open with Default App",
     "Rename",
     "Delete",
@@ -117,7 +117,7 @@ test("a tile's menu is the bar's verbs in the bar's order, and opening it leaves
   expect(getPaneItem()).toBeNull();
 });
 
-test("Copy Path from a tile's menu copies that file's path and leaves the pane alone", async () => {
+test("Copy as Path from a tile's menu copies that file's path and leaves the pane alone", async () => {
   const screen = await render(<Harness />);
   const sphinx = await inCairo("sphinx.jpg");
   await recording(async (calls) => {
@@ -126,7 +126,7 @@ test("Copy Path from a tile's menu copies that file's path and leaves the pane a
       screen.getByRole("button", { name: "sphinx.jpg" }),
       "sphinx.jpg",
     );
-    await menu.getByRole("menuitem", { name: "Copy Path" }).click();
+    await menu.getByRole("menuitem", { name: "Copy as Path" }).click();
     await expect
       .poll(() => calls.filter(([cmd]) => cmd.startsWith("copy_")))
       .toEqual([["copy_item_paths", { itemIds: [sphinx.id] }]]);
@@ -183,7 +183,7 @@ test("a filmstrip frame is a tile, and gets the tile's menu", async () => {
     "Move to…",
     "Show in Explorer",
     "Copy",
-    "Copy Path",
+    "Copy as Path",
     "Open with Default App",
     "Rename",
     "Delete",

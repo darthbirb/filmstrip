@@ -32,7 +32,7 @@ function Term({ row, typed }: { row: Suggestion; typed: string }) {
     return (
       <>
         {titles.length > 1 && (
-          <span className="min-w-0 truncate text-fg-dim">{titles.slice(0, -1).join(" / ")} /</span>
+          <span className="min-w-0 truncate text-fg-dim">{titles.slice(0, -1).join(" › ")} ›</span>
         )}
         <span className="shrink-0">{titles.at(-1)}</span>
       </>

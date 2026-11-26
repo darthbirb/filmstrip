@@ -57,7 +57,7 @@ export function FolderCard({
             <CountPill own={own} all={count} />
           </span>
           {above.length > 0 && (
-            <span className="truncate text-fg-dim text-small">in {above.join(" / ")}</span>
+            <span className="truncate text-fg-dim text-small">in {above.join(" › ")}</span>
           )}
           <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-fg-dim text-small">
             {matched.kind === "name" ? (

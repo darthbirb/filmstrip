@@ -9,6 +9,7 @@ import { sayFailed, unasked } from "../failure";
 import { libraryChanged } from "../library";
 import { dropPaneFolder, getPaneFolder } from "../pane/pane-store";
 import { getPreferences, updatePreferences } from "../preferences";
+import { SORTING_BOX, sortingDetail } from "../sorting-box";
 import {
   folderForGoodLine,
   folderKeptBanner,
@@ -31,7 +32,7 @@ let asking: {
   folder: Doomed;
   held: number;
   back: HTMLElement | null;
-  /** Drives with no Recycle Bin its files are on, which deleting them would empty for good. */
+  /** Drives with no Recycle Bin its files are on, which deleting them would empty permanently. */
   binless: BinlessDrive[];
 } | null = null;
 const listeners = new Set<() => void>();
@@ -57,10 +58,10 @@ export async function deleteFolderAsking(folder: Doomed, sources: readonly Sourc
   };
   const held = await folderFileCount(folder.id).catch(failing);
   if (held === null) return;
-  if (held === 0) return settle(folder, null, 0, sources);
+  if (held === 0) return settle(folder, null, 0);
   const into = getPreferences().deleteInto;
   if (sortingSources(sources).some((source) => source.id === into) && into !== undefined) {
-    return settle(folder, { kind: "moveTo", sourceId: into }, held, sources);
+    return settle(folder, { kind: "moveTo", sourceId: into }, held);
   }
   const focused = document.activeElement;
   const binless = await binlessUnder(folder.id).catch(failing);
@@ -73,12 +74,7 @@ export async function deleteFolderAsking(folder: Doomed, sources: readonly Sourc
  * Sends the folder where its files were told to go, and says what happened: the line at the foot
  * for what went, the banner over the grid for a folder that stayed. DECISIONS.md "Undo".
  */
-async function settle(
-  folder: Doomed,
-  contents: Contents | null,
-  held: number,
-  sources: readonly SourceSummary[],
-) {
+async function settle(folder: Doomed, contents: Contents | null, held: number) {
   const inPane = await showsInPane(folder.id);
   const done = await deleteFolder(folder.id, contents).catch((error: unknown) => {
     sayFailed(`Could not delete ${folder.name}.`, error);
@@ -87,10 +83,7 @@ async function settle(
   if (!done) return;
   const { batch, report } = done;
   if (report.deleted && inPane !== null) dropPaneFolder((shown) => shown.folderId === inPane);
-  const into =
-    contents?.kind === "moveTo"
-      ? (sources.find((source) => source.id === contents.sourceId)?.title ?? null)
-      : null;
+  const into = contents?.kind === "moveTo" ? SORTING_BOX : null;
   const forGood = contents?.kind === "permanently";
   const binned = batch?.files ?? 0;
   const { outright } = report;
@@ -106,7 +99,7 @@ async function settle(
     showReport({
       sentence: folderKeptBanner(folder.name, binned, outright, held),
       rows: report.refused,
-      retry: () => void settle(folder, contents, held - binned - outright, sources),
+      retry: () => void settle(folder, contents, held - binned - outright),
     });
   } else {
     const carried = batch?.files ?? 0;
@@ -114,7 +107,7 @@ async function settle(
     showReport({
       sentence: folderStayedBanner(folder.name, carried, held, into),
       rows: report.refused,
-      retry: () => void settle(folder, contents, held - carried, sources),
+      retry: () => void settle(folder, contents, held - carried),
     });
   }
   await libraryChanged();
@@ -163,7 +156,7 @@ function Asked({ folder, held, back, binless }: NonNullable<typeof asking>) {
   const answer = (contents: Contents) => {
     if (always && contents.kind === "moveTo") updatePreferences({ deleteInto: contents.sourceId });
     ask(null);
-    void settle(folder, contents, held, every);
+    void settle(folder, contents, held);
   };
 
   const asked = binless.flatMap((drive) => drive.files);
@@ -185,8 +178,9 @@ function Asked({ folder, held, back, binless }: NonNullable<typeof asking>) {
       }
       choices={sorting.map((source) => ({
         id: String(source.id),
-        label: `Move Files to ${source.title}`,
-        short: source.title,
+        label: `Move Files to ${SORTING_BOX}`,
+        short: SORTING_BOX,
+        detail: sortingDetail(source, every),
         onChoose: () => answer({ kind: "moveTo", sourceId: source.id }),
       }))}
       choiceGlyph="sortingBox"

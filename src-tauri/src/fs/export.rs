@@ -15,7 +15,7 @@ use ts_rs::TS;
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
 
-use crate::db::sources::{self, SourceKind};
+use crate::db::sources::{self, SORTING_BOX, SourceKind};
 use crate::db::{folders, items};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::paste::Halt;
@@ -24,8 +24,6 @@ use crate::fs::{noclobber, paths, sanitize};
 
 const CHUNK: usize = 1 << 20;
 const STAMP: &str = "%Y-%m-%d-%H-%M-%S";
-/// What a file at a sorting source's top level is named for, as the Sorting Box shows it.
-const SORTING_BOX: &str = "Sorting Box";
 
 /// How the files are named in the zip: their own names, or from their folder and when each was taken.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]

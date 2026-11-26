@@ -1,4 +1,8 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
+
+/** A scope chip naming a path, never a tile's caption, which carries its folder's path the same way. */
+const scope = (page: Page, path: string) =>
+  page.getByTitle(path, { exact: true }).and(page.locator(":not(figcaption)"));
 
 test("a search typed in a folder stands in its results, opens one, widens, acts on one, and goes back", async ({
   page,
@@ -20,7 +24,7 @@ test("a search typed in a folder stands in its results, opens one, widens, acts 
   await expect(page.getByRole("button", { name: "Search Only in Trips" })).toBeVisible();
   await field.pressSequentially("cairo");
   await page.keyboard.press("Tab");
-  await expect(page.getByTitle("Pictures / Trips")).toBeVisible();
+  await expect(scope(page, "Pictures › Trips")).toBeVisible();
   await expect(field).toBeFocused();
   await expect(field).toHaveValue("cairo");
   await page.keyboard.press("Enter");
@@ -36,7 +40,7 @@ test("a search typed in a folder stands in its results, opens one, widens, acts 
 
   await page.getByRole("button", { name: "Search Everywhere" }).click();
   await expect(field).toHaveValue("cairo");
-  await expect(page.getByTitle("Pictures / Trips")).toHaveCount(0);
+  await expect(scope(page, "Pictures › Trips")).toHaveCount(0);
 
   await grid.getByRole("button", { name: "sphinx.jpg" }).click({ button: "right" });
   await page.getByRole("menuitem", { name: "Delete" }).click();
@@ -78,7 +82,7 @@ test("a folder picked from the list under the field becomes the search's scope",
 
   const grid = page.getByRole("main");
   await expect(page.getByRole("option")).toHaveCount(0);
-  await expect(page.getByTitle("Pictures / Trips / Cairo").first()).toBeVisible();
+  await expect(scope(page, "Pictures › Trips › Cairo").first()).toBeVisible();
   await expect(grid.getByRole("button", { name: "pyramid.jpg" })).toBeVisible();
   await expect(grid.getByRole("button", { name: "sphinx.jpg" })).toBeVisible();
   await expect(grid.getByRole("button", { name: "felucca.mp4" })).toHaveCount(0);
@@ -101,7 +105,7 @@ test("a matched folder's glass asks the search again inside it", async ({ page }
   await grid.getByRole("button", { name: "Search in Cairo" }).click();
 
   // Now asked inside Cairo: the scope leads the header, and Search Everywhere comes back.
-  await expect(page.getByTitle("Pictures / Trips / Cairo").first()).toBeVisible();
+  await expect(scope(page, "Pictures › Trips › Cairo").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Search Everywhere" })).toBeVisible();
   await expect(grid.getByRole("button", { name: "pyramid.jpg" })).toBeVisible();
   expect(errors).toEqual([]);

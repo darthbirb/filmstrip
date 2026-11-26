@@ -8,7 +8,7 @@ import { resetSearches } from "./results";
 import { SearchField } from "./SearchField";
 import { movePlate } from "./suggest";
 
-// Against the dev mock, standing in Pictures / Trips with nothing scoped: `ca` begins the folder
+// Against the dev mock, standing in Pictures › Trips with nothing scoped: `ca` begins the folder
 // Cairo, the tag camel and the label location:cairo.
 
 const TRIPS: Place = {
@@ -63,7 +63,7 @@ test("the list opens at the first key, not on focus, with each row's kind at its
   // A folder is named by its whole path from the source.
   expect(rows()).toEqual([
     "caWords",
-    "Pictures / Trips /CairoFolder",
+    "Pictures › Trips ›CairoFolder",
     "camelTag",
     "locationcairoLabel",
   ]);
@@ -124,8 +124,8 @@ test("a folder picked becomes the scope, and the other words stay", async () => 
     query: "path:Pictures/Trips/Cairo giza",
     back: TRIPS,
   });
-  await expect.element(page.getByTitle("Pictures / Trips / Cairo")).toBeVisible();
-  expect(page.getByTitle("Pictures / Trips", { exact: true }).elements()).toHaveLength(0);
+  await expect.element(page.getByTitle("Pictures › Trips › Cairo")).toBeVisible();
+  expect(page.getByTitle("Pictures › Trips", { exact: true }).elements()).toHaveLength(0);
 });
 
 test("a click on a row picks it", async () => {

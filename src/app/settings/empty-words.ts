@@ -13,15 +13,15 @@ export function heldLine(held: Tally) {
   return `${files(held.count)} · ${formatBytes(held.bytes)}`;
 }
 
-/** The question under the head: how many and how much, that only they go, and for good. */
+/** The question under the head: how many and how much, that only they go, and permanently. */
 export function emptyQuestion(held: Tally): Said {
   const one = held.count === 1;
   return [
-    "Delete the ",
+    "Permanently delete the ",
     { term: one ? "file" : files(held.count) },
     " the library sent to the Recycle Bin, ",
     { term: formatBytes(held.bytes) },
-    `, for good? Only ${one ? "it goes" : "these go"}; the rest of the Recycle Bin is left as it is. Undo cannot bring ${one ? "it" : "them"} back.`,
+    `? Only ${one ? "it goes" : "these go"}; the rest of the Recycle Bin is left as it is. Undo cannot bring ${one ? "it" : "them"} back.`,
   ];
 }
 
@@ -31,16 +31,16 @@ export const emptyingLine = (done: number, whole: number) =>
 
 /** The foot once every file counted went. */
 export function emptiedLine({ deleted, bytes }: Emptied) {
-  return `Emptied the Trash: ${files(deleted)}, ${formatBytes(bytes)}, deleted for good.`;
+  return `Emptied the Trash: ${files(deleted)}, ${formatBytes(bytes)}, permanently deleted.`;
 }
 
-/** The foot when some were skipped: what went, then those no longer in the bin and those kept. */
+/** The foot when some were skipped: what went, then those no longer in the Recycle Bin and those kept. */
 export function skippedLine({ deleted, gone, kept }: Emptied) {
   const whole = deleted + gone + kept;
   const lead =
     deleted === 0
       ? `Emptied none of the ${files(whole)}.`
-      : `Emptied ${formatCount(deleted)} of ${files(whole)} for good.`;
+      : `Permanently deleted ${formatCount(deleted)} of ${files(whole)}.`;
   const parts = [
     gone > 0 && `${formatCount(gone)} ${gone === 1 ? "was" : "were"} no longer in the Recycle Bin`,
     kept > 0 &&
@@ -53,8 +53,8 @@ export function skippedLine({ deleted, gone, kept }: Emptied) {
 export function emptiedBannerLine({ deleted, gone, kept, stayed }: Emptied) {
   const whole = deleted + gone + kept;
   if (deleted > 0)
-    return `${formatCount(deleted)} of ${files(whole)} ${deleted === 1 ? "was" : "were"} deleted for good`;
+    return `${formatCount(deleted)} of ${files(whole)} ${deleted === 1 ? "was" : "were"} permanently deleted`;
   const [first] = stayed;
   const what = kept === 1 && first ? first.name : `The ${files(kept)}`;
-  return `${what} could not be deleted for good`;
+  return `${what} could not be permanently deleted`;
 }

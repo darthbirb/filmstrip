@@ -63,7 +63,7 @@ function fileKeyOf(event: KeyboardEvent): FileKey | null {
 
 /**
  * Explorer's keys for files: Delete, Ctrl+C and Ctrl+Shift+C do what the bar's Delete, Copy and
- * Copy Path do, to what is checked, or the pane's file when nothing is.
+ * Copy as Path do, to what is checked, or the pane's file when nothing is.
  */
 export function useFileKeys() {
   useEffect(() => {

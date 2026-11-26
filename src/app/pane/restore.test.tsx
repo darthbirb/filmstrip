@@ -170,7 +170,9 @@ test("a file emptied from the Recycle Bin outside the app is listed as gone, wit
 
   await expect.element(screen.getByText("pyramid.jpg could not go back to Cairo")).toBeVisible();
   await expect.element(screen.getByText("Gone from the Recycle Bin")).toBeVisible();
-  await expect.element(screen.getByText("Emptied outside the app")).toBeVisible();
+  await expect
+    .element(screen.getByText("Emptied from the Recycle Bin outside Filmstrip"))
+    .toBeVisible();
   expect(screen.getByRole("button", { name: "Retry" }).query()).toBeNull();
   expect(screen.getByRole("button", { name: /Restore pyramid\.jpg to/ }).query()).toBeNull();
   expect((await trashListing()).map((one) => one.id)).not.toContain(pyramid);

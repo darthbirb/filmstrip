@@ -49,7 +49,7 @@ export function WindowBar({ search, onSettings, settingsOpen = false }: Props) {
         />
         <CaptionButton
           glyph={maximized ? "restore" : "maximize"}
-          label={maximized ? "Restore" : "Maximise"}
+          label={maximized ? "Restore Down" : "Maximise"}
           dimmed={dimmed}
           onClick={() => void win.toggleMaximize()}
         />

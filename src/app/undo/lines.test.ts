@@ -135,7 +135,7 @@ test("each reason is said in the banner's own words", () => {
     `Holds notes.txt and ${(1204).toLocaleString()} more`,
   );
   expect(reasonText({ kind: "goneFromBin", name: "a.jpg", place: "Cairo" })).toBe(
-    "Emptied outside the app",
+    "Emptied from the Recycle Bin outside Filmstrip",
   );
   expect(reasonText({ kind: "binRefused" })).toBe("The Recycle Bin would not take it");
   expect(reasonText({ kind: "pathTooLong" })).toBe("Path too long for the Recycle Bin");
@@ -222,7 +222,7 @@ test("what the foot says when the Recycle Bin would not take what Delete sent it
     "Deleted 1 of 3 files. The Recycle Bin would not take 2 files, so they stay where they were.",
   );
   expect(binRefusedDetail(1)).toBe(
-    "It may be too large for the bin, or the bin is turned off. Nothing was deleted.",
+    "It may be too large for the Recycle Bin, or the Recycle Bin is turned off. Nothing was deleted.",
   );
   expect(binRefusedDetail(2)).toMatch(/^They may be/);
 });
@@ -500,34 +500,34 @@ test("a drive with no Recycle Bin is named, two are, three or more are counted",
   );
 });
 
-test("the question says what goes for good, its size, and what went to the bin", () => {
+test("the question says what goes permanently, its size, and what went to the Recycle Bin", () => {
   const mb = 1024 * 1024;
   const file = (name: string, bytes: number) => ({ name, bytes });
   expect(noBinDetail([file("MVI_0412.mov", 12 * mb)], 1, 0)).toBe(
-    "Delete MVI_0412.mov, 12 MB, for good? Undo cannot bring it back.",
+    "Permanently delete MVI_0412.mov, 12 MB? Undo cannot bring it back.",
   );
   const three = [file("a.jpg", mb), file("b.jpg", mb), file("c.jpg", 2 * mb)];
   expect(noBinDetail(three, 3, 0)).toBe(
-    "Delete 3 files, 4 MB, for good? Undo cannot bring them back.",
+    "Permanently delete 3 files, 4 MB? Undo cannot bring them back.",
   );
   expect(noBinDetail(three, 15, 12)).toBe(
-    "Delete them, 4 MB, for good? Undo cannot bring them back. The other 12 went to the Recycle Bin.",
+    "Permanently delete them, 4 MB? Undo cannot bring them back. The other 12 went to the Recycle Bin.",
   );
   expect(noBinDetail(three, 15, 10)).toBe(
-    "Delete them, 4 MB, for good? Undo cannot bring them back. 10 of the other 12 went to the Recycle Bin.",
+    "Permanently delete them, 4 MB? Undo cannot bring them back. 10 of the other 12 went to the Recycle Bin.",
   );
   expect(folderNoBinDetail(["USB Drive (E:)"], 214, 214, 3 * mb)).toBe(
-    "USB Drive (E:) has no Recycle Bin. Deleted, its files go for good, 3 MB, and Undo cannot bring them back.",
+    "USB Drive (E:) has no Recycle Bin. Deleting it permanently deletes its files, 3 MB, and Undo cannot bring them back.",
   );
   expect(folderNoBinDetail(["USB Drive (E:)"], 2, 5, mb)).toBe(
-    "USB Drive (E:) has no Recycle Bin. Deleted, 2 of its files go for good, 1 MB, and Undo cannot bring them back.",
+    "USB Drive (E:) has no Recycle Bin. Deleting it permanently deletes 2 of its files, 1 MB, and Undo cannot bring them back.",
   );
   expect(folderNoBinDetail(["USB Drive (E:)"], 1, 5, mb)).toBe(
-    "USB Drive (E:) has no Recycle Bin. Deleted, 1 of its files goes for good, 1 MB, and Undo cannot bring it back.",
+    "USB Drive (E:) has no Recycle Bin. Deleting it permanently deletes 1 of its files, 1 MB, and Undo cannot bring it back.",
   );
 });
 
-test("what went for good is said with no Undo, and what would not go is named", () => {
+test("what went permanently is said with no Undo, and what would not go is named", () => {
   const kept = (name: string, place = "Lisbon"): Stayed => ({
     kind: "file",
     id: name.length,
@@ -535,43 +535,45 @@ test("what went for good is said with no Undo, and what would not go is named", 
     at: { kind: "folder", folderId: 1, path: ["Pictures", place] },
     reason: { kind: "inUse" },
   });
-  expect(forGoodLine(3, ["USB Drive (E:)"])).toBe("Deleted 3 files from USB Drive (E:) for good.");
-  expect(forGoodLine(1, ["USB Drive (E:)"], "a.jpg")).toBe(
-    "Deleted a.jpg from USB Drive (E:) for good.",
+  expect(forGoodLine(3, ["USB Drive (E:)"])).toBe(
+    "Permanently deleted 3 files from USB Drive (E:).",
   );
-  expect(forGoodLine(5, ["E", "F"])).toBe("Deleted 5 files for good.");
+  expect(forGoodLine(1, ["USB Drive (E:)"], "a.jpg")).toBe(
+    "Permanently deleted a.jpg from USB Drive (E:).",
+  );
+  expect(forGoodLine(5, ["E", "F"])).toBe("Permanently deleted 5 files.");
   expect(forGoodKeptLine([kept("DSC_0102.jpg")], 2)).toBe(
-    "Deleted 2 of 3 files for good. DSC_0102.jpg could not be deleted and stays in Lisbon.",
+    "Permanently deleted 2 of 3 files. DSC_0102.jpg could not be deleted and stays in Lisbon.",
   );
   expect(forGoodKeptLine([kept("a.jpg"), kept("b.jpg", "Porto")], 0)).toBe(
     "2 files could not be deleted and stay where they were.",
   );
-  expect(folderForGoodLine("Lisbon", 0, 214)).toBe("Deleted Lisbon and its 214 files for good.");
+  expect(folderForGoodLine("Lisbon", 0, 214)).toBe("Deleted Lisbon and its 214 files permanently.");
   expect(folderForGoodLine("Trips", 1, 2)).toBe(
-    "Deleted Trips and its 3 files, 2 of them for good.",
+    "Deleted Trips and its 3 files, 2 of them permanently.",
   );
   expect(folderForGoodLine("Trips", 3, 0)).toBe("Deleted Trips and its 3 files.");
   expect(folderKeptLine("Lisbon", 0, 213, 214)).toBe(
-    "Deleted 213 of Lisbon’s 214 files for good. Lisbon is in the banner.",
+    "Deleted 213 of Lisbon’s 214 files permanently. Lisbon is in the banner.",
   );
   expect(folderKeptLine("Trips", 1, 2, 4)).toBe(
-    "Deleted 3 of Trips’ 4 files, 2 of them for good. Trips is in the banner.",
+    "Deleted 3 of Trips’ 4 files, 2 of them permanently. Trips is in the banner.",
   );
   expect(folderKeptLine("Trips", 1, 0, 4)).toBe(
     "Deleted 1 of Trips’ 4 files. Trips is in the banner.",
   );
   expect(folderKeptLine("Lisbon", 0, 0, 1)).toBeNull();
   expect(folderKeptBanner("Lisbon", 0, 213, 214)).toBe(
-    "213 of Lisbon’s 214 files are gone for good · Lisbon stayed",
+    "213 of Lisbon’s 214 files are gone permanently · Lisbon stayed",
   );
   expect(folderKeptBanner("Trips", 1, 2, 3)).toBe(
-    "Trips could not go · its 3 files are gone, 2 of them for good",
+    "Trips could not go · its 3 files are gone, 2 of them permanently",
   );
   expect(folderKeptBanner("Lisbon", 0, 0, 214)).toBe(
     "Lisbon’s 214 files could not be deleted · Lisbon stayed",
   );
   expect(folderKeptBanner("Lisbon", 0, 214, 214)).toBe(
-    "Lisbon could not go · its 214 files are gone for good",
+    "Lisbon could not go · its 214 files are gone permanently",
   );
 });
 

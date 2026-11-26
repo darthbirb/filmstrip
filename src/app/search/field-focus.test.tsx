@@ -52,7 +52,7 @@ async function renderBar() {
     field: bar.getByRole("combobox", { name: "Search" }),
     offer: bar.getByRole("button", { name: "Search Only in Trips" }),
     tile: grid.getByRole("button", { name: "Tile" }),
-    scope: bar.getByTitle("Pictures / Trips"),
+    scope: bar.getByTitle("Pictures › Trips"),
   };
 }
 

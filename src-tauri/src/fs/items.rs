@@ -173,10 +173,7 @@ fn move_one(
 
     let taken = || {
         AppError::refused(Reason::NameTaken {
-            place: folders::title(conn, folder_id)
-                .ok()
-                .flatten()
-                .unwrap_or_default(),
+            place: crate::fs::acts::name(conn, folder_id).unwrap_or_default(),
             name: file.disk_name.clone(),
             folder: false,
         })
@@ -237,10 +234,7 @@ pub(super) fn rename_unjournalled(
     }
     let taken = || {
         AppError::refused(Reason::NameTaken {
-            place: folders::title(conn, file.folder_id)
-                .ok()
-                .flatten()
-                .unwrap_or_default(),
+            place: crate::fs::acts::name(conn, file.folder_id).unwrap_or_default(),
             name: name.clone(),
             folder: false,
         })
@@ -364,6 +358,29 @@ mod tests {
         assert_eq!((back.files_back, back.stayed.len()), (1, 0));
         assert!(root.join("Trips/Cairo/pyramid.jpg").is_file());
         assert_eq!(id_of(&conn, cairo, "pyramid.jpg"), pyramid);
+    }
+
+    #[test]
+    fn a_rename_onto_a_name_taken_in_a_sorting_sources_own_folder_is_taken_in_the_sorting_box() {
+        let (conn, root, _, _) = library("rename-taken-sorting");
+        let incoming = root.parent().unwrap().join("incoming");
+        std::fs::create_dir_all(&incoming).unwrap();
+        std::fs::write(incoming.join("a.jpg"), "a").unwrap();
+        std::fs::write(incoming.join("b.jpg"), "b").unwrap();
+        let source = sources::add(&conn, &incoming, "Incoming", SourceKind::Sorting).unwrap();
+        walk::reconcile(&conn).unwrap();
+        let sorting = folders::source_root_folder(&conn, source.id).unwrap();
+
+        let a = id_of(&conn, sorting, "a.jpg");
+        let err = rename(&conn, a, "b.jpg", &journal::new_batch()).unwrap_err();
+        assert_eq!(
+            Reason::of(&err),
+            Reason::NameTaken {
+                place: "Sorting Box".into(),
+                name: "b.jpg".into(),
+                folder: false
+            }
+        );
     }
 
     #[test]

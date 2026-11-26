@@ -13,6 +13,7 @@ import { sayFailed, unasked } from "../failure";
 import { libraryChanged, RELOAD_WINDOW_MS } from "../library";
 import { type FootNews, sayOnce, setNews } from "../navigation/foot-slot";
 import { refreshIndex } from "../navigation/index-store";
+import { SORTING_BOX, sortingDetail } from "../sorting-box";
 import { actLine, copiedBannerLine, copyCancelledLine, reasonSentence } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
@@ -22,7 +23,7 @@ import { counted } from "./clipboard";
 // the foot, ending in the Line and Undo. DECISIONS.md "Bringing files in".
 
 /** Where a copy goes: a folder, named as navigation names it. */
-export type Into = { id: number; title: string };
+export type Into = { id: number; title: string; detail?: string };
 
 /** Copies what the clipboard holds into a folder. */
 export async function pasteInto(to: Into) {
@@ -155,7 +156,11 @@ export async function watchCopies() {
 export function sortingPlaces(sources: readonly SourceSummary[]): Into[] {
   return sources
     .filter((source) => source.kind === "sorting")
-    .map((source) => ({ id: source.rootFolderId, title: source.title }));
+    .map((source) => ({
+      id: source.rootFolderId,
+      title: SORTING_BOX,
+      detail: sortingDetail(source, sources),
+    }));
 }
 
 /** The Sorting Box asks which of its sources, against a row or at the pointer. */

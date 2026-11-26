@@ -13,6 +13,7 @@ use crate::db::journal::{
     Gone, ItemCopied, ItemMoved, ItemRenamed, ItemRestored, ItemTrashed, ItemsTagged,
     ItemsUntagged, Retagged,
 };
+use crate::db::sources;
 use crate::db::{folders, items};
 use crate::error::{AppError, Result};
 
@@ -303,12 +304,9 @@ fn copy_act(
     })
 }
 
-/// A folder as navigation names it: a source's own folder goes by the source's title.
+/// A folder as navigation names it. `sources::place_name`.
 pub(crate) fn name(conn: &Connection, folder_id: i64) -> Result<String> {
-    Ok(folders::ancestry(conn, folder_id)?
-        .pop()
-        .map(|crumb| crumb.title)
-        .unwrap_or_default())
+    sources::place_name(conn, folder_id)
 }
 
 fn parent_name(conn: &Connection, folder_id: i64) -> Result<String> {

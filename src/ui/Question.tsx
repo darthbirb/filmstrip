@@ -8,7 +8,14 @@ import type { GlyphName } from "./glyphs";
 import { ContextMenu } from "./Menu";
 
 /** One answer. `short` names it in the folded menu, where the question already says the verb. */
-export type Answer = { id: string; label: string; short: string; onChoose: () => void };
+export type Answer = {
+  id: string;
+  label: string;
+  short: string;
+  /** Quiet words after the label, on the line and in the fold alike. */
+  detail?: string;
+  onChoose: () => void;
+};
 
 /** Answers that can fold come with what their fold says and shows, or there are none. */
 type Choices =
@@ -115,7 +122,7 @@ export function Question({
     </Button>
   );
   const everyChoice = choices.map((choice) => (
-    <Button key={choice.id} onClick={choice.onChoose}>
+    <Button key={choice.id} detail={choice.detail} onClick={choice.onChoose}>
       {choice.label}
     </Button>
   ));
@@ -218,6 +225,7 @@ export function Question({
             choices.map((choice) => ({
               id: choice.id,
               label: choice.short,
+              detail: choice.detail,
               glyph: choiceGlyph,
               onSelect: choice.onChoose,
             })),

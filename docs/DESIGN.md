@@ -554,6 +554,20 @@ error came with. An ellipsis only where a choice or
 typing follows before anything happens, and figures for a count. One act has one name everywhere
 it appears; the Components sheet's Words block lists them, with the reason each changed.
 
+Names that drifted are held to one. **Sorting Box** is every sorting source wherever the person
+meets one: a question's answer, Move to…, the pick a paste or a drop asks, and an act's line. Where
+there are several, the source's own name follows in `small` `fg-dim`; Settings › Sources alone
+lists them by their own names. **Permanently** in a sentence ("Permanently delete pyramid.jpg,
+2 MB?"), never "for good"; Delete Permanently on a button. **Recycle Bin** in full, never "the
+bin", and a file emptied from it elsewhere is "Emptied from the Recycle Bin outside Filmstrip".
+**Remove Key** takes a destination key off a folder, in its menu as in Settings › Keys. The tags
+screen's keys are **label keys** ("214 tags · 4 label keys", Rename Label Key…), so "key" alone
+is always a destination key. A paste and a drop that ask which sorting source both ask **Copy
+3 Files Into**. A path written out is joined with " › ". Where Windows has a name, it is
+Windows': **Restore Down**, **Copy as Path**, and the system pickers titled **Add Source** and
+**Export to Zip**, filtering **Zip files (\*.zip)**. Apostrophes are typographic, "Filmstrip’s",
+and a row's line that reads as a sentence opens with a capital: "Backing up…".
+
 What the person counts is files: the foot, Sources, a place that is offline, every act and every
 question say "files" for the same thing. "Item" is a word of the code and these docs; the person
 reads it only for what holds files and folders together, or what Explorer carries before its paths
@@ -696,7 +710,9 @@ toward the rest surface.
   on one line; under the question its answers as buttons, the one that destroys last in `danger`;
   under them, where an answer can be kept, a checkbox. The answers hold the line or all fold into
   one raised button with a caret, whose menu names them a `tile-gap` under it; folded answers that
-  still do not fit take a line each, left-aligned. Only the answers ever change shape. Why it is
+  still do not fit take a line each, left-aligned. Only the answers ever change shape. An answer
+  that needs telling from the next carries quiet words after its label, on the line and in the
+  fold alike. Why it is
   asked can stand under the question in `small` `fg-dim`. A question about several files has
   Hide Files before × and their list under its answers, as the notice's, each file's size where a
   reason would be. Where an answer cannot be undone the keyboard starts on the way out, ×; over
@@ -856,7 +872,10 @@ toward the rest surface.
   A file in the Trash has two worded buttons from the left, Restore and Restore to…, and no ⋯.
 - **Menu.** A `menu`-wide list of actions on `panel` at the `control` corner, with the
   `line-control` hairline and the overlay shadow. Its rows are `control` tall in `fg`, each glyph
-  `glyph`-sized in `fg-dim`, and `raised-hi` under the pointer. A rule in `line` stands between two
+  `glyph`-sized in `fg-dim`, and `raised-hi` under the pointer. A row that needs telling from its
+  neighbours ends in quieter words in `small` `fg-dim`, as a Sorting Box row names its source;
+  they are cut before the label is.
+  A rule in `line` stands between two
   groups only when both hold rows. A menu about a thing that is not the row itself, as a
   source's is, opens under a heading: `eyebrow` capitals in `fg-dim`, `chip` tall. The one row
   that cannot be taken back is `danger`, over `danger-tint` under the pointer. It opens from a glyph button, anchored to it, or from a
@@ -1048,7 +1067,7 @@ toward the rest surface.
   the list's scrollbar gutter, so Size stands over its figures whether the list scrolls or not.
   A row that will go at the next backup says so where how it was taken goes, its time in
   `fg-mid`; one that cannot be read says unreadable and has no Restore…; one being written
-  arrives at the top as a push-down, "backing up…" and the `progress` bar in place of its size.
+  arrives at the top as a push-down, "Backing up…" and the `progress` bar in place of its size.
   Restore… asks in the row question's shape, naming in `fg` each source it forgets with files in the Recycle Bin and counting the
   files, which stay there; when what it forgets cannot be read, it says any source added since is
   forgotten and its files stay in the bin, with no names or count, and while it restores the answers give way to the walk's line and bar inside the same

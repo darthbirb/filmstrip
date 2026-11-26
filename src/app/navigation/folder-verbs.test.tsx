@@ -225,7 +225,7 @@ test("a folder with files asks where they go, and × answers none", async () => 
   const question = screen.getByRole("region", { name: "Trips holds 5 files" });
   await expect.element(question).toHaveFocus();
   await expect
-    .element(question.getByRole("button", { name: "Move Files to Incoming" }))
+    .element(question.getByRole("button", { name: "Move Files to Sorting Box" }))
     .toBeVisible();
   await expect.element(question.getByRole("button", { name: "Delete Files Too" })).toBeVisible();
   await expect
@@ -238,15 +238,38 @@ test("a folder with files asks where they go, and × answers none", async () => 
   expect(await titles(1)).toEqual(["People", "Trips"]);
 });
 
+test("with several sorting sources each answer is the Sorting Box, its source's name after it", async () => {
+  const every = await listSources();
+  const incoming = every.find((source) => source.kind === "sorting");
+  if (!incoming) throw new Error("the mock has no sorting source");
+  const cards = { ...incoming, id: 9, title: "Cards", root: "E:\\Cards", rootFolderId: 99 };
+  await recording(
+    async () => {
+      resetIndex();
+      await loadIndex();
+      const screen = await render(<Harness />);
+      await openPictures(screen);
+      await choose(screen, "Trips 2 of 5", "Trips", "Delete");
+      const question = screen.getByRole("region", { name: "Trips holds 5 files" });
+      for (const name of ["Incoming", "Cards"]) {
+        await expect
+          .element(question.getByRole("button", { name: `Move Files to Sorting Box ${name}` }))
+          .toBeVisible();
+      }
+    },
+    (cmd) => (cmd === "list_sources" ? [...every, cards] : undefined),
+  );
+});
+
 test("moving its files to the sorting source deletes it, and the box keeps that answer", async () => {
   const screen = await render(<Harness />);
   await openPictures(screen);
   await choose(screen, "Trips 2 of 5", "Trips", "Delete");
   await screen.getByRole("checkbox", { name: "Always Move to the One I Choose" }).click();
-  await screen.getByRole("button", { name: "Move Files to Incoming" }).click();
+  await screen.getByRole("button", { name: "Move Files to Sorting Box" }).click();
 
   await expect
-    .element(screen.getByText("Deleted Trips. Its 5 files are in Incoming."))
+    .element(screen.getByText("Deleted Trips. Its 5 files are in Sorting Box."))
     .toBeVisible();
   expect(await titles(1)).toEqual(["People"]);
   expect(await titles(2)).toEqual(["Cairo"]);
@@ -260,7 +283,7 @@ test("moving its files to the sorting source deletes it, and the box keeps that 
   // Kept as the default, the next delete moves there without asking.
   await choose(screen, "Trips 2 of 5", "Trips", "Delete");
   await expect
-    .element(screen.getByText("Deleted Trips. Its 5 files are in Incoming."))
+    .element(screen.getByText("Deleted Trips. Its 5 files are in Sorting Box."))
     .toBeVisible();
   expect(screen.getByRole("region", { name: "Trips holds 5 files" }).elements()).toHaveLength(0);
 });
@@ -313,16 +336,16 @@ test("a folder whose files could not all go stays, and the banner says where the
   const screen = await render(<Harness />);
   await openPictures(screen);
   await choose(screen, "Trips 2 of 5", "Trips", "Delete");
-  await screen.getByRole("button", { name: "Move Files to Incoming" }).click();
+  await screen.getByRole("button", { name: "Move Files to Sorting Box" }).click();
 
   await expect
-    .element(screen.getByText("4 of Trips’ 5 files are in Incoming · Trips stayed"))
+    .element(screen.getByText("4 of Trips’ 5 files are in Sorting Box · Trips stayed"))
     .toBeVisible();
   await expect
-    .element(screen.getByText("Moved 4 of Trips’ 5 files to Incoming. Trips is in the banner."))
+    .element(screen.getByText("Moved 4 of Trips’ 5 files to Sorting Box. Trips is in the banner."))
     .toBeVisible();
   await expect.element(screen.getByText("Still in Trips")).toBeVisible();
-  await expect.element(screen.getByText("Name taken in Incoming")).toBeVisible();
+  await expect.element(screen.getByText("Name taken in Sorting Box")).toBeVisible();
   expect(await titles(1)).toEqual(["People", "Trips"]);
 
   await screen.getByRole("button", { name: "Undo" }).click();

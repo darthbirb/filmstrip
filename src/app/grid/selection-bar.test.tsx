@@ -232,7 +232,7 @@ test("right-clicking a checked tile opens the set's menu, counted, with the verb
     "Tag…",
     "Move to…",
     "Copy",
-    "Copy Path",
+    "Copy as Path",
     "Export…",
     "Delete 2 Files",
   ]);
@@ -244,7 +244,7 @@ test("right-clicking a checked tile opens the set's menu, counted, with the verb
   });
 });
 
-test("Copy Path on the set's menu copies every checked file's path", async () => {
+test("Copy as Path on the set's menu copies every checked file's path", async () => {
   await renderGrid();
   const ids = [await idOf("pyramid.jpg"), await idOf("felucca.mp4")];
   await userEvent.click(box("pyramid.jpg"));
@@ -252,7 +252,7 @@ test("Copy Path on the set's menu copies every checked file's path", async () =>
   await userEvent.click(tile("pyramid.jpg"), { button: "right" });
 
   await recording(async (calls) => {
-    await userEvent.click(page.getByRole("menuitem", { name: "Copy Path" }));
+    await userEvent.click(page.getByRole("menuitem", { name: "Copy as Path" }));
     await expect
       .poll(() => calls.find(([cmd]) => cmd === "copy_item_paths")?.[1])
       .toEqual({ itemIds: ids });

@@ -19,6 +19,7 @@ import { setNews } from "../navigation/foot-slot";
 import { getIndex, refreshIndex, useIndex } from "../navigation/index-store";
 import type { Place } from "../place";
 import { getPreferences, RECENT, updatePreferences, usePreferences } from "../preferences";
+import { SORTING_BOX, sortingDetail } from "../sorting-box";
 import { movedBannerLine, movedFailed, moveStoppedLine, reasonSentence } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
@@ -102,21 +103,35 @@ function MovePicker({ request }: { request: MoveRequest }) {
   }, [request.folderId]);
 
   if (!folders) return null;
-  const byId = new Map(folders.map((folder) => [folder.id, folder]));
-  const reachable = new Set((sources ?? []).filter((one) => one.reachable).map((one) => one.id));
-  const usable = folders.filter((folder) => reachable.has(folder.sourceId));
+  const every = sources ?? [];
+  const sorting = new Map(
+    every
+      .filter((one) => one.kind === "sorting")
+      .map((one) => [one.rootFolderId, sortingDetail(one, every)]),
+  );
+  const named = folders.map((folder) =>
+    sorting.has(folder.id) ? { ...folder, title: SORTING_BOX } : folder,
+  );
+  const byId = new Map(named.map((folder) => [folder.id, folder]));
+  const reachable = new Set(every.filter((one) => one.reachable).map((one) => one.id));
+  const usable = named.filter((folder) => reachable.has(folder.sourceId));
   const barred = new Set(
     "folder" in request
-      ? [request.folderId, ...branch(folders, request.folder.id)]
+      ? [request.folderId, ...branch(named, request.folder.id)]
       : request.folderId === null
         ? []
         : [request.folderId],
   );
-  const parentName = (folder: FolderEntry) =>
-    folder.parentId === null ? undefined : byId.get(folder.parentId)?.title;
+  const parentName = (folder: FolderEntry) => {
+    if (folder.parentId === null) return undefined;
+    const source = sorting.get(folder.parentId);
+    const title = byId.get(folder.parentId)?.title;
+    return source && title ? `${title} · ${source}` : title;
+  };
   const flat = (folder: FolderEntry): PickerRow => ({
-    ...row(folder, 0, barred),
-    detail: folder.id === request.folderId ? "current" : parentName(folder),
+    ...row(folder, 0, barred, sorting),
+    detail:
+      folder.id === request.folderId ? "current" : (parentName(folder) ?? sorting.get(folder.id)),
   });
 
   const sections: PickerSection[] = [];
@@ -131,7 +146,7 @@ function MovePicker({ request }: { request: MoveRequest }) {
       return folder && reachable.has(folder.sourceId) ? [flat(folder)] : [];
     });
     if (known.length > 0) sections.push({ heading: "Recent", rows: known });
-    sections.push({ rows: tree(usable, open, request.folderId, barred) });
+    sections.push({ rows: tree(usable, open, request.folderId, barred, sorting) });
   }
 
   return (
@@ -175,11 +190,19 @@ function MovePicker({ request }: { request: MoveRequest }) {
   );
 }
 
-function row(folder: FolderEntry, depth: number, barred: ReadonlySet<number>): PickerRow {
+/** Each sorting source's own folder, with the quiet words that tell it from the others. */
+type SortingRoots = ReadonlyMap<number, string | undefined>;
+
+function row(
+  folder: FolderEntry,
+  depth: number,
+  barred: ReadonlySet<number>,
+  sorting: SortingRoots,
+): PickerRow {
   return {
     id: folder.id,
     label: folder.title,
-    glyph: folder.parentId === null ? "source" : "folder",
+    glyph: sorting.has(folder.id) ? "sortingBox" : folder.parentId === null ? "source" : "folder",
     depth,
     disabled: barred.has(folder.id),
   };
@@ -216,6 +239,7 @@ function tree(
   open: ReadonlySet<number>,
   current: number | null,
   barred: ReadonlySet<number>,
+  sorting: SortingRoots,
 ): PickerRow[] {
   const children = new Map<number | null, FolderEntry[]>();
   for (const folder of folders) {
@@ -226,12 +250,15 @@ function tree(
     for (const folder of children.get(parent) ?? []) {
       const inside = (children.get(folder.id) ?? []).length > 0;
       rows.push({
-        ...row(folder, depth, barred),
+        ...row(folder, depth, barred, sorting),
         // The tree's rows read as navigation's do, but the current one says so in its pill's place;
         // a recent or found row names its parent instead.
         ...(folder.id === current
           ? { detail: "current" }
-          : { count: { own: folder.itemCount, all: folder.allCount } }),
+          : {
+              count: { own: folder.itemCount, all: folder.allCount },
+              detail: sorting.get(folder.id),
+            }),
         expanded: inside ? open.has(folder.id) : undefined,
       });
       if (inside && open.has(folder.id)) walk(folder.id, depth + 1);

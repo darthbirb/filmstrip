@@ -354,6 +354,12 @@ let nextBatch = 1;
 
 const folderName = (id: number) => crumbs(id).folders.at(-1)?.title ?? "";
 
+/** A folder as an act names it, as the Rust side does: a sorting source's own is the Sorting Box. */
+const placeName = (id: number) =>
+  SOURCES.some((one) => one.rootFolderId === id && one.kind === "sorting")
+    ? "Sorting Box"
+    : folderName(id);
+
 /** Every count in the tree, made true again after a change. */
 function recount() {
   for (const node of Object.values(FOLDERS).flat()) {
@@ -429,7 +435,7 @@ function folderTaken(parent: number, title: string, node?: FolderNode) {
 
 /** A name already there, refused as the Rust side refuses it, reason and all. */
 function refusedName(parent: number, name: string, folder: boolean) {
-  const place = folderName(parent);
+  const place = placeName(parent);
   return Promise.reject<AppError>({
     kind: "refused",
     reason: { kind: "nameTaken", place, name, folder },
@@ -446,7 +452,8 @@ function forbidden(name: string) {
   });
 }
 
-const pathOf = (folderId: number) => crumbs(folderId).folders.map((crumb) => crumb.title);
+const pathOf = (folderId: number) =>
+  crumbs(folderId).folders.map((crumb, at) => (at === 0 ? placeName(crumb.id) : crumb.title));
 
 function stayedIn(item: ItemRow, reason: Reason): Stayed {
   const at = { kind: "folder" as const, folderId: item.folderId, path: pathOf(item.folderId) };
@@ -497,7 +504,7 @@ function act(steps: Step[]): Act {
     const [top] = tops;
     return {
       kind: "copy",
-      to: folderName(into),
+      to: placeName(into),
       one: tops.length === 0 && loose.length === 1 ? (loose[0]?.diskName ?? null) : null,
       folder: tops.length === 1 && loose.length === 0 && top ? top.title : null,
       folders: tops.length,
@@ -508,11 +515,11 @@ function act(steps: Step[]): Act {
     const moved = steps.find((step) => step.op === "move" || step.op === "moveFolder");
     const into =
       moved?.op === "move"
-        ? folderName(moved.item.folderId)
+        ? placeName(moved.item.folderId)
         : moved?.op === "moveFolder"
-          ? folderName(moved.to)
+          ? placeName(moved.to)
           : null;
-    return { kind: "deleteFolder", name: gone.node.title, parent: folderName(gone.parent), into };
+    return { kind: "deleteFolder", name: gone.node.title, parent: placeName(gone.parent), into };
   }
   const [first] = steps;
   if (first?.op === "retag") return { kind: "retag", change: first.change };
@@ -523,29 +530,29 @@ function act(steps: Step[]): Act {
     const homes = new Set(restores.map((step) => step.to));
     const [home] = homes;
     const one = steps.length === 1 && first?.op === "restore" ? first.item.diskName : null;
-    return { kind: "restore", to: homes.size === 1 ? folderName(home ?? 0) : null, one };
+    return { kind: "restore", to: homes.size === 1 ? placeName(home ?? 0) : null, one };
   }
   if (first?.op === "createFolder")
-    return { kind: "createFolder", name: first.node.title, parent: folderName(first.parent) };
+    return { kind: "createFolder", name: first.node.title, parent: placeName(first.parent) };
   if (first?.op === "renameFolder") return { kind: "renameFolder", from: first.from, to: first.to };
   if (first?.op === "rename") return { kind: "renameFile", from: first.from, to: first.to };
   if (first?.op === "moveFolder" && steps.length === 1) {
     const { node, from, to } = first;
-    return { kind: "moveFolder", name: node.title, from: folderName(from), to: folderName(to) };
+    return { kind: "moveFolder", name: node.title, from: placeName(from), to: placeName(to) };
   }
   const from = new Set(
     steps.map((step) =>
       step.op === "move" || step.op === "trash" || step.op === "moveFolder" ? step.from : 0,
     ),
   );
-  const only = from.size === 1 ? folderName([...from][0] ?? 0) : null;
+  const only = from.size === 1 ? placeName([...from][0] ?? 0) : null;
   const files = steps.flatMap((step) => ("item" in step ? [step.item] : []));
   const one = steps.length === 1 ? (files[0]?.diskName ?? null) : null;
   if (first?.op === "trash") return { kind: "delete", from: only, one };
   const to = steps.map((step) =>
     step.op === "move" ? step.item.folderId : step.op === "moveFolder" ? step.to : 0,
   )[0];
-  return { kind: "move", from: only, to: folderName(to ?? 0), one };
+  return { kind: "move", from: only, to: placeName(to ?? 0), one };
 }
 
 function record(steps: Step[]) {
@@ -1234,7 +1241,7 @@ function copyIn(folderId: number, paths: readonly string[]): CopyStart {
       isFolderPath(one) && (dir === one.toLowerCase() || dir.startsWith(`${one.toLowerCase()}\\`)),
   );
   if (itself) return { kind: "refused", why: { kind: "intoItself", name: lastName(itself) } };
-  const to = folderName(folderId);
+  const to = placeName(folderId);
   if (paths.every((one) => parentOf(one) === dir)) {
     return { kind: "refused", why: { kind: "alreadyIn", place: to, carried } };
   }
@@ -1388,7 +1395,7 @@ function sendExports() {
 function moveOne(item: ItemRow, to: number, steps: Step[], refused: Stayed[]) {
   if (item.folderId === to) return;
   if (taken(to, item.diskName, item)) {
-    const reason = { kind: "nameTaken" as const, place: folderName(to), folder: false };
+    const reason = { kind: "nameTaken" as const, place: placeName(to), folder: false };
     refused.push(stayedIn(item, { ...reason, name: item.diskName }));
     return;
   }
@@ -1470,7 +1477,7 @@ function startMoveJob(going: ItemRow[], to: number): ItemsMoved {
   const whole = going.length;
   const steps: Step[] = [];
   const refused: Stayed[] = [];
-  moving.set(jobId, { jobId, folderId: to, to: folderName(to), done: 0, whole });
+  moving.set(jobId, { jobId, folderId: to, to: placeName(to), done: 0, whole });
   const ended = (cancelled: boolean) => {
     moving.delete(jobId);
     cancelMoves.delete(jobId);
@@ -1479,7 +1486,7 @@ function startMoveJob(going: ItemRow[], to: number): ItemsMoved {
     const moved: Moved = {
       jobId,
       folderId: to,
-      to: folderName(to),
+      to: placeName(to),
       batch,
       whole,
       refused,
@@ -1734,7 +1741,7 @@ function retireGone(item: ItemRow) {
 function goneFromBin(item: ItemRow, to = item.folderId): Stayed | null {
   if (!emptiedOutside.has(item.id)) return null;
   retireGone(item);
-  const reason = { kind: "goneFromBin" as const, name: item.diskName, place: folderName(to) };
+  const reason = { kind: "goneFromBin" as const, name: item.diskName, place: placeName(to) };
   return { kind: "file", id: item.id, name: item.diskName, at: { kind: "recycleBin" }, reason };
 }
 
@@ -2006,7 +2013,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       if (!went || !liveFolder(to)) {
         stayed({ kind: "folderGone", name: went?.folders.at(-1)?.title ?? "" });
       } else if (taken(to, item.diskName, item)) {
-        const place = folderName(to);
+        const place = placeName(to);
         stayed({ kind: "nameTaken", place, name: item.diskName, folder: false });
       } else {
         steps.push({ op: "restore", item, left: item.folderId, to, went });
@@ -2054,7 +2061,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       const to = SOURCES.find((one) => one.id === how.sourceId)?.rootFolderId ?? 0;
       for (const child of [...(FOLDERS[node.id] ?? [])]) {
         if (folderTaken(to, child.title)) {
-          const reason = { kind: "nameTaken" as const, place: folderName(to), folder: true };
+          const reason = { kind: "nameTaken" as const, place: placeName(to), folder: true };
           refused.push(stayedFolder(child, node.id, { ...reason, name: child.title }));
           continue;
         }
@@ -2064,7 +2071,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       }
       for (const item of [...(ITEMS[node.id] ?? [])]) {
         if (taken(to, item.diskName, item)) {
-          const reason = { kind: "nameTaken" as const, place: folderName(to), folder: false };
+          const reason = { kind: "nameTaken" as const, place: placeName(to), folder: false };
           refused.push(stayedIn(item, { ...reason, name: item.diskName }));
           continue;
         }
@@ -2270,7 +2277,9 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
         const gone = trashed.get(item.id);
         const from = {
           folderId: item.folderId,
-          path: (gone?.folders ?? []).map((crumb) => crumb.title),
+          path: (gone?.folders ?? []).map((crumb, at) =>
+            at === 0 ? placeName(crumb.id) : crumb.title,
+          ),
           gone: !liveFolder(item.folderId),
         };
         return { ...item, trashedAt: gone?.at ?? 0, from };

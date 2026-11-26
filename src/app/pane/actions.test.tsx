@@ -85,18 +85,18 @@ test("what does not fit moves into the menu, and stays out of the bar", async ()
   await screen.getByRole("button", { name: "More" }).click();
   const menu = screen.getByRole("menu", { name: "More" });
   await expect.element(menu.getByRole("menuitem", { name: "Copy" })).toBeVisible();
-  expect(rows(menu)).toEqual(["Copy", "Copy Path", "Open with Default App", "Rename"]);
+  expect(rows(menu)).toEqual(["Copy", "Copy as Path", "Open with Default App", "Rename"]);
   await menu.getByRole("menuitem", { name: "Open with Default App" }).click();
   expect(sent.map((call) => call.cmd)).toEqual(["open_item"]);
 });
 
-test("with room for all of them the menu holds Copy Path and Rename", async () => {
+test("with room for all of them the menu holds Copy as Path and Rename", async () => {
   const screen = await renderBar(400);
   await expect.element(screen.getByRole("button", { name: "Open with Default App" })).toBeVisible();
-  expect(screen.getByRole("button", { name: "Copy Path" }).elements()).toHaveLength(0);
+  expect(screen.getByRole("button", { name: "Copy as Path" }).elements()).toHaveLength(0);
   await screen.getByRole("button", { name: "More" }).click();
   const menu = screen.getByRole("menu", { name: "More" });
-  expect(rows(menu)).toEqual(["Copy Path", "Rename"]);
-  await menu.getByRole("menuitem", { name: "Copy Path" }).click();
+  expect(rows(menu)).toEqual(["Copy as Path", "Rename"]);
+  await menu.getByRole("menuitem", { name: "Copy as Path" }).click();
   expect(sent).toEqual([{ cmd: "copy_item_paths", payload: { itemIds: [sample.id] } }]);
 });

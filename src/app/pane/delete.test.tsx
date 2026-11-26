@@ -89,7 +89,7 @@ test("a file the Recycle Bin would not take stays where it was, and the foot say
   await expect
     .element(
       screen.getByText(
-        "It may be too large for the bin, or the bin is turned off. Nothing was deleted.",
+        "It may be too large for the Recycle Bin, or the Recycle Bin is turned off. Nothing was deleted.",
       ),
     )
     .toBeVisible();

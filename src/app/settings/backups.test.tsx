@@ -150,7 +150,7 @@ test("leaving Backups mid-restore and coming back finds it running, and only the
   await opened();
   await expect.poll(() => rowText(2)).toContain(`Restoring the index from ${when}…`);
   expect(rows()).toHaveLength(7);
-  expect(list()?.textContent).not.toContain("backing up…");
+  expect(list()?.textContent).not.toContain("Backing up…");
   await userEvent.click(restoreOn(0) as HTMLElement);
   expect(page.getByRole("button", { name: "Restore Index" }).query()).toBeNull();
 
@@ -266,8 +266,8 @@ test("Back Up Now writes a new row at the top, and the oldest past the number le
   await expect.poll(() => rows().length).toBe(7);
   const oldest = rowText(6);
   await userEvent.click(page.getByRole("button", { name: "Back Up Now" }));
-  await expect.element(page.getByText("backing up…")).toBeVisible();
-  await expect.element(page.getByText("backing up…")).not.toBeInTheDocument();
+  await expect.element(page.getByText("Backing up…")).toBeVisible();
+  await expect.element(page.getByText("Backing up…")).not.toBeInTheDocument();
   await expect.poll(() => rows().map((_, at) => rowText(at))).not.toContain(oldest);
   expect(rows()).toHaveLength(7);
   expect(rowText(0)).toMatch(/by hand\s+48 MB\s+Restore…$/);

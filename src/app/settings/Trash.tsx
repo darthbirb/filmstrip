@@ -119,7 +119,7 @@ export function Trash() {
       </Note>
       <Note glyph="usb">
         On a drive with no Recycle Bin, such as a USB stick or a network share, Delete asks first,
-        and deletes for good.
+        and deletes permanently.
       </Note>
     </div>
   );

@@ -6,8 +6,9 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::db::journal::{Forgot, Gone};
-use crate::db::{folders, items};
+use crate::db::{folders, items, sources};
 use crate::error::{AppError, Reason, Result};
+use crate::fs::acts;
 
 /// One file or folder that stayed where it was, and why.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
@@ -90,7 +91,7 @@ pub fn forgotten(conn: &Connection, gone: &Gone) -> Result<Stayed> {
             Whereabouts::RecycleBin,
             Reason::GoneFromBin {
                 name: name.clone(),
-                place: folders::title(conn, gone.folder_id)?.unwrap_or_default(),
+                place: acts::name(conn, gone.folder_id)?,
             },
         ),
         Forgot::NotOnDisk => (
@@ -170,8 +171,5 @@ fn folder_at(conn: &Connection, folder_id: i64) -> Result<Whereabouts> {
 }
 
 fn path_of(conn: &Connection, folder_id: i64) -> Result<Vec<String>> {
-    Ok(folders::ancestry(conn, folder_id)?
-        .into_iter()
-        .map(|crumb| crumb.title)
-        .collect())
+    sources::place_path(conn, folder_id)
 }

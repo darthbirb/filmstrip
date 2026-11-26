@@ -66,7 +66,7 @@ test("Assign Key… opens the ten keys and No Key, and picking one binds it", as
   expect(items).toHaveLength(11);
   expect(items[1]?.textContent).toContain("Cairo");
   expect(items[0]?.textContent).toContain("Free");
-  expect(items[10]?.textContent).toContain("No Key");
+  expect(items[10]?.textContent).toContain("Remove Key");
 
   await userEvent.click(menu.getByRole("menuitem").nth(0));
   await expect.poll(() => chipOn("Trips 2 of 5")).toBe("1");
@@ -97,7 +97,7 @@ test("picking a key another folder holds moves it, and No Key frees the folder's
   expect(chipOn("Cairo 3 of 3")).toBeNull();
 
   await openKeys("Trips 2 of 5");
-  await userEvent.click(page.getByRole("menuitem", { name: "No Key" }));
+  await userEvent.click(page.getByRole("menuitem", { name: "Remove Key" }));
   await expect.poll(() => chipOn("Trips 2 of 5")).toBeNull();
   expect(await destinationKeys()).toEqual([]);
 });

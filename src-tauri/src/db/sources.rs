@@ -9,6 +9,9 @@ use ts_rs::TS;
 use crate::db::{folders, journal, now};
 use crate::error::Result;
 
+/// What every sorting source is called where the person meets it: they are one place.
+pub const SORTING_BOX: &str = "Sorting Box";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "lowercase")]
 #[ts(export)]
@@ -100,6 +103,32 @@ pub fn mark_indexed(conn: &Connection, id: i64) -> Result<()> {
         params![now(), id],
     )?;
     Ok(())
+}
+
+/// A folder's names from its source's own folder down, as navigation names them: a source's own
+/// folder goes by the source's title, and a sorting source's by the Sorting Box it is shown in.
+pub fn place_path(conn: &Connection, folder_id: i64) -> Result<Vec<String>> {
+    let crumbs = folders::ancestry(conn, folder_id)?;
+    let sorting = match crumbs.first() {
+        Some(root) => {
+            let location = folders::location(conn, root.id)?;
+            get(conn, location.source_id)?.is_some_and(|source| source.kind == SourceKind::Sorting)
+        }
+        None => false,
+    };
+    Ok(crumbs
+        .into_iter()
+        .enumerate()
+        .map(|(at, crumb)| match at {
+            0 if sorting => SORTING_BOX.to_owned(),
+            _ => crumb.title,
+        })
+        .collect())
+}
+
+/// A folder as navigation names it, the last of its `place_path`.
+pub fn place_name(conn: &Connection, folder_id: i64) -> Result<String> {
+    Ok(place_path(conn, folder_id)?.pop().unwrap_or_default())
 }
 
 pub fn get(conn: &Connection, id: i64) -> Result<Option<Source>> {
