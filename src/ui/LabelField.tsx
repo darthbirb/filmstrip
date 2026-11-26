@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 
-import { formatCount } from "../lib/format";
+import { formatCounted } from "../lib/format";
 import { fold } from "../lib/queryTerm";
 import { ChipButton } from "./ChipButton";
 import { useFocusBack } from "./focus-back";
@@ -38,7 +38,7 @@ const HALVES =
 const HALF =
   "field-sizing-content h-full px-2 outline-none placeholder:text-fg-dim selection:bg-plate selection:text-on-plate";
 
-const folders = (count: number) => `on ${formatCount(count)} ${count === 1 ? "folder" : "folders"}`;
+const folders = (count: number) => `on ${formatCounted(count, "folder")}`;
 
 /**
  * Add Label…, and the label it becomes: the key first, then its value, each with what the library

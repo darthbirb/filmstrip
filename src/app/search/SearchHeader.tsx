@@ -1,5 +1,5 @@
 import type { QueryTerm } from "../../ipc/bindings/QueryTerm";
-import { formatCount } from "../../lib/format";
+import { files as filesOf, formatCounted } from "../../lib/format";
 import { Button } from "../../ui/Button";
 import { GlyphButton } from "../../ui/GlyphButton";
 import { TermChip } from "../../ui/TermChip";
@@ -56,7 +56,6 @@ export function Terms({ terms }: { terms: readonly QueryTerm[] }) {
 
 /** "2 folders · 38 files", and "no files" in words, so the line keeps its shape. */
 export function counted(folders: number, files: number) {
-  const noun = (n: number, one: string) => `${formatCount(n)} ${one}${n === 1 ? "" : "s"}`;
-  const filesPart = files === 0 && folders > 0 ? "no files" : noun(files, "file");
-  return folders > 0 ? `${noun(folders, "folder")} · ${filesPart}` : filesPart;
+  const filesPart = files === 0 && folders > 0 ? "no files" : filesOf(files);
+  return folders > 0 ? `${formatCounted(folders, "folder")} · ${filesPart}` : filesPart;
 }

@@ -554,6 +554,12 @@ error came with. An ellipsis only where a choice or
 typing follows before anything happens, and figures for a count. One act has one name everywhere
 it appears; the Components sheet's Words block lists them, with the reason each changed.
 
+What the person counts is files: the foot, Sources, a place that is offline, every act and every
+question say "files" for the same thing. "Item" is a word of the code and these docs; the person
+reads it only for what holds files and folders together, or what Explorer carries before its paths
+are read. Every count is figures grouped as the system groups them, its noun singular for one
+alone: "1 file", "1 byte", "1 of its files goes", "41,236 files". `src/lib/format.ts` writes them.
+
 Dates come in two styles, both in the system's locale, its order and its clock, and every date
 the interface writes is one of them. **The date** is Today, Yesterday, or the day and the short
 month, the year only outside the current one: "3 Oct", "3 Oct 2025". **The date and time** is the
@@ -660,11 +666,11 @@ toward the rest surface.
   glyph's top-right corner as a `mark-badge` plate in `micro` figures, ringed in the panel's own
   colour to hold it off the glyph; on the selected square it inverts to `fg` with `on-plate` ink.
 - **Panel foot.** Pinned under a panel: a `foot`-tall baseline of what the library holds and
-  weighs, `41,236 items · 312 GB`, in `small` tabular `fg-dim`, and above it, only while a walk
+  weighs, `41,236 files · 312 GB`, in `small` tabular `fg-dim`, and above it, only while a walk
   runs, its line and a `progress`-thin track on `raised` filling with `plate`. The baseline never
   moves; the line appears above it and leaves. The baseline is a button: a `wash` and `fg-mid`
   under the pointer, `raised` while its totals are open, its focus ring inside, flush to the
-  edge. Where the line does not fit, "items" goes first, then the size, whole, and the count
+  edge. Where the line does not fit, "files" goes first, then the size, whole, and the count
   stands alone; the tooltip then gives the whole line. Folded, it keeps its glyph alone, the line
   in its tooltip. While the index cannot be opened it says nothing: its glyph alone in `fg-faint`,
   and it does not open. Its totals open as tallies a `tile-gap` above the foot and whatever line stands

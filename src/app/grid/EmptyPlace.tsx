@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
-import { formatCount } from "../../lib/format";
+import { files, formatCounted } from "../../lib/format";
 import { Button } from "../../ui/Button";
 import { countText } from "../../ui/Count";
 import { EmptyState } from "../../ui/EmptyState";
@@ -58,7 +58,7 @@ export function EmptyPlace({ place }: { place: Place }) {
     <EmptyState
       glyph="folders"
       title="No Pictures Here"
-      note={`${folder.title} holds ${formatCount(inside.length)} ${inside.length === 1 ? "folder" : "folders"}.`}
+      note={`${folder.title} holds ${formatCounted(inside.length, "folder")}.`}
     >
       {inside.map((child) => (
         <Button
@@ -94,7 +94,7 @@ export function OfflinePlace({
     <EmptyState
       glyph="unplugged"
       title={`${source.title} Is Offline`}
-      note={`${formatCount(held.count)} items${where} when last indexed.`}
+      note={`${files(held.count)}${where} when last indexed.`}
     />
   );
 }

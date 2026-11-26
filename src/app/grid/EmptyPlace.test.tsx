@@ -2,9 +2,10 @@ import { beforeEach, expect, test } from "vitest";
 import { render } from "vitest-browser-react";
 
 import { recording } from "../../dev/recording";
+import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { getPlace, type Place, setPlace } from "../place";
-import { EmptyPlace } from "./EmptyPlace";
+import { EmptyPlace, OfflinePlace } from "./EmptyPlace";
 
 // Against the dev mock: Pictures holds People and Trips, People holds nothing, Archive is offline.
 const PICTURES: Place = { kind: "folder", sourceId: 1, path: [{ id: 1, title: "Pictures" }] };
@@ -68,6 +69,19 @@ test("a source that cannot be reached says so, not that it is empty", async () =
   await expect.element(screen.getByText("Archive Is Offline")).toBeVisible();
   expect(lines(screen.container)).toEqual([
     "Archive Is Offline",
-    expect.stringMatching(/^[\d,]+ items when last indexed\.$/),
+    expect.stringMatching(/^[\d,]+ files when last indexed\.$/),
+  ]);
+});
+
+test("an offline place counts its files, one of them singular", async () => {
+  const source = { id: 3, title: "Archive" } as SourceSummary;
+  const one = await render(<OfflinePlace source={source} held={{ count: 1 }} />);
+  expect(lines(one.container)).toEqual(["Archive Is Offline", "1 file when last indexed."]);
+  await one.unmount();
+
+  const many = await render(<OfflinePlace source={source} held={{ count: 1204, in: "Trips" }} />);
+  expect(lines(many.container)).toEqual([
+    "Archive Is Offline",
+    `${(1204).toLocaleString()} files in Trips when last indexed.`,
   ]);
 });

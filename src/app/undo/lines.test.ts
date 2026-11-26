@@ -128,6 +128,12 @@ test("each reason is said in the banner's own words", () => {
   expect(reasonText({ kind: "permissionDenied" })).toBe("Permission denied");
   expect(reasonText({ kind: "notOnDisk", name: "a.jpg" })).toBe("No longer on disk");
   expect(reasonText({ kind: "holds", name: "notes.txt", more: 0 })).toBe("Holds notes.txt");
+  expect(reasonText({ kind: "holds", name: "notes.txt", more: 1 })).toBe(
+    "Holds notes.txt and 1 more",
+  );
+  expect(reasonText({ kind: "holds", name: "notes.txt", more: 1204 })).toBe(
+    `Holds notes.txt and ${(1204).toLocaleString()} more`,
+  );
   expect(reasonText({ kind: "goneFromBin", name: "a.jpg", place: "Cairo" })).toBe(
     "Emptied outside the app",
   );
@@ -515,6 +521,9 @@ test("the question says what goes for good, its size, and what went to the bin",
   );
   expect(folderNoBinDetail(["USB Drive (E:)"], 2, 5, mb)).toBe(
     "USB Drive (E:) has no Recycle Bin. Deleted, 2 of its files go for good, 1 MB, and Undo cannot bring them back.",
+  );
+  expect(folderNoBinDetail(["USB Drive (E:)"], 1, 5, mb)).toBe(
+    "USB Drive (E:) has no Recycle Bin. Deleted, 1 of its files goes for good, 1 MB, and Undo cannot bring it back.",
   );
 });
 

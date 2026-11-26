@@ -15,7 +15,7 @@ import type { Moving } from "../../ipc/bindings/Moving";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import type { Tally } from "../../ipc/bindings/Tally";
 import { cancelCopy, cancelExport, cancelMove, revealPath } from "../../ipc/commands";
-import { formatBytes, formatCount, formatDate, midSentence } from "../../lib/format";
+import { files, formatBytes, formatCount, formatDate, midSentence } from "../../lib/format";
 import { Band } from "../../ui/Band";
 import { Bar } from "../../ui/Bar";
 import { Button } from "../../ui/Button";
@@ -104,13 +104,13 @@ const NOTHING: LibraryTotals = {
   trash: NONE,
 };
 
-/** The library's line, each wording giving up a whole part: "items", then the size. */
+/** The library's line, each wording giving up a whole part: "files", then the size. */
 function wordings({ count, bytes }: Tally) {
   const figure = formatCount(count);
-  const items = `${figure} ${count === 1 ? "item" : "items"}`;
-  if (count === 0) return [items, figure];
+  const counted = files(count);
+  if (count === 0) return [counted, figure];
   const size = formatBytes(bytes);
-  return [`${items} · ${size}`, `${figure} · ${size}`, figure];
+  return [`${counted} · ${size}`, `${figure} · ${size}`, figure];
 }
 
 /**

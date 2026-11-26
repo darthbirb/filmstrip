@@ -9,7 +9,7 @@ import { loadIndex, resetIndex } from "./index-store";
 
 // Against the dev mock: Pictures holds six files, Incoming three, each 2,400,000 bytes.
 
-const line = (files: number) => `${files} items · ${formatBytes(files * 2_400_000)}`;
+const line = (files: number) => `${files} files · ${formatBytes(files * 2_400_000)}`;
 
 beforeEach(async () => {
   while (await undoLast()) {}
@@ -19,7 +19,7 @@ beforeEach(async () => {
 
 test("the counts move the moment a move, a delete or a restore lands, with nothing to reload", async () => {
   const screen = await render(<Foot />);
-  const foot = screen.getByRole("button", { name: /items · / });
+  const foot = screen.getByRole("button", { name: /files · / });
   await expect.poll(() => foot.element().lastElementChild?.textContent).toBe(line(6));
   await foot.click();
   const totals = screen.getByRole("dialog", { name: "Library" });

@@ -110,7 +110,7 @@ beforeEach(async () => {
   await watchWork();
 });
 
-const LINE = "41,236 items · 312 GB";
+const LINE = "41,236 files · 312 GB";
 
 /** The line the foot shows, without its glyph. */
 const wordsOf = (foot: { element: () => Element }) => foot.element().lastElementChild?.textContent;
@@ -140,17 +140,17 @@ test("the panel's baseline says what the library holds and weighs, grouped as Wi
   await expect.element(foot).toHaveAttribute("title", "Library · what it holds");
 });
 
-test("one item is a singular, and an empty library says nought without a size", async () => {
+test("one file is a singular, and an empty library says nought without a size", async () => {
   await holding(SOURCES, { ...TOTALS, all: { count: 1, bytes: 4.2 * MB } });
   const one = await render(<Foot />);
-  await expect.element(one.getByRole("button", { name: "1 item · 4.2 MB" })).toBeVisible();
+  await expect.element(one.getByRole("button", { name: "1 file · 4.2 MB" })).toBeVisible();
   one.unmount();
 
   await holding([], NOTHING);
   const screen = await render(<Foot />);
-  const foot = screen.getByRole("button", { name: "0 items" });
+  const foot = screen.getByRole("button", { name: "0 files" });
   await expect.element(foot).toBeVisible();
-  expect(wordsOf(foot)).toBe("0 items");
+  expect(wordsOf(foot)).toBe("0 files");
 
   // Opened, every figure is nought, still in its column, with no size beside it.
   await foot.click();
@@ -254,7 +254,7 @@ test("other files have a row of their own, so the kinds still add up to In All",
     all: { count: 41_240, bytes: 312 * GB + 2 * MB },
   });
   const screen = await render(<Foot />);
-  await screen.getByRole("button", { name: "41,240 items · 312 GB" }).click();
+  await screen.getByRole("button", { name: "41,240 files · 312 GB" }).click();
   const rows = rowsOf(screen.getByRole("dialog", { name: "Library" }).element());
   expect(rows.slice(0, 4).map(([label]) => label)).toEqual([
     "Pictures",
@@ -274,13 +274,14 @@ test("at the panel's least the line drops a word, then the size, and never cuts 
     );
   };
 
-  const first = await at({ count: 41_236, bytes: 312 * GB });
-  const trimmed = first.getByRole("button", { name: LINE });
-  await expect.poll(() => wordsOf(trimmed)).toBe("41,236 · 312 GB");
-  await expect.element(trimmed).toHaveAttribute("title", LINE);
+  const long = "412,360 files · 312 GB";
+  const first = await at({ count: 412_360, bytes: 312 * GB });
+  const trimmed = first.getByRole("button", { name: long });
+  await expect.poll(() => wordsOf(trimmed)).toBe("412,360 · 312 GB");
+  await expect.element(trimmed).toHaveAttribute("title", long);
   first.unmount();
 
-  const huge = "12,604,388 items · 1,186 TB";
+  const huge = "12,604,388 files · 1,186 TB";
   const second = await at({ count: 12_604_388, bytes: 1186 * 1024 * GB });
   const alone = second.getByRole("button", { name: huge });
   await expect.poll(() => wordsOf(alone)).toBe("12,604,388");
@@ -425,7 +426,7 @@ test("a line for an act that changed nothing has a check and no Undo, and leaves
   expect(screen.getByRole("button", { name: "Undo" }).elements()).toHaveLength(0);
   await screen.unmount();
   const rail = await render(<Foot rail />);
-  await expect.element(rail.getByRole("button", { name: /items/ })).toBeInTheDocument();
+  await expect.element(rail.getByRole("button", { name: /files/ })).toBeInTheDocument();
   expect(document.body.textContent).not.toContain("Nothing to undo.");
   setNews(null);
 });
@@ -448,7 +449,7 @@ test("the baseline is read again when a walk goes quiet", async () => {
 
   now = { ...TOTALS, all: { count: 41_300, bytes: 313 * GB } };
   await emit("job-progress", IDLE);
-  await expect.element(screen.getByRole("button", { name: "41,300 items · 313 GB" })).toBeVisible();
+  await expect.element(screen.getByRole("button", { name: "41,300 files · 313 GB" })).toBeVisible();
 });
 
 test("the rail's own line for a key that did nothing stays out of sight while the panel is the face shown", async () => {

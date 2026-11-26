@@ -31,13 +31,13 @@ test("a first load that fails says why in navigation, and Retry opens the index"
     await expect.element(screen.getByText("Could Not Open the Index")).toBeVisible();
     const foot = await render(<Foot />);
     await expect.element(foot.getByRole("button", { name: "Library" })).toBeDisabled();
-    expect(foot.container.textContent).not.toContain("0 items");
+    expect(foot.container.textContent).not.toContain("0 files");
 
     failCommand("list_sources", null);
     await screen.getByRole("button", { name: "Retry" }).click();
     await expect.element(screen.getByRole("tree", { name: "Places" })).toBeVisible();
     expect(screen.container.textContent).not.toContain("could not open its index");
-    await expect.element(foot.getByRole("button", { name: /items/ })).toBeEnabled();
+    await expect.element(foot.getByRole("button", { name: /files/ })).toBeEnabled();
   } finally {
     failCommand("list_sources", null);
   }

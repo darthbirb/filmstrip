@@ -2,7 +2,7 @@ import { useState } from "react";
 
 import type { Failure } from "../../ipc/bindings/Failure";
 import { revealFolder, revealItem } from "../../ipc/commands";
-import { formatCount } from "../../lib/format";
+import { files } from "../../lib/format";
 import { Banner, LIST_HEADING, LIST_ROW, listRow } from "../../ui/Banner";
 import { failed } from "../failure";
 import { retryFailures, useWork } from "../navigation/work-store";
@@ -22,7 +22,7 @@ export function Notices() {
 
   return (
     <Banner
-      sentence={`${formatCount(count)} ${count === 1 ? "file" : "files"} could not be indexed`}
+      sentence={`${files(count)} could not be indexed`}
       retry={() => void retryFailures()}
       open={open}
       onToggle={() => setOpen(!open)}

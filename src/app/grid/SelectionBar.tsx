@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 
-import { formatBytes, formatCount } from "../../lib/format";
+import { formatBytes, formatCounted } from "../../lib/format";
 import { Button } from "../../ui/Button";
 import { DismissButton } from "../../ui/DismissButton";
 import { Menu, type MenuAction } from "../../ui/Menu";
@@ -68,7 +68,7 @@ function sheetPlace(bar: HTMLElement | null): Sheet {
   return { anchor, maxHeight: grid ? grid.clientHeight / 2 : undefined };
 }
 
-const files = (count: number) => `${formatCount(count)} ${count === 1 ? "File" : "Files"}`;
+const files = (count: number) => formatCounted(count, "File");
 
 function InLibrary({ rows }: { rows: readonly CheckedFile[] }) {
   const ids = rows.map((row) => row.id);
