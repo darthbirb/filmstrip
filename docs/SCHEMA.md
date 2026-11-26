@@ -149,10 +149,11 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   kept under `forward`'s `redo`: a folder made, whose row the undo forgets, keeps its `title`, and
   a folder a copy made keeps when it was retired (`retiredAt`). Nothing else reads an undone row
   as part of its batch, and `journal::latest_batch` passes over it.
-- A redo takes the batch with the highest `undone` and carries its rows out again oldest first.
-  Each row that goes is inserted again as the newest, its `redo` taken off and, for a folder made
-  again, its new `folderId`, and the undone row deleted, so the triggers keep its subjects and the
-  next undo reaches it first. A `retag` row is journalled afresh by the act itself, found by the
+- A redo takes the batch with the highest `undone` and carries its rows out again oldest first,
+  each only while it is still marked: a tags screen act can drop the redo partway, and the redo
+  stops there. Each row that goes is written again as the newest from the row in hand, its `redo`
+  taken off and, for a folder made again, its new `folderId`, and the undone row deleted in the
+  same transaction, so the triggers keep its subjects and the next undo reaches it first. A `retag` row is journalled afresh by the act itself, found by the
   words its `change` names, since an undo can give terms back under other ids. What stayed keeps
   its mark; one gone from the bin or bound for a drive with no bin is deleted, as an undo's is.
 - Every undone row is deleted as a row of a new act is written, unless its batch is the one being

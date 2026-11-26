@@ -66,20 +66,34 @@ fn replay(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
     }
     let batch = acts::describe_undone(conn, batch_id)?;
     let mut stayed = Vec::new();
-    let (mut gone, mut folders_gone) = (0, 0);
+    let (mut files_back, mut folders_back) = (0, 0);
     for entry in &entries {
+        // A tag act takes no turn of the disk, and journalling one drops the redo meanwhile.
+        if !journal::still_undone(conn, entry.id)? {
+            break;
+        }
         if let Some(forgotten) = journal::gone(entry) {
             journal::drop_entry(conn, entry.id)?;
             stayed.push(stayed::forgotten(conn, &forgotten)?);
-            let (files, folders) = acts::count(conn, std::slice::from_ref(entry))?;
-            gone += files;
-            folders_gone += folders;
             continue;
         }
+        #[cfg(test)]
+        BEFORE_EACH_ROW.with(|hook| {
+            if let Some(then) = hook.borrow_mut().as_mut() {
+                then();
+            }
+        });
+        let (files, folders) = acts::count(conn, std::slice::from_ref(entry))?;
         match again(conn, batch_id, entry) {
-            Ok(Again::Same) => journal::redone(conn, entry.id, None)?,
-            Ok(Again::As(now)) => journal::redone(conn, entry.id, Some(&now))?,
-            Ok(Again::Journalled) => journal::drop_entry(conn, entry.id)?,
+            Ok(went) => {
+                match went {
+                    Again::Same => journal::redone(conn, batch_id, entry, None)?,
+                    Again::As(now) => journal::redone(conn, batch_id, entry, Some(&now))?,
+                    Again::Journalled => journal::drop_entry(conn, entry.id)?,
+                }
+                files_back += files;
+                folders_back += folders;
+            }
             Err(err) if undo::tagging(entry) => return Err(err),
             Err(err) => {
                 let one = undo::stayed_of(conn, entry, &err)?;
@@ -88,21 +102,30 @@ fn replay(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
                     Reason::GoneFromBin { .. } | Reason::NoBin { .. }
                 ) {
                     journal::drop_entry(conn, entry.id)?;
-                    let (files, folders) = acts::count(conn, std::slice::from_ref(entry))?;
-                    gone += files;
-                    folders_gone += folders;
                 }
                 stayed.push(one);
             }
         }
     }
-    let (files_left, folders_left) = acts::count(conn, &journal::undone_batch(conn, batch_id)?)?;
     Ok(UndoReport {
-        files_back: batch.files.saturating_sub(files_left + gone),
-        folders_back: batch.folders.saturating_sub(folders_left + folders_gone),
+        files_back,
+        folders_back,
         batch,
         stayed,
     })
+}
+
+#[cfg(test)]
+thread_local! {
+    static BEFORE_EACH_ROW: std::cell::RefCell<Option<Box<dyn FnMut()>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Runs `then` before each row this thread's next redo carries out again, once it has found the row
+/// still the redo's: where a test journals another act meanwhile.
+#[cfg(test)]
+fn just_before_each_row(then: impl FnMut() + 'static) {
+    BEFORE_EACH_ROW.with(|hook| *hook.borrow_mut() = Some(Box::new(then)));
 }
 
 /// Carries out one row again, never deleting for good: a file bound for a drive with no bin stays.
@@ -556,6 +579,60 @@ mod tests {
         assert_eq!(gone.deleted, 1);
         assert_eq!(act_to_redo(&lib.conn, None).unwrap(), None);
         assert!(lib.at("Trips/Cairo/sphinx.jpg").is_file());
+    }
+
+    #[test]
+    fn a_tag_journalled_partway_through_a_redo_stops_it_and_what_went_is_undone() {
+        let lib = library("tagged-meanwhile");
+        std::fs::write(lib.at("Trips/Cairo/temple.jpg"), "t").unwrap();
+        walk::reconcile(&lib.conn).unwrap();
+        let files: Vec<i64> = db::items::in_folder(&lib.conn, lib.cairo)
+            .unwrap()
+            .into_iter()
+            .map(|item| item.id)
+            .collect();
+        let moved = journal::new_batch();
+        items::move_items(&lib.conn, &files, lib.people, &moved).unwrap();
+        undo_last(&lib.conn).unwrap().unwrap();
+        let (path, first) = (lib.dir.join("library.db"), files[0]);
+        let rows = std::rc::Rc::new(std::cell::Cell::new(0));
+        let seen = std::rc::Rc::clone(&rows);
+        just_before_each_row(move || {
+            seen.set(seen.get() + 1);
+            if seen.get() == 2 {
+                let other = db::open(&path).unwrap();
+                tags::add_items_tag(&other, &[first], "dusk", &journal::new_batch()).unwrap();
+            }
+        });
+
+        let report = redo_last(&lib.conn).unwrap().unwrap();
+        assert_eq!(report.files_back, 2);
+        assert_eq!(rows.get(), 2, "the redo stops once the tag drops it");
+        let homes: Vec<Option<i64>> = files.iter().map(|id| lib.folder_of(*id)).collect();
+        assert_eq!(homes, [Some(lib.people), Some(lib.people), Some(lib.cairo)]);
+        assert_eq!(redo_last(&lib.conn).unwrap(), None);
+
+        let undone = undo_last(&lib.conn).unwrap().unwrap();
+        assert_eq!(undone.batch.batch_id, moved);
+        assert_eq!(undone.files_back, 2);
+        assert!(files.iter().all(|id| lib.folder_of(*id) == Some(lib.cairo)));
+        assert_eq!(lib.tags_on("dusk"), 1);
+    }
+
+    #[test]
+    fn emptying_the_trash_drops_the_redo() {
+        let lib = library("emptied");
+        trash::trash_items(&lib.conn, &lib.files[..1], &journal::new_batch()).unwrap();
+        items::rename(&lib.conn, lib.files[1], "giza.jpg", &journal::new_batch()).unwrap();
+        undo_last(&lib.conn).unwrap().unwrap();
+        assert!(act_to_redo(&lib.conn, None).unwrap().is_some());
+
+        let asked = crate::fs::empty::to_empty(&lib.conn).unwrap();
+        let emptied = crate::fs::empty::empty(&lib.conn, &asked.files, &|_| {}).unwrap();
+        assert_eq!(emptied.deleted, 1);
+        assert_eq!(act_to_redo(&lib.conn, None).unwrap(), None);
+        assert_eq!(redo_last(&lib.conn).unwrap(), None);
+        assert!(!lib.at("Trips/Cairo/giza.jpg").exists());
     }
 
     #[test]

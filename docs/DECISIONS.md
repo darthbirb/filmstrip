@@ -1320,7 +1320,9 @@ it. Two acts delete for good, and both ask first: Empty Trash…, and Delete on 
   through the undos the last first, and each row redone is journalled again as the newest, so
   Ctrl+Z takes it back once more. A new act drops the redo as it writes its first row, since what
   it would put back no longer follows from what is there; so does a file deleted for good, by
-  Empty Trash… or on a drive with no bin, and a restore of the index. **A redo never deletes for
+  Empty Trash… or on a drive with no bin, and a restore of the index. A tags screen act does not
+  wait for the disk, so a redo checks each row is still undone before carrying it out, and stops
+  at the first that is not: what it carried out is journalled, and nothing after the new act is. **A redo never deletes for
   good:** a file whose drive has lost its bin since stays, as an undo's does, and nothing that
   cannot be undone is ever offered as a redo, since it was never journalled. A folder an undo
   took away keeps its title for the redo, made again under a new id; a tags screen act is carried

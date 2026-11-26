@@ -517,16 +517,42 @@ pub fn kept(entry: &Entry) -> Kept {
 }
 
 /// Journals a row its redo carried out again, as the newest, so an undo takes it back once more;
-/// `as_now` is the row as it reads after the redo, when that changed.
-pub fn redone(conn: &Connection, entry_id: i64, as_now: Option<&Value>) -> Result<()> {
-    let as_now = as_now.map(serde_json::to_string).transpose()?;
-    conn.execute(
-        "INSERT INTO journal (batch_id, op, forward, inverse, created_at)
-         SELECT batch_id, op, json_remove(COALESCE(?2, forward), '$.redo'), COALESCE(?2, inverse), ?3
-           FROM journal WHERE id = ?1",
-        params![entry_id, as_now, now()],
-    )?;
-    drop_entry(conn, entry_id)
+/// `as_now` is the row as it reads after the redo, when that changed. Written from the row in hand,
+/// so a file that went is journalled even when a new act dropped the redo meanwhile.
+pub fn redone(
+    conn: &Connection,
+    batch_id: &str,
+    entry: &Entry,
+    as_now: Option<&Value>,
+) -> Result<()> {
+    let mut forward = as_now.unwrap_or(&entry.forward).clone();
+    if let Some(row) = forward.as_object_mut() {
+        row.remove("redo");
+    }
+    let inverse = as_now.unwrap_or(&entry.inverse);
+    crate::db::in_transaction(conn, |tx| {
+        tx.execute(
+            "INSERT INTO journal (batch_id, op, forward, inverse, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                batch_id,
+                entry.op,
+                serde_json::to_string(&forward)?,
+                serde_json::to_string(inverse)?,
+                now()
+            ],
+        )?;
+        drop_entry(tx, entry.id)
+    })
+}
+
+/// Whether a row is still the redo's: a new act journalled meanwhile drops it.
+pub fn still_undone(conn: &Connection, entry_id: i64) -> Result<bool> {
+    Ok(conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM journal WHERE id = ?1 AND undone IS NOT NULL)",
+        params![entry_id],
+        |r| r.get(0),
+    )?)
 }
 
 /// The batch the last undo took back, while the redo holds anything of it.

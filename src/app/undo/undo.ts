@@ -163,7 +163,9 @@ async function redoFailed(batchId: string | undefined, error: unknown) {
 }
 
 /** Which of the two a key is: Ctrl+Z, or Ctrl+Y and Ctrl+Shift+Z. */
-function undoKeyOf(event: KeyboardEvent) {
+export function undoKeyOf(
+  event: Pick<KeyboardEvent, "ctrlKey" | "altKey" | "metaKey" | "shiftKey" | "key">,
+) {
   if (!event.ctrlKey || event.altKey || event.metaKey) return null;
   const key = event.key.toLowerCase();
   if (key === "y" && !event.shiftKey) return "redo";

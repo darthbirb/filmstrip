@@ -1102,11 +1102,11 @@ toward the rest surface.
   as a raised Undo button, and a dismiss. After an undo the button is Redo, with the redo arrow,
   its tooltip "Redo · Ctrl+Y"; a redo ends with the act's own line and Undo, and one that failed is
   the Band with Redo, as an undo's is, the rail keeping the Redo glyph button. "Nothing to redo."
-  is said as "Nothing to undo." is, with the redo arrow. An act that changed nothing in the library, as a drop on
-  the pane past its limit, has no Undo, and leaves the folded rail; so does an act's line once the
-  act has left the journal, as when the Trash finds its files emptied from the Recycle Bin, its
-  sentence kept. It shares the one slot with the Band, and the newest of the two replaces the
-  other. Folded, the rail keeps the Undo glyph button alone, its sentence in
+  is said as "Nothing to undo." is, with the redo arrow. An act that changed nothing in the
+  library, as a drop on the pane past its limit, has no Undo, and leaves the folded rail; so does
+  an act's line once the act has left the journal, as when the Trash finds its files emptied from
+  the Recycle Bin, its sentence kept. It shares the one slot with the Band, and the newest of the
+  two replaces the other. Folded, the rail keeps the Undo glyph button alone, its sentence in
   the tooltip; "Nothing to undo." comes out beside the rail on `panel` with the overlay shadow, as
   does "The clipboard holds no files.", with the clipboard glyph.
 - **Copy line.** A copy in progress has the walk's line of its own at the foot, above the walk:

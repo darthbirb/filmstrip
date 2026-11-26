@@ -408,6 +408,43 @@ mod tests {
     }
 
     #[test]
+    fn migration_17_leaves_a_journal_written_before_it_undoable_with_nothing_to_redo() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        name_collation(&conn).unwrap();
+        conn.execute_batch("CREATE TABLE schema_version (version INTEGER NOT NULL);")
+            .unwrap();
+        for (version, sql) in MIGRATIONS.iter().filter(|(version, _)| *version < 17) {
+            conn.execute_batch(sql).unwrap();
+            conn.execute("INSERT INTO schema_version VALUES (?1)", [version])
+                .unwrap();
+        }
+        let older = journal::new_batch();
+        let newer = journal::new_batch();
+        for (batch, row) in [(&older, r#"{"itemId":5}"#), (&newer, r#"{"itemId":6}"#)] {
+            conn.execute(
+                "INSERT INTO journal (batch_id, op, forward, inverse, created_at)
+                 VALUES (?1, ?2, ?3, ?3, 0)",
+                [batch.as_str(), journal::ITEM_TRASH, row],
+            )
+            .unwrap();
+        }
+
+        migrate(&mut conn).unwrap();
+        let undone: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM journal WHERE undone IS NOT NULL",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(undone, 0);
+        assert_eq!(journal::latest_batch(&conn).unwrap(), Some(newer.clone()));
+        assert_eq!(journal::batch(&conn, &older).unwrap().len(), 1);
+        assert_eq!(journal::batch(&conn, &newer).unwrap().len(), 1);
+        assert_eq!(journal::latest_undone(&conn).unwrap(), None);
+    }
+
+    #[test]
     fn a_failed_migration_returns_its_own_error_with_foreign_keys_back_on() {
         use std::io::{Read, Write};
 
