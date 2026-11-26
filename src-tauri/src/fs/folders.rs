@@ -637,12 +637,12 @@ pub(super) fn unmake_copy(conn: &Connection, folder_id: i64) -> Result<Option<i6
     }
     let title = folders::title(conn, folder_id)?.unwrap_or_default();
     let dir = paths::folder_dir(conn, folder_id)?;
-    let holds = || match Shell.binless(&dir) {
-        Some(drive) => AppError::refused(Reason::NoBin { drive }),
-        None => AppError::invalid(format!("{title} holds something now, so it stays")),
-    };
+    let holds = || AppError::invalid(format!("{title} holds something now, so it stays"));
     if folders::holds_anything(conn, folder_id)? {
-        return Err(holds());
+        return Err(match Shell.binless(&dir) {
+            Some(drive) => AppError::refused(Reason::NoBin { drive }),
+            None => holds(),
+        });
     }
     match take_away(&dir) {
         Ok(()) => {}

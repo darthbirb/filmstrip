@@ -1157,6 +1157,33 @@ mod tests {
     }
 
     #[test]
+    fn undo_keeps_a_folder_it_could_not_remove_on_a_drive_with_no_bin_without_blaming_the_bin() {
+        let (conn, dir, lisbon) = library("undo-no-bin-held");
+        let mut fake = Fake::new(Stand::Recycles(dir.join("bin")));
+        fake.binless = vec![(dir.join("library/Trips"), "USB Drive (E:)".into())];
+        let _bin = stand_in_as(fake);
+        std::fs::create_dir_all(dir.join("Downloads/Alexandria")).unwrap();
+        let batch = journal::new_batch();
+        let entries = [dir.join("Downloads/Alexandria")];
+        run(&conn, &batch, lisbon, &entries, &Script::default()).unwrap();
+        let theirs = write(&dir.join("library/Trips/Lisbon/Alexandria/theirs.jpg"), "t");
+
+        let first = undo::undo_batch(&conn, &batch).unwrap();
+        assert_eq!((first.files_back, first.folders_back), (0, 0));
+        assert_eq!(first.stayed.len(), 1, "{:?}", first.stayed);
+        assert_eq!(first.stayed[0].reason, Reason::Other);
+        assert!(theirs.is_file(), "an undo never destroys");
+        assert!(undo::can_undo(&conn, &batch).unwrap());
+        assert_eq!(journal::latest_batch(&conn).unwrap(), Some(batch.clone()));
+
+        crate::fs::remove_once_let_go(&theirs);
+        let again = undo::undo_batch(&conn, &batch).unwrap();
+        assert!(again.stayed.is_empty(), "{:?}", again.stayed);
+        assert_eq!(again.folders_back, 1);
+        settles_to(&dir.join("library/Trips/Lisbon"), &["tram.jpg"]);
+    }
+
+    #[test]
     fn undo_takes_the_act_before_a_copy_that_has_not_ended() {
         let (conn, dir, lisbon) = library("undo-while-copying");
         let entries: Vec<PathBuf> = (1..=4)
