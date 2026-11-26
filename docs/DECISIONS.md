@@ -1844,18 +1844,19 @@ which the app never shows on its behalf.
   more, unless the launch finds the bin took it, as the next bullet says; at worst the bin then
   holds the same file twice. A second name that is not the same file is never removed.
 - **A send the bin took before the app stopped is in the Trash at the next launch**, built for
-  #215. Before the shell is asked, the send's mark keeps the item, its act, the file's identity
-  and every name it has; the second name stays until the row is recorded. At launch a mark whose
-  row already names that file in the bin only lets the second name go. Otherwise a name the second
-  name gained in the bin since is where the bin put it, and the row is recorded as the send would
-  have: in the Trash with its tags, under its act, so one undo still brings it back. The look in
-  the bin that follows finds it there, or retires it if the bin was emptied while the app was
-  closed. The row must still be the file the mark names, live at that path: a source removed
-  while its drive was away can free its items' ids for another source's files, and such a mark
-  only settles the second name as above, as does one with no such name in the bin. A name the
-  file had in the bin before is never taken for the send's, and another file that took the
-  file's name meanwhile does not stop it being recorded. Removing a source leaves its marks, since
-  each still has a second name beside its file to settle once that folder is reached.
+  #215. Before the shell is asked, the send's mark keeps the item's id and uuid, its act, the
+  file's identity and every name it has; the second name stays until the row is recorded. At
+  launch a mark whose row already names that file in the bin only lets the second name go.
+  Otherwise a name the second name gained in the bin since is where the bin put it, and the row is
+  recorded as the send would have: in the Trash with its tags, under its act, so one undo still
+  brings it back. The look in the bin that follows finds it there, or retires it if the bin was
+  emptied while the app was closed. The row must still be the file the mark names, live at that
+  path and with its uuid: a source removed while its drive was away can free its items' ids for
+  other files, even one at the same name once the source is added back, and such a mark only
+  settles the second name as above, as does one with no such name in the bin. A name the file had
+  in the bin before is never taken for the send's, and another file that took the file's name
+  meanwhile does not stop it being recorded. Removing a source leaves its marks, since each still
+  has a second name beside its file to settle once that folder is reached.
 - **The send says where the bin put it**: the name the file gained under `$Recycle.Bin`, and its
   identity, read from the second name before the shell is asked, since the file keeps it in the
   bin. DECISIONS.md "The Trash is the Recycle Bin".
