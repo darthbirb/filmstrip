@@ -572,8 +572,10 @@ screen's keys are **label keys** ("214 tags · 4 label keys", Rename Label Key�
 is always a destination key. A paste and a drop that ask which sorting source both ask **Copy
 3 Files Into**. A path written out is joined with " › ". Where Windows has a name, it is
 Windows': **Restore Down**, **Copy as Path**, and the system pickers titled **Add Source** and
-**Export to Zip**, filtering **Zip files (\*.zip)**. Apostrophes are typographic, "Filmstrip’s",
-and a row's line that reads as a sentence opens with a capital: "Backing up…".
+**Export to Zip**, filtering **Zip files (\*.zip)**. A launch that fails says why in the
+system's message box, titled **Filmstrip Could Not Start**: what failed, then the reason's
+sentence. Apostrophes are typographic, "Filmstrip’s", and a row's line that reads as a sentence
+opens with a capital: "Backing up…".
 
 What the person counts is files: the foot, Sources, a place that is offline, every act and every
 question say "files" for the same thing. "Item" is a word of the code and these docs; the person

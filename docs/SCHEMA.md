@@ -11,6 +11,9 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   each, in order, after every SQL migration, so each sees the latest schema. Each rewrites the
   index only, never a file on disk. Every migration of either kind arrives with the feature
   that needs it and is never edited once shipped.
+- A migration fails whole: its transaction rolls back and the next launch tries it again. One a
+  unique index refuses because two names in one folder fold together under `NAME_FOLD` fails
+  with `NameClash`, naming the folder and both names.
 - Data migration 1 (`tags::refold`) folds every stored `tag.key` and `tag.value` again with
   `db::fold`, for libraries indexed when it only lowercased. Terms that then read the same
   become the oldest of them: `folder_tag`, `item_tag` and `item_effective_tag` point at it

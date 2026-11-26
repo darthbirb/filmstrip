@@ -6,6 +6,7 @@ pub mod db;
 pub mod error;
 pub mod fs;
 pub mod jobs;
+pub mod launch;
 pub mod media;
 pub mod query;
 
@@ -23,83 +24,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            fs::paths::ensure_app_dirs()?;
-            let db_path = fs::paths::db_path()?;
-            let thumbs = fs::paths::thumbs_dir()?;
-            let mut conn = db::open(&db_path)?;
-            db::migrate(&mut conn)?;
-            jobs::abandon_exports(&conn)?;
-            db::jobs::requeue_running(&conn)?;
-            jobs::enqueue_index(&conn)?;
-            fs::trash::settle_unfinished_send(&conn)?;
-
-            // The window may load files from the sources and the thumbnail cache, and a trashed
-            // file only once the pane shows it; and nothing else.
-            let scope = app.asset_protocol_scope();
-            scope.allow_directory(&thumbs, true)?;
-            for source in db::sources::list(&conn)? {
-                scope.allow_directory(&source.root, true)?;
+            if let Err(failure) = start(app) {
+                launch::refuse(app.handle(), &failure);
             }
-
-            // Looked for once, at launch. DECISIONS.md "Video and ffmpeg".
-            let ffmpeg = media::ffmpeg::Ffmpeg::discover(&config::app_dir()?.join("tools"));
-            match &ffmpeg {
-                Some(found) => eprintln!("ffmpeg: {}", found.location().display()),
-                None => eprintln!("ffmpeg: not found, so videos wait"),
-            }
-
-            let handle = app.handle().clone();
-            let announcer = app.handle().clone();
-            let exporter = app.handle().clone();
-            let mover = app.handle().clone();
-            let deleter = app.handle().clone();
-            let queue = jobs::JobQueue::start(
-                db_path.clone(),
-                thumbs.clone(),
-                ffmpeg,
-                Box::new(move |progress| {
-                    let _ = handle.emit(jobs::PROGRESS_EVENT, progress);
-                }),
-                Box::new(move |copied| {
-                    let _ = announcer.emit(jobs::COPIED_EVENT, copied);
-                }),
-                Box::new(move |exported| {
-                    let _ = exporter.emit(jobs::EXPORTED_EVENT, exported);
-                }),
-                Box::new(move |moved| {
-                    let _ = mover.emit(jobs::MOVED_EVENT, moved);
-                }),
-                Box::new(move |deleted| {
-                    let _ = deleter.emit(jobs::DELETED_EVENT, deleted);
-                }),
-            );
-            let backups = fs::backups::Shelf::new(fs::paths::backups_dir()?);
-            back_up_at_launch(app.handle().clone(), &backups, db_path.clone());
-            app.manage(commands::AppState {
-                db: db_path,
-                thumbs,
-                queue: std::sync::Arc::new(queue),
-                backups,
-            });
-
-            // Beside the executable, never in the user's profile.
-            // DECISIONS.md "Nothing outside the app folder".
-            let webview_dir = config::app_data_dir()?.join("webview");
-
-            #[cfg(debug_assertions)]
-            let args = format!("{WEBVIEW_ARGS} --remote-debugging-port={DEBUG_PORT}");
-            #[cfg(not(debug_assertions))]
-            let args = WEBVIEW_ARGS.to_owned();
-
-            WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
-                .title("Filmstrip")
-                .inner_size(1280.0, 820.0)
-                .min_inner_size(640.0, 480.0)
-                .decorations(false)
-                .shadow(true)
-                .data_directory(webview_dir)
-                .additional_browser_args(&args)
-                .build()?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -221,6 +148,83 @@ pub fn run() {
             state.queue.stop();
         }
     });
+}
+
+/// Everything before the window shows, and the window. A failure here is said in a message box.
+fn start(app: &mut tauri::App) -> Result<(), launch::Failure> {
+    fs::paths::ensure_app_dirs()?;
+    let db_path = fs::paths::db_path()?;
+    let thumbs = fs::paths::thumbs_dir()?;
+    let conn = launch::open_index(&db_path)?;
+
+    // The window may load files from the sources and the thumbnail cache, and a trashed
+    // file only once the pane shows it; and nothing else.
+    let scope = app.asset_protocol_scope();
+    scope.allow_directory(&thumbs, true)?;
+    for source in db::sources::list(&conn)? {
+        scope.allow_directory(&source.root, true)?;
+    }
+
+    // Looked for once, at launch. DECISIONS.md "Video and ffmpeg".
+    let ffmpeg = media::ffmpeg::Ffmpeg::discover(&config::app_dir()?.join("tools"));
+    match &ffmpeg {
+        Some(found) => eprintln!("ffmpeg: {}", found.location().display()),
+        None => eprintln!("ffmpeg: not found, so videos wait"),
+    }
+
+    let backups = fs::backups::Shelf::new(fs::paths::backups_dir()?);
+    // Beside the executable, never in the user's profile.
+    // DECISIONS.md "Nothing outside the app folder".
+    let webview_dir = config::app_data_dir()?.join("webview");
+
+    let handle = app.handle().clone();
+    let announcer = app.handle().clone();
+    let exporter = app.handle().clone();
+    let mover = app.handle().clone();
+    let deleter = app.handle().clone();
+    let queue = jobs::JobQueue::start(
+        db_path.clone(),
+        thumbs.clone(),
+        ffmpeg,
+        Box::new(move |progress| {
+            let _ = handle.emit(jobs::PROGRESS_EVENT, progress);
+        }),
+        Box::new(move |copied| {
+            let _ = announcer.emit(jobs::COPIED_EVENT, copied);
+        }),
+        Box::new(move |exported| {
+            let _ = exporter.emit(jobs::EXPORTED_EVENT, exported);
+        }),
+        Box::new(move |moved| {
+            let _ = mover.emit(jobs::MOVED_EVENT, moved);
+        }),
+        Box::new(move |deleted| {
+            let _ = deleter.emit(jobs::DELETED_EVENT, deleted);
+        }),
+    );
+    back_up_at_launch(app.handle().clone(), &backups, db_path.clone());
+    app.manage(commands::AppState {
+        db: db_path,
+        thumbs,
+        queue: std::sync::Arc::new(queue),
+        backups,
+    });
+
+    #[cfg(debug_assertions)]
+    let args = format!("{WEBVIEW_ARGS} --remote-debugging-port={DEBUG_PORT}");
+    #[cfg(not(debug_assertions))]
+    let args = WEBVIEW_ARGS.to_owned();
+
+    WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
+        .title("Filmstrip")
+        .inner_size(1280.0, 820.0)
+        .min_inner_size(640.0, 480.0)
+        .decorations(false)
+        .shadow(true)
+        .data_directory(webview_dir)
+        .additional_browser_args(&args)
+        .build()?;
+    Ok(())
 }
 
 /// Once the library has opened, a backup when the newest is over a day old, off the window's
