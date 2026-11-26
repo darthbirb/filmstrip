@@ -1184,6 +1184,43 @@ mod tests {
     }
 
     #[test]
+    fn undo_keeps_a_pasted_tree_whose_subfolder_it_could_not_remove_on_a_drive_with_no_bin() {
+        let (conn, dir, lisbon) = library("undo-no-bin-held-tree");
+        let mut fake = Fake::new(Stand::Recycles(dir.join("bin")));
+        fake.binless = vec![(dir.join("library/Trips"), "USB Drive (E:)".into())];
+        let _bin = stand_in_as(fake);
+        std::fs::create_dir_all(dir.join("Downloads/Alexandria/Sub")).unwrap();
+        let batch = journal::new_batch();
+        let entries = [dir.join("Downloads/Alexandria")];
+        run(&conn, &batch, lisbon, &entries, &Script::default()).unwrap();
+        let theirs = write(
+            &dir.join("library/Trips/Lisbon/Alexandria/Sub/theirs.jpg"),
+            "t",
+        );
+
+        let first = undo::undo_batch(&conn, &batch).unwrap();
+        assert_eq!((first.files_back, first.folders_back), (0, 0));
+        let mut stayed: Vec<_> = first
+            .stayed
+            .iter()
+            .map(|one| (one.name.as_str(), one.reason.clone()))
+            .collect();
+        stayed.sort_by_key(|(name, _)| *name);
+        assert_eq!(
+            stayed,
+            [("Alexandria", Reason::Other), ("Sub", Reason::Other)]
+        );
+        assert!(theirs.is_file(), "an undo never destroys");
+        assert_eq!(journal::batch(&conn, &batch).unwrap().len(), 2);
+
+        crate::fs::remove_once_let_go(&theirs);
+        let again = undo::undo_batch(&conn, &batch).unwrap();
+        assert!(again.stayed.is_empty(), "{:?}", again.stayed);
+        assert_eq!(again.folders_back, 2);
+        settles_to(&dir.join("library/Trips/Lisbon"), &["tram.jpg"]);
+    }
+
+    #[test]
     fn undo_takes_the_act_before_a_copy_that_has_not_ended() {
         let (conn, dir, lisbon) = library("undo-while-copying");
         let entries: Vec<PathBuf> = (1..=4)

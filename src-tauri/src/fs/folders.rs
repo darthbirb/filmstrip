@@ -640,8 +640,10 @@ pub(super) fn unmake_copy(conn: &Connection, folder_id: i64) -> Result<Option<i6
     let holds = || AppError::invalid(format!("{title} holds something now, so it stays"));
     if folders::holds_anything(conn, folder_id)? {
         return Err(match Shell.binless(&dir) {
-            Some(drive) => AppError::refused(Reason::NoBin { drive }),
-            None => holds(),
+            Some(drive) if !items::live_under(conn, folder_id)?.is_empty() => {
+                AppError::refused(Reason::NoBin { drive })
+            }
+            _ => holds(),
         });
     }
     match take_away(&dir) {
