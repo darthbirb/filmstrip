@@ -28,6 +28,50 @@ impl Control for Unwatched {
     fn progress(&self, _done: u32, _whole: u32) {}
 }
 
+/// Work a test watches: never stopped, each count handed to `0`.
+#[cfg(test)]
+pub(crate) struct Hearing<F: Fn(u32, u32)>(pub F);
+
+#[cfg(test)]
+impl<F: Fn(u32, u32)> Control for Hearing<F> {
+    fn halt(&self) -> Option<Halt> {
+        None
+    }
+    fn progress(&self, done: u32, whole: u32) {
+        (self.0)(done, whole);
+    }
+}
+
+/// Work a test stops with `halt` once `after` of its files are settled, hearing each count.
+#[cfg(test)]
+pub(crate) struct HaltAfter {
+    pub after: u32,
+    pub halt: Halt,
+    pub heard: std::cell::RefCell<Vec<(u32, u32)>>,
+}
+
+#[cfg(test)]
+impl HaltAfter {
+    pub(crate) fn new(after: u32, halt: Halt) -> HaltAfter {
+        HaltAfter {
+            after,
+            halt,
+            heard: std::cell::RefCell::new(Vec::new()),
+        }
+    }
+}
+
+#[cfg(test)]
+impl Control for HaltAfter {
+    fn halt(&self) -> Option<Halt> {
+        let done = self.heard.borrow().last().map_or(0, |(done, _)| *done);
+        (done >= self.after).then_some(self.halt)
+    }
+    fn progress(&self, done: u32, whole: u32) {
+        self.heard.borrow_mut().push((done, whole));
+    }
+}
+
 /// Moves `from` to `to`, refused with `AlreadyExists` when anything has that name, however late
 /// it came.
 pub fn relocate(from: &Path, to: &Path) -> Result<()> {

@@ -250,6 +250,7 @@ test("only the source a walk is reading says Indexing, and only it gives up its 
     copies: [],
     exports: [],
     moves: [],
+    deletes: [],
     walks: 0,
     walkedSource: 1,
     thumbed: [],

@@ -29,7 +29,7 @@ use crate::fs::acts::{self, Batch};
 use crate::fs::backups::{self, Backup, Forgets, Restored, Shelf, Shelved, Taken};
 use crate::fs::binless::{self, BinlessDrive, GoneReport};
 use crate::fs::clipboard;
-use crate::fs::empty::{self, Counted, Emptied, ToEmpty};
+use crate::fs::empty::{self, Counted, ToEmpty};
 use crate::fs::export::{self, Naming, Plan, Scope};
 use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
 use crate::fs::items::{self as fs_items, MoveReport};
@@ -51,8 +51,7 @@ pub struct AppState {
 
 /// How far a restore has got, from 0 to 100, as its row's bar shows it.
 pub const RESTORE_PROGRESS_EVENT: &str = "restore-progress";
-/// How many of the files Empty Trash… counted are settled so far.
-pub const EMPTY_PROGRESS_EVENT: &str = "empty-progress";
+
 /// The launch's backup has ended, taken, refused or not due, so a list showing it writing is stale.
 pub const BACKUPS_CHANGED_EVENT: &str = "backups-changed";
 
@@ -325,28 +324,40 @@ pub async fn rename_item(
     .await
 }
 
-/// What sending files to the trash did, and the batch that undoes it when anything went.
+/// What sending files to the trash did, and the batch that undoes it when anything went; or, for
+/// more than a delete sends at once, the job that sends them.
 #[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "kind", rename_all = "camelCase")]
 #[ts(export)]
-pub struct ItemsTrashed {
-    pub batch: Option<Batch>,
-    pub report: TrashReport,
+pub enum ItemsTrashed {
+    Done {
+        batch: Option<Batch>,
+        report: TrashReport,
+    },
+    Started {
+        #[serde(rename = "jobId")]
+        job_id: i64,
+    },
 }
 
 /// Files sent to the Recycle Bin, out of their folders, until taken back; one the bin will not take
-/// stays where it was.
+/// stays where it was. More than a delete sends at once go as a job, still one batch.
 #[tauri::command]
 pub async fn trash_items(state: State<'_, AppState>, item_ids: Vec<i64>) -> Result<ItemsTrashed> {
-    run(&state, move |conn| {
-        let batch_id = journal::new_batch();
-        let report = trash::trash_items(conn, &item_ids, &batch_id)?;
-        Ok(ItemsTrashed {
-            batch: described(conn, report.trashed > 0, &batch_id)?,
-            report,
-        })
+    run(&state, move |conn| start_trash(conn, &item_ids)).await
+}
+
+pub fn start_trash(conn: &Connection, item_ids: &[i64]) -> Result<ItemsTrashed> {
+    if item_ids.len() > crate::jobs::kinds::AT_ONCE {
+        let job_id = jobs::enqueue_trash(conn, item_ids)?;
+        return Ok(ItemsTrashed::Started { job_id });
+    }
+    let batch_id = journal::new_batch();
+    let report = trash::trash_items(conn, item_ids, &batch_id)?;
+    Ok(ItemsTrashed::Done {
+        batch: described(conn, report.trashed > 0, &batch_id)?,
+        report,
     })
-    .await
 }
 
 /// Which of these files are on a drive with no Recycle Bin, under each drive, for Delete to ask
@@ -380,24 +391,11 @@ pub async fn trash_to_empty(state: State<'_, AppState>) -> Result<ToEmpty> {
     run(&state, empty::to_empty).await
 }
 
-/// Deletes for good, from the Recycle Bin, the files counted that are still in the Trash, saying
-/// how many are settled as it goes; nothing can undo it.
+/// Deletes for good, from the Recycle Bin, the files counted that are still in the Trash, as a
+/// job whose line counts them as it goes; nothing can undo it, nor cancel it.
 #[tauri::command]
-pub async fn empty_trash(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    counted: Vec<Counted>,
-) -> Result<Emptied> {
-    run(&state, move |conn| {
-        let whole = u32::try_from(counted.len()).unwrap_or(u32::MAX);
-        let every = (whole / 200).max(1);
-        empty::empty(conn, &counted, &|done| {
-            if done % every == 0 || done == whole {
-                let _ = app.emit(EMPTY_PROGRESS_EVENT, done);
-            }
-        })
-    })
-    .await
+pub async fn empty_trash(state: State<'_, AppState>, counted: Vec<Counted>) -> Result<i64> {
+    run(&state, move |conn| jobs::enqueue_empty(conn, counted)).await
 }
 
 /// What restoring files did, and the batch that undoes it when anything came back.
@@ -436,16 +434,24 @@ pub async fn folder_file_count(state: State<'_, AppState>, folder_id: i64) -> Re
     .await
 }
 
-/// What deleting a folder did, and the batch that undoes whatever of it happened.
+/// What deleting a folder did, and the batch that undoes whatever of it happened; or, for one
+/// holding more files than a delete sends at once, the job that deletes it.
 #[derive(Debug, Clone, Serialize, TS)]
-#[serde(rename_all = "camelCase")]
+#[serde(tag = "kind", rename_all = "camelCase")]
 #[ts(export)]
-pub struct FolderDeleted {
-    pub batch: Option<Batch>,
-    pub report: DeleteReport,
+pub enum FolderDeleted {
+    Done {
+        batch: Option<Batch>,
+        report: DeleteReport,
+    },
+    Started {
+        #[serde(rename = "jobId")]
+        job_id: i64,
+    },
 }
 
-/// A folder deleted; one that holds files needs `contents` to say where they go.
+/// A folder deleted; one that holds files needs `contents` to say where they go. One whose files go
+/// to the Recycle Bin, more of them than a delete sends at once, is deleted as a job.
 #[tauri::command]
 pub async fn delete_folder(
     state: State<'_, AppState>,
@@ -453,15 +459,32 @@ pub async fn delete_folder(
     contents: Option<Contents>,
 ) -> Result<FolderDeleted> {
     run(&state, move |conn| {
-        let batch_id = journal::new_batch();
-        let report = fs_folders::delete(conn, folder_id, contents, &batch_id)?;
-        let journalled = !journal::batch(conn, &batch_id)?.is_empty();
-        Ok(FolderDeleted {
-            batch: described(conn, journalled, &batch_id)?,
-            report,
-        })
+        start_folder_delete(conn, folder_id, contents)
     })
     .await
+}
+
+pub fn start_folder_delete(
+    conn: &Connection,
+    folder_id: i64,
+    contents: Option<Contents>,
+) -> Result<FolderDeleted> {
+    if let Some(contents @ (Contents::Trash | Contents::Permanently)) = contents
+        && folders::is_live(conn, folder_id)?
+    {
+        let held = items::live_under(conn, folder_id)?.len();
+        if held > crate::jobs::kinds::AT_ONCE {
+            let job_id = jobs::enqueue_delete_folder(conn, folder_id, contents, held)?;
+            return Ok(FolderDeleted::Started { job_id });
+        }
+    }
+    let batch_id = journal::new_batch();
+    let report = fs_folders::delete(conn, folder_id, contents, &batch_id)?;
+    let journalled = !journal::batch(conn, &batch_id)?.is_empty();
+    Ok(FolderDeleted::Done {
+        batch: described(conn, journalled, &batch_id)?,
+        report,
+    })
 }
 
 /// Reverses whatever the app did last, in this session or an earlier one.
@@ -612,6 +635,14 @@ pub async fn cancel_copy(state: State<'_, AppState>, job_id: i64) -> Result<bool
 pub async fn cancel_move(state: State<'_, AppState>, job_id: i64) -> Result<bool> {
     let conn = crate::db::open(&state.db)?;
     state.queue.cancel_move(&conn, job_id)
+}
+
+/// Stops a delete after the file in hand; each file is in the Recycle Bin or where it was, and
+/// what went is one batch with its Undo. Empty Trash is never stopped.
+#[tauri::command]
+pub async fn cancel_delete(state: State<'_, AppState>, job_id: i64) -> Result<bool> {
+    let conn = crate::db::open(&state.db)?;
+    state.queue.cancel_delete(&conn, job_id)
 }
 
 /// What an export of a branch or a set would hold, read before the save dialog opens.

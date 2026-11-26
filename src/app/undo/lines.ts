@@ -293,6 +293,14 @@ export function movedBannerLine(moved: number, whole: number, to: string, one?: 
   return `${one ?? `The ${files(whole)}`} could not go to ${to}`;
 }
 
+/**
+ * The line at the foot after a delete on the queue that was stopped: what went to the Recycle
+ * Bin, counted against what it was asked to delete.
+ */
+export function deleteStoppedLine(batch: Batch, whole: number): string {
+  return `Moved ${formatCount(batch.files)} of ${files(whole)} to the Recycle Bin.`;
+}
+
 /** The banner's sentence for a delete that finished in part, or not at all. */
 export function deletedBannerLine(trashed: number, whole: number, one?: string) {
   if (trashed > 0) return `${formatCount(trashed)} of ${files(whole)} went to the Recycle Bin`;
@@ -479,6 +487,24 @@ export function folderKeptLine(name: string, binned: number, outright: number, w
       ? `${whose(name)} ${files(whole)}`
       : `${formatCount(gone)} of ${whose(name)} ${files(whole)}`;
   return `Deleted ${what}${ofThem(binned, outright)}. ${name} is in the banner.`;
+}
+
+/**
+ * The line at the foot after a folder's delete on the queue was cancelled: what went, the folder
+ * staying; none when nothing went.
+ */
+export function folderCancelledLine(name: string, binned: number, outright: number, whole: number) {
+  const gone = binned + outright;
+  if (gone === 0) return null;
+  const what =
+    gone === whole
+      ? `${whose(name)} ${files(whole)}`
+      : `${formatCount(gone)} of ${whose(name)} ${files(whole)}`;
+  const act =
+    outright === 0
+      ? `Moved ${what} to the Recycle Bin.`
+      : `Deleted ${what}${ofThem(binned, outright)}.`;
+  return `${act} ${name} stays.`;
 }
 
 /** The banner's sentence for a folder that stayed while its files went permanently, or would not. */

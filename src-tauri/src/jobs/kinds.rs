@@ -14,10 +14,22 @@ pub const COPY_IN: &str = "copy_in";
 pub const EXPORT: &str = "export";
 /// Files moved between drives, which count themselves too.
 pub const MOVE: &str = "move";
+/// Files sent to the Recycle Bin, more than a delete sends at once; they count themselves too.
+pub const TRASH: &str = "trash";
+/// A folder deleted with more files in it than a delete sends at once, which counts them too.
+pub const DELETE_FOLDER: &str = "delete_folder";
+/// The Trash emptied, which counts its files too.
+pub const EMPTY: &str = "empty";
 /// The kinds that count themselves on a line of their own, never in the walk's.
-pub const OWN_LINES: [&str; 3] = [COPY_IN, EXPORT, MOVE];
+pub const OWN_LINES: [&str; 6] = [COPY_IN, EXPORT, MOVE, TRASH, DELETE_FOLDER, EMPTY];
 /// The kinds that write a batch as they run, which is no act until they end.
-pub const ACTS: [&str; 2] = [COPY_IN, MOVE];
+pub const ACTS: [&str; 4] = [COPY_IN, MOVE, TRASH, DELETE_FOLDER];
+/// The kinds that delete, each with its line.
+pub const DELETES: [&str; 3] = [TRASH, DELETE_FOLDER, EMPTY];
+
+/// The most files a delete sends to the Recycle Bin inside its command; more are a job, since
+/// each send takes the shell tens of milliseconds. DECISIONS.md "Background work".
+pub const AT_ONCE: usize = 10;
 
 /// The kinds that walk the disk. Only one runs at a time: each retires what it did not see, so a
 /// second walk alongside would retire what the first had just found.
@@ -80,4 +92,44 @@ pub struct MovePayload {
     pub item_ids: Vec<i64>,
     /// Every file it carries, for its line while it waits.
     pub whole: u32,
+}
+
+/// What a delete of files sends to the Recycle Bin, and the batch its journal rows go under: the
+/// same batch when it goes on after a restart, which passes over what already went.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TrashPayload {
+    pub batch_id: String,
+    pub item_ids: Vec<i64>,
+    pub whole: u32,
+}
+
+/// A folder deleted, where its files go, and the batch its journal rows go under.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteFolderPayload {
+    pub batch_id: String,
+    pub folder_id: i64,
+    pub contents: crate::fs::folders::Contents,
+    /// Its title as it was asked, for its line once it has gone.
+    pub name: String,
+    /// The files it held as it was asked.
+    pub whole: u32,
+    /// How many files runs before a restart deleted for good, which no journal row counts.
+    #[serde(default)]
+    pub outright: u32,
+}
+
+/// The files Empty Trash… counted, and what runs before a restart did with them, which no journal
+/// row counts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmptyPayload {
+    pub counted: Vec<crate::fs::empty::Counted>,
+    #[serde(default)]
+    pub deleted: u32,
+    #[serde(default)]
+    pub bytes: i64,
+    #[serde(default)]
+    pub gone: u32,
 }

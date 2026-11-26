@@ -120,6 +120,13 @@ pub(super) fn is_binless(conn: &Connection, item_id: i64) -> Result<bool> {
     Ok(Shell.binless(&from).is_some())
 }
 
+/// Whether a folder is on a drive with no Recycle Bin.
+pub(super) fn is_binless_folder(conn: &Connection, folder_id: i64) -> Result<bool> {
+    Ok(Shell
+        .binless(&paths::folder_dir(conn, folder_id)?)
+        .is_some())
+}
+
 /// Deletes one file outright and retires its row, as a walk retires a file it finds gone. Only a
 /// file on a drive with no Recycle Bin ever is; one open in another app or read-only stays whole.
 pub(super) fn delete_unjournalled(conn: &Connection, item_id: i64) -> Result<()> {
@@ -373,6 +380,36 @@ mod tests {
         assert!(!root.join("Stick/Lisbon").exists());
         assert!(!folders::is_live(&conn, lisbon).unwrap());
         assert!(bin.asked.borrow().is_empty());
+        assert!(journal::batch(&conn, &batch).unwrap().is_empty());
+        assert_eq!(journal::latest_batch(&conn).unwrap(), None);
+    }
+
+    #[test]
+    fn a_folder_whose_files_went_for_good_before_a_restart_goes_with_nothing_to_undo() {
+        let (conn, root, _) = library("folder-resumed");
+        let lisbon = lisbon(&conn);
+        let batch = journal::new_batch();
+        let contents = crate::fs::folders::Contents::Permanently;
+        let stopped = crate::fs::relocate::HaltAfter::new(2, crate::fs::paste::Halt::Stop);
+
+        let first =
+            crate::fs::folders::delete_watched(&conn, lisbon, contents, &batch, 2, &stopped)
+                .unwrap();
+        assert_eq!(first.halted, Some(crate::fs::paste::Halt::Stop));
+        assert_eq!(first.report.outright, 2);
+        assert!(folders::is_live(&conn, lisbon).unwrap());
+
+        let rest = crate::fs::folders::delete_watched(
+            &conn,
+            lisbon,
+            contents,
+            &batch,
+            2,
+            &crate::fs::relocate::Unwatched,
+        )
+        .unwrap();
+        assert!(rest.report.deleted, "{:?}", rest.report.refused);
+        assert!(!root.join("Stick/Lisbon").exists());
         assert!(journal::batch(&conn, &batch).unwrap().is_empty());
         assert_eq!(journal::latest_batch(&conn).unwrap(), None);
     }

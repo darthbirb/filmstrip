@@ -19,14 +19,18 @@ use ts_rs::TS;
 use crate::db::{self, jobs as table};
 use crate::error::{Reason, Result};
 use crate::fs::acts::Batch;
+use crate::fs::empty::{Counted, Emptied};
 use crate::fs::export::{self, End, Naming, Scope};
+use crate::fs::folders::{Contents, DeleteReport};
 use crate::fs::stayed::Stayed;
+use crate::fs::trash::TrashReport;
 use crate::media::ffmpeg::Ffmpeg;
 
 pub const PROGRESS_EVENT: &str = "job-progress";
 pub const COPIED_EVENT: &str = "copy-done";
 pub const EXPORTED_EVENT: &str = "export-done";
 pub const MOVED_EVENT: &str = "move-done";
+pub const DELETED_EVENT: &str = "delete-done";
 
 const TICK: Duration = Duration::from_millis(500);
 const IDLE: Duration = Duration::from_millis(150);
@@ -62,6 +66,8 @@ pub struct Progress {
     pub exports: Vec<Exporting>,
     /// Each move between drives running or waiting to, oldest first.
     pub moves: Vec<Moving>,
+    /// Each delete and Empty Trash running or waiting to, oldest first.
+    pub deletes: Vec<Deleting>,
     /// Walks finished since launch.
     pub walks: u64,
     /// The source a walk is reading, while one is.
@@ -131,6 +137,70 @@ pub struct Moved {
     pub stopped: Option<Reason>,
 }
 
+/// What a delete on the queue is deleting.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub enum DeleteKind {
+    Files,
+    Folder,
+    Empty,
+}
+
+/// A delete in progress: what it deletes, the folder's name for a folder, and how many of its files
+/// are settled.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export)]
+pub struct Deleting {
+    pub job_id: i64,
+    pub kind: DeleteKind,
+    pub name: String,
+    pub done: u32,
+    pub whole: u32,
+}
+
+/// How a delete on the queue ended, as the line at the foot and the banner say it. One the app's
+/// closing stopped says nothing until it ends at a later launch.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[ts(export)]
+pub enum Deleted {
+    Files {
+        #[serde(rename = "jobId")]
+        job_id: i64,
+        /// What went, as one batch; nothing when nothing did.
+        batch: Option<Batch>,
+        report: TrashReport,
+        /// Every file it was asked to send.
+        whole: u32,
+        cancelled: bool,
+        stopped: Option<Reason>,
+    },
+    Folder {
+        #[serde(rename = "jobId")]
+        job_id: i64,
+        #[serde(rename = "folderId")]
+        folder_id: i64,
+        name: String,
+        contents: Contents,
+        batch: Option<Batch>,
+        report: DeleteReport,
+        /// Every file it held as it was asked.
+        whole: u32,
+        cancelled: bool,
+        stopped: Option<Reason>,
+    },
+    Empty {
+        #[serde(rename = "jobId")]
+        job_id: i64,
+        emptied: Emptied,
+        /// Taken off the queue before it started, as a restore of the index does.
+        cancelled: bool,
+        stopped: Option<Reason>,
+    },
+}
+
 /// An export in progress: the zip it is writing, and how many of its files are settled.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -165,6 +235,7 @@ pub type Report = Box<dyn Fn(&Progress) + Send + Sync>;
 pub type Announce = Box<dyn Fn(&Copied) + Send + Sync>;
 pub type AnnounceExport = Box<dyn Fn(&Exported) + Send + Sync>;
 pub type AnnounceMove = Box<dyn Fn(&Moved) + Send + Sync>;
+pub type AnnounceDelete = Box<dyn Fn(&Deleted) + Send + Sync>;
 
 pub struct QueueInner {
     db_path: PathBuf,
@@ -186,13 +257,16 @@ pub struct QueueInner {
     announce: Announce,
     exported: AnnounceExport,
     moved: AnnounceMove,
+    deleted: AnnounceDelete,
     copies: Mutex<BTreeMap<i64, Copying>>,
     exports: Mutex<BTreeMap<i64, Exporting>>,
     moves: Mutex<BTreeMap<i64, Moving>>,
+    deletes: Mutex<BTreeMap<i64, Deleting>>,
     cancelled: Mutex<HashSet<i64>>,
 }
 
 impl QueueInner {
+    #[expect(clippy::too_many_arguments)]
     fn new(
         db_path: PathBuf,
         thumbs: PathBuf,
@@ -201,6 +275,7 @@ impl QueueInner {
         announce: Announce,
         exported: AnnounceExport,
         moved: AnnounceMove,
+        deleted: AnnounceDelete,
     ) -> QueueInner {
         QueueInner {
             db_path,
@@ -218,9 +293,11 @@ impl QueueInner {
             announce,
             exported,
             moved,
+            deleted,
             copies: Mutex::new(BTreeMap::new()),
             exports: Mutex::new(BTreeMap::new()),
             moves: Mutex::new(BTreeMap::new()),
+            deletes: Mutex::new(BTreeMap::new()),
             cancelled: Mutex::new(HashSet::new()),
         }
     }
@@ -243,6 +320,7 @@ impl QueueInner {
             copies: copies(conn, &lock(&self.copies))?,
             exports: exports(conn, &lock(&self.exports))?,
             moves: moves(conn, &lock(&self.moves))?,
+            deletes: deletes(conn, &lock(&self.deletes))?,
             walks: self.walks.load(Ordering::Relaxed),
             walked_source: *lock(&self.walked_source),
             thumbed: Vec::new(),
@@ -272,6 +350,23 @@ impl QueueInner {
         }
         if !lock(&self.moves).contains_key(&job_id) {
             return Ok(false);
+        }
+        lock(&self.cancelled).insert(job_id);
+        Ok(true)
+    }
+
+    /// Takes a delete off the queue while it waits, or stops one running after the file in hand;
+    /// an Empty Trash running is never stopped, since what has gone has gone.
+    fn cancel_delete(&self, conn: &Connection, job_id: i64) -> Result<bool> {
+        for kind in kinds::DELETES {
+            if let Some(payload) = table::cancel_pending(conn, job_id, kind)? {
+                worker::deleted_waiting(self, conn, job_id, kind, &payload)?;
+                return Ok(true);
+            }
+        }
+        match lock(&self.deletes).get(&job_id) {
+            Some(line) if line.kind != DeleteKind::Empty => {}
+            _ => return Ok(false),
         }
         lock(&self.cancelled).insert(job_id);
         Ok(true)
@@ -399,6 +494,23 @@ fn moves(conn: &Connection, running: &BTreeMap<i64, Moving>) -> Result<Vec<Movin
     Ok(moves)
 }
 
+/// Each delete running, and each waiting its turn at none of its files settled, oldest first.
+fn deletes(conn: &Connection, running: &BTreeMap<i64, Deleting>) -> Result<Vec<Deleting>> {
+    let mut deletes: Vec<Deleting> = running.values().cloned().collect();
+    for kind in kinds::DELETES {
+        for (job_id, payload) in table::waiting(conn, kind)? {
+            if running.contains_key(&job_id) {
+                continue;
+            }
+            if let Some(line) = worker::waiting_line(job_id, kind, &payload) {
+                deletes.push(line);
+            }
+        }
+    }
+    deletes.sort_by_key(|one| one.job_id);
+    Ok(deletes)
+}
+
 /// A poisoned lock still holds what it held: one panicking copy must not stop the others' lines.
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
@@ -411,6 +523,7 @@ pub struct JobQueue {
 
 impl JobQueue {
     /// One worker per core but one, within bounds, and a reporter that sends progress as it changes.
+    #[expect(clippy::too_many_arguments)]
     pub fn start(
         db_path: PathBuf,
         thumbs: PathBuf,
@@ -419,9 +532,10 @@ impl JobQueue {
         announce: Announce,
         exported: AnnounceExport,
         moved: AnnounceMove,
+        deleted: AnnounceDelete,
     ) -> JobQueue {
         let inner = Arc::new(QueueInner::new(
-            db_path, thumbs, ffmpeg, report, announce, exported, moved,
+            db_path, thumbs, ffmpeg, report, announce, exported, moved, deleted,
         ));
         let workers = std::thread::available_parallelism()
             .map_or(MIN_WORKERS, |cores| cores.get().saturating_sub(1))
@@ -455,14 +569,20 @@ impl JobQueue {
         self.inner.cancel_move(conn, job_id)
     }
 
+    /// Stops a delete: one still waiting is taken off the queue, one running stops after the file
+    /// in hand. `false` when there was nothing to stop, or it is emptying the Trash.
+    pub fn cancel_delete(&self, conn: &Connection, job_id: i64) -> Result<bool> {
+        self.inner.cancel_delete(conn, job_id)
+    }
+
     /// Stops an export, waiting or running, and leaves nothing of it behind. `false` when there
     /// was nothing to stop.
     pub fn cancel_export(&self, conn: &Connection, job_id: i64) -> Result<bool> {
         self.inner.cancel_export(conn, job_id)
     }
 
-    /// Stops the queue for as long as the hold is kept: each copy, move and export is cancelled as its
-    /// Cancel would, a walk stops before its next directory, and the hold waits for every job in
+    /// Stops the queue while the hold is kept: each copy, move, delete, export and waiting Empty Trash
+    /// is cancelled, a walk stops before its next directory, and the hold waits for every job in
     /// flight to end. Nothing starts again until it is dropped.
     pub fn hold(&self) -> Result<Hold<'_>> {
         let inner = &*self.inner;
@@ -478,6 +598,9 @@ impl JobQueue {
         }
         for moving in &progress.moves {
             inner.cancel_move(&conn, moving.job_id)?;
+        }
+        for deleting in &progress.deletes {
+            inner.cancel_delete(&conn, deleting.job_id)?;
         }
         hold._gate = Some(inner.gate.write().unwrap_or_else(PoisonError::into_inner));
         Ok(hold)
@@ -671,6 +794,61 @@ pub fn enqueue_move_items(conn: &Connection, item_ids: &[i64], into: i64) -> Res
     )
 }
 
+/// Queues files sent to the Recycle Bin under a batch of its own, and returns the job that sends
+/// them.
+pub fn enqueue_trash(conn: &Connection, item_ids: &[i64]) -> Result<i64> {
+    let payload = kinds::TrashPayload {
+        batch_id: crate::db::journal::new_batch(),
+        item_ids: item_ids.to_vec(),
+        whole: u32::try_from(item_ids.len()).unwrap_or(u32::MAX),
+    };
+    table::enqueue(
+        conn,
+        kinds::TRASH,
+        &serde_json::to_string(&payload)?,
+        kinds::PRIORITY_COPY,
+    )
+}
+
+/// Queues a folder's delete under a batch of its own, its `held` files going as `contents` says,
+/// and returns the job that deletes it.
+pub fn enqueue_delete_folder(
+    conn: &Connection,
+    folder_id: i64,
+    contents: Contents,
+    held: usize,
+) -> Result<i64> {
+    let payload = kinds::DeleteFolderPayload {
+        batch_id: crate::db::journal::new_batch(),
+        folder_id,
+        contents,
+        name: crate::db::folders::title(conn, folder_id)?.unwrap_or_default(),
+        whole: u32::try_from(held).unwrap_or(u32::MAX),
+        outright: 0,
+    };
+    table::enqueue(
+        conn,
+        kinds::DELETE_FOLDER,
+        &serde_json::to_string(&payload)?,
+        kinds::PRIORITY_COPY,
+    )
+}
+
+/// Queues Empty Trash over the files it counted, and returns the job that empties them.
+pub fn enqueue_empty(conn: &Connection, counted: Vec<Counted>) -> Result<i64> {
+    table::enqueue(
+        conn,
+        kinds::EMPTY,
+        &serde_json::to_string(&kinds::EmptyPayload {
+            counted,
+            deleted: 0,
+            bytes: 0,
+            gone: 0,
+        })?,
+        kinds::PRIORITY_COPY,
+    )
+}
+
 fn enqueue_move(conn: &Connection, payload: kinds::MovePayload) -> Result<i64> {
     table::enqueue(
         conn,
@@ -778,6 +956,7 @@ mod tests {
             }),
             Box::new(|_| {}),
             Box::new(|_| {}),
+            Box::new(|_| {}),
         );
         let copied = heard.recv_timeout(Duration::from_secs(60)).unwrap();
         let deadline = Instant::now() + Duration::from_secs(10);
@@ -832,6 +1011,7 @@ mod tests {
             Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),
+            Box::new(|_| {}),
         );
         assert_eq!(
             inner.progress(&conn).unwrap().copies,
@@ -861,6 +1041,7 @@ mod tests {
             Box::new(move |copied| {
                 let _ = said.send(copied.clone());
             }),
+            Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),
         );
@@ -903,6 +1084,7 @@ mod tests {
                 let _ = said.send(exported.clone());
             }),
             Box::new(|_| {}),
+            Box::new(|_| {}),
         )
     }
 
@@ -939,6 +1121,7 @@ mod tests {
             Box::new(move |exported| {
                 let _ = said.send(exported.clone());
             }),
+            Box::new(|_| {}),
             Box::new(|_| {}),
         );
         let exported = heard.recv_timeout(Duration::from_secs(60)).unwrap();
@@ -1053,6 +1236,7 @@ mod tests {
             }),
             Box::new(|_| {}),
             Box::new(|_| {}),
+            Box::new(|_| {}),
         );
         assert!(inner.cancel_copy(&conn, job).unwrap());
         let copied = heard.try_recv().expect("its line ends with what came in");
@@ -1083,6 +1267,7 @@ mod tests {
             Box::new(move |copied| {
                 let _ = said.send(copied.clone());
             }),
+            Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),
         );
@@ -1122,6 +1307,7 @@ mod tests {
             Box::new(move |moved| {
                 let _ = said.send(moved.clone());
             }),
+            Box::new(|_| {}),
         )
     }
 
@@ -1160,6 +1346,7 @@ mod tests {
             Box::new(move |moved| {
                 let _ = said.send(moved.clone());
             }),
+            Box::new(|_| {}),
         );
         let moved = heard.recv_timeout(Duration::from_secs(60)).unwrap();
         let deadline = Instant::now() + Duration::from_secs(10);
@@ -1232,6 +1419,310 @@ mod tests {
         assert!(!into.join("IMG_2.jpg").exists());
     }
 
+    #[test]
+    fn cancel_on_a_waiting_move_whose_part_cannot_be_cleared_still_ends_it() {
+        let (conn, dir, _, people, ids) = library_to_move("move-cancel-removed");
+        let job = enqueue_move_items(&conn, &ids, people).unwrap();
+        sources::remove(&conn, 1).unwrap();
+
+        let (said, heard) = mpsc::channel();
+        let inner = hearing_moves(&dir, said);
+        assert!(inner.cancel_move(&conn, job).unwrap());
+        assert!(heard.try_recv().unwrap().cancelled);
+    }
+
+    fn hearing_deletes(dir: &Path, said: mpsc::Sender<Deleted>) -> QueueInner {
+        QueueInner::new(
+            dir.join("library.db"),
+            dir.join("thumbs"),
+            None,
+            Box::new(|_| {}),
+            Box::new(|_| {}),
+            Box::new(|_| {}),
+            Box::new(|_| {}),
+            Box::new(move |deleted| {
+                let _ = said.send(deleted.clone());
+            }),
+        )
+    }
+
+    /// Trips holding `count` files, IMG_0.jpg on; their ids.
+    fn library_to_delete(name: &str, count: usize) -> (Connection, PathBuf, i64, Vec<i64>) {
+        let (conn, dir, trips) = library_to_export(name);
+        for one in ["IMG_1.jpg", "IMG_2.jpg"] {
+            std::fs::remove_file(dir.join("library/Trips").join(one)).unwrap();
+        }
+        for n in 0..count {
+            std::fs::write(dir.join(format!("library/Trips/IMG_{n}.jpg")), "bytes").unwrap();
+        }
+        crate::fs::walk::reconcile(&conn).unwrap();
+        let ids = (0..count)
+            .map(|n| {
+                crate::db::items::existing_by_disk_name(&conn, trips, &format!("IMG_{n}.jpg"))
+                    .unwrap()
+                    .unwrap()
+                    .id
+            })
+            .collect();
+        (conn, dir, trips, ids)
+    }
+
+    /// Claims the job waiting and runs it on this thread, whose stand-in is the Recycle Bin.
+    fn run_here(inner: &QueueInner, dir: &Path) -> worker::Done {
+        let mut conn = db::open(&dir.join("library.db")).unwrap();
+        let job = table::claim(&mut conn).unwrap().unwrap();
+        let done = worker::execute(inner, &mut conn, &job).unwrap();
+        match done {
+            worker::Done::Finished => table::complete(&conn, job.id).unwrap(),
+            worker::Done::Paused => table::release(&conn, job.id).unwrap(),
+        }
+        done
+    }
+
+    /// Closes the app, as far as the queue knows, as this thread asks for its `nth` turn of the
+    /// disk from now on.
+    fn stop_at_turn(inner: &Arc<QueueInner>, nth: u32) {
+        let inner = Arc::clone(inner);
+        let mut asked = 0;
+        crate::fs::just_after_queueing(move || {
+            asked += 1;
+            if asked == nth {
+                inner.stop.store(true, Ordering::Relaxed);
+            }
+        });
+    }
+
+    #[test]
+    fn a_delete_of_a_few_files_goes_at_once_and_of_more_runs_as_a_job_with_its_line() {
+        let (conn, dir, _, ids) = library_to_delete("delete-job", kinds::AT_ONCE + 1);
+        let few = crate::commands::start_trash(&conn, &ids[..kinds::AT_ONCE]).unwrap();
+        let crate::commands::ItemsTrashed::Done {
+            report,
+            batch: Some(went),
+        } = few
+        else {
+            panic!("a few go at once");
+        };
+        assert_eq!(report.trashed as usize, kinds::AT_ONCE);
+
+        let rest = [ids[kinds::AT_ONCE], ids[0]];
+        let crate::commands::ItemsTrashed::Started { job_id } =
+            crate::commands::start_trash(&conn, &[&ids[..], &rest[..]].concat()).unwrap()
+        else {
+            panic!("more are a job");
+        };
+        let (said, heard) = mpsc::channel();
+        let inner = hearing_deletes(&dir, said);
+        let waiting = Deleting {
+            job_id,
+            kind: DeleteKind::Files,
+            name: String::new(),
+            done: 0,
+            whole: 13,
+        };
+        assert_eq!(inner.progress(&conn).unwrap().deletes, [waiting]);
+        assert_eq!(table::counts(&conn).unwrap().pending, 0);
+        assert_eq!(
+            crate::db::journal::latest_batch(&conn).unwrap(),
+            Some(went.batch_id),
+            "the job's batch is no act until it ends"
+        );
+
+        assert!(matches!(run_here(&inner, &dir), worker::Done::Finished));
+        let Deleted::Files {
+            job_id: ended,
+            batch,
+            report,
+            whole,
+            cancelled,
+            stopped,
+        } = heard.try_recv().unwrap()
+        else {
+            panic!("files were deleted");
+        };
+        assert_eq!(
+            (ended, whole, cancelled, stopped),
+            (job_id, 13, false, None)
+        );
+        assert_eq!(report.trashed, 1);
+        assert_eq!(report.refused.len(), 12, "the rest had gone already");
+        assert_eq!(batch.map(|went| went.files), Some(1));
+        assert!(inner.progress(&conn).unwrap().deletes.is_empty());
+        assert!(
+            !dir.join(format!("library/Trips/IMG_{}.jpg", kinds::AT_ONCE))
+                .exists()
+        );
+    }
+
+    #[test]
+    fn a_folder_holding_more_files_than_go_at_once_is_deleted_as_a_job_with_its_line() {
+        let (conn, dir, trips, _) = library_to_delete("delete-folder-job", kinds::AT_ONCE + 1);
+        let few = crate::commands::start_folder_delete(&conn, trips, Some(Contents::Trash));
+        let Ok(crate::commands::FolderDeleted::Started { job_id }) = few else {
+            panic!("a job: {few:?}");
+        };
+        let (said, heard) = mpsc::channel();
+        let inner = hearing_deletes(&dir, said);
+        assert_eq!(
+            inner.progress(&conn).unwrap().deletes,
+            [Deleting {
+                job_id,
+                kind: DeleteKind::Folder,
+                name: "Trips".into(),
+                done: 0,
+                whole: 11,
+            }]
+        );
+
+        assert!(matches!(run_here(&inner, &dir), worker::Done::Finished));
+        let Deleted::Folder {
+            name,
+            batch,
+            report,
+            cancelled,
+            stopped,
+            ..
+        } = heard.try_recv().unwrap()
+        else {
+            panic!("a folder was deleted");
+        };
+        assert_eq!((name.as_str(), cancelled, stopped), ("Trips", false, None));
+        assert!(report.deleted, "{report:?}");
+        assert_eq!(batch.map(|went| went.files), Some(11));
+        assert!(!dir.join("library/Trips").exists());
+
+        let back = crate::fs::undo::undo_last(&conn).unwrap().unwrap();
+        assert_eq!(back.files_back, 11);
+        assert!(dir.join("library/Trips/IMG_0.jpg").is_file());
+    }
+
+    #[test]
+    fn empty_trash_runs_as_a_job_with_its_line_and_no_cancel_once_it_runs() {
+        let (conn, dir, _, ids) = library_to_delete("empty-job", 2);
+        crate::fs::trash::trash_items(&conn, &ids, &crate::db::journal::new_batch()).unwrap();
+        let asked = crate::fs::empty::to_empty(&conn).unwrap();
+        let job_id = enqueue_empty(&conn, asked.files).unwrap();
+        let (said, heard) = mpsc::channel();
+        let inner = hearing_deletes(&dir, said);
+        assert_eq!(
+            inner.progress(&conn).unwrap().deletes[0].kind,
+            DeleteKind::Empty
+        );
+        lock(&inner.deletes).insert(
+            job_id + 1,
+            Deleting {
+                job_id: job_id + 1,
+                kind: DeleteKind::Empty,
+                name: String::new(),
+                done: 1,
+                whole: 2,
+            },
+        );
+        assert!(
+            !inner.cancel_delete(&conn, job_id + 1).unwrap(),
+            "what has gone has gone"
+        );
+        lock(&inner.deletes).clear();
+
+        assert!(matches!(run_here(&inner, &dir), worker::Done::Finished));
+        let Deleted::Empty {
+            emptied,
+            cancelled,
+            stopped,
+            ..
+        } = heard.try_recv().unwrap()
+        else {
+            panic!("the Trash was emptied");
+        };
+        assert_eq!((emptied.deleted, cancelled, stopped), (2, false, None));
+        assert!(crate::fs::empty::to_empty(&conn).unwrap().files.is_empty());
+    }
+
+    #[test]
+    fn a_hold_takes_each_waiting_delete_off_the_queue_and_ends_its_line() {
+        let (conn, dir, trips, ids) = library_to_delete("delete-held", kinds::AT_ONCE + 1);
+        let trash = enqueue_trash(&conn, &ids).unwrap();
+        enqueue_delete_folder(&conn, trips, Contents::Trash, ids.len()).unwrap();
+        enqueue_empty(&conn, Vec::new()).unwrap();
+        let (said, heard) = mpsc::channel();
+        let queue = JobQueue {
+            inner: Arc::new(hearing_deletes(&dir, said)),
+            threads: Mutex::new(Vec::new()),
+        };
+        let inner = &*queue.inner;
+
+        let hold = queue.hold().unwrap();
+        let ended: Vec<bool> = heard
+            .try_iter()
+            .map(|deleted| match deleted {
+                Deleted::Files { cancelled, .. }
+                | Deleted::Folder { cancelled, .. }
+                | Deleted::Empty { cancelled, .. } => cancelled,
+            })
+            .collect();
+        assert_eq!(ended, [true, true, true]);
+        assert!(inner.progress(&conn).unwrap().deletes.is_empty());
+        assert!(
+            ids.iter()
+                .all(|id| crate::db::items::is_live(&conn, *id).unwrap())
+        );
+        assert!(
+            !inner.cancel_delete(&conn, trash).unwrap(),
+            "nothing is left"
+        );
+        assert_eq!(table::counts(&conn).unwrap().pending, 0);
+        drop(hold);
+    }
+
+    #[test]
+    fn an_empty_trash_going_on_after_a_restart_counts_what_its_first_run_deleted() {
+        let (conn, dir, _, ids) = library_to_delete("empty-resumed", 4);
+        crate::fs::trash::trash_items(&conn, &ids, &crate::db::journal::new_batch()).unwrap();
+        enqueue_empty(&conn, crate::fs::empty::to_empty(&conn).unwrap().files).unwrap();
+        let (said, heard) = mpsc::channel();
+        let inner = Arc::new(hearing_deletes(&dir, said));
+        stop_at_turn(&inner, 2);
+
+        assert!(matches!(run_here(&inner, &dir), worker::Done::Paused));
+        assert!(heard.try_recv().is_err());
+        assert_eq!(crate::fs::empty::to_empty(&conn).unwrap().files.len(), 2);
+
+        inner.stop.store(false, Ordering::Relaxed);
+        assert!(matches!(run_here(&inner, &dir), worker::Done::Finished));
+        let Deleted::Empty { emptied, .. } = heard.try_recv().unwrap() else {
+            panic!("the Trash was emptied");
+        };
+        assert_eq!((emptied.deleted, emptied.bytes), (4, 20));
+        assert!(crate::fs::empty::to_empty(&conn).unwrap().files.is_empty());
+    }
+
+    #[test]
+    fn a_folder_delete_going_on_after_a_restart_counts_what_its_first_run_deleted_for_good() {
+        use crate::fs::recycle::tests::{Fake, Stand, stand_in_as};
+
+        let (conn, dir, trips, ids) = library_to_delete("delete-folder-resumed", 4);
+        let mut bin = Fake::new(Stand::Recycles(dir.join("bin")));
+        bin.binless = vec![(dir.join("library/Trips"), "USB Drive (E:)".into())];
+        stand_in_as(bin);
+        enqueue_delete_folder(&conn, trips, Contents::Permanently, ids.len()).unwrap();
+        let (said, heard) = mpsc::channel();
+        let inner = Arc::new(hearing_deletes(&dir, said));
+        stop_at_turn(&inner, 3);
+
+        assert!(matches!(run_here(&inner, &dir), worker::Done::Paused));
+        assert!(heard.try_recv().is_err());
+        assert_eq!(crate::db::items::live_under(&conn, trips).unwrap().len(), 2);
+
+        inner.stop.store(false, Ordering::Relaxed);
+        assert!(matches!(run_here(&inner, &dir), worker::Done::Finished));
+        let Deleted::Folder { report, batch, .. } = heard.try_recv().unwrap() else {
+            panic!("a folder was deleted");
+        };
+        assert!(report.deleted, "{report:?}");
+        assert_eq!((report.outright, batch), (4, None));
+        assert!(!dir.join("library/Trips").exists());
+    }
+
     /// Starting the queue on a fresh library walks it and thumbnails its pictures, off this thread.
     #[test]
     fn a_walk_indexes_a_library_and_its_pictures_get_thumbnails() {
@@ -1254,6 +1745,7 @@ mod tests {
             Box::new(move |progress| {
                 let _ = sent.send(progress.clone());
             }),
+            Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),
@@ -1299,6 +1791,7 @@ mod tests {
             db_path,
             dir.join("thumbs"),
             None,
+            Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),
@@ -1360,6 +1853,7 @@ mod tests {
             Box::new(move |progress| {
                 let _ = sent.send(progress.clone());
             }),
+            Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),

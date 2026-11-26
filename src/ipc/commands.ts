@@ -12,7 +12,6 @@ import type { Coverage } from "./bindings/Coverage";
 import type { CoverChoice } from "./bindings/CoverChoice";
 import type { DestinationKey } from "./bindings/DestinationKey";
 import type { EffectiveTag } from "./bindings/EffectiveTag";
-import type { Emptied } from "./bindings/Emptied";
 import type { ExportStart } from "./bindings/ExportStart";
 import type { Failure } from "./bindings/Failure";
 import type { FavouritePlace } from "./bindings/FavouritePlace";
@@ -152,6 +151,8 @@ export const cancelCopy = (jobId: number) => invoke<boolean>("cancel_copy", { jo
 
 export const cancelMove = (jobId: number) => invoke<boolean>("cancel_move", { jobId });
 
+export const cancelDelete = (jobId: number) => invoke<boolean>("cancel_delete", { jobId });
+
 export const exportPlan = (scope: Scope) => invoke<Plan>("export_plan", { scope });
 
 export const pickExportZip = (name: string, dir: string | null) =>
@@ -285,8 +286,8 @@ export const lookInBin = () => invoke<Looked>("look_in_bin");
 /** The files in the Trash as Empty Trash… asks about them, and what they weigh. */
 export const trashToEmpty = () => invoke<ToEmpty>("trash_to_empty");
 
-/** Deletes for good the files counted that are still in the Trash; `empty-progress` counts them. */
-export const emptyTrash = (counted: Counted[]) => invoke<Emptied>("empty_trash", { counted });
+/** Empties the files counted that are still in the Trash as a job, whose line counts them. */
+export const emptyTrash = (counted: Counted[]) => invoke<number>("empty_trash", { counted });
 
 export const libraryTotals = () => invoke<LibraryTotals>("library_totals");
 

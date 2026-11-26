@@ -207,8 +207,35 @@ danger hairline, never a fill, that counts the failures, offers to try them agai
 list in place rather than in a dialog. Neither is a dialog, and both leave when they are done.
 Each row is the file's path from inside its source, as Explorer writes it, so two files of one
 name in different folders read apart, with a way to go and look at it; a failed walk of a source's
-own folder goes by the source's name. Copies, moves and exports count themselves on their own
-lines, so they are left out of the list as they are out of its count.
+own folder goes by the source's name. Copies, moves, deletes and exports count themselves on their
+own lines, so they are left out of the list as they are out of its count.
+
+**A delete of more than ten files is a job** (#252), as a move between drives is: Delete on a
+selection, Delete Folder whose files go to the Recycle Bin or outright, and every Empty Trash.
+The shell takes tens of milliseconds a file, so a card's worth sent inside the command held the
+window and every other verb with no progress and no Cancel. Ten or fewer go at once, inside the
+command and in one turn of the disk, as before. A folder whose files go to a sorting source still
+moves them inside the command, as a folder's move does. Each has a line at the foot, "Deleting
+1,204 files…", "Deleting Lisbon…" or "Emptying the Trash…", and ends as the command's delete did:
+the Line and Undo for what went, the banner for what stayed.
+
+- **Files go one to a turn of the disk**, each in the Recycle Bin, gone from a drive with no bin,
+  or where it was, so a walk or another verb waits for one file, never the selection, and Cancel
+  Delete finishes the file in hand and starts no other. Cancelled, the Line counts what went
+  against what was asked, and a folder stays, with what went undone by its Undo. A folder goes in
+  a turn of its own once its last file has: a file moved out of it meanwhile stays where it went,
+  and one moved in keeps the folder and is named, as any file that keeps a folder is.
+- **Its batch is no act until it ends**, as a move's is: Ctrl+Z passes over it while it runs. One
+  the app's closing stops goes on at the next launch under the same batch, passing over what
+  already went, and its job carries what no journal row counts, the files gone for good, so its
+  Line counts both runs. A folder whose files go for good on a drive with no bin is no act however
+  many runs it takes. A restore of the index cancels it as Cancel would.
+- **Empty Trash has no Cancel**: what has gone has gone, as "Emptying the Trash" says. Its line
+  has no dismiss and its description says why; only the app's closing stops it, between two files, and
+  it goes on at the next launch. One still waiting when the index is restored is taken off the
+  queue, since what it counted describes the index before.
+- **Left out:** an undo of a move between drives still copies back inside `undo_batch`, with no
+  line; an undo replays a whole batch in one turn, and splitting it is its own change.
 
 ## Reasons, never raw errors
 
@@ -1356,8 +1383,9 @@ it. Two acts delete for good, and both ask first: Empty Trash…, and Delete on 
   something stayed cannot empty, so it is tried once and not waited on.
 - **One change to the disk at a time, and a walk's turn is one directory** (#249). A walk that
   read a directory while a verb renamed it would find the old name gone and retire everything
-  under it, so they take turns: a verb holds the turn for its whole change, an undo or a redo for
-  its whole replay, and the walk for one directory, or 256 of a directory's files, at a time. A
+  under it, so they take turns: a verb holds the turn for its whole change, a job on the queue one
+  file at a time (DECISIONS.md "Background work"), an undo or a redo for its whole replay, and the
+  walk for one directory, or 256 of a directory's files, at a time. A
   rename, move or delete made while a 100,000-file source is first read waits for one directory,
   never the walk. **The turn goes in the order it was asked for**, a ticket each: a plain lock
   lets the thread that just let go take it straight back, so a walk letting go between
@@ -1776,7 +1804,9 @@ the way back; a single file is never purged from the app, as Explorer's bin can 
   with no file in it keeps its undo. A row that fails to retire after its file went is retired by
   the next look in the bin, which lets its journal go the same way.
 - **Nothing to cancel.** What has gone has gone, so the head counts as it goes with the walk's bar
-  where the button was, and the foot says when it is done; leaving Settings loses nothing.
+  where the button was, and the foot says when it is done; leaving Settings loses nothing. It runs
+  as a job (#252), so the window and every other verb go on meanwhile, and its line at the foot
+  counts it too, with no dismiss: DECISIONS.md "Background work".
 - **Tests never reach the real bin.** In a test build `Shell::holds` is the stand-in's, so only a
   folder of the test's own can be emptied, and each test writes the files it deletes.
 

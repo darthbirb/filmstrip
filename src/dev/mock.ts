@@ -14,6 +14,8 @@ import type { Counted } from "../ipc/bindings/Counted";
 import type { Coverage } from "../ipc/bindings/Coverage";
 import type { Covered } from "../ipc/bindings/Covered";
 import type { Crumb } from "../ipc/bindings/Crumb";
+import type { Deleted } from "../ipc/bindings/Deleted";
+import type { Deleting } from "../ipc/bindings/Deleting";
 import type { DestinationKey } from "../ipc/bindings/DestinationKey";
 import type { EffectiveTag } from "../ipc/bindings/EffectiveTag";
 import type { Emptied } from "../ipc/bindings/Emptied";
@@ -1865,47 +1867,110 @@ function dropFromJournal(item: ItemRow) {
   }
 }
 
-/** Deletes for good the files counted still in the Trash, one at a time, as the Rust side does. */
-function emptyTrash(counted: readonly Counted[]): Promise<Emptied> {
+/** Deletes for good the files counted still in the Trash, one at a time, as the Rust job does. */
+function emptyTrash(counted: readonly Counted[]): number {
   undone.length = 0;
   const emptied: Emptied = { deleted: 0, bytes: 0, gone: 0, kept: 0, stayed: [] };
-  return new Promise((resolve) => {
-    let at = 0;
-    const step = () => {
-      const one = counted[at];
-      if (!one) {
-        resolve(emptied);
-        return;
+  const jobId = nextDeleteJob++;
+  deleting.set(jobId, { jobId, kind: "empty", name: "", done: 0, whole: counted.length });
+  setTimeout(sendExports);
+  let at = 0;
+  const step = () => {
+    const one = counted[at];
+    if (!one) {
+      deleting.delete(jobId);
+      sendExports();
+      const ended: Deleted = { kind: "empty", jobId, emptied, cancelled: false, stopped: null };
+      void emit("delete-done", ended);
+      return;
+    }
+    const item = (ITEMS[TRASH] ?? []).find((held) => held.id === one.itemId);
+    if (item && binPathOf(item) === one.binPath) {
+      if (emptiedOutside.has(item.id)) {
+        dropFromJournal(item);
+        retireGone(item);
+        emptied.gone += 1;
+      } else if (undeletable.has(item.id)) {
+        emptied.kept += 1;
+        emptied.stayed.push({
+          kind: "file",
+          id: item.id,
+          name: item.diskName,
+          at: { kind: "trash" },
+          reason: { kind: "inUse" },
+        });
+      } else {
+        dropFromJournal(item);
+        retireGone(item);
+        goneForGood.push(item);
+        emptied.deleted += 1;
+        emptied.bytes += item.sizeBytes;
       }
-      const item = (ITEMS[TRASH] ?? []).find((held) => held.id === one.itemId);
-      if (item && binPathOf(item) === one.binPath) {
-        if (emptiedOutside.has(item.id)) {
-          dropFromJournal(item);
-          retireGone(item);
-          emptied.gone += 1;
-        } else if (undeletable.has(item.id)) {
-          emptied.kept += 1;
-          emptied.stayed.push({
-            kind: "file",
-            id: item.id,
-            name: item.diskName,
-            at: { kind: "trash" },
-            reason: { kind: "inUse" },
-          });
-        } else {
-          dropFromJournal(item);
-          retireGone(item);
-          goneForGood.push(item);
-          emptied.deleted += 1;
-          emptied.bytes += item.sizeBytes;
-        }
-      }
-      at += 1;
-      void emit("empty-progress", at);
-      setTimeout(step, EMPTY_STEP_MS);
-    };
+    }
+    at += 1;
+    const line = deleting.get(jobId);
+    if (line) deleting.set(jobId, { ...line, done: at });
+    sendExports();
     setTimeout(step, EMPTY_STEP_MS);
+  };
+  setTimeout(step, EMPTY_STEP_MS);
+  return jobId;
+}
+
+// More files than a delete sends at once make it a job, as on the Rust side.
+const AT_ONCE = 10;
+let nextDeleteJob = 9000;
+const deleting = new Map<number, Deleting>();
+const cancelDeletes = new Map<number, () => void>();
+const DELETE_STEP_MS = 300;
+
+/** One file sent to the Recycle Bin, or refused as the bin or its drive would. */
+function trashOne(item: ItemRow, steps: Step[], refused: Stayed[]) {
+  const drive = binless.get(item.id);
+  if (drive) {
+    refused.push(stayedIn(item, { kind: "noBin", drive }));
+    return;
+  }
+  if (binRefuses.has(item.id)) {
+    refused.push(stayedIn(item, { kind: "binRefused" }));
+    return;
+  }
+  steps.push({ op: "trash", item, from: item.folderId });
+  toTrash(item);
+}
+
+/** A delete on the queue, a file a step, cancelled after the file in hand. */
+function startDeleteJob(
+  kind: Deleting["kind"],
+  name: string,
+  going: readonly ItemRow[],
+  each: (item: ItemRow) => void,
+  ended: (jobId: number, cancelled: boolean) => Deleted,
+) {
+  const jobId = nextDeleteJob++;
+  deleting.set(jobId, { jobId, kind, name, done: 0, whole: going.length });
+  const end = (cancelled: boolean) => {
+    deleting.delete(jobId);
+    cancelDeletes.delete(jobId);
+    sendExports();
+    void emit("delete-done", ended(jobId, cancelled));
+  };
+  const step = () => {
+    const line = deleting.get(jobId);
+    if (!line) return;
+    const item = going[line.done];
+    if (!item) return end(false);
+    each(item);
+    deleting.set(jobId, { ...line, done: line.done + 1 });
+    sendExports();
+    setTimeout(step, DELETE_STEP_MS);
+  };
+  setTimeout(() => {
+    sendExports();
+    setTimeout(step, DELETE_STEP_MS);
   });
+  cancelDeletes.set(jobId, () => end(true));
+  return jobId;
 }
 
 function withTrashCount(one: SourceSummary): SourceSummary {
@@ -2031,20 +2096,27 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   trash_items: ({ itemIds }): ItemsTrashed => {
     const steps: Step[] = [];
     const refused: Stayed[] = [];
-    for (const item of everyItem().filter((one) => (itemIds as number[]).includes(one.id))) {
-      const drive = binless.get(item.id);
-      if (drive) {
-        refused.push(stayedIn(item, { kind: "noBin", drive }));
-        continue;
-      }
-      if (binRefuses.has(item.id)) {
-        refused.push(stayedIn(item, { kind: "binRefused" }));
-        continue;
-      }
-      steps.push({ op: "trash", item, from: item.folderId });
-      toTrash(item);
+    const going = everyItem().filter((one) => (itemIds as number[]).includes(one.id));
+    if (going.length > AT_ONCE) {
+      const jobId = startDeleteJob(
+        "files",
+        "",
+        going,
+        (item) => trashOne(item, steps, refused),
+        (jobId, cancelled): Deleted => ({
+          kind: "files",
+          jobId,
+          batch: record(steps),
+          report: { trashed: steps.length, refused },
+          whole: going.length,
+          cancelled,
+          stopped: null,
+        }),
+      );
+      return { kind: "started", jobId };
     }
-    return { batch: record(steps), report: { trashed: steps.length, refused } };
+    for (const item of going) trashOne(item, steps, refused);
+    return { kind: "done", batch: record(steps), report: { trashed: steps.length, refused } };
   },
   binless_items: ({ itemIds }) =>
     binlessAmong((itemIds as number[]).flatMap((id) => everyItem().filter((one) => one.id === id))),
@@ -2104,28 +2176,43 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     const steps: Step[] = [];
     const refused: Stayed[] = [];
     let outright = 0;
-    if (held.length > 0 && (how?.kind === "trash" || how?.kind === "permanently")) {
-      for (const item of held) {
-        const drive = binless.get(item.id);
-        if (drive && how.kind === "permanently") {
-          if (undeletable.has(item.id)) refused.push(stayedIn(item, { kind: "inUse" }));
-          else {
-            deleteOutright(item);
-            outright += 1;
-          }
-          continue;
+    const sendOne = (item: ItemRow) => {
+      if (binless.has(item.id) && how?.kind === "permanently") {
+        if (undeletable.has(item.id)) refused.push(stayedIn(item, { kind: "inUse" }));
+        else {
+          deleteOutright(item);
+          outright += 1;
         }
-        if (drive) {
-          refused.push(stayedIn(item, { kind: "noBin", drive }));
-          continue;
-        }
-        if (binRefuses.has(item.id)) {
-          refused.push(stayedIn(item, { kind: "binRefused" }));
-          continue;
-        }
-        steps.push({ op: "trash", item, from: item.folderId });
-        toTrash(item);
+        return;
       }
+      trashOne(item, steps, refused);
+    };
+    const takeAway = () => {
+      if (refused.length > 0) return;
+      detach(node);
+      if (outright === 0 || steps.length > 0) steps.push({ op: "deleteFolder", node, parent });
+      else foldersGoneForGood.push({ node, parent });
+    };
+    if (held.length > AT_ONCE && (how?.kind === "trash" || how?.kind === "permanently")) {
+      const jobId = startDeleteJob("folder", node.title, held, sendOne, (jobId, cancelled) => {
+        if (!cancelled) takeAway();
+        return {
+          kind: "folder",
+          jobId,
+          folderId: node.id,
+          name: node.title,
+          contents: how,
+          batch: record(steps),
+          report: { deleted: !cancelled && refused.length === 0, refused, outright },
+          whole: held.length,
+          cancelled,
+          stopped: null,
+        };
+      });
+      return { kind: "started", jobId };
+    }
+    if (held.length > 0 && (how?.kind === "trash" || how?.kind === "permanently")) {
+      for (const item of held) sendOne(item);
     }
     if (held.length > 0 && how?.kind === "moveTo") {
       const to = SOURCES.find((one) => one.id === how.sourceId)?.rootFolderId ?? 0;
@@ -2149,12 +2236,9 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
         relocate(item, to);
       }
     }
-    if (refused.length === 0) {
-      detach(node);
-      if (outright === 0 || steps.length > 0) steps.push({ op: "deleteFolder", node, parent });
-      else foldersGoneForGood.push({ node, parent });
-    }
+    takeAway();
     return {
+      kind: "done",
       batch: record(steps),
       report: { deleted: refused.length === 0, refused, outright },
     };
@@ -2574,6 +2658,12 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
   paste_files: ({ folderId }) => copyIn(folderId as number, clipboard),
   drop_files: ({ folderId, paths }) => copyIn(folderId as number, paths as string[]),
   cancel_copy: () => false,
+  cancel_delete: ({ jobId }) => {
+    const cancel = cancelDeletes.get(jobId as number);
+    if (!cancel) return false;
+    cancel();
+    return true;
+  },
   cancel_move: ({ jobId }) => {
     const cancel = cancelMoves.get(jobId as number);
     if (!cancel) return false;
@@ -2610,6 +2700,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
       copies: [],
       exports: [...exporting.values()],
       moves: [...moving.values()],
+      deletes: [...deleting.values()],
       walks: 0,
       walkedSource,
       thumbed: [],

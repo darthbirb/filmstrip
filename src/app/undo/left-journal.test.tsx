@@ -1,9 +1,10 @@
-import { afterEach, beforeEach, expect, test } from "vitest";
+import { afterEach, beforeAll, beforeEach, expect, test } from "vitest";
 import { page } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { emptyOutside, resetBin } from "../../dev/mock";
 import { deleteFolder, folderItems, trashItems, trashListing, undoLast } from "../../ipc/commands";
+import { watchDeletes } from "../deleted";
 import { Foot } from "../navigation/Foot";
 import { getNews, setNews } from "../navigation/foot-slot";
 import { loadIndex, refreshIndex, resetIndex } from "../navigation/index-store";
@@ -17,6 +18,8 @@ import { afterAct } from "./undo";
 // DECISIONS.md "Emptying the Trash" and "The Trash is the Recycle Bin".
 
 let stop: () => void = () => undefined;
+
+beforeAll(() => watchDeletes());
 
 beforeEach(async () => {
   await page.viewport(1280, 820);
@@ -37,7 +40,7 @@ test("opening the Trash takes Undo off the line of an act whose files were all e
   const files = (await folderItems(6)).map((row) => row.id);
   const screen = await render(<Foot />);
   const deleted = await deleteFolder(6, { kind: "trash" });
-  if (!deleted.batch) throw new Error("the mock deleted nothing");
+  if (deleted.kind !== "done" || !deleted.batch) throw new Error("the mock deleted nothing");
   afterAct(deleted.batch);
   const line = `Deleted Cairo and its ${files.length} files.`;
   await expect.element(screen.getByText(line)).toBeVisible();
@@ -60,7 +63,7 @@ test("opening the Trash takes Undo off the line of an act whose files were all e
 test("Empty Trash… leaves no Undo on the foot for an act whose files it found emptied", async () => {
   const files = (await folderItems(4)).map((row) => row.id);
   const trashed = await trashItems(files);
-  if (!trashed.batch) throw new Error("the mock deleted nothing");
+  if (trashed.kind !== "done" || !trashed.batch) throw new Error("the mock deleted nothing");
   emptyOutside(files);
   await refreshIndex();
   const screen = await render(

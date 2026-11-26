@@ -3,6 +3,7 @@ import type { Batch } from "./Batch";
 import type { TrashReport } from "./TrashReport";
 
 /**
- * What sending files to the trash did, and the batch that undoes it when anything went.
+ * What sending files to the trash did, and the batch that undoes it when anything went; or, for
+ * more than a delete sends at once, the job that sends them.
  */
-export type ItemsTrashed = { batch: Batch | null, report: TrashReport, };
+export type ItemsTrashed = { "kind": "done", batch: Batch | null, report: TrashReport, } | { "kind": "started", jobId: number, };
