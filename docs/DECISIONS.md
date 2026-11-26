@@ -1016,6 +1016,22 @@ and one height in justified rows is equal cells by another measure.
     and stood still nowhere else; the recorded WebM loops without a pause. Charged to the span,
     that put two 4K clips that looped in different spans at 0.931 and 0.925 in run 43667718288,
     a fail, while the pane, which never judges a span a clip looped in, kept both playing.
+  - **It leaves out the frames within one of the pane's spans of a loop, before it or after**,
+    dropped and due alike, and prints them apart; the bounds hold on the rest. A loop's restart
+    drops frames as well as holding the clock: across ten Gates runs on 25 and 26 November 2026,
+    the MP4 spans that showed every frame due, so held through no loop, dropped 6 of 36478, and
+    those a loop's hold fell in dropped 236 of 46687. Two clips that loop in different spans put
+    a loop in two of three, so the middle span held one: 4K at two clips is due about 300 frames
+    a span, and its three drops at a restart made 1.02 to 1.06% in runs 45734049941 and
+    45877907463, over the bound with no clip behind. Frames are read at every frame the window
+    draws, so only those near a loop are left out, and a loop just outside the count is placed
+    by the clip's clock. Each clip loops at most once in a count, so at least a second of it
+    stays in every span, and a pane playing too many, which drops throughout, still fails. The
+    test checks that: every clip is longer than the count, the recorded WebM by a second, and a
+    clip whose clock went back twice fails it, since a pane that restarts clips would otherwise
+    hide its own drops as loops. Not every drop is a loop's: a runner's hitch drops in one span
+    now and then, as 18 of 1092 did at 1080p60 in run 45884619678, and the middle of three
+    absorbs it.
 
 - **The bounds were set from the test clip's edge.** Counted on 2 November 2026, before the pane
   measured itself, with the 37ms clip among twelve originals in a 1500 × 900 pane. These were runs

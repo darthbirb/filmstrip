@@ -68,13 +68,17 @@ test.for(PHONE)(
 );
 
 function keepsTime(bench: Bench, label: string) {
-  expect(bench.spans.every((span) => span.due > 0)).toBe(true);
   const counts = bench.spans.map((span) => `${span.dropped}/${span.due}`).join(" ");
+  const near = bench.spans
+    .map((span) => `${span.nearLoops.dropped}/${span.nearLoops.due}`)
+    .join(" ");
   const paces = bench.spans.map((span) => span.pace.toFixed(3)).join(" ");
   console.info(
-    `${label}: ${bench.playing} playing, window ${bench.rate.toFixed(1)}/s, dropped ${counts}, pace ${paces}`,
+    `${label}: ${bench.playing} playing, window ${bench.rate.toFixed(1)}/s, dropped ${counts} of the frames kept, ${near} near loops, most loops ${bench.loops}, pace ${paces}`,
   );
   expect(bench.playing).toBeGreaterThan(0);
+  expect(bench.spans.every((span) => span.due > 0)).toBe(true);
+  expect(bench.loops).toBeLessThanOrEqual(1);
   const middle = (values: number[]) =>
     [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
   expect(middle(bench.spans.map((span) => span.dropped / span.due))).toBeLessThan(0.01);

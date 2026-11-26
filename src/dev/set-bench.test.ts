@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 
-import { benchSet, clock, recordings, tick } from "./set-bench";
+import { benchSet, clock, framesIn, recordings, type Sample, tick } from "./set-bench";
 
 test("one recording serves a warm-up and the longer count after it", async () => {
   const asked: number[] = [];
@@ -49,10 +49,15 @@ test("a clip given that would loop in more than one span is refused before the p
 
 const FRAME = 1000 / 30;
 
-/** The pace of a clip read every frame for `ms`, showing `shows(at)` at `at` ms in. */
-function pace(ms: number, shows: (at: number) => number) {
+/** The clock of a clip read every frame for `ms`, showing `shows(at)` at `at` ms in. */
+function read(ms: number, shows: (at: number) => number) {
   let held = clock(shows(0), 0);
   for (let at = FRAME; at <= ms; at += FRAME) held = tick(held, shows(at), at);
+  return held;
+}
+
+function pace(ms: number, shows: (at: number) => number) {
+  const held = read(ms, shows);
   return held.moved / held.seconds;
 }
 
@@ -80,4 +85,46 @@ test("a stall away from a loop counts against the pace", () => {
 
 test("a clip slow throughout reads slow across its loop", () => {
   expect(pace(5000, (at) => (20 + (0.9 * at) / 1000) % 22)).toBeCloseTo(0.9, 3);
+});
+
+/** A clip read every frame for `ms`, each frame due and its `n`th dropped where `drops(n, at)`. */
+function readings(ms: number, drops: (n: number, at: number) => boolean) {
+  const samples: Sample[] = [{ at: 0, dropped: 0, due: 0 }];
+  for (let n = 1; n * FRAME <= ms; n += 1) {
+    const at = n * FRAME;
+    const was = samples.at(-1) ?? { dropped: 0, due: 0 };
+    samples.push({ at, dropped: was.dropped + (drops(n, at) ? 1 : 0), due: was.due + 1 });
+  }
+  return samples;
+}
+
+test("frames dropped around a loop, before it and after, are left out of the span", () => {
+  const samples = readings(15_000, (_, at) => Math.abs(at - 7500) < 300);
+  const span = framesIn(samples, [7500], 5000, 10_000);
+  expect(span.dropped).toBe(0);
+  expect(span.due).toBe(31);
+  expect(span.nearLoops.due).toBe(119);
+  expect(span.nearLoops.dropped).toBeGreaterThan(0);
+  expect(framesIn(samples, [], 5000, 10_000).dropped).toBe(span.nearLoops.dropped);
+});
+
+test("a clip dropping throughout still drops in every span, the one it looped in too", () => {
+  const samples = readings(15_000, (n) => n % 10 === 5);
+  const spans = [0, 5000, 10_000].map((from) => {
+    const { dropped, due } = framesIn(samples, [7500], from, from + 5000);
+    return { dropped, due };
+  });
+  expect(spans).toEqual([
+    { dropped: 15, due: 150 },
+    { dropped: 4, due: 31 },
+    { dropped: 15, due: 149 },
+  ]);
+});
+
+test("a clip that loops once in the count reads one loop", () => {
+  expect(read(15_000, (at) => (20 + at / 1000) % 22).loops).toBe(1);
+});
+
+test("a clip sent back to the start every six seconds reads each time it went back", () => {
+  expect(read(15_000, (at) => (at % 6000) / 1000).loops).toBe(2);
 });
