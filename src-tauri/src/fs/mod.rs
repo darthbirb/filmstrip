@@ -19,15 +19,66 @@ pub mod undo;
 pub mod walk;
 
 use std::path::Path;
-use std::sync::{Mutex, MutexGuard, PoisonError};
+use std::sync::{Condvar, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
-static DISK: Mutex<()> = Mutex::new(());
+/// Tickets handed out, and the one whose turn it is.
+struct Tickets {
+    next: u64,
+    serving: u64,
+}
 
-/// One change to the library's disk at a time. A walk takes a turn per source and a verb takes one
-/// for its whole change, so neither reads the other half-done. DECISIONS.md "Undo".
-pub fn turn() -> MutexGuard<'static, ()> {
-    DISK.lock().unwrap_or_else(PoisonError::into_inner)
+static TICKETS: Mutex<Tickets> = Mutex::new(Tickets {
+    next: 0,
+    serving: 0,
+});
+static PASSED: Condvar = Condvar::new();
+
+fn tickets() -> MutexGuard<'static, Tickets> {
+    TICKETS.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// The disk's turn, held until dropped.
+#[must_use]
+pub struct Turn(());
+
+impl Drop for Turn {
+    fn drop(&mut self) {
+        tickets().serving += 1;
+        PASSED.notify_all();
+    }
+}
+
+/// One change to the library's disk at a time, in the order they asked. A walk takes a turn per
+/// directory and a verb takes one for its whole change, so neither reads the other half-done, and
+/// a walk taking its next turn goes behind a verb already waiting. DECISIONS.md "Undo".
+pub fn turn() -> Turn {
+    let mut tickets = tickets();
+    let ticket = tickets.next;
+    tickets.next += 1;
+    #[cfg(test)]
+    QUEUED.with(|hook| {
+        if let Some(then) = hook.borrow_mut().as_mut() {
+            then();
+        }
+    });
+    while tickets.serving != ticket {
+        tickets = PASSED.wait(tickets).unwrap_or_else(PoisonError::into_inner);
+    }
+    Turn(())
+}
+
+#[cfg(test)]
+thread_local! {
+    static QUEUED: std::cell::RefCell<Option<Box<dyn FnMut()>>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Runs `then` each time this thread asks for the disk's turn from now on, once it is in line and
+/// before it waits: where a test knows a verb is waiting.
+#[cfg(test)]
+pub(crate) fn just_after_queueing(then: impl FnMut() + 'static) {
+    QUEUED.with(|hook| *hook.borrow_mut() = Some(Box::new(then)));
 }
 
 /// How long a directory just emptied may hold another program's file before it stays.
