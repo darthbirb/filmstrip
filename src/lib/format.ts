@@ -12,7 +12,15 @@ export function formatCounted(count: number, one: string) {
   return `${formatCount(count)} ${count === 1 ? one : `${one}s`}`;
 }
 
-export const files = (count: number) => formatCounted(count, "file");
+/** Files counted mid-sentence: 1 file, 38 files. */
+export function files(count: number) {
+  return formatCounted(count, "file");
+}
+
+/** Files counted in a Title Case label: 1 File, 38 Files. */
+export function Files(count: number) {
+  return formatCounted(count, "File");
+}
 
 /** Bytes as Windows counts them: steps of 1024, under the familiar names. */
 export function formatBytes(bytes: number) {

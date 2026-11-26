@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 
 import {
+  Files,
   files,
   formatBytes,
   formatCounted,
@@ -27,6 +28,8 @@ test("a count takes its noun's singular for one alone, and groups its figures", 
   expect(files(41_236)).toBe(`${(41_236).toLocaleString()} files`);
   expect(formatCounted(1, "folder")).toBe("1 folder");
   expect(formatCounted(2, "File")).toBe("2 Files");
+  expect(Files(1)).toBe("1 File");
+  expect(Files(38)).toBe("38 Files");
 });
 
 test("lengths read as a clock does", () => {

@@ -10,7 +10,7 @@ import {
 
 import type { Coverage } from "../../ipc/bindings/Coverage";
 import { addItemsTag, removeItemsTag, selectionTagCoverage, tagOffers } from "../../ipc/commands";
-import { files, formatCount, formatCounted } from "../../lib/format";
+import { Files, files, formatCount } from "../../lib/format";
 import { keepEscape, SURFACE } from "../../ui/Menu";
 import { SetChip } from "../../ui/SetChip";
 import { StandingTagField } from "../../ui/TagField";
@@ -46,7 +46,6 @@ type Props = {
 
 const HEADING = "m-0 flex h-chip shrink-0 items-center px-2 text-eyebrow text-fg-dim uppercase";
 const RULE = "mx-2 my-1 h-px shrink-0 border-0 bg-line";
-const Files = (n: number) => formatCounted(n, "File");
 
 /**
  * Tag…: what a set of checked files carries and whose each tag is, with the shared tag field to

@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 
-import { formatBytes, formatCounted } from "../../lib/format";
+import { Files, formatBytes } from "../../lib/format";
 import { Button } from "../../ui/Button";
 import { DismissButton } from "../../ui/DismissButton";
 import { Menu, type MenuAction } from "../../ui/Menu";
@@ -68,8 +68,6 @@ function sheetPlace(bar: HTMLElement | null): Sheet {
   return { anchor, maxHeight: grid ? grid.clientHeight / 2 : undefined };
 }
 
-const files = (count: number) => formatCounted(count, "File");
-
 function InLibrary({ rows }: { rows: readonly CheckedFile[] }) {
   const ids = rows.map((row) => row.id);
   const bar = useRef<HTMLDivElement>(null);
@@ -107,7 +105,7 @@ function InLibrary({ rows }: { rows: readonly CheckedFile[] }) {
   }, [live]);
   const favourite = useEveryFavourite(rows);
   const star = favourite ? "Remove Favourite" : "Favourite";
-  const remove = `Delete ${files(ids.length)}`;
+  const remove = `Delete ${Files(ids.length)}`;
   const run = {
     favourite: () => setFavourites(rows, !favourite),
     copy: () => void copyFiles(ids).catch(failed(copiedFailed(rows))),
@@ -287,7 +285,7 @@ function Bar({ rows, pieces, sheds, ref }: BarProps) {
       data-piece="count"
       className="flex shrink-0 items-baseline gap-1.5 whitespace-nowrap pr-1 tabular-nums"
     >
-      <span className="font-semibold text-fg text-ui">{files(rows.length)}</span>
+      <span className="font-semibold text-fg text-ui">{Files(rows.length)}</span>
       {(measured || !gone.has("size")) && (
         <span data-piece="size" className="text-fg-dim text-small">
           {formatBytes(bytes)}

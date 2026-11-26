@@ -453,7 +453,7 @@ Escape; the header's button is still the one that docks the panel for good. Favo
 back to that folder.
 
 **The foot says what the library holds and what it weighs**, drawn on 12 October 2026 and built
-the day after: `41,236 items · 312 GB`. A count says how many, not how much, and a library of
+the day after: `41,236 files · 312 GB`. A count says how many, not how much, and a library of
 videos and one of phone pictures read the same; the size is what tells someone their drive is
 filling. The source count it used to carry moved into the totals a click on it opens, by kind,
 since pictures and videos differ in size by orders of magnitude: a question asked while looking,
@@ -466,7 +466,7 @@ moves when a move, a delete, a restore or a walk lands. **A source that is away 
 the index**, as its folders are listed from it, and the totals name it and say when it was last
 read; the Sorting Box's header names a sorting source that is away, while its row keeps both
 figures, since only one of several sources is gone. At the panel's least the line gives up whole
-parts, "items" and then the size, and never a figure cut part-way.
+parts, "files" and then the size, and never a figure cut part-way.
 
 ## The grid
 

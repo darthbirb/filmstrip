@@ -18,7 +18,7 @@ import {
   restoreForgets,
   setBackupsKept,
 } from "../../ipc/commands";
-import { formatBytes, formatCount, formatWhen, midSentence } from "../../lib/format";
+import { formatBytes, formatCounted, formatWhen, midSentence } from "../../lib/format";
 import { BackupGroup, BackupRow, RowProgress } from "../../ui/BackupTable";
 import { Band } from "../../ui/Band";
 import { Bar } from "../../ui/Bar";
@@ -51,7 +51,6 @@ import {
 
 const KEPT = [3, 7, 14, 30].map((kept) => ({ value: String(kept), label: String(kept) }));
 
-const plural = (n: number, one: string) => `${formatCount(n)} ${n === 1 ? one : `${one}s`}`;
 const Term = ({ children }: { children: ReactNode }) => <span className="text-fg">{children}</span>;
 
 type Said = { kind: "line"; sentence: string } | { kind: "band"; sentence: string; path?: string };
@@ -141,8 +140,8 @@ export function Backups() {
   const total = backups.reduce((sum, backup) => sum + backup.bytes, 0);
   const count =
     backups.length > 0
-      ? `${plural(backups.length, "backup")} · ${formatBytes(total)}`
-      : plural(0, "backup");
+      ? `${formatCounted(backups.length, "backup")} · ${formatBytes(total)}`
+      : formatCounted(0, "backup");
   const pending = writing ?? (shelved.writing ? Math.floor(Date.now() / 1000) : null);
   const going = (at: number) => backups.length > keep && at >= keep - 1;
 
