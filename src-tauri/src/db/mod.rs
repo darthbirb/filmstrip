@@ -42,6 +42,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (14, include_str!("migrations/014_journal_subject.sql")),
     (15, include_str!("migrations/015_cached.sql")),
     (16, include_str!("migrations/016_job_payload.sql")),
+    (17, include_str!("migrations/017_redo.sql")),
 ];
 
 type Rewrite = fn(&Connection) -> Result<()>;
@@ -369,16 +370,28 @@ mod tests {
             conn.execute("INSERT INTO schema_version VALUES (?1)", [version])
                 .unwrap();
         }
-        let deleted = journal::new_batch();
-        journal::record_item_trash(&conn, &deleted, 5).unwrap();
-        journal::record_folder_delete(&conn, &deleted, 9, 1).unwrap();
-        let tagged = journal::new_batch();
-        let set = journal::ItemsTagged {
-            tag_id: 1,
-            value: "dusk".into(),
-            item_ids: vec![5, 6],
+        // Written as the journal of then held them, before later migrations gave it columns.
+        let write = |batch: &str, op: &str, row: &str| {
+            conn.execute(
+                "INSERT INTO journal (batch_id, op, forward, inverse, created_at)
+                 VALUES (?1, ?2, ?3, ?3, 0)",
+                [batch, op, row],
+            )
+            .unwrap();
         };
-        journal::record_items_tag(&conn, &tagged, &set).unwrap();
+        let deleted = journal::new_batch();
+        write(&deleted, journal::ITEM_TRASH, r#"{"itemId":5}"#);
+        write(
+            &deleted,
+            journal::FOLDER_DELETE,
+            r#"{"folderId":9,"retiredAt":1}"#,
+        );
+        let tagged = journal::new_batch();
+        write(
+            &tagged,
+            journal::ITEMS_TAG,
+            r#"{"tagId":1,"value":"dusk","itemIds":[5,6]}"#,
+        );
 
         migrate(&mut conn).unwrap();
         let indexed: i64 = conn
@@ -392,6 +405,43 @@ mod tests {
             serde_json::from_value(journal::batch(&conn, &tagged).unwrap()[0].inverse.clone())
                 .unwrap();
         assert_eq!(left.item_ids, [6]);
+    }
+
+    #[test]
+    fn migration_17_leaves_a_journal_written_before_it_undoable_with_nothing_to_redo() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        name_collation(&conn).unwrap();
+        conn.execute_batch("CREATE TABLE schema_version (version INTEGER NOT NULL);")
+            .unwrap();
+        for (version, sql) in MIGRATIONS.iter().filter(|(version, _)| *version < 17) {
+            conn.execute_batch(sql).unwrap();
+            conn.execute("INSERT INTO schema_version VALUES (?1)", [version])
+                .unwrap();
+        }
+        let older = journal::new_batch();
+        let newer = journal::new_batch();
+        for (batch, row) in [(&older, r#"{"itemId":5}"#), (&newer, r#"{"itemId":6}"#)] {
+            conn.execute(
+                "INSERT INTO journal (batch_id, op, forward, inverse, created_at)
+                 VALUES (?1, ?2, ?3, ?3, 0)",
+                [batch.as_str(), journal::ITEM_TRASH, row],
+            )
+            .unwrap();
+        }
+
+        migrate(&mut conn).unwrap();
+        let undone: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM journal WHERE undone IS NOT NULL",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(undone, 0);
+        assert_eq!(journal::latest_batch(&conn).unwrap(), Some(newer.clone()));
+        assert_eq!(journal::batch(&conn, &older).unwrap().len(), 1);
+        assert_eq!(journal::batch(&conn, &newer).unwrap().len(), 1);
+        assert_eq!(journal::latest_undone(&conn).unwrap(), None);
     }
 
     #[test]

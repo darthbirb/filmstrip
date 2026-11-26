@@ -44,7 +44,7 @@ import { libraryChanged, whenLibraryChanges } from "../library";
 import { setNews, useNews } from "../navigation/foot-slot";
 import { addToSearch, searchFor } from "../search/search";
 import { filesAndFolders } from "../undo/lines";
-import { afterAct, undo } from "../undo/undo";
+import { afterAct, redo, undo, undoKeyOf } from "../undo/undo";
 import { closeSettings } from "./settings-store";
 
 // The library's vocabulary, renamed, merged and deleted where each row stands. Artboards › Tags;
@@ -798,14 +798,17 @@ export function Tags() {
     );
   };
 
-  // While the line stands, Ctrl+Z here takes its act back: the list it changed is in view.
+  // While the line stands, Ctrl+Z here takes its act back, and Ctrl+Y or Ctrl+Shift+Z after its
+  // undo carries it out again: the list it changed is in view.
   const onKeyDown = (event: KeyboardEvent) => {
-    if (!event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) return;
-    if (event.key.toLowerCase() !== "z" || line?.kind !== "done") return;
+    const key = undoKeyOf(event);
+    if (!line || !key) return;
+    if (!(key === "undo" && line.kind === "done") && !(key === "redo" && line.kind === "undone"))
+      return;
     const target = event.target;
     if (target instanceof HTMLElement && target.matches("input, textarea, select")) return;
     event.preventDefault();
-    void undo(line.batchId);
+    void (key === "undo" ? undo(line.batchId) : redo(line.batchId));
   };
 
   return (
@@ -854,7 +857,16 @@ export function Tags() {
         />
       )}
       {line?.kind === "undone" && (
-        <Line glyph="undo" sentence={line.line} onDismiss={() => setNews(null)} />
+        <Line
+          glyph="undo"
+          sentence={line.line}
+          action={
+            <Button glyph="redo" title="Redo · Ctrl+Y" onClick={() => void redo(line.batchId)}>
+              Redo
+            </Button>
+          }
+          onDismiss={() => setNews(null)}
+        />
       )}
       {menu && (
         <ContextMenu

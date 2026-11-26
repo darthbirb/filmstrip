@@ -141,7 +141,8 @@ in the pane when nothing is.
 - **F2** renames the focused tile's file, or the focused folder in navigation.
 - **Ctrl+C** copies the files, and **Ctrl+Shift+C** their paths.
 - **Ctrl+V** pastes into the place the grid shows.
-- **Ctrl+Z** undoes the newest act.
+- **Ctrl+Z** undoes the newest act, and **Ctrl+Y** or **Ctrl+Shift+Z** redoes what it undid,
+  until a new act replaces it. The line at the foot after an undo offers Redo too.
 - **Ctrl+A** checks the whole place, and **Escape** clears it.
 - **Ctrl+F** goes to the search field.
 - **1 to 0** move the files to the folders bound to them.

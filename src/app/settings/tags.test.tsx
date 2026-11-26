@@ -93,6 +93,17 @@ test("Rename… renames a tag everywhere, its line has Undo, and Undo puts it ba
   await userEvent.click(page.getByRole("button", { name: "Undo" }));
   await expect.poll(values).toContain("egypt");
   await expect.element(page.getByText("The tag nile valley is egypt again.")).toBeVisible();
+
+  await userEvent.click(page.getByRole("button", { name: "Redo", exact: true }));
+  await expect.poll(values).toContain("nile valley");
+  await expect
+    .element(page.getByText("Renamed the tag egypt to nile valley on 3 files and 1 folder."))
+    .toBeVisible();
+  await userEvent.click(page.getByRole("button", { name: "Undo" }));
+  await expect.poll(values).toContain("egypt");
+  (page.getByRole("button", { name: "Redo", exact: true }).element() as HTMLElement).focus();
+  await userEvent.keyboard("{Control>}y{/Control}");
+  await expect.poll(values).toContain("nile valley");
 });
 
 test("a rename that worked keeps its line when the list cannot be read again after it", async () => {

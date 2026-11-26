@@ -352,6 +352,9 @@ type Step =
 const journal: { batchId: string; steps: Step[] }[] = [];
 let nextBatch = 1;
 
+/** What each undo took back, the last undone last, and how to carry each step out again. */
+const undone: { batch: Batch; steps: Step[]; again: (() => void)[] }[] = [];
+
 const folderName = (id: number) => crumbs(id).folders.at(-1)?.title ?? "";
 
 /** A folder as an act names it, as the Rust side does: a sorting source's own is the Sorting Box. */
@@ -557,6 +560,7 @@ function act(steps: Step[]): Act {
 
 function record(steps: Step[]) {
   if (steps.length === 0) return null;
+  undone.length = 0;
   const batchId = `mock-batch-${nextBatch++}`;
   journal.push({ batchId, steps });
   return describeBatch(batchId, steps);
@@ -567,32 +571,56 @@ function takeBack(at: number): UndoReport {
   // Described before anything comes back, as the Rust journal is.
   const batch = describeBatch(batchId, steps);
   const stayed: Stayed[] = [];
+  const back: Step[] = [];
+  const again: (() => void)[] = [];
+  const came = (step: Step, redo: () => void) => {
+    back.unshift(step);
+    again.unshift(redo);
+  };
   for (const step of [...steps].reverse()) {
     switch (step.op) {
-      case "move":
+      case "move": {
+        const to = step.item.folderId;
         relocate(step.item, step.from);
+        came(step, () => relocate(step.item, to));
         break;
+      }
       case "trash": {
         const gone = goneFromBin(step.item);
         if (gone) stayed.push(gone);
-        else fromTrash(step.item, step.from);
+        else {
+          fromTrash(step.item, step.from);
+          came(step, () => toTrash(step.item));
+        }
         break;
       }
       case "rename":
         step.item.diskName = step.from;
+        came(step, () => {
+          step.item.diskName = step.to;
+        });
         break;
       case "createFolder":
         detach(step.node);
+        came(step, () => attach(step.node, step.parent));
         break;
       case "renameFolder":
         step.node.title = step.from;
+        came(step, () => {
+          step.node.title = step.to;
+        });
         break;
       case "moveFolder":
         detach(step.node);
         attach(step.node, step.from);
+        came(step, () => {
+          detach(step.node);
+          attach(step.node, step.to);
+        });
         break;
       case "deleteFolder":
         attach(step.node, step.parent);
+        came(step, () => detach(step.node));
         break;
       case "restore": {
         const drive = binlessFolders.get(step.item.folderId);
@@ -603,6 +631,7 @@ function takeBack(at: number): UndoReport {
         toTrash(step.item);
         step.item.folderId = step.left;
         trashed.set(step.item.id, step.went);
+        came(step, () => fromTrash(step.item, step.to));
         break;
       }
       case "tag":
@@ -613,6 +642,12 @@ function takeBack(at: number): UndoReport {
             own.filter((value) => value !== step.value),
           );
         }
+        came(step, () => {
+          for (const item of step.items) {
+            const own = ITEM_TAGS.get(item.id) ?? [];
+            if (!own.includes(step.value)) ITEM_TAGS.set(item.id, [...own, step.value]);
+          }
+        });
         break;
       case "untag":
         for (const { item, at } of step.items) {
@@ -620,22 +655,49 @@ function takeBack(at: number): UndoReport {
           if (!own.includes(step.value)) own.splice(at, 0, step.value);
           ITEM_TAGS.set(item.id, own);
         }
+        came(step, () => {
+          for (const { item } of step.items) {
+            const own = ITEM_TAGS.get(item.id) ?? [];
+            ITEM_TAGS.set(
+              item.id,
+              own.filter((value) => value !== step.value),
+            );
+          }
+        });
         break;
-      case "retag":
+      case "retag": {
+        const after = words();
         putWords(step.before);
+        came(step, () => putWords(after));
         break;
+      }
       case "copy": {
         const drive = binless.get(step.item.id);
         if (drive) stayed.push(stayedIn(step.item, { kind: "noBin", drive }));
-        else toTrash(step.item);
+        else {
+          toTrash(step.item);
+          came(step, () => fromTrash(step.item, step.item.folderId));
+        }
         break;
       }
       case "copyFolder":
         detach(step.node);
+        came(step, () => attach(step.node, step.parent));
         break;
     }
   }
-  return { batch, filesBack: batch.files - stayed.length, foldersBack: batch.folders, stayed };
+  const filesBack = batch.files - stayed.length;
+  if (back.length > 0) undone.push({ batch: { ...batch, files: filesBack }, steps: back, again });
+  return { batch, filesBack, foldersBack: batch.folders, stayed };
+}
+
+/** Carries out again what an undo took back, journalled again as the newest act. */
+function carryOutAgain(at: number): UndoReport {
+  const [{ batch, steps, again }] = undone.splice(at, 1) as [(typeof undone)[number]];
+  for (const step of again) step();
+  recount();
+  journal.push({ batchId: batch.batchId, steps });
+  return { batch, filesBack: batch.files, foldersBack: batch.folders, stayed: [] };
 }
 
 /** The live folder with this id, and the folder it is in. */
@@ -1460,6 +1522,7 @@ const walkingSource = () =>
 // `?undo-fails` has every undo fail on a full disk, its act left in the journal.
 let undoFailing = false;
 let lookupFailing = false;
+let redoFailing = false;
 const undoFails = () => undoFailing || new URLSearchParams(location.search).has("undo-fails");
 const diskFull = () => Promise.reject<AppError>({ kind: "io", reason: { kind: "diskFull" } });
 
@@ -1648,6 +1711,11 @@ function failureOf(cmd: string): Reason | undefined {
   return failing.get(cmd) ?? (named.includes(cmd) ? { kind: "permissionDenied" } : undefined);
 }
 
+/** Has every redo fail on a full disk, or succeed again. */
+export function failRedo(failing: boolean) {
+  redoFailing = failing;
+}
+
 /** Has every undo fail, or succeed again, as `?undo-fails` does; and the look for its act, too. */
 export function failUndo(failing: boolean, lookupToo = false) {
   undoFailing = failing;
@@ -1724,6 +1792,7 @@ function binlessAmong(rows: readonly ItemRow[]): BinlessDrive[] {
 
 /** Deletes a file outright, as a walk would then find it gone: nothing keeps it. */
 function deleteOutright(item: ItemRow) {
+  undone.length = 0;
   ITEMS[item.folderId] = (ITEMS[item.folderId] ?? []).filter((other) => other !== item);
   binless.delete(item.id);
   goneForGood.push(item);
@@ -1798,6 +1867,7 @@ function dropFromJournal(item: ItemRow) {
 
 /** Deletes for good the files counted still in the Trash, one at a time, as the Rust side does. */
 function emptyTrash(counted: readonly Counted[]): Promise<Emptied> {
+  undone.length = 0;
   const emptied: Emptied = { deleted: 0, bytes: 0, gone: 0, kept: 0, stayed: [] };
   return new Promise((resolve) => {
     let at = 0;
@@ -2099,6 +2169,19 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     return undoFails() ? diskFull() : takeBack(at);
   },
   can_undo: ({ batchId }) => journal.some((batch) => batch.batchId === batchId),
+  redo_last: () => {
+    if (undone.length === 0) return null;
+    return redoFailing ? diskFull() : carryOutAgain(undone.length - 1);
+  },
+  redo_batch: ({ batchId }) => {
+    const at = undone.findIndex((one) => one.batch.batchId === batchId);
+    if (at < 0) return invalid();
+    return redoFailing ? diskFull() : carryOutAgain(at);
+  },
+  act_to_redo: ({ batchId }) => {
+    const one = batchId ? undone.find((it) => it.batch.batchId === batchId) : undone.at(-1);
+    return one?.batch ?? null;
+  },
   act_to_undo: ({ batchId }) => {
     if (lookupFailing) return diskFull();
     const one = batchId ? journal.find((batch) => batch.batchId === batchId) : journal.at(-1);

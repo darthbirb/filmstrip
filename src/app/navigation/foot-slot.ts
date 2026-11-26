@@ -26,9 +26,12 @@ export type FootNews =
   | { kind: "said"; line: string }
   /** An undo that failed, and the batch its Undo tries again: the newest, when none is named. */
   | { kind: "undoFailed"; line: string; batchId?: string }
-  /** What an undo brought back, and the batch it took back. */
+  /** What an undo brought back, and the batch it took back, which its Redo carries out again. */
   | { kind: "undone"; line: string; batchId?: string }
-  | { kind: "nothing" }
+  /** A redo that failed, and the batch its Redo tries again: the last undone, when none is named. */
+  | { kind: "redoFailed"; line: string; batchId?: string }
+  /** Ctrl+Z, or with `redo` Ctrl+Y, with nothing to take back or carry out again. */
+  | { kind: "nothing"; redo?: boolean }
   /** Ctrl+V with no files on the clipboard. */
   | { kind: "noFiles" };
 

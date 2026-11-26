@@ -3,7 +3,7 @@ import type { Batch } from "./Batch";
 import type { Stayed } from "./Stayed";
 
 /**
- * The act an undo took back, how much of it came back, and what could not, each with where it
+ * The act an undo or a redo carried, how much of it went, and what could not, each with where it
  * still is and why.
  */
 export type UndoReport = { batch: Batch, filesBack: number, foldersBack: number, stayed: Array<Stayed>, };

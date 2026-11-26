@@ -1311,10 +1311,26 @@ it. Two acts delete for good, and both ask first: Empty Trash…, and Delete on 
   keeps it under. After an undo its button is Show in Trash, which goes there with the file in
   the pane; after a refused Restore it is Restore to…, since the answer is a place to choose.
 
+- **What an undo took back can be redone, until the next act.** Ctrl+Y and Ctrl+Shift+Z, and
+  Redo on the line after an undo, carry it out again, as Explorer and Lightroom do: the owner asked
+  for it after the interface audit (#246). The rows an undo took back stay in the journal, marked
+  undone, rather than going, so whatever forgets or drops a file from the journal reaches them
+  too and a redo answers per file as an undo does: what cannot go again stays in the banner with
+  Retry, saying why. Each undo marks its rows one higher than the last, so redo walks back
+  through the undos the last first, and each row redone is journalled again as the newest, so
+  Ctrl+Z takes it back once more. A new act drops the redo as it writes its first row, since what
+  it would put back no longer follows from what is there; so does a file deleted for good, by
+  Empty Trash… or on a drive with no bin, and a restore of the index. A tags screen act does not
+  wait for the disk, so a redo checks each row is still undone before carrying it out, and stops
+  at the first that is not: what it carried out is journalled, and nothing after the new act is. **A redo never deletes for
+  good:** a file whose drive has lost its bin since stays, as an undo's does, and nothing that
+  cannot be undone is ever offered as a redo, since it was never journalled. A folder an undo
+  took away keeps its title for the redo, made again under a new id; a tags screen act is carried
+  out again by the words its line names, since its undo can give terms back under other ids.
 - **The disk changes first, then the index and the journal together.** A disk that refuses leaves
   nothing claiming it succeeded, and a transaction that fails puts the disk back.
 - **One act, one batch, one undo.** A batch comes back newest row first. Each row leaves the
-  journal as it comes back and what failed stays, so trying again takes back only what stayed.
+  batch as it comes back and what failed stays, so trying again takes back only what stayed.
 - **An undo never destroys.** A folder the app made is taken back only while it is still empty,
   on disk as well as in the index: files the index has not read yet would go with it otherwise.
 - **A folder that will not go is tried again for a quarter of a second.** Some programs put a

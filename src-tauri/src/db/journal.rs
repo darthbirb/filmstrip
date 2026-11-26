@@ -268,6 +268,12 @@ fn record<T: Serialize>(
     inverse: &T,
 ) -> Result<()> {
     conn.execute(
+        "DELETE FROM journal
+          WHERE undone IS NOT NULL
+            AND NOT EXISTS (SELECT 1 FROM journal j WHERE j.batch_id = ?1 AND j.undone IS NOT NULL)",
+        params![batch_id],
+    )?;
+    conn.execute(
         "INSERT INTO journal (batch_id, op, forward, inverse, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5)",
         params![
@@ -427,11 +433,28 @@ pub fn record_folder_copy(conn: &Connection, batch_id: &str, made: &FolderCopied
 }
 
 /// Every row in a batch, newest first: the order an undo applies them in, since a later row can
-/// depend on an earlier one.
+/// depend on an earlier one. Rows an undo took back are the redo's, not the batch's.
 pub fn batch(conn: &Connection, batch_id: &str) -> Result<Vec<Entry>> {
-    let mut stmt = conn.prepare(
-        "SELECT id, op, forward, inverse FROM journal WHERE batch_id = ?1 ORDER BY id DESC",
-    )?;
+    entries(
+        conn,
+        "SELECT id, op, forward, inverse FROM journal
+          WHERE batch_id = ?1 AND undone IS NULL ORDER BY id DESC",
+        batch_id,
+    )
+}
+
+/// The rows of a batch an undo took back, oldest first: the order a redo applies them in.
+pub fn undone_batch(conn: &Connection, batch_id: &str) -> Result<Vec<Entry>> {
+    entries(
+        conn,
+        "SELECT id, op, forward, inverse FROM journal
+          WHERE batch_id = ?1 AND undone IS NOT NULL ORDER BY id",
+        batch_id,
+    )
+}
+
+fn entries(conn: &Connection, sql: &str, batch_id: &str) -> Result<Vec<Entry>> {
+    let mut stmt = conn.prepare(sql)?;
     let json = |raw: String| serde_json::from_str(&raw).unwrap_or(Value::Null);
     let rows = stmt
         .query_map(params![batch_id], |r| {
@@ -446,10 +469,108 @@ pub fn batch(conn: &Connection, batch_id: &str) -> Result<Vec<Entry>> {
     Ok(rows)
 }
 
-/// Removes one row once it has been reversed: a reversed act is not history to reverse again, and
-/// a batch that came back only in part keeps exactly what stayed.
+/// Removes one row that can never be undone or redone.
 pub fn drop_entry(conn: &Connection, entry_id: i64) -> Result<()> {
     conn.execute("DELETE FROM journal WHERE id = ?1", params![entry_id])?;
+    Ok(())
+}
+
+/// What a row's redo needs that the undo took away with it: the title of a folder made, whose row
+/// went, and when a folder a copy made was retired.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Kept {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub retired_at: Option<i64>,
+}
+
+/// The number the next undo marks its rows with, above every row the redo holds.
+pub fn next_undo(conn: &Connection) -> Result<i64> {
+    Ok(conn.query_row(
+        "SELECT COALESCE(MAX(undone), 0) + 1 FROM journal WHERE undone IS NOT NULL",
+        [],
+        |r| r.get(0),
+    )?)
+}
+
+/// Takes a row out of its batch once it has been reversed, and keeps it as the redo: a reversed
+/// act is not history to reverse again, and a batch that came back only in part keeps exactly
+/// what stayed.
+pub fn set_undone(conn: &Connection, entry_id: i64, undo: i64, kept: &Kept) -> Result<()> {
+    conn.execute(
+        "UPDATE journal SET undone = ?2, forward = json_set(forward, '$.redo', json(?3))
+          WHERE id = ?1",
+        params![entry_id, undo, serde_json::to_string(kept)?],
+    )?;
+    Ok(())
+}
+
+/// What an undo kept on a row for its redo.
+pub fn kept(entry: &Entry) -> Kept {
+    entry
+        .forward
+        .get("redo")
+        .and_then(|kept| serde_json::from_value(kept.clone()).ok())
+        .unwrap_or_default()
+}
+
+/// Journals a row its redo carried out again, as the newest, so an undo takes it back once more;
+/// `as_now` is the row as it reads after the redo, when that changed. Written from the row in hand,
+/// so a file that went is journalled even when a new act dropped the redo meanwhile.
+pub fn redone(
+    conn: &Connection,
+    batch_id: &str,
+    entry: &Entry,
+    as_now: Option<&Value>,
+) -> Result<()> {
+    let mut forward = as_now.unwrap_or(&entry.forward).clone();
+    if let Some(row) = forward.as_object_mut() {
+        row.remove("redo");
+    }
+    let inverse = as_now.unwrap_or(&entry.inverse);
+    crate::db::in_transaction(conn, |tx| {
+        tx.execute(
+            "INSERT INTO journal (batch_id, op, forward, inverse, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                batch_id,
+                entry.op,
+                serde_json::to_string(&forward)?,
+                serde_json::to_string(inverse)?,
+                now()
+            ],
+        )?;
+        drop_entry(tx, entry.id)
+    })
+}
+
+/// Whether a row is still the redo's: a new act journalled meanwhile drops it.
+pub fn still_undone(conn: &Connection, entry_id: i64) -> Result<bool> {
+    Ok(conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM journal WHERE id = ?1 AND undone IS NOT NULL)",
+        params![entry_id],
+        |r| r.get(0),
+    )?)
+}
+
+/// The batch the last undo took back, while the redo holds anything of it.
+pub fn latest_undone(conn: &Connection) -> Result<Option<String>> {
+    Ok(conn
+        .query_row(
+            "SELECT batch_id FROM journal WHERE undone IS NOT NULL
+              ORDER BY undone DESC, id DESC LIMIT 1",
+            [],
+            |r| r.get(0),
+        )
+        .optional()?)
+}
+
+/// Drops the redo, as an act that cannot be undone does: what it would put back no longer follows
+/// from what is there.
+pub fn drop_redo(conn: &Connection) -> Result<()> {
+    conn.execute("DELETE FROM journal WHERE undone IS NOT NULL", [])?;
     Ok(())
 }
 
@@ -460,7 +581,8 @@ pub fn latest_batch(conn: &Connection) -> Result<Option<String>> {
     Ok(conn
         .query_row(
             "SELECT batch_id FROM journal
-              WHERE batch_id NOT IN (SELECT json_extract(payload, '$.batchId') FROM job
+              WHERE undone IS NULL
+                AND batch_id NOT IN (SELECT json_extract(payload, '$.batchId') FROM job
                                       WHERE kind IN (SELECT value FROM json_each(?1))
                                         AND status IN ('pending', 'running')
                                         AND json_extract(payload, '$.batchId') IS NOT NULL)
@@ -486,9 +608,10 @@ pub fn floor(conn: &Connection) -> Result<i64> {
         .unwrap_or(0))
 }
 
-/// Ends the way back at the journal as it stands, as a restore does: what it holds describes a
-/// disk the walk has read again since. DECISIONS.md "Backing up the index".
+/// Ends the way back at the journal as it stands, and the redo with it, as a restore does: what it
+/// holds describes a disk the walk has read again since. DECISIONS.md "Backing up the index".
 pub fn set_floor(conn: &Connection) -> Result<()> {
+    drop_redo(conn)?;
     conn.execute(
         "INSERT INTO setting (key, value) SELECT ?1, COALESCE(MAX(id), 0) FROM journal WHERE true
          ON CONFLICT (key) DO UPDATE SET value = excluded.value",

@@ -1,6 +1,6 @@
 //! Reversing what the journal holds: one batch at a time, newest row first. A reversal writes
-//! nothing to the journal, and each row leaves it as it comes back, so a retry takes back only
-//! what stayed. DECISIONS.md "Undo".
+//! nothing to the journal, and each row leaves the batch for the redo as it comes back, so a retry
+//! takes back only what stayed. DECISIONS.md "Undo".
 
 use rusqlite::Connection;
 use serde::Serialize;
@@ -9,7 +9,7 @@ use ts_rs::TS;
 
 use crate::db::journal::{
     self, Entry, FolderCopied, FolderCreated, FolderDeleted, FolderMoved, FolderRenamed, Forgot,
-    ItemCopied, ItemMoved, ItemRenamed, ItemRestored, ItemTrashed, ItemsTagged,
+    ItemCopied, ItemMoved, ItemRenamed, ItemRestored, ItemTrashed, ItemsTagged, Kept,
 };
 use crate::db::{tags, vocabulary};
 use crate::error::{AppError, Reason, Result};
@@ -17,7 +17,7 @@ use crate::fs::acts::{self, Batch};
 use crate::fs::stayed::{self, Stayed};
 use crate::fs::{folders, items, trash};
 
-/// The act an undo took back, how much of it came back, and what could not, each with where it
+/// The act an undo or a redo carried, how much of it went, and what could not, each with where it
 /// still is and why.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
@@ -81,6 +81,7 @@ fn reverse_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
     }
     // Described before anything comes back, while every name is still where the act left it.
     let batch = acts::describe(conn, batch_id)?;
+    let undo = journal::next_undo(conn)?;
     let mut stayed = Vec::new();
     let (mut gone, mut folders_gone) = (0, 0);
     for entry in &entries {
@@ -99,7 +100,7 @@ fn reverse_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
         // What failed stays in the journal, or it could never be tried again; a file emptied from
         // the Recycle Bin, or bound for one on a drive with none, never could be.
         match reverse(conn, entry) {
-            Ok(()) => journal::drop_entry(conn, entry.id)?,
+            Ok(kept) => journal::set_undone(conn, entry.id, undo, &kept)?,
             Err(err) if tagging(entry) => return Err(err),
             Err(err) => {
                 let one = stayed_of(conn, entry, &err)?;
@@ -125,8 +126,8 @@ fn reverse_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
     })
 }
 
-/// The file or folder a row that failed to come back is about.
-fn stayed_of(conn: &Connection, entry: &Entry, err: &AppError) -> Result<Stayed> {
+/// The file or folder a row that failed to come back, or to go again, is about.
+pub(super) fn stayed_of(conn: &Connection, entry: &Entry, err: &AppError) -> Result<Stayed> {
     match entry.op.as_str() {
         journal::ITEM_MOVE => stayed::file(conn, inverse::<ItemMoved>(entry)?.item_id, err),
         journal::ITEM_TRASH => stayed::file(conn, inverse::<ItemTrashed>(entry)?.item_id, err),
@@ -151,19 +152,39 @@ fn stayed_of(conn: &Connection, entry: &Entry, err: &AppError) -> Result<Stayed>
 }
 
 /// A tag's row names no one file or folder that stayed: it comes back whole or not at all.
-fn tagging(entry: &Entry) -> bool {
+pub(super) fn tagging(entry: &Entry) -> bool {
     matches!(
         entry.op.as_str(),
         journal::ITEMS_TAG | journal::ITEMS_UNTAG | journal::RETAG
     )
 }
 
-fn reverse(conn: &Connection, entry: &Entry) -> Result<()> {
+/// Reverses one row, and keeps what its redo needs that the reversal takes away.
+fn reverse(conn: &Connection, entry: &Entry) -> Result<Kept> {
     match entry.op.as_str() {
         journal::FOLDER_CREATE => {
             let made: FolderCreated = inverse(entry)?;
-            folders::unmake(conn, made.folder_id)
+            let title = crate::db::folders::title(conn, made.folder_id)?;
+            folders::unmake(conn, made.folder_id)?;
+            Ok(Kept {
+                title,
+                ..Kept::default()
+            })
         }
+        journal::FOLDER_COPY => {
+            let made: FolderCopied = inverse(entry)?;
+            let retired_at = folders::unmake_copy(conn, made.folder_id)?;
+            Ok(Kept {
+                retired_at,
+                ..Kept::default()
+            })
+        }
+        _ => reverse_only(conn, entry).map(|()| Kept::default()),
+    }
+}
+
+fn reverse_only(conn: &Connection, entry: &Entry) -> Result<()> {
+    match entry.op.as_str() {
         journal::FOLDER_RENAME => {
             let back: FolderRenamed = inverse(entry)?;
             folders::rename_unjournalled(conn, back.folder_id, &back.to, None).map(|_| ())
@@ -203,10 +224,6 @@ fn reverse(conn: &Connection, entry: &Entry) -> Result<()> {
                 return Ok(());
             }
             trash::trash_unjournalled(conn, came.item_id, None)
-        }
-        journal::FOLDER_COPY => {
-            let made: FolderCopied = inverse(entry)?;
-            folders::unmake_copy(conn, made.folder_id)
         }
         other => Err(AppError::invalid(format!("{other} cannot be undone"))),
     }
