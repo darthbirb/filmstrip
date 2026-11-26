@@ -1047,7 +1047,8 @@ toward the rest surface.
   glyph for a drive with no bin, in `glyph`, each sentence in `small` `fg-dim`. Empty Trash… in
   `danger` ends its head while it holds anything, and asks under the head in the row question's
   shape, its own `line-danger` ring round it, disabled while it asks. Emptying, the head counts
-  as it goes and the `progress` bar, `head-progress` wide, stands where the button was.
+  as it goes from the job's line and the `progress` bar, `head-progress` wide, stands where the
+  button was.
 - **Filter field.** Narrows the list under it as you type: `bar-field` tall on `ground` at the
   `nested` corner in a `line-control` ring, `line-strong` while it has the focus, the search glyph
   before it in `fg-dim` and "3 of 228" at its end in `small` tabular figures once something is
@@ -1120,6 +1121,12 @@ toward the rest surface.
   Cancel Move on its dismiss, and the bar; it stacks with copies and exports, the newest highest.
   It ends as a move on one drive does, with the Line and Undo, and the banner for what stayed.
   Cancelled, the Line counts what went against what it carried.
+- **Delete line.** A delete on the queue has the move's line: "Deleting 1,204 files…" or
+  "Deleting Lisbon…", its figure, Cancel Delete on its dismiss, and the bar; Empty Trash's is
+  "Emptying the Trash…" with no dismiss, its tooltip saying it cannot be cancelled, its figure at
+  the line's end and its bar the full width. They stack with copies, moves and exports, the newest
+  highest. Each ends as its act does inside the command; cancelled, the Line counts what went
+  against what was asked, and a folder's says the folder stays.
 - **Export line.** An export's line is the copy's: "Exporting Trips.zip…", its figure, Cancel
   Export on its dismiss, and the bar, its tooltip the whole path and what is left. Copies and
   exports stack together, the newest highest. It ends with the Line and Show in Explorer where

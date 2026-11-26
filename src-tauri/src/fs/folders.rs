@@ -12,6 +12,7 @@ use ts_rs::TS;
 use crate::db::sources::{self, SourceKind};
 use crate::db::{folders, in_transaction, items, journal, now, tags};
 use crate::error::{AppError, Reason, Result};
+use crate::fs::paste::Halt;
 use crate::fs::recycle::{Bin, Shell};
 use crate::fs::stayed::{self, Stayed};
 use crate::fs::{
@@ -200,6 +201,109 @@ pub fn delete(
     batch_id: &str,
 ) -> Result<DeleteReport> {
     let _turn = super::turn();
+    delete_held(conn, folder_id, contents, batch_id)
+}
+
+/// What a folder's delete on the queue did, and why it stopped before the end, if it did.
+#[derive(Debug, Default)]
+pub struct DeleteOutcome {
+    pub report: DeleteReport,
+    pub halted: Option<Halt>,
+    pub stopped: Option<Reason>,
+}
+
+/// `delete` one file to a turn of the disk, answering to `control` between them; the folder goes
+/// in a turn of its own once nothing is left in it. Files moved to a sorting source move in one
+/// turn, as a folder's move does. DECISIONS.md "Background work".
+pub fn delete_watched(
+    conn: &Connection,
+    folder_id: i64,
+    contents: Contents,
+    batch_id: &str,
+    whole: u32,
+    control: &impl relocate::Control,
+) -> Result<DeleteOutcome> {
+    let mut outcome = DeleteOutcome::default();
+    if let Contents::MoveTo { .. } = contents {
+        let _turn = super::turn();
+        outcome.report = delete_held(conn, folder_id, Some(contents), batch_id)?;
+        control.progress(whole, whole);
+        return Ok(outcome);
+    }
+    let at_first = {
+        let _turn = super::turn();
+        refuse_undeletable(conn, folder_id)?;
+        items::live_under(conn, folder_id)?
+    };
+    let mut done = whole.saturating_sub(u32::try_from(at_first.len()).unwrap_or(u32::MAX));
+    control.progress(done, whole);
+    for item_id in at_first {
+        if let Some(halt) = control.halt() {
+            outcome.halted = Some(halt);
+            return Ok(outcome);
+        }
+        let _turn = super::turn();
+        if !folders::is_live(conn, folder_id)? {
+            outcome.stopped = Some(Reason::NotIndexed);
+            return Ok(outcome);
+        }
+        if is_under(conn, item_id, folder_id)? {
+            send_one(conn, item_id, contents, batch_id, &mut outcome.report)?;
+        }
+        done += 1;
+        control.progress(done, whole);
+    }
+    if !outcome.report.refused.is_empty() {
+        return Ok(outcome);
+    }
+    if let Some(halt) = control.halt() {
+        outcome.halted = Some(halt);
+        return Ok(outcome);
+    }
+    let _turn = super::turn();
+    if !folders::is_live(conn, folder_id)? {
+        outcome.stopped = Some(Reason::NotIndexed);
+        return Ok(outcome);
+    }
+    let arrived = items::live_under(conn, folder_id)?;
+    if let Some(&first) = arrived.first() {
+        let name = items::file_of(conn, first)?
+            .map(|file| file.disk_name)
+            .unwrap_or_default();
+        let holds = AppError::refused(Reason::Holds {
+            name,
+            more: arrived.len() as u32 - 1,
+        });
+        outcome
+            .report
+            .refused
+            .push(stayed::folder(conn, folder_id, &holds)?);
+        return Ok(outcome);
+    }
+    take_away_folder(conn, folder_id, batch_id, &mut outcome.report)?;
+    Ok(outcome)
+}
+
+/// Whether a file is still live at or below a folder, not moved out of it since it was listed.
+fn is_under(conn: &Connection, item_id: i64, folder_id: i64) -> Result<bool> {
+    if !items::is_live(conn, item_id)? {
+        return Ok(false);
+    }
+    let Some(file) = items::file_of(conn, item_id)? else {
+        return Ok(false);
+    };
+    let mut at = Some(file.folder_id);
+    while let Some(id) = at {
+        if id == folder_id {
+            return Ok(true);
+        }
+        at = folders::parent(conn, id)?;
+    }
+    Ok(false)
+}
+
+/// Refuses a folder that is gone, or is a source's own.
+fn refuse_undeletable(conn: &Connection, folder_id: i64) -> Result<()> {
     if !folders::is_live(conn, folder_id)? {
         return Err(AppError::refused(Reason::NotIndexed));
     }
@@ -208,6 +312,37 @@ pub fn delete(
             "a source's own folder is removed as a source, never deleted",
         ));
     }
+    Ok(())
+}
+
+/// Sends one file of a folder being deleted to the trash, or deletes it outright from a drive with
+/// no Recycle Bin when `contents` says so; one that stays is reported.
+fn send_one(
+    conn: &Connection,
+    item_id: i64,
+    contents: Contents,
+    batch_id: &str,
+    report: &mut DeleteReport,
+) -> Result<()> {
+    let went = if contents == Contents::Permanently && binless::is_binless(conn, item_id)? {
+        binless::delete_unjournalled(conn, item_id).map(|()| report.outright += 1)
+    } else {
+        trash::trash_unjournalled(conn, item_id, Some(batch_id))
+    };
+    if let Err(err) = went {
+        report.refused.push(stayed::file(conn, item_id, &err)?);
+    }
+    Ok(())
+}
+
+/// The whole of a folder's delete, under the caller's one turn of the disk.
+fn delete_held(
+    conn: &Connection,
+    folder_id: i64,
+    contents: Option<Contents>,
+    batch_id: &str,
+) -> Result<DeleteReport> {
+    refuse_undeletable(conn, folder_id)?;
     let title = folders::title(conn, folder_id)?.unwrap_or_default();
     let held = items::live_under(conn, folder_id)?;
     let mut report = DeleteReport::default();
@@ -218,25 +353,6 @@ pub fn delete(
                 "{title} holds {} files, so where they go has to be chosen",
                 held.len()
             )));
-        }
-        (Some(Contents::Trash), false) => {
-            for item_id in held {
-                if let Err(err) = trash::trash_unjournalled(conn, item_id, Some(batch_id)) {
-                    report.refused.push(stayed::file(conn, item_id, &err)?);
-                }
-            }
-        }
-        (Some(Contents::Permanently), false) => {
-            for item_id in held {
-                let went = if binless::is_binless(conn, item_id)? {
-                    binless::delete_unjournalled(conn, item_id).map(|()| report.outright += 1)
-                } else {
-                    trash::trash_unjournalled(conn, item_id, Some(batch_id))
-                };
-                if let Err(err) = went {
-                    report.refused.push(stayed::file(conn, item_id, &err)?);
-                }
-            }
         }
         (Some(Contents::MoveTo { source_id }), false) => {
             let inbox = sorting_root(conn, source_id)?;
@@ -255,11 +371,26 @@ pub fn delete(
                 }
             }
         }
+        (Some(contents), false) => {
+            for item_id in held {
+                send_one(conn, item_id, contents, batch_id, &mut report)?;
+            }
+        }
     }
-    if !report.refused.is_empty() {
-        return Ok(report);
+    if report.refused.is_empty() {
+        take_away_folder(conn, folder_id, batch_id, &mut report)?;
     }
+    Ok(report)
+}
 
+/// Takes away a folder its delete has emptied, journalled under `batch_id` unless its files went
+/// for good and nothing of it can be undone; one that still holds a file is reported.
+fn take_away_folder(
+    conn: &Connection,
+    folder_id: i64,
+    batch_id: &str,
+    report: &mut DeleteReport,
+) -> Result<()> {
     let undoable = report.outright == 0 || !journal::batch(conn, batch_id)?.is_empty();
     match take_away_emptied(conn, folder_id, now(), undoable.then_some(batch_id)) {
         Ok(()) => report.deleted = true,
@@ -270,10 +401,10 @@ pub fn delete(
         }
         Err(err) => return Err(err),
     }
-    Ok(report)
+    Ok(())
 }
 
-/// Deletes a folder again, as a redo does once what it held has gone again: under the stamp its
+// Deletes a folder again, as a redo does once what it held has gone again: under the stamp its
 /// delete first retired it with, so an undo finds it once more.
 pub(super) fn redelete(conn: &Connection, folder_id: i64, retired_at: i64) -> Result<()> {
     if !folders::is_live(conn, folder_id)? {
@@ -886,6 +1017,142 @@ mod tests {
         assert!(root.join("Trips/Cairo/Night/stars.jpg").is_file());
         assert!(folders::is_live(&conn, night).unwrap());
         assert!(held.iter().all(|id| items::is_live(&conn, *id).unwrap()));
+    }
+
+    /// Cairo holding pyramid.jpg and Night/stars.jpg, and Trips lone.jpg; Cairo's id, Night's, and
+    /// the ids of stars and lone.
+    fn cairo_by_night(conn: &Connection, root: &Path, trips: i64) -> (i64, i64, i64, i64) {
+        std::fs::create_dir_all(root.join("Trips/Cairo/Night")).unwrap();
+        std::fs::write(root.join("Trips/Cairo/Night/stars.jpg"), "s").unwrap();
+        std::fs::write(root.join("Trips/lone.jpg"), "l").unwrap();
+        walk::reconcile(conn).unwrap();
+        let cairo = folders::child_id(conn, trips, "Cairo").unwrap().unwrap();
+        let night = folders::child_id(conn, cairo, "Night").unwrap().unwrap();
+        let id = |folder, name| {
+            items::existing_by_disk_name(conn, folder, name)
+                .unwrap()
+                .unwrap()
+                .id
+        };
+        (cairo, night, id(night, "stars.jpg"), id(trips, "lone.jpg"))
+    }
+
+    /// Runs `then` on its own connection to the library as the delete asks for its `nth` turn.
+    fn at_turn(root: &Path, nth: u32, then: impl Fn(&Connection) + 'static) {
+        let db = root.parent().unwrap().join("library.db");
+        let asked = Cell::new(0);
+        crate::fs::just_after_queueing(move || {
+            asked.set(asked.get() + 1);
+            if asked.get() == nth {
+                then(&db::open(&db).unwrap());
+            }
+        });
+    }
+
+    #[test]
+    fn a_folder_deleted_on_the_queue_sends_one_file_to_a_turn_and_goes_once_they_have() {
+        let (conn, root, _, trips) = library("delete-watched");
+        let (cairo, night, ..) = cairo_by_night(&conn, &root, trips);
+        let held = items::live_under(&conn, cairo).unwrap();
+        let control = relocate::HaltAfter::new(u32::MAX, Halt::Cancel);
+        let batch = journal::new_batch();
+
+        let outcome = delete_watched(&conn, cairo, Contents::Trash, &batch, 2, &control).unwrap();
+
+        assert!(outcome.report.deleted, "{:?}", outcome.report);
+        assert_eq!((outcome.halted, outcome.stopped), (None, None));
+        assert_eq!(*control.heard.borrow(), [(0, 2), (1, 2), (2, 2)]);
+        assert!(!root.join("Trips/Cairo").exists());
+        assert!(held.iter().all(|id| items::is_trashed(&conn, *id).unwrap()));
+        assert!(!folders::is_live(&conn, night).unwrap());
+
+        crate::fs::undo::undo_batch(&conn, &batch).unwrap();
+        assert!(root.join("Trips/Cairo/Night/stars.jpg").is_file());
+        assert!(held.iter().all(|id| items::is_live(&conn, *id).unwrap()));
+    }
+
+    #[test]
+    fn a_cancelled_folder_delete_keeps_the_folder_and_each_file_in_the_bin_or_where_it_was() {
+        let (conn, root, _, trips) = library("delete-cancelled");
+        let (cairo, ..) = cairo_by_night(&conn, &root, trips);
+        let held = items::live_under(&conn, cairo).unwrap();
+        let batch = journal::new_batch();
+
+        let outcome = delete_watched(
+            &conn,
+            cairo,
+            Contents::Trash,
+            &batch,
+            2,
+            &relocate::HaltAfter::new(1, Halt::Cancel),
+        )
+        .unwrap();
+
+        assert_eq!(outcome.halted, Some(Halt::Cancel));
+        assert!(!outcome.report.deleted);
+        assert!(folders::is_live(&conn, cairo).unwrap());
+        assert!(items::is_trashed(&conn, held[0]).unwrap());
+        assert!(items::is_live(&conn, held[1]).unwrap());
+        let still = items::file_of(&conn, held[1]).unwrap().unwrap();
+        assert!(
+            paths::item_path(&conn, still.folder_id, &still.disk_name)
+                .unwrap()
+                .is_file()
+        );
+        assert_eq!(journal::batch(&conn, &batch).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_file_moved_out_of_a_folder_as_it_is_deleted_stays_where_it_went() {
+        let (conn, root, _, trips) = library("delete-moved-out");
+        let (cairo, _, stars, _) = cairo_by_night(&conn, &root, trips);
+        at_turn(&root, 2, move |other| {
+            fs_items::move_unjournalled(other, stars, trips, None).unwrap();
+        });
+
+        let outcome = delete_watched(
+            &conn,
+            cairo,
+            Contents::Trash,
+            &journal::new_batch(),
+            2,
+            &relocate::Unwatched,
+        )
+        .unwrap();
+
+        assert!(outcome.report.deleted, "{:?}", outcome.report);
+        assert!(items::is_live(&conn, stars).unwrap());
+        assert!(root.join("Trips/stars.jpg").is_file());
+    }
+
+    #[test]
+    fn a_file_moved_into_a_folder_as_it_is_deleted_keeps_it_and_is_named() {
+        let (conn, root, _, trips) = library("delete-moved-in");
+        let (cairo, _, _, lone) = cairo_by_night(&conn, &root, trips);
+        at_turn(&root, 4, move |other| {
+            fs_items::move_unjournalled(other, lone, cairo, None).unwrap();
+        });
+
+        let outcome = delete_watched(
+            &conn,
+            cairo,
+            Contents::Trash,
+            &journal::new_batch(),
+            2,
+            &relocate::Unwatched,
+        )
+        .unwrap();
+
+        assert!(!outcome.report.deleted);
+        assert_eq!(
+            outcome.report.refused[0].reason,
+            Reason::Holds {
+                name: "lone.jpg".into(),
+                more: 0
+            }
+        );
+        assert!(folders::is_live(&conn, cairo).unwrap());
+        assert!(root.join("Trips/Cairo/lone.jpg").is_file());
     }
 
     #[test]

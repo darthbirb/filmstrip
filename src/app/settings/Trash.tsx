@@ -1,8 +1,8 @@
-import { listen } from "@tauri-apps/api/event";
 import { type KeyboardEvent, type ReactNode, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 
 import type { Counted } from "../../ipc/bindings/Counted";
+import type { Deleted } from "../../ipc/bindings/Deleted";
 import type { ToEmpty } from "../../ipc/bindings/ToEmpty";
 import { emptyTrash, trashToEmpty } from "../../ipc/commands";
 import { Bar } from "../../ui/Bar";
@@ -10,11 +10,12 @@ import { Button } from "../../ui/Button";
 import { Glyph } from "../../ui/Glyph";
 import type { GlyphName } from "../../ui/glyphs";
 import { RowQuestion } from "../../ui/TermTable";
-import { failed, unasked } from "../failure";
+import { failed } from "../failure";
 import { libraryChanged } from "../library";
 import { setNews } from "../navigation/foot-slot";
 import { useIndex } from "../navigation/index-store";
-import { whyFailed } from "../undo/lines";
+import { useWork } from "../navigation/work-store";
+import { reasonSentence, whyFailed } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import {
   emptiedBannerLine,
@@ -25,13 +26,7 @@ import {
   type Said,
   skippedLine,
 } from "./empty-words";
-import {
-  emptyingProgress,
-  finishEmptying,
-  getEmptying,
-  startEmptying,
-  useEmptying,
-} from "./settings-store";
+import { finishEmptying, getEmptying, startEmptying, useEmptying } from "./settings-store";
 
 // What the library has in the Recycle Bin, where a deleted file goes, and emptying it. Artboards ›
 // The Trash in the Recycle Bin; DECISIONS.md "The Trash is the Recycle Bin" and "Emptying the
@@ -40,7 +35,9 @@ import {
 export function Trash() {
   const held = useIndex().totals?.trash;
   const [asking, setAsking] = useState<ToEmpty | null>(null);
-  const emptying = useEmptying();
+  const started = useEmptying();
+  const running = useWork().progress?.deletes.find((one) => one.kind === "empty");
+  const emptying = running ?? started;
   const button = useRef<HTMLButtonElement>(null);
   const root = useRef<HTMLDivElement>(null);
 
@@ -125,33 +122,43 @@ export function Trash() {
   );
 }
 
-/** Deletes the files counted for good, outside the section, so leaving it loses nothing. */
+/**
+ * Deletes the files counted for good as a job, outside the section, so leaving it loses nothing;
+ * the head counts from the job's line once it has one.
+ */
 async function emptyAll(counted: Counted[]) {
   if (getEmptying()) return;
   startEmptying(counted.length);
-  const heard = listen<number>("empty-progress", (event) => emptyingProgress(event.payload)).catch(
-    unasked,
-  );
-  try {
-    const emptied = await emptyTrash(counted);
-    await libraryChanged();
-    const whole = emptied.deleted + emptied.gone + emptied.kept;
-    if (whole === 0) return;
-    const [first] = emptied.stayed;
-    if (whole === emptied.deleted) setNews({ kind: "said", line: emptiedLine(emptied) });
-    else setNews({ kind: "skipped", line: skippedLine(emptied), first: first?.id ?? null });
-    showReport(first ? { sentence: emptiedBannerLine(emptied), rows: emptied.stayed } : null);
-  } catch (error) {
+  await emptyTrash(counted).catch(async (error: unknown) => {
+    finishEmptying();
     await libraryChanged();
     setNews({
       kind: "skipped",
       line: `The Trash could not be emptied. ${whyFailed(error)} What is still in it stays.`,
       first: null,
     });
-  } finally {
-    void heard.then((unlisten) => unlisten?.());
-    finishEmptying();
+  });
+}
+
+/** How emptying the Trash ended: the foot for what went, the banner for what stayed. */
+export async function afterEmptied({ emptied, stopped }: Extract<Deleted, { kind: "empty" }>) {
+  finishEmptying();
+  await libraryChanged();
+  if (stopped) {
+    const why = reasonSentence(stopped);
+    setNews({
+      kind: "skipped",
+      line: `The Trash could not be emptied. ${why} What is still in it stays.`,
+      first: null,
+    });
+    return;
   }
+  const whole = emptied.deleted + emptied.gone + emptied.kept;
+  if (whole === 0) return;
+  const [first] = emptied.stayed;
+  if (whole === emptied.deleted) setNews({ kind: "said", line: emptiedLine(emptied) });
+  else setNews({ kind: "skipped", line: skippedLine(emptied), first: first?.id ?? null });
+  showReport(first ? { sentence: emptiedBannerLine(emptied), rows: emptied.stayed } : null);
 }
 
 /** A sentence in pieces, the terms it names in `fg`. */

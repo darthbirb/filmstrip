@@ -1,4 +1,4 @@
-import { beforeEach, expect, test } from "vitest";
+import { beforeAll, beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
@@ -15,6 +15,7 @@ import {
   undoLast,
 } from "../../ipc/commands";
 import { formatBytes } from "../../lib/format";
+import { watchDeletes } from "../deleted";
 import { Foot } from "../navigation/Foot";
 import { getNews, setNews } from "../navigation/foot-slot";
 import { loadIndex, refreshIndex, resetIndex } from "../navigation/index-store";
@@ -25,6 +26,8 @@ import { getEmptying } from "./settings-store";
 
 // Against the dev mock, whose files are each 2,400,000 bytes; Cairo (6) holds a few. Artboards ›
 // The Trash in the Recycle Bin.
+
+beforeAll(() => watchDeletes());
 
 beforeEach(async () => {
   await page.viewport(1280, 820);
@@ -218,6 +221,7 @@ test("emptying when every file counted has left the Trash leaves the foot as it 
 test("a folder deleted with its files leaves Undo once they are emptied", async () => {
   await deleteFolder(6, { kind: "trash" });
   await emptyTrash((await trashToEmpty()).files);
+  await expect.poll(async () => (await trashToEmpty()).files, { timeout: 5000 }).toEqual([]);
 
   expect(await undoLast()).toBeNull();
 });

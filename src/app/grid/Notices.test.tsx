@@ -38,6 +38,7 @@ const IDLE: Progress = {
   copies: [],
   exports: [],
   moves: [],
+  deletes: [],
   walks: 0,
   walkedSource: null,
   thumbed: [],

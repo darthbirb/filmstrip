@@ -2,7 +2,7 @@
 //! back. Sending one there is journalled, so it can be undone.
 //! DECISIONS.md "The Trash is the Recycle Bin".
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use rusqlite::Connection;
@@ -10,10 +10,11 @@ use serde::Serialize;
 use ts_rs::TS;
 
 use crate::db::items::{ItemFile, ItemRow};
-use crate::db::journal::{Forgot, ItemRestored};
+use crate::db::journal::{Forgot, ItemRestored, ItemTrashed};
 use crate::db::recycling::{self, Sending};
 use crate::db::{folders, in_transaction, items, journal, now, sources, tags};
 use crate::error::{AppError, Reason, Result};
+use crate::fs::paste::Halt;
 use crate::fs::recycle::{self, Bin, Binned, Sent, Shell};
 use crate::fs::stayed::{self, Stayed};
 use crate::fs::{paths, relocate};
@@ -75,14 +76,69 @@ pub fn origin(conn: &Connection, folder_id: i64) -> Result<Origin> {
 /// Sends each item to the trash under one batch, so one undo brings the whole selection back.
 pub fn trash_items(conn: &Connection, item_ids: &[i64], batch_id: &str) -> Result<TrashReport> {
     let _turn = super::turn();
-    let mut report = TrashReport::default();
-    for &item_id in item_ids {
-        match trash_unjournalled(conn, item_id, Some(batch_id)) {
-            Ok(()) => report.trashed += 1,
-            Err(err) => report.refused.push(stayed::file(conn, item_id, &err)?),
+    Ok(trash_each(conn, item_ids, batch_id, &relocate::Unwatched, false)?.report)
+}
+
+/// What a delete on the queue did, and why it stopped before the end, if it did.
+#[derive(Debug, Default)]
+pub struct TrashOutcome {
+    pub report: TrashReport,
+    pub halted: Option<Halt>,
+}
+
+/// `trash_items` one file to a turn of the disk, answering to `control` between them, so each file
+/// is in the Recycle Bin or where it was. One already sent under `batch_id`, before a restart, is
+/// counted as sent.
+pub fn trash_watched(
+    conn: &Connection,
+    item_ids: &[i64],
+    batch_id: &str,
+    control: &impl relocate::Control,
+) -> Result<TrashOutcome> {
+    trash_each(conn, item_ids, batch_id, control, true)
+}
+
+fn trash_each(
+    conn: &Connection,
+    item_ids: &[i64],
+    batch_id: &str,
+    control: &impl relocate::Control,
+    turn_each: bool,
+) -> Result<TrashOutcome> {
+    let whole = u32::try_from(item_ids.len()).unwrap_or(u32::MAX);
+    let sent = sent_under(conn, batch_id)?;
+    let mut outcome = TrashOutcome::default();
+    control.progress(0, whole);
+    for (done, &item_id) in (1..).zip(item_ids) {
+        if let Some(halt) = control.halt() {
+            outcome.halted = Some(halt);
+            break;
         }
+        let _turn = turn_each.then(super::turn);
+        if sent.contains(&item_id) {
+            outcome.report.trashed += 1;
+        } else {
+            match trash_unjournalled(conn, item_id, Some(batch_id)) {
+                Ok(()) => outcome.report.trashed += 1,
+                Err(err) => outcome
+                    .report
+                    .refused
+                    .push(stayed::file(conn, item_id, &err)?),
+            }
+        }
+        control.progress(done, whole);
     }
-    Ok(report)
+    Ok(outcome)
+}
+
+/// The files a batch has already sent to the Recycle Bin.
+fn sent_under(conn: &Connection, batch_id: &str) -> Result<HashSet<i64>> {
+    Ok(journal::batch(conn, batch_id)?
+        .into_iter()
+        .filter(|entry| entry.op == journal::ITEM_TRASH)
+        .filter_map(|entry| serde_json::from_value::<ItemTrashed>(entry.forward).ok())
+        .map(|trashed| trashed.item_id)
+        .collect())
 }
 
 /// Sends one item's file to the Recycle Bin and records where the bin keeps it. A file gone from
@@ -997,6 +1053,87 @@ mod tests {
         undo::undo_batch(&conn, &batch).unwrap();
         cairo_holds(&root, &["pyramid.jpg", "sphinx.jpg"]);
         assert!(items::is_live(&conn, pyramid).unwrap());
+    }
+
+    /// Cairo holding sphinx.jpg, pyramid.jpg and then each name here, walked; their ids, sphinx first.
+    fn with_more(conn: &Connection, root: &Path, cairo: i64, names: &[&str]) -> Vec<i64> {
+        for name in names {
+            std::fs::write(root.join("Trips/Cairo").join(name), *name).unwrap();
+        }
+        walk::reconcile(conn).unwrap();
+        ["sphinx.jpg", "pyramid.jpg"]
+            .iter()
+            .chain(names)
+            .map(|name| id_of(conn, cairo, name))
+            .collect()
+    }
+
+    #[test]
+    fn a_delete_on_the_queue_sends_one_file_to_a_turn_and_counts_each() {
+        let (conn, root, cairo) = library("watched");
+        stand_in();
+        let ids = with_more(&conn, &root, cairo, &["obelisk.jpg"]);
+        let batch = journal::new_batch();
+        let control = relocate::HaltAfter::new(u32::MAX, Halt::Cancel);
+        let turns = Rc::new(RefCell::new(0));
+        let counted = Rc::clone(&turns);
+        crate::fs::just_after_queueing(move || *counted.borrow_mut() += 1);
+
+        let outcome = trash_watched(&conn, &ids, &batch, &control).unwrap();
+
+        assert_eq!((outcome.report.trashed, outcome.halted), (3, None));
+        assert_eq!(*control.heard.borrow(), [(0, 3), (1, 3), (2, 3), (3, 3)]);
+        assert_eq!(*turns.borrow(), 3, "one turn of the disk per file");
+        cairo_holds(&root, &[]);
+        undo::undo_batch(&conn, &batch).unwrap();
+        cairo_holds(&root, &["obelisk.jpg", "pyramid.jpg", "sphinx.jpg"]);
+    }
+
+    #[test]
+    fn a_cancelled_delete_leaves_each_file_in_the_bin_or_where_it_was() {
+        let (conn, root, cairo) = library("cancelled");
+        stand_in();
+        let ids = with_more(&conn, &root, cairo, &["obelisk.jpg"]);
+        let batch = journal::new_batch();
+        let control = relocate::HaltAfter::new(1, Halt::Cancel);
+
+        let outcome = trash_watched(&conn, &ids, &batch, &control).unwrap();
+
+        assert_eq!(
+            (outcome.report.trashed, outcome.halted),
+            (1, Some(Halt::Cancel))
+        );
+        assert!(outcome.report.refused.is_empty());
+        cairo_holds(&root, &["obelisk.jpg", "pyramid.jpg"]);
+        assert!(bin_file(&conn, ids[0]).is_file(), "sphinx is in the bin");
+        assert!(items::is_trashed(&conn, ids[0]).unwrap());
+        assert!(items::is_live(&conn, ids[1]).unwrap());
+        assert!(items::is_live(&conn, ids[2]).unwrap());
+        assert_eq!(journal::batch(&conn, &batch).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_delete_going_on_after_a_restart_passes_over_what_already_went() {
+        let (conn, root, cairo) = library("resumed");
+        stand_in();
+        let ids = with_more(&conn, &root, cairo, &["obelisk.jpg"]);
+        let batch = journal::new_batch();
+        let stopped = trash_watched(
+            &conn,
+            &ids,
+            &batch,
+            &relocate::HaltAfter::new(2, Halt::Stop),
+        )
+        .unwrap();
+        assert_eq!(stopped.halted, Some(Halt::Stop));
+
+        let outcome = trash_watched(&conn, &ids, &batch, &relocate::Unwatched).unwrap();
+
+        assert_eq!(outcome.report.trashed, 3);
+        assert!(outcome.report.refused.is_empty(), "{:?}", outcome.report);
+        cairo_holds(&root, &[]);
+        undo::undo_batch(&conn, &batch).unwrap();
+        cairo_holds(&root, &["obelisk.jpg", "pyramid.jpg", "sphinx.jpg"]);
     }
 
     #[test]

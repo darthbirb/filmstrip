@@ -9,12 +9,14 @@ import {
 } from "react";
 
 import type { Copying } from "../../ipc/bindings/Copying";
+import type { DeleteKind } from "../../ipc/bindings/DeleteKind";
+import type { Deleting } from "../../ipc/bindings/Deleting";
 import type { Exporting } from "../../ipc/bindings/Exporting";
 import type { LibraryTotals } from "../../ipc/bindings/LibraryTotals";
 import type { Moving } from "../../ipc/bindings/Moving";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import type { Tally } from "../../ipc/bindings/Tally";
-import { cancelCopy, cancelExport, cancelMove, revealPath } from "../../ipc/commands";
+import { cancelCopy, cancelDelete, cancelExport, cancelMove, revealPath } from "../../ipc/commands";
 import { files, formatBytes, formatCount, formatDate, midSentence } from "../../lib/format";
 import { Band } from "../../ui/Band";
 import { Bar } from "../../ui/Bar";
@@ -49,6 +51,11 @@ export function Foot({ rail = false }: { rail?: boolean }) {
     ...(progress?.copies ?? []).map((copy) => ({ kind: "copy" as const, ...copy })),
     ...(progress?.moves ?? []).map((one) => ({ kind: "move" as const, ...one })),
     ...(progress?.exports ?? []).map((one) => ({ kind: "export" as const, ...one })),
+    ...(progress?.deletes ?? []).map((one) => ({
+      ...one,
+      deleting: one.kind,
+      kind: "delete" as const,
+    })),
   ].sort((a, b) => b.jobId - a.jobId);
   const left = progress ? progress.pending + progress.running : 0;
   const busy = progress !== null && progress.phase !== "idle";
@@ -62,6 +69,8 @@ export function Foot({ rail = false }: { rail?: boolean }) {
       {jobs.map((job) =>
         job.kind === "export" ? (
           <ExportLine key={job.jobId} job={job} rail={rail} />
+        ) : job.kind === "delete" ? (
+          <DeleteLine key={job.jobId} job={job} rail={rail} />
         ) : (
           <CarryLine key={job.jobId} job={job} rail={rail} />
         ),
@@ -88,11 +97,12 @@ export function Foot({ rail = false }: { rail?: boolean }) {
   );
 }
 
-/** A copy's, a move's or an export's line, by the job that runs it. */
+/** A copy's, a move's, an export's or a delete's line, by the job that runs it. */
 type Job =
   | (Copying & { kind: "copy" })
   | (Moving & { kind: "move" })
-  | (Exporting & { kind: "export" });
+  | (Exporting & { kind: "export" })
+  | (Omit<Deleting, "kind"> & { kind: "delete"; deleting: DeleteKind });
 
 const NONE: Tally = { count: 0, bytes: 0 };
 const NOTHING: LibraryTotals = {
@@ -526,6 +536,53 @@ function ExportLine({ job, rail }: { job: Exporting; rail: boolean }) {
         />
       </span>
       <span className="pr-1">
+        <Bar percent={percent} />
+      </span>
+    </div>
+  );
+}
+
+/** What a delete's line says it is deleting. */
+function deletingWhat(job: Extract<Job, { kind: "delete" }>) {
+  if (job.deleting === "empty") return "Emptying the Trash";
+  if (job.deleting === "folder") return `Deleting ${job.name}`;
+  return `Deleting ${files(job.whole)}`;
+}
+
+/**
+ * A delete's own line, as a move's: what it deletes, how far, and its dismiss, which cancels it
+ * after the file in hand. Emptying the Trash has none, since what has gone has gone, and its
+ * tooltip says so. DECISIONS.md "Background work".
+ */
+function DeleteLine({ job, rail }: { job: Extract<Job, { kind: "delete" }>; rail: boolean }) {
+  const percent = job.whole > 0 ? Math.round((job.done / job.whole) * 100) : 0;
+  const what = deletingWhat(job);
+  const emptying = job.deleting === "empty";
+  const left = `${what} · ${formatCount(job.whole - job.done)} of ${formatCount(job.whole)} left${emptying ? " · It cannot be cancelled: what has gone has gone." : ""}`;
+  if (rail) {
+    return (
+      <div title={left} className="border-line border-t px-1.5 pt-2 pb-1.5">
+        <Bar percent={percent} />
+      </div>
+    );
+  }
+  return (
+    <div
+      title={left}
+      className={`flex flex-col gap-1 border-line border-t py-1.5 pl-2.5 ${emptying ? "pr-2.5" : "pr-1.5"}`}
+    >
+      <span className="flex min-h-control items-center gap-2 text-fg-mid text-small">
+        <span className="min-w-0 flex-1 truncate">{what}…</span>
+        <span className="text-fg tabular-nums">{percent}%</span>
+        {!emptying && (
+          <GlyphButton
+            glyph="close"
+            label="Cancel Delete"
+            onClick={() => void cancelDelete(job.jobId).catch(() => false)}
+          />
+        )}
+      </span>
+      <span className={emptying ? undefined : "pr-1"}>
         <Bar percent={percent} />
       </span>
     </div>

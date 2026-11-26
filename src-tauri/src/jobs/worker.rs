@@ -9,17 +9,22 @@ use rusqlite::Connection;
 use crate::db::jobs::{self as table, QueuedJob};
 use crate::db::{self, items, journal, sources};
 use crate::error::{AppError, Reason, Result};
+use crate::fs::empty::Emptied;
 use crate::fs::export as fs_export;
+use crate::fs::folders::DeleteReport;
 use crate::fs::paste::{self, Halt};
 use crate::fs::stayed::Stayed;
+use crate::fs::trash::TrashReport;
 use crate::fs::{items as fs_items, paths, relocate, walk};
 use crate::jobs::kinds::{
-    self, CopyPayload, ExportPayload, FolderPayload, ItemPayload, MovePayload,
+    self, CopyPayload, DeleteFolderPayload, EmptyPayload, ExportPayload, FolderPayload,
+    ItemPayload, MovePayload, TrashPayload,
 };
 use crate::jobs::{
-    Copied, Copying, Exporting, Moved, Moving, QueueInner, enqueue_scrub, enqueue_thumb, exported,
-    lock, thumbed,
+    Copied, Copying, DeleteKind, Deleted, Deleting, Exporting, Moved, Moving, QueueInner,
+    enqueue_scrub, enqueue_thumb, exported, lock, thumbed,
 };
+
 use crate::media::ffmpeg::Ffmpeg;
 use crate::media::probe::Probe;
 use crate::media::{scrub, thumbs};
@@ -44,6 +49,11 @@ pub fn execute(inner: &QueueInner, conn: &mut Connection, job: &QueuedJob) -> Re
         kinds::SCRUB => finished(scrub(inner, conn, serde_json::from_str(&job.payload)?)),
         kinds::COPY_IN => copy_in(inner, conn, job.id, serde_json::from_str(&job.payload)?),
         kinds::MOVE => move_across(inner, conn, job.id, &serde_json::from_str(&job.payload)?),
+        kinds::TRASH => trash(inner, conn, job.id, &serde_json::from_str(&job.payload)?),
+        kinds::DELETE_FOLDER => {
+            delete_folder(inner, conn, job.id, &serde_json::from_str(&job.payload)?)
+        }
+        kinds::EMPTY => empty(inner, conn, job.id, &serde_json::from_str(&job.payload)?),
         kinds::EXPORT => {
             export(inner, conn, job.id, &serde_json::from_str(&job.payload)?);
             Ok(Done::Finished)
@@ -155,16 +165,15 @@ pub fn moved_waiting(
     job_id: i64,
     payload: &MovePayload,
 ) -> Result<()> {
-    // Its job is already gone, so its line ends even when the tidy cannot.
-    let cleared = fs_items::clear_parts(conn, &payload.item_ids, payload.into);
+    // Its job is already gone and its line ends, so a tidy that cannot run is left for the walk.
+    let _ = fs_items::clear_parts(conn, &payload.item_ids, payload.into);
     let ended = Ended {
         whole: payload.whole,
         refused: Vec::new(),
         cancelled: true,
         stopped: None,
     };
-    announce_move(inner, conn, job_id, payload, ended)?;
-    cleared
+    announce_move(inner, conn, job_id, payload, ended)
 }
 
 fn announce_move(
@@ -215,6 +224,256 @@ impl relocate::Control for MoveControl<'_> {
 
     fn progress(&self, done: u32, whole: u32) {
         if let Some(line) = lock(&self.inner.moves).get_mut(&self.job_id) {
+            line.done = done;
+            line.whole = whole;
+        }
+    }
+}
+
+/// Files sent to the Recycle Bin one to a turn, the line kept while it runs, and how it ended said
+/// once it has. One the app's closing stopped goes on at the next launch under the same batch.
+fn trash(
+    inner: &QueueInner,
+    conn: &Connection,
+    job_id: i64,
+    payload: &TrashPayload,
+) -> Result<Done> {
+    let control = DeleteControl::start(inner, job_id, DeleteKind::Files, "", payload.whole);
+    let (report, halted, stopped) =
+        match crate::fs::trash::trash_watched(conn, &payload.item_ids, &payload.batch_id, &control)
+        {
+            Ok(outcome) => (outcome.report, outcome.halted, None),
+            Err(err) => (TrashReport::default(), None, Some(Reason::of(&err))),
+        };
+    drop(control);
+    if halted == Some(Halt::Stop) {
+        return Ok(Done::Paused);
+    }
+    (inner.deleted)(&Deleted::Files {
+        job_id,
+        batch: batch_of(conn, &payload.batch_id)?,
+        report,
+        whole: payload.whole,
+        cancelled: halted == Some(Halt::Cancel),
+        stopped,
+    });
+    Ok(Done::Finished)
+}
+
+/// A folder deleted one file to a turn, the line kept while it runs, and how it ended said once it
+/// has. One the app's closing stopped goes on at the next launch under the same batch.
+fn delete_folder(
+    inner: &QueueInner,
+    conn: &Connection,
+    job_id: i64,
+    payload: &DeleteFolderPayload,
+) -> Result<Done> {
+    let control = DeleteControl::start(
+        inner,
+        job_id,
+        DeleteKind::Folder,
+        &payload.name,
+        payload.whole,
+    );
+    let outcome = crate::fs::folders::delete_watched(
+        conn,
+        payload.folder_id,
+        payload.contents,
+        &payload.batch_id,
+        payload.whole,
+        &control,
+    )
+    .unwrap_or_else(|err| crate::fs::folders::DeleteOutcome {
+        stopped: Some(Reason::of(&err)),
+        ..Default::default()
+    });
+    drop(control);
+    if outcome.halted == Some(Halt::Stop) {
+        return Ok(Done::Paused);
+    }
+    announce_folder(
+        inner,
+        conn,
+        job_id,
+        payload,
+        outcome.report,
+        outcome.halted == Some(Halt::Cancel),
+        outcome.stopped,
+    )
+}
+
+fn announce_folder(
+    inner: &QueueInner,
+    conn: &Connection,
+    job_id: i64,
+    payload: &DeleteFolderPayload,
+    report: DeleteReport,
+    cancelled: bool,
+    stopped: Option<Reason>,
+) -> Result<Done> {
+    (inner.deleted)(&Deleted::Folder {
+        job_id,
+        folder_id: payload.folder_id,
+        name: payload.name.clone(),
+        contents: payload.contents,
+        batch: batch_of(conn, &payload.batch_id)?,
+        report,
+        whole: payload.whole,
+        cancelled,
+        stopped,
+    });
+    Ok(Done::Finished)
+}
+
+/// The Trash emptied, the line kept while it runs, and what went said once it has. One the app's
+/// closing stopped goes on at the next launch.
+fn empty(
+    inner: &QueueInner,
+    conn: &Connection,
+    job_id: i64,
+    payload: &EmptyPayload,
+) -> Result<Done> {
+    let whole = u32::try_from(payload.counted.len()).unwrap_or(u32::MAX);
+    let control = DeleteControl::start(inner, job_id, DeleteKind::Empty, "", whole);
+    let emptied = crate::fs::empty::empty(conn, &payload.counted, &control);
+    drop(control);
+    let (emptied, stopped) = match emptied {
+        Ok(emptied) if emptied.stopped => return Ok(Done::Paused),
+        Ok(emptied) => (emptied, None),
+        Err(err) => (Emptied::default(), Some(Reason::of(&err))),
+    };
+    (inner.deleted)(&Deleted::Empty {
+        job_id,
+        emptied,
+        cancelled: false,
+        stopped,
+    });
+    Ok(Done::Finished)
+}
+
+/// A delete taken off the queue as it waited, ending as one cancelled while running does, with
+/// what a run before a restart did, if any did.
+pub fn deleted_waiting(
+    inner: &QueueInner,
+    conn: &Connection,
+    job_id: i64,
+    kind: &str,
+    payload: &str,
+) -> Result<()> {
+    let ended = match kind {
+        kinds::TRASH => {
+            let payload: TrashPayload = serde_json::from_str(payload)?;
+            let batch = batch_of(conn, &payload.batch_id)?;
+            Deleted::Files {
+                job_id,
+                report: TrashReport {
+                    trashed: batch.as_ref().map_or(0, |went| went.files),
+                    refused: Vec::new(),
+                },
+                batch,
+                whole: payload.whole,
+                cancelled: true,
+                stopped: None,
+            }
+        }
+        kinds::DELETE_FOLDER => {
+            let payload: DeleteFolderPayload = serde_json::from_str(payload)?;
+            announce_folder(
+                inner,
+                conn,
+                job_id,
+                &payload,
+                DeleteReport::default(),
+                true,
+                None,
+            )?;
+            return Ok(());
+        }
+        _ => Deleted::Empty {
+            job_id,
+            emptied: Emptied::default(),
+            cancelled: true,
+            stopped: None,
+        },
+    };
+    (inner.deleted)(&ended);
+    Ok(())
+}
+
+/// A delete's line while it waits its turn, at none of its files settled.
+pub fn waiting_line(job_id: i64, kind: &str, payload: &str) -> Option<Deleting> {
+    let (kind, name, whole) = match kind {
+        kinds::TRASH => {
+            let payload: TrashPayload = serde_json::from_str(payload).ok()?;
+            (DeleteKind::Files, String::new(), payload.whole)
+        }
+        kinds::DELETE_FOLDER => {
+            let payload: DeleteFolderPayload = serde_json::from_str(payload).ok()?;
+            (DeleteKind::Folder, payload.name, payload.whole)
+        }
+        _ => {
+            let payload: EmptyPayload = serde_json::from_str(payload).ok()?;
+            let whole = u32::try_from(payload.counted.len()).unwrap_or(u32::MAX);
+            (DeleteKind::Empty, String::new(), whole)
+        }
+    };
+    Some(Deleting {
+        job_id,
+        kind,
+        name,
+        done: 0,
+        whole,
+    })
+}
+
+struct DeleteControl<'a> {
+    inner: &'a QueueInner,
+    job_id: i64,
+    kind: DeleteKind,
+}
+
+impl<'a> DeleteControl<'a> {
+    fn start(
+        inner: &'a QueueInner,
+        job_id: i64,
+        kind: DeleteKind,
+        name: &str,
+        whole: u32,
+    ) -> DeleteControl<'a> {
+        let line = Deleting {
+            job_id,
+            kind,
+            name: name.to_owned(),
+            done: 0,
+            whole,
+        };
+        lock(&inner.deletes).insert(job_id, line);
+        DeleteControl {
+            inner,
+            job_id,
+            kind,
+        }
+    }
+}
+
+/// A delete's line and its Cancel go when it ends, however it ends: a panic included.
+impl Drop for DeleteControl<'_> {
+    fn drop(&mut self) {
+        lock(&self.inner.deletes).remove(&self.job_id);
+        lock(&self.inner.cancelled).remove(&self.job_id);
+    }
+}
+
+impl relocate::Control for DeleteControl<'_> {
+    fn halt(&self) -> Option<Halt> {
+        match halt_of(self.inner, self.job_id) {
+            Some(Halt::Cancel) if self.kind == DeleteKind::Empty => None,
+            halt => halt,
+        }
+    }
+
+    fn progress(&self, done: u32, whole: u32) {
+        if let Some(line) = lock(&self.inner.deletes).get_mut(&self.job_id) {
             line.done = done;
             line.whole = whole;
         }
@@ -585,6 +844,7 @@ mod tests {
             Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),
+            Box::new(|_| {}),
         )
     }
 
@@ -728,6 +988,7 @@ mod tests {
             dir.join("library.db"),
             dir.join("thumbs"),
             None,
+            Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),
             Box::new(|_| {}),

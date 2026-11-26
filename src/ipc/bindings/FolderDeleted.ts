@@ -3,6 +3,7 @@ import type { Batch } from "./Batch";
 import type { DeleteReport } from "./DeleteReport";
 
 /**
- * What deleting a folder did, and the batch that undoes whatever of it happened.
+ * What deleting a folder did, and the batch that undoes whatever of it happened; or, for one
+ * holding more files than a delete sends at once, the job that deletes it.
  */
-export type FolderDeleted = { batch: Batch | null, report: DeleteReport, };
+export type FolderDeleted = { "kind": "done", batch: Batch | null, report: DeleteReport, } | { "kind": "started", jobId: number, };

@@ -107,10 +107,6 @@ export function startEmptying(whole: number) {
   setEmptying({ done: 0, whole });
 }
 
-export function emptyingProgress(done: number) {
-  if (emptying) setEmptying({ ...emptying, done: Math.min(done, emptying.whole) });
-}
-
 export function finishEmptying() {
   setEmptying(null);
 }

@@ -1,7 +1,10 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 
+import type { Batch } from "../../ipc/bindings/Batch";
 import type { BinlessDrive } from "../../ipc/bindings/BinlessDrive";
 import type { Contents } from "../../ipc/bindings/Contents";
+import type { Deleted } from "../../ipc/bindings/Deleted";
+import type { DeleteReport } from "../../ipc/bindings/DeleteReport";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { binlessUnder, deleteFolder, folderDetail, folderFileCount } from "../../ipc/commands";
 import { Question } from "../../ui/Question";
@@ -11,6 +14,7 @@ import { dropPaneFolder, getPaneFolder } from "../pane/pane-store";
 import { getPreferences, updatePreferences } from "../preferences";
 import { SORTING_BOX, sortingDetail } from "../sorting-box";
 import {
+  folderCancelledLine,
   folderForGoodLine,
   folderKeptBanner,
   folderKeptLine,
@@ -18,6 +22,7 @@ import {
   folderStayedBanner,
   folderStayedLine,
   holdsLine,
+  reasonSentence,
 } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
@@ -72,7 +77,8 @@ export async function deleteFolderAsking(folder: Doomed, sources: readonly Sourc
 
 /**
  * Sends the folder where its files were told to go, and says what happened: the line at the foot
- * for what went, the banner over the grid for a folder that stayed. DECISIONS.md "Undo".
+ * for what went, the banner over the grid for a folder that stayed. One holding more files than
+ * a delete sends at once is a job, which says so when it ends. DECISIONS.md "Undo".
  */
 async function settle(folder: Doomed, contents: Contents | null, held: number) {
   const inPane = await showsInPane(folder.id);
@@ -81,7 +87,25 @@ async function settle(folder: Doomed, contents: Contents | null, held: number) {
     return null;
   });
   if (!done) return;
-  const { batch, report } = done;
+  if (done.kind === "started") {
+    deleting.set(done.jobId, inPane);
+    return;
+  }
+  settled(folder, contents, held, inPane, done.batch, done.report);
+  await libraryChanged();
+}
+
+// Folders being deleted on the queue, by job, with the folder the pane showed in them.
+const deleting = new Map<number, number | null>();
+
+function settled(
+  folder: Doomed,
+  contents: Contents | null,
+  held: number,
+  inPane: number | null,
+  batch: Batch | null,
+  report: DeleteReport,
+) {
   if (report.deleted && inPane !== null) dropPaneFolder((shown) => shown.folderId === inPane);
   const into = contents?.kind === "moveTo" ? SORTING_BOX : null;
   const forGood = contents?.kind === "permanently";
@@ -110,7 +134,29 @@ async function settle(folder: Doomed, contents: Contents | null, held: number) {
       retry: () => void settle(folder, contents, held - carried),
     });
   }
+}
+
+/**
+ * How a folder's delete on the queue ended: as one inside the command does, or, cancelled, the
+ * Line counting what went and the folder staying. One that stopped on its own says why.
+ */
+export async function afterFolderDeleted(deleted: Extract<Deleted, { kind: "folder" }>) {
   await libraryChanged();
+  const inPane = deleting.get(deleted.jobId) ?? null;
+  deleting.delete(deleted.jobId);
+  const { batch, report, whole, name, stopped } = deleted;
+  const folder = { id: deleted.folderId, name };
+  const binned = batch?.files ?? 0;
+  if (stopped || deleted.cancelled) {
+    const line = folderCancelledLine(name, binned, report.outright, whole);
+    const why = stopped ? reasonSentence(stopped) : null;
+    const said = [line, why].filter((part) => part !== null).join(" ");
+    if (batch) afterAct(batch, 0, said);
+    else if (why) setNews({ kind: "keyRefused", line: `Could not delete ${name}.`, detail: why });
+    else if (line) setNews({ kind: "said", line });
+    return;
+  }
+  settled(folder, deleted.contents, whole, inPane, batch, report);
 }
 
 /** The folder the pane shows, when it is this one or inside it. */

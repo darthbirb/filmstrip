@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "./app/App";
 import { suppressBrowserMenu } from "./app/browser-menu";
+import { watchDeletes } from "./app/deleted";
 import { watchExports } from "./app/export/export";
 import { startIndex } from "./app/navigation/index-store";
 import { settleTrash, watchTrashOpening } from "./app/navigation/look-in-bin";
@@ -23,6 +24,7 @@ void startIndex();
 void watchWork();
 void watchCopies();
 void watchMoves();
+void watchDeletes();
 void watchExports();
 void settleTrash();
 watchTrashOpening();

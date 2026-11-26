@@ -9,7 +9,9 @@ use ts_rs::TS;
 use crate::db::in_transaction;
 use crate::db::items::{self, Tally};
 use crate::error::{AppError, Reason, Result};
+use crate::fs::paste::Halt;
 use crate::fs::recycle::{self, Shell};
+use crate::fs::relocate::Control;
 use crate::fs::stayed::{self, Stayed};
 use crate::fs::trash::{self, Found};
 
@@ -57,6 +59,10 @@ pub struct Emptied {
     pub gone: u32,
     pub kept: u32,
     pub stayed: Vec<Stayed>,
+    /// Stopped before the end as the app closed, to go on at the next launch.
+    #[serde(skip)]
+    #[ts(skip)]
+    pub stopped: bool,
 }
 
 enum Outcome {
@@ -70,14 +76,21 @@ enum Outcome {
 /// How many deleted files' rows leave the Trash and the journal in one transaction.
 const LEFT_AT_ONCE: usize = 200;
 
-/// Deletes for good each file counted that is still in the Trash as it was counted, one turn of
-/// the disk per file, so a restore between two takes its file out of reach. One it cannot finish
-/// stays, and the rest go on. `progress` hears how many of them are settled.
-pub fn empty(conn: &Connection, counted: &[Counted], progress: &dyn Fn(u32)) -> Result<Emptied> {
+/// Deletes for good each file counted still in the Trash as it was counted, one turn of the disk
+/// per file, so a restore between two takes its file out of reach; one it cannot finish stays.
+/// Only the app's closing stops it. DECISIONS.md "Background work".
+pub fn empty(conn: &Connection, counted: &[Counted], control: &impl Control) -> Result<Emptied> {
     crate::db::journal::drop_redo(conn)?;
+    let whole = u32::try_from(counted.len()).unwrap_or(u32::MAX);
     let mut emptied = Emptied::default();
     let mut deleted = Vec::new();
+    control.progress(0, whole);
     for (at, one) in counted.iter().enumerate() {
+        if control.halt() == Some(Halt::Stop) {
+            leave(conn, &std::mem::take(&mut deleted));
+            emptied.stopped = true;
+            break;
+        }
         let outcome = {
             let _turn = super::turn();
             let outcome = empty_one(conn, one).unwrap_or_else(Outcome::Kept);
@@ -104,7 +117,7 @@ pub fn empty(conn: &Connection, counted: &[Counted], progress: &dyn Fn(u32)) -> 
             }
             Outcome::NotCounted => {}
         }
-        progress(u32::try_from(at + 1).unwrap_or(u32::MAX));
+        control.progress(u32::try_from(at + 1).unwrap_or(u32::MAX), whole);
     }
     Ok(emptied)
 }
@@ -178,6 +191,7 @@ mod tests {
     use crate::db::sources::{self, SourceKind};
     use crate::db::{self, folders, journal, tags};
     use crate::fs::recycle::tests::{Fake, stand_in};
+    use crate::fs::relocate::{HaltAfter, Hearing, Unwatched};
     use crate::fs::{settles_to, undo, walk};
     use std::cell::{Cell, RefCell};
     use std::path::{Path, PathBuf};
@@ -247,7 +261,7 @@ mod tests {
         }
 
         fn empty(&self, asked: &ToEmpty) -> Emptied {
-            empty(&self.conn, &asked.files, &|_| {}).unwrap()
+            empty(&self.conn, &asked.files, &Unwatched).unwrap()
         }
 
         fn bin_dir(&self) -> &Path {
@@ -276,9 +290,11 @@ mod tests {
         lib.delete(&["c.jpg"]);
         let heard = RefCell::new(Vec::new());
 
-        let emptied = empty(&lib.conn, &asked.files, &|done| {
-            heard.borrow_mut().push(done);
-        })
+        let emptied = empty(
+            &lib.conn,
+            &asked.files,
+            &Hearing(|done, _| heard.borrow_mut().push(done)),
+        )
         .unwrap();
 
         assert_eq!(
@@ -289,7 +305,7 @@ mod tests {
                 ..Emptied::default()
             }
         );
-        assert_eq!(*heard.borrow(), [1, 2]);
+        assert_eq!(*heard.borrow(), [0, 1, 2]);
         for file in &binned {
             assert!(std::fs::symlink_metadata(file).is_err());
         }
@@ -320,6 +336,31 @@ mod tests {
         assert!(back.stayed.is_empty());
         settles_to(&lib.root.join("Trips/Cairo"), &["c.jpg", "d.jpg"]);
         assert_eq!(undo::undo_last(&lib.conn).unwrap(), None);
+    }
+
+    #[test]
+    fn emptying_stops_only_as_the_app_closes_and_goes_on_from_there_at_the_next_launch() {
+        let lib = library("stopped", &["a.jpg", "b.jpg", "c.jpg", "d.jpg"]);
+        lib.delete(&["a.jpg", "b.jpg", "c.jpg", "d.jpg"]);
+        let asked = lib.asked();
+
+        let cancelled = HaltAfter::new(1, Halt::Cancel);
+        assert_eq!(
+            empty(&lib.conn, &asked.files[..2], &cancelled)
+                .unwrap()
+                .deleted,
+            2
+        );
+        let stopped = HaltAfter::new(3, Halt::Stop);
+        let first = empty(&lib.conn, &asked.files, &stopped).unwrap();
+        assert!(first.stopped);
+        assert_eq!(first.deleted, 1);
+        assert_eq!(*stopped.heard.borrow(), [(0, 4), (1, 4), (2, 4), (3, 4)]);
+        assert_eq!(lib.asked().files.len(), 1);
+
+        let rest = lib.empty(&asked);
+        assert_eq!((rest.deleted, rest.stopped), (1, false));
+        assert!(lib.asked().files.is_empty());
     }
 
     #[cfg(windows)]
@@ -405,13 +446,17 @@ mod tests {
         let asked = lib.asked();
         let restored = Cell::new(false);
 
-        let emptied = empty(&lib.conn, &asked.files, &|done| {
-            if done == 1 {
-                let report =
-                    trash::restore_items(&lib.conn, &[b], None, &journal::new_batch()).unwrap();
-                restored.set(report.restored == 1);
-            }
-        })
+        let emptied = empty(
+            &lib.conn,
+            &asked.files,
+            &Hearing(|done, _| {
+                if done == 1 {
+                    let report =
+                        trash::restore_items(&lib.conn, &[b], None, &journal::new_batch()).unwrap();
+                    restored.set(report.restored == 1);
+                }
+            }),
+        )
         .unwrap();
 
         assert!(restored.get());
@@ -621,13 +666,18 @@ mod tests {
             .unwrap();
         let heard = RefCell::new(Vec::new());
 
-        let emptied = empty(&lib.conn, &counted, &|done| heard.borrow_mut().push(done)).unwrap();
+        let emptied = empty(
+            &lib.conn,
+            &counted,
+            &Hearing(|done, _| heard.borrow_mut().push(done)),
+        )
+        .unwrap();
 
         assert_eq!(
             (emptied.deleted, emptied.bytes, emptied.gone, emptied.kept),
             (2, 10, 0, 1)
         );
-        assert_eq!(*heard.borrow(), [1, 2, 3]);
+        assert_eq!(*heard.borrow(), [0, 1, 2, 3]);
         let [row] = emptied.stayed.as_slice() else {
             panic!("{:?}", emptied.stayed);
         };

@@ -222,6 +222,7 @@ const QUIET: Progress = {
   copies: [],
   exports: [],
   moves: [],
+  deletes: [],
   walks: 1,
   walkedSource: null,
   thumbed: [],

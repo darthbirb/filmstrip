@@ -52,6 +52,7 @@ pub fn run() {
             let announcer = app.handle().clone();
             let exporter = app.handle().clone();
             let mover = app.handle().clone();
+            let deleter = app.handle().clone();
             let queue = jobs::JobQueue::start(
                 db_path.clone(),
                 thumbs.clone(),
@@ -67,6 +68,9 @@ pub fn run() {
                 }),
                 Box::new(move |moved| {
                     let _ = mover.emit(jobs::MOVED_EVENT, moved);
+                }),
+                Box::new(move |deleted| {
+                    let _ = deleter.emit(jobs::DELETED_EVENT, deleted);
                 }),
             );
             let backups = fs::backups::Shelf::new(fs::paths::backups_dir()?);
@@ -135,6 +139,7 @@ pub fn run() {
             commands::drop_files,
             commands::cancel_copy,
             commands::cancel_move,
+            commands::cancel_delete,
             commands::export_plan,
             commands::pick_export_zip,
             commands::start_export,

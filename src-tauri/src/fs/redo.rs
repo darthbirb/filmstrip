@@ -628,7 +628,9 @@ mod tests {
         assert!(act_to_redo(&lib.conn, None).unwrap().is_some());
 
         let asked = crate::fs::empty::to_empty(&lib.conn).unwrap();
-        let emptied = crate::fs::empty::empty(&lib.conn, &asked.files, &|_| {}).unwrap();
+        let emptied =
+            crate::fs::empty::empty(&lib.conn, &asked.files, &crate::fs::relocate::Unwatched)
+                .unwrap();
         assert_eq!(emptied.deleted, 1);
         assert_eq!(act_to_redo(&lib.conn, None).unwrap(), None);
         assert_eq!(redo_last(&lib.conn).unwrap(), None);
