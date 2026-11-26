@@ -2,7 +2,7 @@
 //! DECISIONS.md "A walk only judges what it read".
 //! Gap: DECISIONS.md "Renames made while the app was closed".
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
@@ -120,30 +120,24 @@ fn read_directory(dir: &Path) -> Box<dyn Iterator<Item = Read>> {
     }))
 }
 
-/// Whether a walk reading now would find `file` under `root`: a file there, with nothing between
-/// left out.
-fn would_read(root: &Path, file: &Path) -> bool {
-    let Ok(inside) = file.strip_prefix(root) else {
+/// Whether a walk reading now would go into `dir` under `root`: each directory on the way there,
+/// and none left out.
+fn would_enter(root: &Path, dir: &Path, app_data: Option<&Path>) -> bool {
+    let Ok(inside) = dir.strip_prefix(root) else {
         return false;
     };
-    let app_data = crate::config::app_data_dir().ok();
     let mut at = root.to_path_buf();
-    let mut steps = inside.components().peekable();
-    while let Some(step) = steps.next() {
+    inside.components().all(|step| {
         at.push(step);
-        let Ok(meta) = std::fs::symlink_metadata(&at) else {
-            return false;
-        };
-        let shaped = if steps.peek().is_some() {
-            meta.is_dir()
-        } else {
-            meta.is_file()
-        };
-        if !shaped || left_out(&at, Some(&meta), app_data.as_deref()) {
-            return false;
-        }
-    }
-    true
+        std::fs::symlink_metadata(&at)
+            .is_ok_and(|meta| meta.is_dir() && !left_out(&at, Some(&meta), app_data))
+    })
+}
+
+/// Whether a walk reading `file`'s directory now would find it there, a file and not left out.
+fn would_find(file: &Path, app_data: Option<&Path>) -> bool {
+    std::fs::symlink_metadata(file)
+        .is_ok_and(|meta| meta.is_file() && !left_out(file, Some(&meta), app_data))
 }
 
 /// How many of a directory's files one turn of the disk records.
@@ -165,16 +159,20 @@ struct Pass<'a> {
     read: Reader<'a>,
     report: &'a mut WalkReport,
     waiting: Vec<Step>,
+    listed: HashSet<i64>,
     unread: Vec<i64>,
 }
 
 impl Pass<'_> {
     /// One step, its folder found where it is now. A folder gone, or moved out of the source,
-    /// since the walk found it is passed over.
+    /// since the walk found it is passed over, and one listed already is not listed again.
     fn take(&mut self, step: Step) -> Result<()> {
         let folder_id = match &step {
             Step::Directory(id) | Step::Files(id, _) => *id,
         };
+        if matches!(step, Step::Directory(_)) && self.listed.contains(&folder_id) {
+            return Ok(());
+        }
         if !folders::is_live(self.conn, folder_id)?
             || folders::location(self.conn, folder_id)?.source_id != self.source_id
         {
@@ -190,6 +188,7 @@ impl Pass<'_> {
     /// A directory's subdirectories found or made as folders and queued, its files queued a turn's
     /// worth at a time, and the first of them recorded.
     fn directory(&mut self, dir: &Path, folder_id: i64) -> Result<()> {
+        self.listed.insert(folder_id);
         let mut here = HashMap::from([(dir.to_path_buf(), folder_id)]);
         let mut found = Vec::new();
         let mut names = Vec::new();
@@ -247,7 +246,11 @@ impl Pass<'_> {
                 Ok(Outcome::Unchanged) => self.report.unchanged += 1,
                 Ok(Outcome::Indexed) => self.report.indexed += 1,
                 Err(err) => {
-                    eprintln!("could not index {}: {err}", file.display());
+                    let moved_away = std::fs::symlink_metadata(&file)
+                        .is_err_and(|gone| gone.kind() == std::io::ErrorKind::NotFound);
+                    if !moved_away {
+                        eprintln!("could not index {}: {err}", file.display());
+                    }
                     keep_unread(self.conn, &file, folder_id)?;
                 }
             }
@@ -480,6 +483,7 @@ fn record_all(
         read,
         report,
         waiting: vec![Step::Directory(top)],
+        listed: HashSet::new(),
         unread: Vec::new(),
     };
     while let Some(step) = pass.waiting.pop() {
@@ -501,13 +505,22 @@ fn spare_still_there(
     under: Option<i64>,
     kept: &HashSet<i64>,
 ) -> Result<()> {
+    let mut by_folder: BTreeMap<i64, Vec<items::Unseen>> = BTreeMap::new();
     for unseen in items::unseen(conn, source_id, under)? {
-        if kept.contains(&unseen.folder_id) {
+        if !kept.contains(&unseen.folder_id) {
+            by_folder.entry(unseen.folder_id).or_default().push(unseen);
+        }
+    }
+    let app_data = crate::config::app_data_dir().ok();
+    for (folder_id, unseen) in by_folder {
+        let dir = paths::folder_dir(conn, folder_id)?;
+        if !would_enter(root, &dir, app_data.as_deref()) {
             continue;
         }
-        let file = paths::item_path(conn, unseen.folder_id, &unseen.disk_name)?;
-        if would_read(root, &file) {
-            items::mark_seen(conn, &unseen.uuid)?;
+        for one in unseen {
+            if would_find(&dir.join(&one.disk_name), app_data.as_deref()) {
+                items::mark_seen(conn, &one.uuid)?;
+            }
         }
     }
     Ok(())
@@ -542,20 +555,26 @@ fn reconcile_folder_with(
     read: Reader,
 ) -> Result<WalkReport> {
     let mut report = WalkReport::default();
-    if !folders::is_live(conn, folder_id)? {
-        return Ok(report);
-    }
-    let source_id = folders::location(conn, folder_id)?.source_id;
-    let Some(source) = sources::get(conn, source_id)? else {
-        return Ok(report);
+    let (source_id, root, present) = {
+        let _turn = super::turn();
+        if !folders::is_live(conn, folder_id)? {
+            return Ok(report);
+        }
+        let source_id = folders::location(conn, folder_id)?.source_id;
+        let Some(source) = sources::get(conn, source_id)? else {
+            return Ok(report);
+        };
+        let root = PathBuf::from(source.root);
+        if !root.is_dir() {
+            return Ok(report);
+        }
+        let present = paths::folder_dir(conn, folder_id)?.is_dir();
+        (source_id, root, present)
     };
-    let root = Path::new(&source.root);
-    if !root.is_dir() {
-        return Ok(report);
-    }
+    let root = root.as_path();
     reading(source_id);
     items::begin_sweep(conn)?;
-    let unread = if paths::folder_dir(conn, folder_id)?.is_dir() {
+    let unread = if present {
         let read = record_all(conn, folder_id, source_id, &mut report, &|| false, read)?;
         let Some(unread) = read else {
             return Ok(report);
@@ -596,15 +615,16 @@ fn retire_vanished_folders(conn: &Connection, walked: &[Walk]) -> Result<i64> {
         .collect::<rusqlite::Result<_>>()?;
     drop(stmt);
 
-    let mut by_source: HashMap<i64, Vec<i64>> = HashMap::new();
-    for folder_id in candidates {
-        let source_id = folders::location(conn, folder_id)?.source_id;
-        by_source.entry(source_id).or_default().push(folder_id);
-    }
     let mut retired = 0;
-    for walk in walked {
-        let read = by_source.remove(&walk.source_id).unwrap_or_default();
-        retired += retire_gone(conn, &walk.root, read, &walk.kept)?;
+    for folder_id in candidates {
+        let _turn = super::turn();
+        if !folders::is_live(conn, folder_id)? {
+            continue;
+        }
+        let source_id = folders::location(conn, folder_id)?.source_id;
+        if let Some(walk) = walked.iter().find(|walk| walk.source_id == source_id) {
+            retired += retire_if_gone(conn, &walk.root, folder_id, &walk.kept)?;
+        }
     }
     Ok(retired)
 }
@@ -619,25 +639,27 @@ fn retire_gone(
 ) -> Result<i64> {
     let mut retired = 0;
     for folder_id in candidates {
-        if kept.contains(&folder_id) {
-            continue;
-        }
         let _turn = super::turn();
         // An ancestor retired earlier in this loop takes its descendants with
         // it, so anything already gone is skipped rather than counted twice.
-        let still_live: bool = conn.query_row(
-            "SELECT EXISTS(SELECT 1 FROM folder WHERE id = ?1 AND deleted_at IS NULL)",
-            rusqlite::params![folder_id],
-            |r| r.get(0),
-        )?;
-        if !still_live {
-            continue;
-        }
-        if !paths::folder_dir(conn, folder_id)?.is_dir() && root.is_dir() {
-            retired += folders::trash_subtree(conn, folder_id)?;
+        if folders::is_live(conn, folder_id)? {
+            retired += retire_if_gone(conn, root, folder_id, kept)?;
         }
     }
     Ok(retired)
+}
+
+/// Retires a live folder outside `kept` whose directory is gone while its source's root is there.
+fn retire_if_gone(
+    conn: &Connection,
+    root: &Path,
+    folder_id: i64,
+    kept: &HashSet<i64>,
+) -> Result<i64> {
+    if kept.contains(&folder_id) || paths::folder_dir(conn, folder_id)?.is_dir() || !root.is_dir() {
+        return Ok(0);
+    }
+    folders::trash_subtree(conn, folder_id)
 }
 
 #[cfg(test)]
@@ -1414,6 +1436,194 @@ pub(crate) mod tests {
             ]
         );
         assert_eq!((report.items_retired, report.folders_retired), (0, 0));
+    }
+
+    #[test]
+    fn a_verb_waiting_while_the_walk_runs_freely_goes_before_its_next_directory() {
+        let (conn, root, index) = on_disk("fair-turn");
+        for d in 0..20 {
+            write(&root.join(format!("{d:02}/a.jpg")), "a");
+        }
+        let top = folders::source_root_folder(&conn, 1).unwrap();
+        let listed = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let ran_after = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(usize::MAX));
+        let verb = std::cell::RefCell::new(None);
+
+        // The verb asks for the turn while the walk holds it to list the source's own directory.
+        let read = |dir: &Path| -> Box<dyn Iterator<Item = Read>> {
+            let listing: Vec<Read> = read_directory(dir).collect();
+            if verb.borrow().is_none() {
+                let (queued, in_line) = std::sync::mpsc::channel();
+                let (index, listed, ran_after) = (
+                    index.clone(),
+                    std::sync::Arc::clone(&listed),
+                    std::sync::Arc::clone(&ran_after),
+                );
+                *verb.borrow_mut() = Some(std::thread::spawn(move || {
+                    let conn = db::open(&index).unwrap();
+                    crate::fs::just_after_queueing(move || {
+                        let _ = queued.send(());
+                    });
+                    crate::fs::folders::create(&conn, top, "Lisbon", &journal::new_batch())
+                        .unwrap();
+                    ran_after.store(
+                        listed.load(std::sync::atomic::Ordering::SeqCst),
+                        std::sync::atomic::Ordering::SeqCst,
+                    );
+                }));
+                in_line
+                    .recv_timeout(std::time::Duration::from_secs(5))
+                    .unwrap();
+            }
+            listed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Box::new(listing.into_iter())
+        };
+        let report = reconcile_list(
+            &conn,
+            sources::list(&conn).unwrap(),
+            &|| false,
+            &|_| {},
+            &read,
+        )
+        .unwrap()
+        .unwrap();
+        verb.into_inner().unwrap().join().unwrap();
+
+        assert_eq!(
+            ran_after.load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "the verb went once the walk had listed one directory"
+        );
+        assert_eq!(report.indexed, 20);
+        assert!(root.join("Lisbon").is_dir());
+    }
+
+    /// A.jpg in A, then 300 files in B, which the walk records in two turns; every live row by
+    /// name, with its id.
+    fn two_batches(name: &str) -> (Connection, PathBuf, PathBuf, Vec<(String, i64)>) {
+        let (conn, root, index) = on_disk(name);
+        write(&root.join("A/a.jpg"), "a");
+        for f in 0..300 {
+            write(&root.join(format!("B/f{f:03}.jpg")), "f");
+        }
+        reconcile(&conn).unwrap();
+        let rows = rows_by_name(&conn);
+        (conn, root, index, rows)
+    }
+
+    fn rows_by_name(conn: &Connection) -> Vec<(String, i64)> {
+        let mut stmt = conn
+            .prepare("SELECT disk_name, id FROM item WHERE deleted_at IS NULL ORDER BY disk_name")
+            .unwrap();
+        stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap()
+    }
+
+    /// A walk over [`two_batches`] that runs `change` between B's two turns: asked before the
+    /// source, its own directory, A, B's first 256 files, then the rest.
+    fn between_batches(
+        conn: &Connection,
+        index: &Path,
+        change: impl FnOnce(&Connection) + Send + 'static,
+    ) -> WalkReport {
+        let asked = std::cell::Cell::new(0);
+        let change = std::cell::RefCell::new(Some(change));
+        let halt = || {
+            asked.set(asked.get() + 1);
+            if asked.get() == 5 {
+                let change = change.borrow_mut().take().unwrap();
+                assert!(meanwhile(index, change), "the change waited for the walk");
+            }
+            false
+        };
+        reconcile_until(conn, &halt, &|_| {}).unwrap().unwrap()
+    }
+
+    #[test]
+    fn a_folder_renamed_between_two_turns_of_its_files_has_the_rest_read_under_its_new_name() {
+        let (conn, root, index, before) = two_batches("renamed-mid-directory");
+        write(&root.join("B/new.jpg"), "n");
+        let top = folders::source_root_folder(&conn, 1).unwrap();
+        let b = folder_under(&conn, top, "B");
+
+        let report = between_batches(&conn, &index, move |conn| {
+            crate::fs::folders::rename(conn, b, "Bee", &journal::new_batch()).unwrap();
+        });
+
+        assert!(root.join("Bee/new.jpg").is_file());
+        let after = rows_by_name(&conn);
+        assert_eq!(after.len(), before.len() + 1);
+        assert!(
+            before.iter().all(|row| after.contains(row)),
+            "every row kept its id"
+        );
+        assert_eq!(item_folder(&conn, "new.jpg"), b);
+        assert_eq!(
+            (report.unchanged, report.indexed, report.items_retired),
+            (301, 1, 0)
+        );
+    }
+
+    #[test]
+    fn a_file_moved_out_of_a_turn_not_yet_taken_keeps_its_row() {
+        let (conn, root, index, before) = two_batches("moved-mid-directory");
+        let top = folders::source_root_folder(&conn, 1).unwrap();
+        let a = folder_under(&conn, top, "A");
+        let last = item_named(&conn, "f299.jpg");
+
+        let report = between_batches(&conn, &index, move |conn| {
+            crate::fs::items::move_items(conn, &[last], a, &journal::new_batch()).unwrap();
+        });
+
+        assert!(root.join("A/f299.jpg").is_file());
+        assert_eq!(rows_by_name(&conn), before, "every row kept its id");
+        assert_eq!(item_folder(&conn, "f299.jpg"), a);
+        assert_eq!((report.unchanged, report.items_retired), (300, 0));
+    }
+
+    #[test]
+    fn a_folder_read_and_then_moved_ahead_of_the_walk_is_not_read_twice() {
+        let (conn, root, index) = on_disk("read-then-moved");
+        write(&root.join("A/a.jpg"), "a");
+        write(&root.join("B/b.jpg"), "b");
+        reconcile(&conn).unwrap();
+        let top = folders::source_root_folder(&conn, 1).unwrap();
+        let a = folder_under(&conn, top, "A");
+        let b = folder_under(&conn, top, "B");
+
+        // Asked before the source, its own directory, A, then B: A goes into B first.
+        let asked = std::cell::Cell::new(0);
+        let halt = || {
+            asked.set(asked.get() + 1);
+            if asked.get() == 4 {
+                assert!(
+                    meanwhile(&index, move |conn| {
+                        crate::fs::folders::move_into(conn, a, b, &journal::new_batch()).unwrap();
+                    }),
+                    "the move waited for the walk"
+                );
+            }
+            false
+        };
+        let report = reconcile_until(&conn, &halt, &|_| {}).unwrap().unwrap();
+
+        assert!(root.join("B/A/a.jpg").is_file());
+        assert_eq!(
+            live_items(&conn),
+            [("a.jpg".to_string(), a), ("b.jpg".to_string(), b)]
+        );
+        assert_eq!((report.unchanged, report.items_retired), (2, 0));
+    }
+
+    fn item_folder(conn: &Connection, name: &str) -> i64 {
+        conn.query_row(
+            "SELECT folder_id FROM item WHERE disk_name = ?1 AND deleted_at IS NULL",
+            [name],
+            |r| r.get(0),
+        )
+        .unwrap()
     }
 
     #[cfg(windows)]
