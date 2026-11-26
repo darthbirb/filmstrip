@@ -1026,7 +1026,12 @@ and one height in justified rows is equal cells by another measure.
     45877907463, over the bound with no clip behind. Frames are read at every frame the window
     draws, so only those near a loop are left out, and a loop just outside the count is placed
     by the clip's clock. Each clip loops at most once in a count, so at least a second of it
-    stays in every span, and a pane playing too many, which drops throughout, still fails.
+    stays in every span, and a pane playing too many, which drops throughout, still fails. The
+    test checks that: every clip is longer than the count, the recorded WebM by a second, and a
+    clip whose clock went back twice fails it, since a pane that restarts clips would otherwise
+    hide its own drops as loops. Not every drop is a loop's: a runner's hitch drops in one span
+    now and then, as 18 of 1092 did at 1080p60 in run 45884619678, and the middle of three
+    absorbs it.
 
 - **The bounds were set from the test clip's edge.** Counted on 2 November 2026, before the pane
   measured itself, with the 37ms clip among twelve originals in a 1500 × 900 pane. These were runs

@@ -53,7 +53,8 @@ export function framesIn(
 
 /**
  * A clip's clock read at every frame the window draws: how far it moved, and over how many of the
- * window's seconds, since it was first read. `wrapped`, in ms, from a loop until it moves again.
+ * window's seconds, since it was first read. `wrapped`, in ms, from a loop until it moves again;
+ * `loops`, how many times it went back.
  */
 export type Clock = {
   time: number;
@@ -61,10 +62,11 @@ export type Clock = {
   moved: number;
   seconds: number;
   wrapped: number | null;
+  loops: number;
 };
 
 export function clock(time: number, at: number): Clock {
-  return { time, at, moved: 0, seconds: 0, wrapped: null };
+  return { time, at, moved: 0, seconds: 0, wrapped: null, loops: 0 };
 }
 
 /**
@@ -74,7 +76,7 @@ export function clock(time: number, at: number): Clock {
  */
 export function tick(was: Clock, time: number, at: number): Clock {
   const next = { ...was, time, at };
-  if (time < was.time) return { ...next, wrapped: at };
+  if (time < was.time) return { ...next, wrapped: at, loops: was.loops + 1 };
   if (was.wrapped !== null && at - was.wrapped < KEEP.span) {
     return { ...next, wrapped: time === was.time ? was.wrapped : null };
   }
@@ -94,15 +96,18 @@ export type Bench = {
   intervals: number;
   /**
    * Of the frames the clips were due to show over the whole count, how many they dropped, those
-   * near a loop left out.
+   * near a loop left out and counted in `nearLoops`.
    */
   dropped: number;
   due: number;
   pace: number;
+  nearLoops: Frames;
   /** The same, span by span. */
   spans: Span[];
   /** How many clips the pane settled on playing through the count. */
   playing: number;
+  /** The most times any playing clip looped inside the count. */
+  loops: number;
 };
 
 /** What the window does while its frames are counted. */
@@ -132,8 +137,9 @@ export type BenchOptions = {
   height?: number;
 };
 
-// Three five-second spans, the timing test's count.
-const LEAST = 15_000;
+// The timing test's count, three five-second spans, and a second more so the clip loops in it at
+// most once.
+const LEAST = 16_000;
 
 // The pane holds its count this long only once every clip plays or it waits on a count that fell.
 const SETTLED = (KEEP.calm + 2) * KEEP.span;
@@ -320,7 +326,11 @@ async function settle(videos: readonly HTMLVideoElement[], deadline: number) {
 
 type Counting = { motion: Motion; ms: number; spans: number; width: number };
 
-/** The count itself, or null when the clips playing changed inside it. */
+/**
+ * The count itself, or null when the clips playing changed inside it. A loop just before or after
+ * the count is placed by the clip's clock as though it ran at rate 1, so for a slow clip it lands
+ * a little off.
+ */
 async function countFrames(
   host: HTMLElement,
   videos: readonly HTMLVideoElement[],
@@ -336,7 +346,7 @@ async function countFrames(
   const begun = performance.now();
   let clocks = videos.map((one) => clock(one.currentTime, begun));
   const samples = videos.map((one) => [sample(one, begun)]);
-  const loops = videos.map((one) => [begun - one.currentTime * 1000]);
+  const loopsAt = videos.map((one) => [begun - one.currentTime * 1000]);
   const opening: Mark = { at: Number.NEGATIVE_INFINITY, clocks };
   const marks = [opening];
   let changed = false;
@@ -351,7 +361,7 @@ async function countFrames(
     if (playingNow(videos) !== held) changed = true;
     clocks = clocks.map((was, index) => {
       const next = tick(was, videos[index]?.currentTime ?? was.time, now);
-      if (next.time < was.time) loops[index]?.push(now);
+      if (next.loops > was.loops) loopsAt[index]?.push(now);
       return next;
     });
     for (const index of going) {
@@ -364,7 +374,7 @@ async function countFrames(
   if (changed) return null;
   const ended = performance.now();
   videos.forEach((one, index) => {
-    loops[index]?.push(ended + (one.duration - one.currentTime) * 1000);
+    loopsAt[index]?.push(ended + (one.duration - one.currentTime) * 1000);
   });
   const span = (from: Mark, to: Mark): Span => {
     const clocked = (pick: (one: Clock) => number) =>
@@ -374,7 +384,7 @@ async function countFrames(
         return end !== undefined && was !== undefined ? sum + pick(end) - pick(was) : sum;
       }, 0);
     const shown = going.map((index) =>
-      framesIn(samples[index] ?? [], loops[index] ?? [], from.at, to.at),
+      framesIn(samples[index] ?? [], loopsAt[index] ?? [], from.at, to.at),
     );
     const sum = (pick: (one: (typeof shown)[number]) => number) =>
       shown.reduce((all, one) => all + pick(one), 0);
@@ -390,7 +400,7 @@ async function countFrames(
     };
   };
   const each = marks.slice(1).map((to, index) => span(marks[index] ?? opening, to));
-  const { nearLoops: _, ...whole } = span(opening, marks.at(-1) ?? opening);
+  const whole = span(opening, marks.at(-1) ?? opening);
   const intervals = drawn.slice(1).map((at, index) => at - (drawn[index] ?? at));
   const sorted = [...intervals].sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
@@ -404,6 +414,7 @@ async function countFrames(
     ...whole,
     spans: each,
     playing: going.length,
+    loops: Math.max(0, ...going.map((index) => clocks[index]?.loops ?? 0)),
   };
 }
 
