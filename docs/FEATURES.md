@@ -30,7 +30,7 @@ drawn. **Not started** — neither.
 
 | Capability | Filmstrip | Where |
 | --- | --- | --- |
-| Walk every source in the background | Built | `start_index`, the job queue; a directory it cannot read, or a drive lost mid-walk, retires nothing, and hidden or system entries are never read: DECISIONS.md "A walk only judges what it read" |
+| Walk every source in the background | Built | `start_index`, the job queue; a directory it cannot read, or a drive lost mid-walk, retires nothing, hidden or system entries are never read, and a rename, move or delete waits for one directory of it, never the whole walk: DECISIONS.md "A walk only judges what it read" |
 | Report progress | Built | the foot's indexing line, and in Settings › Sources the row of the source the walk is reading |
 | Report per-file failures, each by its path and reason, and retry them | Built | the notices above the grid, with Show in Explorer |
 | Thumbnails for pictures | Built | `thumb` jobs |

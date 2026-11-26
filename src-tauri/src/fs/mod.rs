@@ -24,8 +24,8 @@ use std::time::{Duration, Instant};
 
 static DISK: Mutex<()> = Mutex::new(());
 
-/// One change to the library's disk at a time. A walk takes a turn per source and a verb takes one
-/// for its whole change, so neither reads the other half-done. DECISIONS.md "Undo".
+/// One change to the library's disk at a time. A walk takes a turn per directory and a verb takes
+/// one for its whole change, so neither reads the other half-done. DECISIONS.md "Undo".
 pub fn turn() -> MutexGuard<'static, ()> {
     DISK.lock().unwrap_or_else(PoisonError::into_inner)
 }

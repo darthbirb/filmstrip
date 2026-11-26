@@ -634,6 +634,41 @@ pub fn mark_seen(conn: &Connection, uuid: &str) -> Result<()> {
     Ok(())
 }
 
+/// An item a sweep has not seen, where the index has it.
+pub struct Unseen {
+    pub uuid: String,
+    pub folder_id: i64,
+    pub disk_name: String,
+}
+
+/// The live items in `source_id`, or only in `under`'s subtree, the sweep has not seen.
+pub fn unseen(conn: &Connection, source_id: i64, under: Option<i64>) -> Result<Vec<Unseen>> {
+    conn.execute_batch("CREATE INDEX IF NOT EXISTS temp.idx_seen ON seen(uuid);")?;
+    let mut stmt = conn.prepare(
+        "WITH RECURSIVE subtree(id) AS (
+             SELECT ?2 WHERE ?2 IS NOT NULL
+           UNION ALL
+             SELECT f.id FROM folder f JOIN subtree s ON f.parent_id = s.id
+         )
+         SELECT uuid, folder_id, disk_name FROM item
+          WHERE deleted_at IS NULL
+            AND source_id = ?1
+            AND (?2 IS NULL OR folder_id IN (SELECT id FROM subtree))
+            AND NOT EXISTS (SELECT 1 FROM temp.seen s WHERE s.uuid = item.uuid)
+          ORDER BY id",
+    )?;
+    let unseen = stmt
+        .query_map(params![source_id, under], |r| {
+            Ok(Unseen {
+                uuid: r.get(0)?,
+                folder_id: r.get(1)?,
+                disk_name: r.get(2)?,
+            })
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(unseen)
+}
+
 /// Holds `kept` in `temp.kept` for the sweep's own statement.
 fn hold_kept(conn: &Connection, kept: &HashSet<i64>) -> Result<()> {
     conn.execute_batch(

@@ -147,6 +147,16 @@ the hidden or system attribute, as `System Volume Information` at a drive's root
 never reads them and a paste never copies them. A source's own root is always read, since a
 drive's root carries both attributes.
 
+**Verbs go on while it walks** (#249). The walk takes the disk's turn a directory at a time
+(DECISIONS.md "Undo"), so between two of its turns a verb can move a file into a directory it
+has already read, or rename one it has yet to reach. Each directory is found again by its folder
+as its turn comes, so a folder renamed or moved meanwhile is read where it now is, and one deleted
+meanwhile is passed over. An item the walk did not find is retired only if, under the walk's last
+turn, its file is not where the index has it, or is somewhere the walk would not read: hidden, or
+under a hidden directory. A file a verb moved behind the walk keeps its row, and one Explorer
+deleted still goes. That costs a look at each item not found, which on an unchanged library is
+none.
+
 A file whose size and modification time match its row is not opened again. That is the common
 case, and what keeps walking an unchanged library cheap.
 
@@ -1343,9 +1353,14 @@ it. Two acts delete for good, and both ask first: Empty Trash…, and Delete on 
   `fs::take_away`; a delete also looks again, for as long, while it finds a file it does not
   show, and names the file that kept the folder when one stays. A directory around one where
   something stayed cannot empty, so it is tried once and not waited on.
-- **One change to the disk at a time.** A walk that read a directory while a verb renamed it would
-  find the old name gone and retire everything under it. So the walk takes a turn per source and
-  a verb waits for the turn, which bounds the wait by one source's walk, never the whole pass.
+- **One change to the disk at a time, and a walk's turn is one directory** (#249). A walk that
+  read a directory while a verb renamed it would find the old name gone and retire everything
+  under it, so they take turns: a verb holds the turn for its whole change, an undo or a redo for
+  its whole replay, and the walk for one directory, or 256 of a directory's files, at a time. A
+  rename, move or delete made while a 100,000-file source is first read waits for one directory,
+  never the walk. Between two of its turns the walk follows what a verb changed, as "A walk only
+  judges what it read" says. It writes nothing to the journal, so it never drops the redo, and
+  never lands between the rows of one replay, whose turn it waits for like any verb.
 - **The journal is found by what it is about, never read whole** (#220). Each row's files and
   folders are kept in `journal_subject` beside it, indexed, so letting go of a file emptied from
   the bin reads the few rows about it, not every row's JSON: emptying 10,000 files against a

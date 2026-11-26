@@ -3,7 +3,7 @@
 //! Gap: DECISIONS.md "Renames made while the app was closed".
 
 use std::collections::{HashMap, HashSet};
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
@@ -75,10 +75,6 @@ fn marked_hidden(_: &std::fs::Metadata) -> bool {
     false
 }
 
-fn is_hidden_entry(entry: &walkdir::DirEntry) -> bool {
-    is_hidden(entry.file_name(), entry.metadata().ok().as_ref())
-}
-
 /// The Recycle Bin a drive keeps at its root, where Delete sends the library's own files: a source
 /// at a drive's root would otherwise take them in again. DECISIONS.md "The Trash is the Recycle Bin".
 fn is_recycle_bin(path: &Path) -> bool {
@@ -87,29 +83,33 @@ fn is_recycle_bin(path: &Path) -> bool {
         && path.parent().is_some_and(|drive| drive.parent().is_none())
 }
 
-/// One step of reading a tree: an entry found, or a place that could not be read, named when the
-/// walker knows which.
+/// One step of reading a directory: an entry found, or a place that could not be read, named when
+/// the walker knows which.
 pub(crate) enum Read {
     Entry(walkdir::DirEntry),
     Unread(Option<PathBuf>),
 }
 
-/// How a tree is read: [`read_tree`], or in a test, a tree read with failures in it.
+/// How a directory is read: [`read_directory`], or in a test, one read with failures in it.
 type Reader<'a> = &'a dyn Fn(&Path) -> Box<dyn Iterator<Item = Read>>;
 
-/// A tree as the walk reads it, leaving out hidden entries, a drive's Recycle Bin, and the app's
-/// own directory should a root contain it.
-fn read_tree(root: &Path) -> Box<dyn Iterator<Item = Read>> {
+/// What the walk never reads: a hidden entry, a drive's Recycle Bin, and the app's own directory.
+fn left_out(path: &Path, meta: Option<&std::fs::Metadata>, app_data: Option<&Path>) -> bool {
+    path.file_name().is_some_and(|name| is_hidden(name, meta))
+        || is_recycle_bin(path)
+        || app_data.is_some_and(|dir| path.starts_with(dir))
+}
+
+/// A directory's own entry, then what it holds by name, leaving out what [`left_out`] names.
+fn read_directory(dir: &Path) -> Box<dyn Iterator<Item = Read>> {
     let app_data = crate::config::app_data_dir().ok();
-    let walker = WalkDir::new(root)
+    let walker = WalkDir::new(dir)
+        .max_depth(1)
         .follow_links(false)
+        .sort_by_file_name()
         .into_iter()
         .filter_entry(move |e| {
-            (e.depth() == 0 || !is_hidden_entry(e))
-                && !is_recycle_bin(e.path())
-                && !app_data
-                    .as_deref()
-                    .is_some_and(|dir| e.path().starts_with(dir))
+            e.depth() == 0 || !left_out(e.path(), e.metadata().ok().as_ref(), app_data.as_deref())
         });
     Box::new(walker.map(|read| match read {
         Ok(entry) => Read::Entry(entry),
@@ -120,63 +120,140 @@ fn read_tree(root: &Path) -> Box<dyn Iterator<Item = Read>> {
     }))
 }
 
-/// What reading one tree found: a folder for each directory, its files, and the folders whose
-/// subtrees it could not read in full.
-struct Mirrored {
-    folder_ids: HashMap<PathBuf, i64>,
-    files: Vec<PathBuf>,
+/// Whether a walk reading now would find `file` under `root`: a file there, with nothing between
+/// left out.
+fn would_read(root: &Path, file: &Path) -> bool {
+    let Ok(inside) = file.strip_prefix(root) else {
+        return false;
+    };
+    let app_data = crate::config::app_data_dir().ok();
+    let mut at = root.to_path_buf();
+    let mut steps = inside.components().peekable();
+    while let Some(step) = steps.next() {
+        at.push(step);
+        let Ok(meta) = std::fs::symlink_metadata(&at) else {
+            return false;
+        };
+        let shaped = if steps.peek().is_some() {
+            meta.is_dir()
+        } else {
+            meta.is_file()
+        };
+        if !shaped || left_out(&at, Some(&meta), app_data.as_deref()) {
+            return false;
+        }
+    }
+    true
+}
+
+/// How many of a directory's files one turn of the disk records.
+const FILES_PER_TURN: usize = 256;
+
+/// One turn of the disk in a walk: a directory listed and its first files recorded, or more of a
+/// directory's files.
+enum Step {
+    Directory(i64),
+    Files(i64, Vec<OsString>),
+}
+
+/// A walk under way over one folder's subtree: the steps it has still to take, and the folders it
+/// could not read in full.
+struct Pass<'a> {
+    conn: &'a Connection,
+    source_id: i64,
+    top: i64,
+    read: Reader<'a>,
+    report: &'a mut WalkReport,
+    waiting: Vec<Step>,
     unread: Vec<i64>,
 }
 
-/// Mirrors a tree's directories into folders and collects its files.
-fn mirror(
-    conn: &Connection,
-    source_root: &Path,
-    root_folder_id: i64,
-    tree: Box<dyn Iterator<Item = Read>>,
-) -> Result<Mirrored> {
-    let mut folder_ids = HashMap::from([(source_root.to_path_buf(), root_folder_id)]);
-    let mut files = Vec::new();
-    let mut unread = Vec::new();
+impl Pass<'_> {
+    /// One step, its folder found where it is now. A folder gone, or moved out of the source,
+    /// since the walk found it is passed over.
+    fn take(&mut self, step: Step) -> Result<()> {
+        let folder_id = match &step {
+            Step::Directory(id) | Step::Files(id, _) => *id,
+        };
+        if !folders::is_live(self.conn, folder_id)?
+            || folders::location(self.conn, folder_id)?.source_id != self.source_id
+        {
+            return Ok(());
+        }
+        let dir = paths::folder_dir(self.conn, folder_id)?;
+        match step {
+            Step::Directory(_) => self.directory(&dir, folder_id),
+            Step::Files(_, names) => self.files(&dir, folder_id, names),
+        }
+    }
 
-    for read in tree {
-        let entry = match read {
-            Read::Entry(entry) => entry,
-            Read::Unread(at) => {
-                unread.push(unread_folder(&folder_ids, at.as_deref(), root_folder_id));
+    /// A directory's subdirectories found or made as folders and queued, its files queued a turn's
+    /// worth at a time, and the first of them recorded.
+    fn directory(&mut self, dir: &Path, folder_id: i64) -> Result<()> {
+        let mut here = HashMap::from([(dir.to_path_buf(), folder_id)]);
+        let mut found = Vec::new();
+        let mut names = Vec::new();
+        for read in (self.read)(dir) {
+            let entry = match read {
+                Read::Entry(entry) => entry,
+                Read::Unread(at) => {
+                    self.unread
+                        .push(unread_folder(&here, at.as_deref(), self.top));
+                    continue;
+                }
+            };
+            if entry.depth() == 0 {
                 continue;
             }
+            if entry.file_type().is_dir() {
+                let title = entry.file_name().to_string_lossy().to_string();
+                let child = match folders::child_id(self.conn, folder_id, &title)? {
+                    Some(existing) => existing,
+                    None => folders::create(self.conn, folder_id, &title)?,
+                };
+                here.insert(entry.into_path(), child);
+                found.push(child);
+            } else if entry.file_type().is_file()
+                && !IGNORED_FILES
+                    .contains(&entry.file_name().to_string_lossy().to_lowercase().as_str())
+            {
+                names.push(entry.file_name().to_os_string());
+            }
+        }
+        self.waiting
+            .extend(found.into_iter().rev().map(Step::Directory));
+        let mut turns: Vec<Vec<OsString>> = names
+            .chunks(FILES_PER_TURN)
+            .map(<[OsString]>::to_vec)
+            .collect();
+        let first = if turns.is_empty() {
+            Vec::new()
+        } else {
+            turns.remove(0)
         };
-        if entry.depth() == 0 {
-            continue; // the root is already seeded
-        }
-        let path = entry.path().to_path_buf();
-
-        if entry.file_type().is_dir() {
-            let Some(parent_id) = path.parent().and_then(|p| folder_ids.get(p)).copied() else {
-                continue; // its parent was skipped, so this is skipped too
-            };
-            let title = entry.file_name().to_string_lossy().to_string();
-            let folder_id = match folders::child_id(conn, parent_id, &title)? {
-                Some(existing) => existing,
-                None => folders::create(conn, parent_id, &title)?,
-            };
-            folder_ids.insert(path, folder_id);
-            continue;
-        }
-        if !entry.file_type().is_file() {
-            continue;
-        }
-        if IGNORED_FILES.contains(&entry.file_name().to_string_lossy().to_lowercase().as_str()) {
-            continue;
-        }
-        files.push(path);
+        self.waiting.extend(
+            turns
+                .into_iter()
+                .rev()
+                .map(|names| Step::Files(folder_id, names)),
+        );
+        self.files(dir, folder_id, first)
     }
-    Ok(Mirrored {
-        folder_ids,
-        files,
-        unread,
-    })
+
+    fn files(&mut self, dir: &Path, folder_id: i64, names: Vec<OsString>) -> Result<()> {
+        for name in names {
+            let file = dir.join(name);
+            match record_file(self.conn, &file, folder_id, self.source_id) {
+                Ok(Outcome::Unchanged) => self.report.unchanged += 1,
+                Ok(Outcome::Indexed) => self.report.indexed += 1,
+                Err(err) => {
+                    eprintln!("could not index {}: {err}", file.display());
+                    keep_unread(self.conn, &file, folder_id)?;
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 /// The folder a failed read leaves unjudged: the directory it names, else the one holding what it
@@ -226,7 +303,7 @@ fn record_file(conn: &Connection, file: &Path, folder_id: i64, source_id: i64) -
 }
 
 /// A file the app is putting in a folder itself under `name`, recorded as a walk would record it,
-/// from `file` as it is now. No walk is sweeping meanwhile: both hold the turn.
+/// from `file` as it is now. A walk part-way through a source spares it: its file is there.
 pub(crate) fn index_arrival(
     conn: &Connection,
     file: &Path,
@@ -282,19 +359,25 @@ fn record_new(
 
 /// Brings the index back in line with what is on disk.
 pub fn reconcile(conn: &Connection) -> Result<WalkReport> {
-    reconcile_list(conn, sources::list(conn)?, &|| false, &|_| {}, &read_tree)
-        .map(Option::unwrap_or_default)
+    reconcile_list(
+        conn,
+        sources::list(conn)?,
+        &|| false,
+        &|_| {},
+        &read_directory,
+    )
+    .map(Option::unwrap_or_default)
 }
 
-/// As [`reconcile`], stopping before the next source or directory once `halt` says so, having
-/// retired nothing in the source it stopped in; `None` when it stopped. `reading` is told each
-/// source as its walk begins.
+/// As [`reconcile`], stopping before the next source or turn of the disk once `halt` says so,
+/// having retired nothing in the source it stopped in; `None` when it stopped. `reading` is told
+/// each source as its walk begins.
 pub fn reconcile_until(
     conn: &Connection,
     halt: &dyn Fn() -> bool,
     reading: &dyn Fn(i64),
 ) -> Result<Option<WalkReport>> {
-    reconcile_list(conn, sources::list(conn)?, halt, reading, &read_tree)
+    reconcile_list(conn, sources::list(conn)?, halt, reading, &read_directory)
 }
 
 /// A source the pass read, and the folders in it at or under one it could not read in full.
@@ -330,10 +413,7 @@ fn reconcile_list(
             continue; // unreachable, so nothing here can be judged
         }
         reading(source.id);
-        let turn = super::turn();
-        let walked_one = walk_source(conn, &source, &mut report, halt, read);
-        drop(turn);
-        match walked_one {
+        match walk_source(conn, &source, &mut report, halt, read) {
             Ok(Walked::Read(kept)) => walked.push(Walk {
                 source_id: source.id,
                 root,
@@ -350,7 +430,6 @@ fn reconcile_list(
         }
     }
 
-    let _turn = super::turn();
     report.folders_retired = retire_vanished_folders(conn, &walked)?;
     Ok(Some(report))
 }
@@ -369,57 +448,69 @@ fn walk_source(
     let root_folder = folders::source_root_folder(conn, source.id)?;
 
     items::begin_sweep(conn)?;
-    let Some(unread) = record_all(conn, &root, root_folder, source.id, report, halt, read)? else {
+    let Some(unread) = record_all(conn, root_folder, source.id, report, halt, read)? else {
         return Ok(Walked::Halted);
     };
+    let _turn = super::turn();
     if !root.is_dir() || unread.contains(&root_folder) {
         return Ok(Walked::Away);
     }
     let kept = folders::at_or_under(conn, &unread)?;
+    spare_still_there(conn, &root, source.id, None, &kept)?;
     report.items_retired += items::finish_sweep(conn, source.id, &kept)?;
     sources::mark_indexed(conn, source.id)?;
     Ok(Walked::Read(kept))
 }
 
-/// Every directory under `dir` mirrored into folders under `folder_id`, and every file recorded,
-/// with the folders it could not read in full; `None` when `halt` stopped it before a directory's
-/// files.
+/// Every directory at or under `top` mirrored into folders, and every file recorded, a turn of the
+/// disk to each step, with the folders it could not read in full; `None` when `halt` stopped it
+/// before a step. DECISIONS.md "A walk only judges what it read".
 fn record_all(
     conn: &Connection,
-    dir: &Path,
-    folder_id: i64,
+    top: i64,
     source_id: i64,
     report: &mut WalkReport,
     halt: &dyn Fn() -> bool,
     read: Reader,
 ) -> Result<Option<Vec<i64>>> {
-    let Mirrored {
-        folder_ids,
-        files,
-        unread,
-    } = mirror(conn, dir, folder_id, read(dir))?;
-    let mut reading: Option<&Path> = None;
-    for file in &files {
-        let parent = file.parent();
-        if parent != reading {
-            if halt() {
-                return Ok(None);
-            }
-            reading = parent;
+    let mut pass = Pass {
+        conn,
+        source_id,
+        top,
+        read,
+        report,
+        waiting: vec![Step::Directory(top)],
+        unread: Vec::new(),
+    };
+    while let Some(step) = pass.waiting.pop() {
+        if halt() {
+            return Ok(None);
         }
-        let Some(folder_id) = parent.and_then(|p| folder_ids.get(p)).copied() else {
+        let _turn = super::turn();
+        pass.take(step)?;
+    }
+    Ok(Some(pass.unread))
+}
+
+/// Marks seen each item the sweep would retire whose file a walk reading now would find where the
+/// index has it: a verb moved it, between two of the walk's turns, somewhere the walk had been.
+fn spare_still_there(
+    conn: &Connection,
+    root: &Path,
+    source_id: i64,
+    under: Option<i64>,
+    kept: &HashSet<i64>,
+) -> Result<()> {
+    for unseen in items::unseen(conn, source_id, under)? {
+        if kept.contains(&unseen.folder_id) {
             continue;
-        };
-        match record_file(conn, file, folder_id, source_id) {
-            Ok(Outcome::Unchanged) => report.unchanged += 1,
-            Ok(Outcome::Indexed) => report.indexed += 1,
-            Err(err) => {
-                eprintln!("could not index {}: {err}", file.display());
-                keep_unread(conn, file, folder_id)?;
-            }
+        }
+        let file = paths::item_path(conn, unseen.folder_id, &unseen.disk_name)?;
+        if would_read(root, &file) {
+            items::mark_seen(conn, &unseen.uuid)?;
         }
     }
-    Ok(Some(unread))
+    Ok(())
 }
 
 /// A file found but not read keeps the row it had.
@@ -441,7 +532,7 @@ pub fn reconcile_folder(
     folder_id: i64,
     reading: &dyn Fn(i64),
 ) -> Result<WalkReport> {
-    reconcile_folder_with(conn, folder_id, reading, &read_tree)
+    reconcile_folder_with(conn, folder_id, reading, &read_directory)
 }
 
 fn reconcile_folder_with(
@@ -450,7 +541,6 @@ fn reconcile_folder_with(
     reading: &dyn Fn(i64),
     read: Reader,
 ) -> Result<WalkReport> {
-    let _turn = super::turn();
     let mut report = WalkReport::default();
     if !folders::is_live(conn, folder_id)? {
         return Ok(report);
@@ -464,18 +554,9 @@ fn reconcile_folder_with(
         return Ok(report);
     }
     reading(source_id);
-    let dir = paths::folder_dir(conn, folder_id)?;
     items::begin_sweep(conn)?;
-    let unread = if dir.is_dir() {
-        let read = record_all(
-            conn,
-            &dir,
-            folder_id,
-            source_id,
-            &mut report,
-            &|| false,
-            read,
-        )?;
+    let unread = if paths::folder_dir(conn, folder_id)?.is_dir() {
+        let read = record_all(conn, folder_id, source_id, &mut report, &|| false, read)?;
         let Some(unread) = read else {
             return Ok(report);
         };
@@ -483,16 +564,21 @@ fn reconcile_folder_with(
     } else {
         Vec::new()
     };
-    if !root.is_dir() {
-        return Ok(report);
-    }
-    let kept = folders::at_or_under(conn, &unread)?;
-    report.items_retired += items::finish_sweep_under(conn, folder_id, &kept)?;
-    report.folders_retired = if dir.is_dir() {
-        retire_gone(conn, root, folders::descendants(conn, folder_id)?, &kept)?
-    } else {
-        folders::trash_subtree(conn, folder_id)?
+    let (kept, beneath) = {
+        let _turn = super::turn();
+        if !root.is_dir() || !folders::is_live(conn, folder_id)? {
+            return Ok(report);
+        }
+        let kept = folders::at_or_under(conn, &unread)?;
+        spare_still_there(conn, root, source_id, Some(folder_id), &kept)?;
+        report.items_retired += items::finish_sweep_under(conn, folder_id, &kept)?;
+        if !paths::folder_dir(conn, folder_id)?.is_dir() {
+            report.folders_retired = folders::trash_subtree(conn, folder_id)?;
+            return Ok(report);
+        }
+        (kept, folders::descendants(conn, folder_id)?)
     };
+    report.folders_retired = retire_gone(conn, root, beneath, &kept)?;
     Ok(report)
 }
 
@@ -523,8 +609,8 @@ fn retire_vanished_folders(conn: &Connection, walked: &[Walk]) -> Result<i64> {
     Ok(retired)
 }
 
-/// Retires each folder, in the order given, whose directory is no longer there while its source's
-/// root still is, but none in `kept`.
+/// Retires each folder, in the order given and a turn of the disk to each, whose directory is no
+/// longer there while its source's root still is, but none in `kept`.
 fn retire_gone(
     conn: &Connection,
     root: &Path,
@@ -536,6 +622,7 @@ fn retire_gone(
         if kept.contains(&folder_id) {
             continue;
         }
+        let _turn = super::turn();
         // An ancestor retired earlier in this loop takes its descendants with
         // it, so anything already gone is skipped rather than counted twice.
         let still_live: bool = conn.query_row(
@@ -557,6 +644,7 @@ fn retire_gone(
 pub(crate) mod tests {
     use super::*;
     use crate::db;
+    use crate::db::journal;
     use crate::db::sources::SourceKind;
 
     fn scratch(name: &str) -> PathBuf {
@@ -628,7 +716,7 @@ pub(crate) mod tests {
         let listed = sources::list(&conn).unwrap();
         sources::remove(&conn, doomed.id).unwrap();
 
-        let report = reconcile_list(&conn, listed, &|| false, &|_| {}, &read_tree)
+        let report = reconcile_list(&conn, listed, &|| false, &|_| {}, &read_directory)
             .unwrap()
             .unwrap();
         assert_eq!(report.indexed, 1);
@@ -706,10 +794,11 @@ pub(crate) mod tests {
         write(&root.join("A/a2.jpg"), "a2");
         write(&root.join("B/b2.jpg"), "b2");
         std::fs::remove_file(root.join("B/b.jpg")).unwrap();
+        // Asked before the source, its own directory, A, then B.
         let asked = std::cell::Cell::new(0);
         let halt = || {
             asked.set(asked.get() + 1);
-            asked.get() > 2
+            asked.get() > 3
         };
 
         assert_eq!(reconcile_until(&conn, &halt, &|_| {}).unwrap(), None);
@@ -858,18 +947,15 @@ pub(crate) mod tests {
         assert_eq!(folders::child_id(&conn, 1, "Private").unwrap(), None);
     }
 
-    /// Reads the tree as [`read_tree`] does, but `unreadable` fails to open: nothing beneath it
-    /// is found, and the walker says so.
+    /// Reads each directory as [`read_directory`] does, but `unreadable` fails to open, and the
+    /// walker says so.
     fn failing_at(unreadable: PathBuf) -> impl Fn(&Path) -> Box<dyn Iterator<Item = Read>> {
         move |dir: &Path| -> Box<dyn Iterator<Item = Read>> {
-            let unreadable = unreadable.clone();
-            Box::new(read_tree(dir).flat_map(move |read| match read {
-                Read::Entry(entry) if entry.path() == unreadable => {
-                    vec![Read::Entry(entry), Read::Unread(Some(unreadable.clone()))]
-                }
-                Read::Entry(entry) if entry.path().starts_with(&unreadable) => vec![],
-                read => vec![read],
-            }))
+            if dir == unreadable {
+                Box::new(std::iter::once(Read::Unread(Some(dir.to_path_buf()))))
+            } else {
+                read_directory(dir)
+            }
         }
     }
 
@@ -912,7 +998,7 @@ pub(crate) mod tests {
 
         std::fs::remove_dir_all(root.join("Trips")).unwrap();
         let read = |dir: &Path| -> Box<dyn Iterator<Item = Read>> {
-            Box::new(read_tree(dir).chain([Read::Unread(None)]))
+            Box::new(read_directory(dir).chain([Read::Unread(None)]))
         };
         let report = reconcile_list(
             &conn,
@@ -929,7 +1015,7 @@ pub(crate) mod tests {
         assert_eq!(indexed_at(&conn), stamped, "it was not read in full");
     }
 
-    /// The pass asks `halt` before each source and before each directory's files.
+    /// The pass asks `halt` before each source and before each turn of the disk.
     #[test]
     fn a_drive_lost_mid_walk_changes_nothing() {
         let (conn, root) = library("lost-mid-walk");
@@ -965,16 +1051,18 @@ pub(crate) mod tests {
         write(&root.join("Trips/b.jpg"), "b");
         reconcile(&conn).unwrap();
 
-        // Asked before the source, then before Trips' files: a.jpg goes after the tree was listed.
-        let asked = std::cell::Cell::new(0);
-        let halt = || {
-            asked.set(asked.get() + 1);
-            if asked.get() == 2 {
-                std::fs::remove_file(root.join("Trips/a.jpg")).unwrap();
+        let trips = root.join("Trips");
+        let read = |dir: &Path| -> Box<dyn Iterator<Item = Read>> {
+            let listed: Vec<Read> = read_directory(dir).collect();
+            if dir == trips {
+                std::fs::remove_file(trips.join("a.jpg")).unwrap();
             }
-            false
+            Box::new(listed.into_iter())
         };
-        reconcile_until(&conn, &halt, &|_| {}).unwrap().unwrap();
+        let listed = sources::list(&conn).unwrap();
+        reconcile_list(&conn, listed, &|| false, &|_| {}, &read)
+            .unwrap()
+            .unwrap();
         assert_eq!(names(&conn), ["a.jpg", "b.jpg"]);
 
         reconcile(&conn).unwrap();
@@ -992,11 +1080,11 @@ pub(crate) mod tests {
         let top = folders::source_root_folder(&conn, 1).unwrap();
         let trips = folder_under(&conn, top, "Trips");
 
-        // Asked before the first source, its one directory, then the second source.
+        // Asked before the first source, its own directory, Trips, then the second source.
         let asked = std::cell::Cell::new(0);
         let halt = || {
             asked.set(asked.get() + 1);
-            if asked.get() == 3 {
+            if asked.get() == 4 {
                 std::fs::remove_dir_all(&root).unwrap();
             }
             false
@@ -1204,7 +1292,7 @@ pub(crate) mod tests {
         let gone = root.clone();
         let read = move |dir: &Path| -> Box<dyn Iterator<Item = Read>> {
             let cut = dir.join("Cairo");
-            let listed: Vec<Read> = read_tree(dir)
+            let listed: Vec<Read> = read_directory(dir)
                 .filter(|read| !matches!(read, Read::Entry(e) if e.path().starts_with(&cut)))
                 .collect();
             std::fs::remove_dir_all(&gone).unwrap();
@@ -1215,6 +1303,200 @@ pub(crate) mod tests {
         assert_eq!(names(&conn), ["a.jpg", "b.jpg"]);
         assert!(live(&conn, trips) && live(&conn, cairo));
         assert_eq!((report.items_retired, report.folders_retired), (0, 0));
+    }
+
+    /// A library whose index is a file, so a verb on another thread reaches what the walk does.
+    fn on_disk(name: &str) -> (Connection, PathBuf, PathBuf) {
+        let dir = scratch(name);
+        let index = dir.join("library.db");
+        let root = dir.join("library");
+        std::fs::create_dir_all(&root).unwrap();
+        let mut conn = db::open(&index).unwrap();
+        db::migrate(&mut conn).unwrap();
+        sources::add(&conn, &root, "Library", SourceKind::Library).unwrap();
+        (conn, root, index)
+    }
+
+    /// Runs `change` on a thread of its own, as a command does, and says whether it was done
+    /// within five seconds.
+    fn meanwhile(index: &Path, change: impl FnOnce(&Connection) + Send + 'static) -> bool {
+        let (done, finished) = std::sync::mpsc::channel();
+        let index = index.to_path_buf();
+        std::thread::spawn(move || {
+            change(&db::open(&index).unwrap());
+            let _ = done.send(());
+        });
+        finished
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .is_ok()
+    }
+
+    fn item_named(conn: &Connection, name: &str) -> i64 {
+        conn.query_row(
+            "SELECT id FROM item WHERE disk_name = ?1 AND deleted_at IS NULL",
+            [name],
+            |r| r.get(0),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn a_file_moved_between_two_directories_of_a_walk_keeps_its_row() {
+        let (conn, root, index) = on_disk("moved-mid-walk");
+        write(&root.join("A/a.jpg"), "a");
+        write(&root.join("B/b.jpg"), "b");
+        reconcile(&conn).unwrap();
+        let top = folders::source_root_folder(&conn, 1).unwrap();
+        let a = folder_under(&conn, top, "A");
+        let b_jpg = item_named(&conn, "b.jpg");
+
+        // Asked before the source, its own directory, A, then B: b.jpg goes into A, read already.
+        let asked = std::cell::Cell::new(0);
+        let halt = || {
+            asked.set(asked.get() + 1);
+            if asked.get() == 4 {
+                assert!(
+                    meanwhile(&index, move |conn| {
+                        crate::fs::items::move_items(conn, &[b_jpg], a, &journal::new_batch())
+                            .unwrap();
+                    }),
+                    "the move waited for the walk"
+                );
+            }
+            false
+        };
+        let report = reconcile_until(&conn, &halt, &|_| {}).unwrap().unwrap();
+
+        assert!(root.join("A/b.jpg").is_file());
+        assert_eq!(
+            live_items(&conn),
+            [("a.jpg".to_string(), a), ("b.jpg".to_string(), a)]
+        );
+        assert_eq!(item_named(&conn, "b.jpg"), b_jpg);
+        assert_eq!(report.items_retired, 0);
+    }
+
+    #[test]
+    fn a_folder_renamed_before_the_walk_reaches_it_is_read_under_its_new_name() {
+        let (conn, root, index) = on_disk("renamed-mid-walk");
+        write(&root.join("A/a.jpg"), "a");
+        write(&root.join("B/b.jpg"), "b");
+        reconcile(&conn).unwrap();
+        let top = folders::source_root_folder(&conn, 1).unwrap();
+        let a = folder_under(&conn, top, "A");
+        let b = folder_under(&conn, top, "B");
+        write(&root.join("B/new.jpg"), "n");
+
+        // Asked before the source, its own directory, A, then B: B becomes Bee first.
+        let asked = std::cell::Cell::new(0);
+        let halt = || {
+            asked.set(asked.get() + 1);
+            if asked.get() == 4 {
+                assert!(
+                    meanwhile(&index, move |conn| {
+                        crate::fs::folders::rename(conn, b, "Bee", &journal::new_batch()).unwrap();
+                    }),
+                    "the rename waited for the walk"
+                );
+            }
+            false
+        };
+        let report = reconcile_until(&conn, &halt, &|_| {}).unwrap().unwrap();
+
+        assert!(root.join("Bee/new.jpg").is_file());
+        assert_eq!(folders::child_id(&conn, top, "Bee").unwrap(), Some(b));
+        assert_eq!(
+            live_items(&conn),
+            [
+                ("a.jpg".to_string(), a),
+                ("b.jpg".to_string(), b),
+                ("new.jpg".to_string(), b)
+            ]
+        );
+        assert_eq!((report.items_retired, report.folders_retired), (0, 0));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_file_the_walk_did_not_find_is_retired_only_where_it_would_not_be_read() {
+        use windows_sys::Win32::Storage::FileSystem::FILE_ATTRIBUTE_HIDDEN;
+        let (conn, root) = library("spared");
+        write(&root.join("Trips/stays.jpg"), "s");
+        write(&root.join("Trips/goes.jpg"), "g");
+        write(&root.join("Trips/hides.jpg"), "h");
+        reconcile(&conn).unwrap();
+        std::fs::remove_file(root.join("Trips/goes.jpg")).unwrap();
+        mark(&root.join("Trips/hides.jpg"), FILE_ATTRIBUTE_HIDDEN);
+
+        // Trips reads as empty, as if a verb had put all three there just after it was read.
+        let trips = root.join("Trips");
+        let read = |dir: &Path| -> Box<dyn Iterator<Item = Read>> {
+            let listed: Vec<Read> = read_directory(dir)
+                .filter(|read| !(dir == trips && matches!(read, Read::Entry(e) if e.depth() == 1)))
+                .collect();
+            Box::new(listed.into_iter())
+        };
+        let report = reconcile_list(
+            &conn,
+            sources::list(&conn).unwrap(),
+            &|| false,
+            &|_| {},
+            &read,
+        )
+        .unwrap()
+        .unwrap();
+
+        assert_eq!(names(&conn), ["stays.jpg"]);
+        assert_eq!(report.items_retired, 2);
+    }
+
+    mod timing {
+        use super::*;
+
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn a_change_made_while_a_hundred_thousand_files_are_first_read_waits_under_a_second() {
+            let (conn, root, index) = on_disk("timing-walk");
+            for d in 0..100 {
+                let dir = root.join(format!("{d:03}"));
+                std::fs::create_dir_all(&dir).unwrap();
+                for f in 0..1000 {
+                    std::fs::write(dir.join(format!("{f:04}.jpg")), "x").unwrap();
+                }
+            }
+            let top = folders::source_root_folder(&conn, 1).unwrap();
+            let walking = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
+            let still = std::sync::Arc::clone(&walking);
+            let walk_index = index.clone();
+            let walk = std::thread::spawn(move || {
+                let report = reconcile(&db::open(&walk_index).unwrap()).unwrap();
+                still.store(false, std::sync::atomic::Ordering::SeqCst);
+                report
+            });
+            let count = || -> i64 {
+                conn.query_row("SELECT COUNT(*) FROM item", [], |r| r.get(0))
+                    .unwrap()
+            };
+            while count() < 10_000 && walking.load(std::sync::atomic::Ordering::SeqCst) {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+
+            let started = std::time::Instant::now();
+            crate::fs::folders::create(&conn, top, "Lisbon", &journal::new_batch()).unwrap();
+            let waited = started.elapsed();
+
+            assert!(
+                walking.load(std::sync::atomic::Ordering::SeqCst),
+                "the walk had ended"
+            );
+            assert!(
+                waited < std::time::Duration::from_secs(1),
+                "waited {waited:?}"
+            );
+            assert_eq!(walk.join().unwrap().indexed, 100_000);
+            assert!(folders::child_id(&conn, top, "Lisbon").unwrap().is_some());
+            assert_eq!(count(), 100_000);
+        }
     }
 
     /// Writing the same number of bytes within the same second would leave
