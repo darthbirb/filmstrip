@@ -102,6 +102,13 @@ pub enum Reason {
     ForbiddenCharacter {
         character: String,
     },
+    /// Two names Windows takes for one, side by side in one folder of an index written before the
+    /// app compared names as NTFS does, so a migration could not bring the index up to date.
+    NameClash {
+        path: Vec<String>,
+        first: String,
+        second: String,
+    },
     /// Anything else. What it said went to the log; the interface says one fixed thing.
     Other,
 }
@@ -140,6 +147,15 @@ impl fmt::Display for Reason {
             Reason::ForbiddenCharacter { character } => {
                 write!(f, "a name cannot contain {character:?}")
             }
+            Reason::NameClash {
+                path,
+                first,
+                second,
+            } => write!(
+                f,
+                "{first} and {second} are one name in {}",
+                path.join(" › ")
+            ),
             Reason::Other => f.write_str("something went wrong"),
         }
     }

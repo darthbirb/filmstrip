@@ -22,10 +22,10 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use rusqlite::{Connection, Transaction, TransactionBehavior};
 
-use crate::error::Result;
+use crate::error::{AppError, Reason, Result};
 
 /// Applied in order, never edited once shipped.
-const MIGRATIONS: &[(i64, &str)] = &[
+pub(crate) const MIGRATIONS: &[(i64, &str)] = &[
     (1, include_str!("migrations/001_initial.sql")),
     (2, include_str!("migrations/002_jobs.sql")),
     (3, include_str!("migrations/003_probed.sql")),
@@ -117,7 +117,10 @@ fn migrate_inner(conn: &mut Connection) -> Result<()> {
             continue;
         }
         let tx = begin(conn)?;
-        tx.execute_batch(sql)?;
+        if let Err(err) = tx.execute_batch(sql) {
+            drop(tx);
+            return Err(clash_behind(conn, err));
+        }
         tx.execute(
             "INSERT INTO schema_version (version) VALUES (?1)",
             [version],
@@ -141,6 +144,50 @@ fn migrate_inner(conn: &mut Connection) -> Result<()> {
         tx.commit()?;
     }
     Ok(())
+}
+
+/// A migration's unique index refused two names `NAME_FOLD` calls one: the two, and where, so the
+/// refusal names them. Anything else is the error it was.
+fn clash_behind(conn: &Connection, err: rusqlite::Error) -> AppError {
+    if err.sqlite_error_code() != Some(rusqlite::ErrorCode::ConstraintViolation) {
+        return err.into();
+    }
+    match name_clash(conn) {
+        Ok(Some(reason)) => {
+            eprintln!("{err} (said as: {reason})");
+            AppError::refused(reason)
+        }
+        _ => err.into(),
+    }
+}
+
+/// The first two names in one folder that `NAME_FOLD` calls one, among the rows that hold a name.
+fn name_clash(conn: &Connection) -> Result<Option<Reason>> {
+    for sql in [
+        "SELECT folder_id, disk_name FROM item WHERE trashed_at IS NULL
+          ORDER BY folder_id, disk_name COLLATE NAME_FOLD, id",
+        "SELECT parent_id, title FROM folder WHERE deleted_at IS NULL AND parent_id IS NOT NULL
+          ORDER BY parent_id, title COLLATE NAME_FOLD, id",
+    ] {
+        let mut stmt = conn.prepare(sql)?;
+        let mut rows = stmt.query([])?;
+        let mut last: Option<(i64, String)> = None;
+        while let Some(row) = rows.next()? {
+            let (folder, name): (i64, String) = (row.get(0)?, row.get(1)?);
+            if let Some((was, first)) = last
+                && was == folder
+                && compare_names(&first, &name) == Ordering::Equal
+            {
+                return Ok(Some(Reason::NameClash {
+                    path: sources::place_path(conn, folder)?,
+                    first,
+                    second: name,
+                }));
+            }
+            last = Some((folder, name));
+        }
+    }
+    Ok(None)
 }
 
 /// Registers `NAME_FOLD`, the comparison every folder title and file name is matched with.
@@ -442,6 +489,48 @@ mod tests {
         assert_eq!(journal::batch(&conn, &older).unwrap().len(), 1);
         assert_eq!(journal::batch(&conn, &newer).unwrap().len(), 1);
         assert_eq!(journal::latest_undone(&conn).unwrap(), None);
+    }
+
+    #[test]
+    fn migration_13_refused_by_two_folders_that_fold_together_names_them_and_changes_nothing() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE schema_version (version INTEGER NOT NULL);")
+            .unwrap();
+        for (version, sql) in MIGRATIONS.iter().filter(|(version, _)| *version < 13) {
+            conn.execute_batch(sql).unwrap();
+            conn.execute("INSERT INTO schema_version VALUES (?1)", [version])
+                .unwrap();
+        }
+        let source = sources::add(
+            &conn,
+            Path::new("D:/Pictures"),
+            "Pictures",
+            sources::SourceKind::Library,
+        )
+        .unwrap();
+        let root = folders::source_root_folder(&conn, source.id).unwrap();
+        for title in ["Ägypten", "ägypten"] {
+            conn.execute(
+                "INSERT INTO folder (source_id, parent_id, title, created_at) VALUES (?1, ?2, ?3, 0)",
+                rusqlite::params![source.id, root, title],
+            )
+            .unwrap();
+        }
+
+        let err = migrate(&mut conn).unwrap_err();
+
+        assert_eq!(
+            Reason::of(&err),
+            Reason::NameClash {
+                path: vec!["Pictures".into()],
+                first: "Ägypten".into(),
+                second: "ägypten".into(),
+            }
+        );
+        let version: i64 = conn
+            .query_row("SELECT MAX(version) FROM schema_version", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(version, 12);
     }
 
     #[test]

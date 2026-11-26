@@ -281,6 +281,25 @@ quietly, since nobody typed them.
 **The index that cannot be opened says so where the sources would be**, with Retry: with nothing
 read there is nothing else for navigation to show, and an empty panel reads as an empty library.
 
+## A launch that fails says why
+
+**A launch that fails says so in a native message box before the app exits.** The release build
+has no console, so a failure before the window opens was a double-click that did nothing, every
+time. Everything before the window is `start` in `lib.rs`; a failure there is shown by
+`launch::refuse` through the dialog plugin, titled Filmstrip Could Not Start, and the app exits
+once it is closed. The box says what failed, "Filmstrip could not open its index." or "Filmstrip
+could not start.", then the reason's sentence. The window never opened, so the backend words it
+(`launch::said`), in the sentences `reasonSentence` gives the reasons a launch can meet, and what
+the error said goes to the log as everywhere else.
+
+**A migration that a unique index refuses names the two names.** An index written before names
+were compared as NTFS compares them can hold two in one folder that `NAME_FOLD` calls one, such as
+a retired `Ägypten.jpg` beside a live `ägypten.jpg`. Rebuilding the index then fails, its
+transaction rolls back, and `db::migrate` looks for the first such pair and returns it as
+`NameClash`: "Ägypten.jpg and ägypten.jpg are one name in Pictures › Trips." Nothing in the index
+changes, and the next launch tries again. No migration repairs the pair: no library was written
+by those builds.
+
 ## Thumbnails
 
 **320px on the longest edge, lossy WebP at quality 78**, as measured in ggallery: AVIF encoded

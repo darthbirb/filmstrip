@@ -180,6 +180,12 @@ const EVERY: { [K in Reason["kind"]]: Extract<Reason, { kind: K }> } = {
   unreadable: { kind: "unreadable" },
   noFfmpeg: { kind: "noFfmpeg" },
   forbiddenCharacter: { kind: "forbiddenCharacter", character: ":" },
+  nameClash: {
+    kind: "nameClash",
+    path: ["Pictures", "Trips"],
+    first: "Ägypten.jpg",
+    second: "ägypten.jpg",
+  },
   other: { kind: "other" },
 };
 
@@ -194,6 +200,9 @@ test("every reason is worded as a phrase and as a sentence with one full stop", 
   expect(reasonSentence(EVERY.permissionDenied)).toBe("Windows refused access.");
   expect(reasonSentence(EVERY.diskFull)).toBe("The disk is full.");
   expect(reasonSentence(EVERY.other)).toBe("Something went wrong.");
+  expect(reasonSentence(EVERY.nameClash)).toBe(
+    "Ägypten.jpg and ägypten.jpg are one name in Pictures › Trips.",
+  );
 });
 
 test("what the foot says when the Recycle Bin would not take what Delete sent it", () => {

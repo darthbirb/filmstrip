@@ -578,6 +578,8 @@ export function reasonText(reason: Reason): string {
       return "ffmpeg not found";
     case "forbiddenCharacter":
       return `A name cannot contain ${character(reason.character)}`;
+    case "nameClash":
+      return `${reason.first} and ${reason.second} are one name in ${reason.path.join(" › ")}`;
     case "other":
       return "Something went wrong";
   }

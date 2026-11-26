@@ -24,6 +24,7 @@ drawn. **Not started** — neither.
 | Remember the interface's own state | Built | `ui_preferences` |
 | Back up the index beside it, at launch once a day and by hand, the newest kept | Built | `list_backups`, `back_up_now`, `set_backups_kept`, `launch_backup_refusal`; DECISIONS.md "Backing up the index". Filmstrip's own change: SQLite's online backup while the app runs, not a file copy as it closes, and the number kept is a setting |
 | Restore the index from a backup | Built | `restore_backup`, on the backup's row in Settings › Backups; the Trash stays as it is now, and undo stops at the restore. A trashed file the restore forgets, from a source added since, stays in the Recycle Bin, as a removed source's do |
+| Say why a launch failed | Built | a native message box before the app exits, never a silent exit; a migration refused by two names that fold together names them: DECISIONS.md "A launch that fails says why" |
 | First-import review, then a move | **Dropped on purpose.** A folder is read where it stands, so there is nothing to review and nothing to move. |
 
 ## Reading what is there
