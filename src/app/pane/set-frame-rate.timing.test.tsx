@@ -70,9 +70,12 @@ test.for(PHONE)(
 function keepsTime(bench: Bench, label: string) {
   expect(bench.spans.every((span) => span.due > 0)).toBe(true);
   const counts = bench.spans.map((span) => `${span.dropped}/${span.due}`).join(" ");
+  const near = bench.spans
+    .map((span) => `${span.nearLoops.dropped}/${span.nearLoops.due}`)
+    .join(" ");
   const paces = bench.spans.map((span) => span.pace.toFixed(3)).join(" ");
   console.info(
-    `${label}: ${bench.playing} playing, window ${bench.rate.toFixed(1)}/s, dropped ${counts}, pace ${paces}`,
+    `${label}: ${bench.playing} playing, window ${bench.rate.toFixed(1)}/s, dropped ${counts}, near loops ${near}, pace ${paces}`,
   );
   expect(bench.playing).toBeGreaterThan(0);
   const middle = (values: number[]) =>

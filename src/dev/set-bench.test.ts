@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 
-import { benchSet, clock, recordings, tick } from "./set-bench";
+import { benchSet, clock, framesIn, recordings, type Sample, tick } from "./set-bench";
 
 test("one recording serves a warm-up and the longer count after it", async () => {
   const asked: number[] = [];
@@ -80,4 +80,34 @@ test("a stall away from a loop counts against the pace", () => {
 
 test("a clip slow throughout reads slow across its loop", () => {
   expect(pace(5000, (at) => (20 + (0.9 * at) / 1000) % 22)).toBeCloseTo(0.9, 3);
+});
+
+/** A clip read every frame for `ms`, each frame due and its `n`th dropped where `drops(n, at)`. */
+function readings(ms: number, drops: (n: number, at: number) => boolean) {
+  const samples: Sample[] = [{ at: 0, dropped: 0, due: 0 }];
+  for (let n = 1; n * FRAME <= ms; n += 1) {
+    const at = n * FRAME;
+    const was = samples.at(-1) ?? { dropped: 0, due: 0 };
+    samples.push({ at, dropped: was.dropped + (drops(n, at) ? 1 : 0), due: was.due + 1 });
+  }
+  return samples;
+}
+
+test("frames dropped around a loop, before it and after, are left out of the span", () => {
+  const samples = readings(15_000, (_, at) => Math.abs(at - 7500) < 300);
+  const span = framesIn(samples, [7500], 5000, 10_000);
+  expect(span.dropped).toBe(0);
+  expect(span.due).toBeGreaterThan(0);
+  expect(span.nearLoops.dropped).toBeGreaterThan(0);
+  expect(framesIn(samples, [], 5000, 10_000).dropped).toBe(span.nearLoops.dropped);
+});
+
+test("a clip dropping throughout still drops 2% in the middle span across its loop", () => {
+  const samples = readings(15_000, (n) => n % 50 === 25);
+  const shares = [0, 5000, 10_000].map((from) => {
+    const span = framesIn(samples, [7500], from, from + 5000);
+    return span.dropped / span.due;
+  });
+  const middle = [...shares].sort((a, b) => a - b)[1];
+  expect(middle).toBeCloseTo(0.02, 3);
 });
