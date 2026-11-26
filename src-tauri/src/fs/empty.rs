@@ -74,6 +74,7 @@ const LEFT_AT_ONCE: usize = 200;
 /// the disk per file, so a restore between two takes its file out of reach. One it cannot finish
 /// stays, and the rest go on. `progress` hears how many of them are settled.
 pub fn empty(conn: &Connection, counted: &[Counted], progress: &dyn Fn(u32)) -> Result<Emptied> {
+    crate::db::journal::drop_redo(conn)?;
     let mut emptied = Emptied::default();
     let mut deleted = Vec::new();
     for (at, one) in counted.iter().enumerate() {

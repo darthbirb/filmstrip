@@ -99,11 +99,19 @@ pub enum Act {
 
 /// Describes a batch still in the journal.
 pub fn describe(conn: &Connection, batch_id: &str) -> Result<Batch> {
-    let entries = journal::batch(conn, batch_id)?;
-    let (files, folders) = count(conn, &entries)?;
+    describe_rows(conn, batch_id, &journal::batch(conn, batch_id)?)
+}
+
+/// Describes what of a batch an undo took back, which a redo would carry out again.
+pub fn describe_undone(conn: &Connection, batch_id: &str) -> Result<Batch> {
+    describe_rows(conn, batch_id, &journal::undone_batch(conn, batch_id)?)
+}
+
+fn describe_rows(conn: &Connection, batch_id: &str, entries: &[Entry]) -> Result<Batch> {
+    let (files, folders) = count(conn, entries)?;
     Ok(Batch {
         batch_id: batch_id.to_string(),
-        act: act(conn, &entries)?,
+        act: act(conn, entries)?,
         files,
         folders,
     })
@@ -193,8 +201,12 @@ fn act(conn: &Connection, entries: &[Entry]) -> Result<Act> {
     }
     if let Some(entry) = of(journal::FOLDER_CREATE).next() {
         let made: FolderCreated = forward(entry)?;
+        let name = match journal::kept(entry).title {
+            Some(title) => title,
+            None => places.name(made.folder_id)?,
+        };
         return Ok(Act::CreateFolder {
-            name: places.name(made.folder_id)?,
+            name,
             parent: places.name(made.parent_id)?,
         });
     }

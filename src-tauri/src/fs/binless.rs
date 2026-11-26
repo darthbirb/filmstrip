@@ -8,7 +8,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::db::{folders, items};
+use crate::db::{folders, items, journal};
 use crate::error::{AppError, Reason, Result};
 use crate::fs::paths;
 use crate::fs::recycle::{Bin, Shell};
@@ -146,6 +146,7 @@ pub(super) fn delete_unjournalled(conn: &Connection, item_id: i64) -> Result<()>
     if meta.permissions().readonly() {
         return Err(AppError::refused(Reason::PermissionDenied));
     }
+    journal::drop_redo(conn)?;
     std::fs::remove_file(&from)?;
     // The file is gone whatever the index says now; a row left live is retired by the next walk.
     if let Err(err) = items::retire(conn, item_id) {

@@ -659,6 +659,33 @@ pub fn reverse(conn: &Connection, retagged: &Retagged) -> Result<()> {
     })
 }
 
+/// Carries out a change the tags screen made again, by the words its line names, journalled under
+/// its own batch: an undo can give back its terms under other ids, so the row it wrote no longer
+/// names them. Whether anything changed.
+pub fn redo(conn: &Connection, change: &Change, batch_id: &str) -> Result<bool> {
+    let tag = |value: &str| known(conn, None, value);
+    let label = |key: &str, value: &str| known(conn, Some(key), value);
+    match change {
+        Change::RenameTag { from, to } => rename_tag(conn, tag(from)?, to, batch_id),
+        Change::MergeTags { from, into } => merge_tags(conn, tag(from)?, tag(into)?, batch_id),
+        Change::DeleteTag { tag: value } => delete_tag(conn, tag(value)?, batch_id),
+        Change::RenameKey { from, to } => rename_key(conn, from, to, batch_id),
+        Change::MergeKeys { from, into } => merge_keys(conn, from, into, batch_id),
+        Change::DeleteKey { key } => delete_key(conn, key, batch_id),
+        Change::RenameValue { key, from, to } => {
+            rename_value(conn, label(key, from)?, to, batch_id)
+        }
+        Change::MergeValues { key, from, into } => {
+            merge_values(conn, label(key, from)?, label(key, into)?, batch_id)
+        }
+        Change::DeleteValue { key, value } => delete_value(conn, label(key, value)?, batch_id),
+    }
+}
+
+fn known(conn: &Connection, key: Option<&str>, value: &str) -> Result<i64> {
+    find(conn, key, value)?.ok_or_else(|| AppError::invalid("that tag is gone"))
+}
+
 fn blank(change: Change, files: usize, folders: i64) -> Retagged {
     Retagged {
         change,

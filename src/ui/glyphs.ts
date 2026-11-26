@@ -49,6 +49,7 @@ export const GLYPHS = {
   into: { icon: "arrow-right", code: 0xe06c },
   done: { icon: "check", code: 0xe182 },
   undo: { icon: "arrow-counter-clockwise", code: 0xe038 },
+  redo: { icon: "arrow-clockwise", code: 0xe036 },
   backups: { icon: "clock-counter-clockwise", code: 0xe1a0 },
   recycle: { icon: "recycle", code: 0xe75a },
   usb: { icon: "usb", code: 0xe956 },

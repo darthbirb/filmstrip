@@ -30,6 +30,8 @@ import {
   pathsFailed,
   reasonSentence,
   reasonText,
+  redoBannerLine,
+  redoFailedLine,
   refusedName,
   restoredBannerLine,
   restoredFailed,
@@ -611,4 +613,31 @@ test("a failed undo names its act in one sentence, or says only why when the act
     "Could not undo “Deleted Lisbon and its 4 files”. Something went wrong.",
   );
   expect(undoFailedLine(null, full)).toBe("Could not undo. The disk is full.");
+});
+
+test("a redo that went in part is counted as its act's banner counts it, or turned round", () => {
+  expect(redoBannerLine(undone(MOVE, 5, 3))).toBe("3 of 5 files moved to Cairo");
+  expect(redoBannerLine(undone(MOVE, 3, 0))).toBe("The 3 files could not go to Cairo");
+  expect(redoBannerLine(undone(DELETE, 4, 1))).toBe("1 of 4 files went to the Recycle Bin");
+  expect(redoBannerLine(undone(RENAME, 0, 0))).toBe("Lisbon could not be Lisboa again");
+  expect(redoBannerLine(undone(CREATE, 0, 0))).toBe("Egypt could not come back to Trips");
+  expect(redoBannerLine(undone(MOVED_FOLDER, 0, 0))).toBe("Lisbon could not go to Archive");
+  const folder: Stayed = {
+    kind: "folder",
+    id: 9,
+    name: "Lisbon",
+    at: { kind: "folder", folderId: 4, path: ["Library", "Trips"] },
+    reason: { kind: "holds", name: "tram.jpg", more: 0 },
+  };
+  expect(redoBannerLine(undone(TO_TRASH, 3, 2, [folder]))).toBe(
+    "2 of Lisbon’s 3 files are in the Trash · Lisbon stayed",
+  );
+});
+
+test("a failed redo names its act in one sentence, or says only why when the act could not be read", () => {
+  const full = { kind: "io", reason: { kind: "diskFull" } };
+  expect(redoFailedLine(batch(MOVE, 3), full)).toBe(
+    "Could not redo “Moved 3 files to Cairo”. The disk is full.",
+  );
+  expect(redoFailedLine(null, full)).toBe("Could not redo. The disk is full.");
 });

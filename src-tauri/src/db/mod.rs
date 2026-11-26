@@ -42,6 +42,7 @@ const MIGRATIONS: &[(i64, &str)] = &[
     (14, include_str!("migrations/014_journal_subject.sql")),
     (15, include_str!("migrations/015_cached.sql")),
     (16, include_str!("migrations/016_job_payload.sql")),
+    (17, include_str!("migrations/017_redo.sql")),
 ];
 
 type Rewrite = fn(&Connection) -> Result<()>;
@@ -369,16 +370,28 @@ mod tests {
             conn.execute("INSERT INTO schema_version VALUES (?1)", [version])
                 .unwrap();
         }
-        let deleted = journal::new_batch();
-        journal::record_item_trash(&conn, &deleted, 5).unwrap();
-        journal::record_folder_delete(&conn, &deleted, 9, 1).unwrap();
-        let tagged = journal::new_batch();
-        let set = journal::ItemsTagged {
-            tag_id: 1,
-            value: "dusk".into(),
-            item_ids: vec![5, 6],
+        // Written as the journal of then held them, before later migrations gave it columns.
+        let write = |batch: &str, op: &str, row: &str| {
+            conn.execute(
+                "INSERT INTO journal (batch_id, op, forward, inverse, created_at)
+                 VALUES (?1, ?2, ?3, ?3, 0)",
+                [batch, op, row],
+            )
+            .unwrap();
         };
-        journal::record_items_tag(&conn, &tagged, &set).unwrap();
+        let deleted = journal::new_batch();
+        write(&deleted, journal::ITEM_TRASH, r#"{"itemId":5}"#);
+        write(
+            &deleted,
+            journal::FOLDER_DELETE,
+            r#"{"folderId":9,"retiredAt":1}"#,
+        );
+        let tagged = journal::new_batch();
+        write(
+            &tagged,
+            journal::ITEMS_TAG,
+            r#"{"tagId":1,"value":"dusk","itemIds":[5,6]}"#,
+        );
 
         migrate(&mut conn).unwrap();
         let indexed: i64 = conn

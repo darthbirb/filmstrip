@@ -124,6 +124,7 @@ drawn. **Not started** — neither.
 | An undo journal that survives a restart | Built | `journal`, DECISIONS.md "Undo"; the line at the foot of navigation, Ctrl+Z |
 | An act that fails says what and why | Built | at the foot, in the Band, and at Settings' foot while it is open; a note keeps its text, a tag its field, and an index that will not open says so in navigation with Retry: DECISIONS.md "Acts say why they failed" |
 | Undo the last batch, or a named one | Built | Ctrl+Z takes the last, the line's Undo its own batch; an undo that fails names its act and why in the Band and keeps Undo, `act_to_undo`; no list of batches yet |
+| Redo what an undo took back | Built | `redo_last`, `redo_batch`, `act_to_redo`: Ctrl+Y and Ctrl+Shift+Z, and Redo on the line after an undo and on the tags screen's; the last undone first, until a new act is journalled or a file is deleted for good; what cannot go again is in the banner with Retry, and a failed redo names its act in the Band with Redo: DECISIONS.md "Undo" |
 
 ## The interface
 

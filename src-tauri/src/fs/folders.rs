@@ -22,6 +22,16 @@ use crate::fs::{
 /// Makes a folder inside `parent_id` under `title`, as a directory and then a row.
 pub fn create(conn: &Connection, parent_id: i64, title: &str, batch_id: &str) -> Result<i64> {
     let _turn = super::turn();
+    make(conn, parent_id, title, Some(batch_id))
+}
+
+/// The making itself, which a redo also uses to make a folder again without journalling it.
+pub(super) fn make(
+    conn: &Connection,
+    parent_id: i64,
+    title: &str,
+    batch_id: Option<&str>,
+) -> Result<i64> {
     if !folders::is_live(conn, parent_id)? {
         return Err(AppError::refused(Reason::NotIndexed));
     }
@@ -38,7 +48,9 @@ pub fn create(conn: &Connection, parent_id: i64, title: &str, batch_id: &str) ->
 
     let recorded = in_transaction(conn, |tx| {
         let id = folders::create(tx, parent_id, &title)?;
-        journal::record_folder_create(tx, batch_id, id, parent_id)?;
+        if let Some(batch_id) = batch_id {
+            journal::record_folder_create(tx, batch_id, id, parent_id)?;
+        }
         Ok(id)
     });
     if recorded.is_err() {
@@ -248,6 +260,46 @@ pub fn delete(
         return Ok(report);
     }
 
+    let undoable = report.outright == 0 || !journal::batch(conn, batch_id)?.is_empty();
+    match take_away_emptied(conn, folder_id, now(), undoable.then_some(batch_id)) {
+        Ok(()) => report.deleted = true,
+        Err(holds @ AppError::Refused(Reason::Holds { .. })) => {
+            report
+                .refused
+                .push(stayed::folder(conn, folder_id, &holds)?);
+        }
+        Err(err) => return Err(err),
+    }
+    Ok(report)
+}
+
+/// Deletes a folder again, as a redo does once what it held has gone again: under the stamp its
+/// delete first retired it with, so an undo finds it once more.
+pub(super) fn redelete(conn: &Connection, folder_id: i64, retired_at: i64) -> Result<()> {
+    if !folders::is_live(conn, folder_id)? {
+        return Err(AppError::refused(Reason::NotIndexed));
+    }
+    let held = items::live_under(conn, folder_id)?;
+    if let Some(&first) = held.first() {
+        let name = items::file_of(conn, first)?
+            .map(|file| file.disk_name)
+            .unwrap_or_default();
+        return Err(AppError::refused(Reason::Holds {
+            name,
+            more: held.len() as u32 - 1,
+        }));
+    }
+    take_away_emptied(conn, folder_id, retired_at, None)
+}
+
+/// Takes away a folder that holds nothing the index shows, once only Windows' litter is left in
+/// it, and retires it and everything under it at `retired_at`; refused, naming what it holds.
+fn take_away_emptied(
+    conn: &Connection,
+    folder_id: i64,
+    retired_at: i64,
+    batch_id: Option<&str>,
+) -> Result<()> {
     let dir = paths::folder_dir(conn, folder_id)?;
     let mut unseen = unseen_once_passed(&dir)?;
     if unseen.is_empty()
@@ -259,25 +311,19 @@ pub fn delete(
         };
     }
     if let Some(first) = unseen.first() {
-        let holds = AppError::refused(Reason::Holds {
+        return Err(AppError::refused(Reason::Holds {
             name: file_name(first),
             more: unseen.len() as u32 - 1,
-        });
-        report
-            .refused
-            .push(stayed::folder(conn, folder_id, &holds)?);
-        return Ok(report);
+        }));
     }
 
-    let retired_at = now();
     let subtree: Vec<PathBuf> = folders::descendants(conn, folder_id)?
         .into_iter()
         .map(|id| paths::folder_dir(conn, id))
         .collect::<Result<_>>()?;
-    let undoable = report.outright == 0 || !journal::batch(conn, batch_id)?.is_empty();
     let recorded = in_transaction(conn, |tx| {
         folders::retire_subtree_at(tx, folder_id, retired_at)?;
-        if undoable {
+        if let Some(batch_id) = batch_id {
             journal::record_folder_delete(tx, batch_id, folder_id, retired_at)?;
         }
         Ok(())
@@ -288,8 +334,7 @@ pub fn delete(
         }
         return Err(err);
     }
-    report.deleted = true;
-    Ok(report)
+    Ok(())
 }
 
 /// Brings a deleted folder back: its directories made again, then its rows.
@@ -450,10 +495,10 @@ pub(super) fn unmake(conn: &Connection, folder_id: i64) -> Result<()> {
 
 /// Takes back a folder a copy made, once what came into it has gone: its directory while still
 /// empty, then its row, which is retired rather than forgotten since the trash still names it as
-/// where its files came from.
-pub(super) fn unmake_copy(conn: &Connection, folder_id: i64) -> Result<()> {
+/// where its files came from. When it was retired, for a redo to make it again.
+pub(super) fn unmake_copy(conn: &Connection, folder_id: i64) -> Result<Option<i64>> {
     if !folders::is_live(conn, folder_id)? {
-        return Ok(());
+        return Ok(None);
     }
     let title = folders::title(conn, folder_id)?.unwrap_or_default();
     let dir = paths::folder_dir(conn, folder_id)?;
@@ -469,7 +514,9 @@ pub(super) fn unmake_copy(conn: &Connection, folder_id: i64) -> Result<()> {
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
         Err(_) => return Err(holds()),
     }
-    folders::retire_subtree_at(conn, folder_id, now()).map(|_| ())
+    let retired_at = now();
+    folders::retire_subtree_at(conn, folder_id, retired_at)?;
+    Ok(Some(retired_at))
 }
 
 fn refuse_clash(conn: &Connection, parent_id: i64, title: &str, own: Option<i64>) -> Result<()> {

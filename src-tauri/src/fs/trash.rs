@@ -427,7 +427,7 @@ pub fn restore_items(
 /// Takes an item back out of the Recycle Bin under its own name, into `to` or the folder it left or
 /// a live one at its place; a name taken there is never changed. One already back at its path is
 /// restored where it is; one emptied from the bin has its row retired, and says so.
-fn restore_unjournalled(
+pub(super) fn restore_unjournalled(
     conn: &Connection,
     item_id: i64,
     to: Option<i64>,

@@ -30,7 +30,7 @@ import { failed } from "../failure";
 import { showInPane } from "../pane/pane-store";
 import { setPlace } from "../place";
 import { dirName, shownFailed } from "../undo/lines";
-import { undo } from "../undo/undo";
+import { redo, undo } from "../undo/undo";
 import { refusalSentence } from "./add-source";
 import { type FootNews, setNews, useNews } from "./foot-slot";
 import { useIndex } from "./index-store";
@@ -265,6 +265,15 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
               onClick={() => void undo(news.batchId)}
             />
           </OutOfRail>
+        ) : news.kind === "redoFailed" ? (
+          <OutOfRail news={news} sentence={news.line} alarm>
+            <GlyphButton
+              glyph="redo"
+              label="Redo · Ctrl+Y"
+              description={news.line}
+              onClick={() => void redo(news.batchId)}
+            />
+          </OutOfRail>
         ) : news.kind === "exported" ? (
           <GlyphButton
             glyph="folderOpen"
@@ -274,9 +283,9 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
             }
           />
         ) : (
-          <OutOfRail news={news} sentence={news.kind === "noFiles" ? NO_FILES : "Nothing to undo."}>
+          <OutOfRail news={news} sentence={news.kind === "noFiles" ? NO_FILES : nothing(news)}>
             <span className="grid size-control place-items-center text-fg-dim text-icon">
-              <Glyph name={news.kind === "noFiles" ? "paste" : "undo"} />
+              <Glyph name={news.kind === "noFiles" ? "paste" : redoing(news) ? "redo" : "undo"} />
             </span>
           </OutOfRail>
         )}
@@ -310,6 +319,33 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
       />
     );
   }
+  if (news.kind === "redoFailed") {
+    return (
+      <Band
+        sentence={news.line}
+        action={
+          <Button glyph="redo" title="Redo · Ctrl+Y" onClick={() => void redo(news.batchId)}>
+            Redo
+          </Button>
+        }
+        onDismiss={dismiss}
+      />
+    );
+  }
+  if (news.kind === "undone") {
+    return (
+      <Line
+        glyph="undo"
+        sentence={news.line}
+        action={
+          <Button glyph="redo" title="Redo · Ctrl+Y" onClick={() => void redo(news.batchId)}>
+            Redo
+          </Button>
+        }
+        onDismiss={dismiss}
+      />
+    );
+  }
   if (news.kind === "exported") {
     return (
       <Line
@@ -336,15 +372,15 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
     return <Line glyph="done" sentence={news.line} onDismiss={dismiss} />;
   }
   return (
-    <Line
-      glyph="undo"
-      sentence={news.kind === "undone" ? news.line : "Nothing to undo."}
-      onDismiss={dismiss}
-    />
+    <Line glyph={redoing(news) ? "redo" : "undo"} sentence={nothing(news)} onDismiss={dismiss} />
   );
 }
 
 const NO_FILES = "The clipboard holds no files.";
+
+const redoing = (news: FootNews) => news.kind === "nothing" && news.redo === true;
+
+const nothing = (news: FootNews) => (redoing(news) ? "Nothing to redo." : "Nothing to undo.");
 
 /** Goes to the Trash with a file there in the pane. */
 function showInTrash(itemId: number) {

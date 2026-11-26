@@ -34,6 +34,7 @@ use crate::fs::export::{self, Naming, Plan, Scope};
 use crate::fs::folders::{self as fs_folders, Contents, DeleteReport};
 use crate::fs::items::{self as fs_items, MoveReport};
 use crate::fs::paste::{self, Carried, CopyRefusal};
+use crate::fs::redo;
 use crate::fs::trash::{self, Looked, Origin, RestoreReport, TrashReport, Trashed};
 use crate::fs::undo::{self, UndoReport};
 use crate::fs::{paths, sanitize};
@@ -483,6 +484,30 @@ pub async fn act_to_undo(
 ) -> Result<Option<Batch>> {
     run(&state, move |conn| {
         undo::act_to_undo(conn, batch_id.as_deref())
+    })
+    .await
+}
+
+/// Carries out again what the last undo took back, until a new act is journalled.
+#[tauri::command]
+pub async fn redo_last(state: State<'_, AppState>) -> Result<Option<UndoReport>> {
+    run(&state, redo::redo_last).await
+}
+
+/// Carries out again one batch an undo took back, as the line after that undo names it.
+#[tauri::command]
+pub async fn redo_batch(state: State<'_, AppState>, batch_id: String) -> Result<UndoReport> {
+    run(&state, move |conn| redo::redo_batch(conn, &batch_id)).await
+}
+
+/// The act a redo would carry out again, the one named or the last undone, while any is left.
+#[tauri::command]
+pub async fn act_to_redo(
+    state: State<'_, AppState>,
+    batch_id: Option<String>,
+) -> Result<Option<Batch>> {
+    run(&state, move |conn| {
+        redo::act_to_redo(conn, batch_id.as_deref())
     })
     .await
 }

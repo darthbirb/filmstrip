@@ -164,6 +164,45 @@ export function undoBannerLine({ batch, filesBack, stayed }: UndoReport): string
   }
 }
 
+/**
+ * The banner's sentence for a redo that went in part: counted, or turned round when none went,
+ * as the act's own banner says it.
+ */
+export function redoBannerLine({ batch, filesBack, stayed }: UndoReport): string {
+  const { act, files: carried } = batch;
+  switch (act.kind) {
+    case "move":
+      return movedBannerLine(filesBack, carried, act.to, act.one ?? undefined);
+    case "delete":
+      return deletedBannerLine(filesBack, carried, act.one ?? undefined);
+    case "restore":
+      return restoredBannerLine(filesBack, carried, act.to, false, act.one ?? undefined);
+    case "copy":
+      return copiedBannerLine(filesBack, carried, act.to, act.one ?? undefined);
+    case "renameFile":
+    case "renameFolder":
+      return `${act.from} could not be ${act.to} again`;
+    case "createFolder":
+      return `${act.name} could not come back to ${act.parent}`;
+    case "moveFolder":
+      return `${act.name} could not go to ${act.to}`;
+    case "deleteFolder": {
+      const folderStayed = stayed.some((one) => one.kind === "folder" && one.name === act.name);
+      if (!folderStayed)
+        return `${act.name} went with ${formatCount(filesBack)} of its ${files(carried)}`;
+      return folderStayedBanner(act.name, filesBack, carried, act.into);
+    }
+    case "addTag":
+      return `${act.tag} could not go on ${files(carried)}`;
+    case "removeTag":
+      return `${act.tag} could not come off ${files(carried)}`;
+    case "retag": {
+      const { kind, was } = changed(act.change);
+      return `${capital(kind)} ${was} could not change again`;
+    }
+  }
+}
+
 const folders = (n: number) => formatCounted(n, "folder");
 
 /** "38 files and 2 folders", either alone, or nothing when the act touched neither. */
@@ -581,6 +620,12 @@ export function undoFailedLine(batch: Batch | null, error: unknown): string {
       ? `Deleted ${act.name}`
       : actLine(batch).replace(/\.$/, "");
   return `Could not undo “${line}”. ${whyFailed(error)}`;
+}
+
+/** What the foot says when a redo failed, its Redo kept to try again, as an undo's failure is. */
+export function redoFailedLine(batch: Batch | null, error: unknown): string {
+  if (!batch) return `Could not redo. ${whyFailed(error)}`;
+  return `Could not redo “${actLine(batch).replace(/\.$/, "")}”. ${whyFailed(error)}`;
 }
 
 /**

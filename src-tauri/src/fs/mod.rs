@@ -10,6 +10,7 @@ pub mod noclobber;
 pub mod paste;
 pub mod paths;
 pub mod recycle;
+pub mod redo;
 pub mod relocate;
 pub mod sanitize;
 pub mod stayed;

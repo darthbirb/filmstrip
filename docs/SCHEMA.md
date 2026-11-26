@@ -142,8 +142,22 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   in `inverse`. `batch_id` groups the rows one act wrote, so one undo reverses the act.
 - Rows are written in the same transaction as the change to the index they describe, and only
   after the disk has changed.
-- An undo applies a batch's rows newest first and writes no row of its own. Each row is deleted
-  as it comes back, so a batch that came back in part keeps exactly the rows that stayed.
+- An undo applies a batch's rows newest first and writes no row of its own. Each row leaves its
+  batch as it comes back, so a batch that came back in part keeps exactly the rows that stayed:
+  migration 17's `undone` marks it with a number one higher than any the journal holds, so one
+  undo's rows share it, and the row is the redo's. What its redo needs that the undo took away is
+  kept under `forward`'s `redo`: a folder made, whose row the undo forgets, keeps its `title`, and
+  a folder a copy made keeps when it was retired (`retiredAt`). Nothing else reads an undone row
+  as part of its batch, and `journal::latest_batch` passes over it.
+- A redo takes the batch with the highest `undone` and carries its rows out again oldest first.
+  Each row that goes is inserted again as the newest, its `redo` taken off and, for a folder made
+  again, its new `folderId`, and the undone row deleted, so the triggers keep its subjects and the
+  next undo reaches it first. A `retag` row is journalled afresh by the act itself, found by the
+  words its `change` names, since an undo can give terms back under other ids. What stayed keeps
+  its mark; one gone from the bin or bound for a drive with no bin is deleted, as an undo's is.
+- Every undone row is deleted as a row of a new act is written, unless its batch is the one being
+  redone, and as a file is deleted for good or a restore sets the floor (`journal::drop_redo`).
+  Undone rows are marked and dropped with the rest when a file leaves the journal.
 - A set tagged at once is one row, `items_tag` or `items_untag`, naming every file it changed;
   an untag keeps each file's `added_at`, so an undo puts the tag back in its place. One file's
   tag is not journalled.
