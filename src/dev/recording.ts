@@ -5,6 +5,14 @@ type Internals = { invoke: (cmd: string, args?: unknown, options?: unknown) => P
 const internals = () =>
   (window as unknown as { __TAURI_INTERNALS__: Internals }).__TAURI_INTERNALS__;
 
+export type Invoke = (cmd: string, args?: unknown) => Promise<unknown>;
+
+/**
+ * The dev mock's own answer to a command, taken before `recording` runs, for a test that holds
+ * one back.
+ */
+export const theMock = (): Invoke => internals().invoke;
+
 /** Every command the app sends while `work` runs, answered as the dev mock answers it. */
 export async function recording(
   work: (calls: [string, unknown][]) => Promise<void>,

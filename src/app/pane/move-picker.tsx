@@ -24,7 +24,7 @@ import { movedBannerLine, movedFailed, moveStoppedLine, reasonSentence } from ".
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
 import { keepFocusThrough } from "./act-focus";
-import { once } from "./going";
+import { goingUntilEnd, jobEnded, once } from "./going";
 import { type MoveOn, moveOn, moveOnFrom, moveOnLanded, stillListed } from "./move-on";
 import { restoreFiles } from "./restore";
 
@@ -301,6 +301,7 @@ async function moveNow(itemIds: number[], to: Into) {
   if (!moved) return null;
   remember(to);
   if (moved.kind === "started") {
+    goingUntilEnd(moved.jobId, itemIds);
     if (pane.next === pane.shown) return "started" as const;
     if (pane.origin?.kind === "search") landing.set(moved.jobId, pane);
     else if (await leavesAhead(pane.origin, to)) moveOn(pane, []);
@@ -392,6 +393,7 @@ export async function moveFolderTo(
  * what stayed, with Retry. One that stopped on its own says why at the foot. DECISIONS.md "Undo".
  */
 export async function afterMoved(moved: Moved) {
+  jobEnded(moved.jobId);
   await libraryChanged();
   const pane = landing.get(moved.jobId);
   landing.delete(moved.jobId);

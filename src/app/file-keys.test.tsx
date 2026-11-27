@@ -3,8 +3,10 @@ import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { failCommand, onDriveWithoutBin, resetBin } from "../dev/mock";
-import { recording } from "../dev/recording";
+import { recording, theMock } from "../dev/recording";
+import type { Deleted } from "../ipc/bindings/Deleted";
 import { folderItems, undoLast } from "../ipc/commands";
+import { afterDeleted } from "./deleted";
 import { Grid } from "./grid/Grid";
 import { clearChecked } from "./grid/selection";
 import { useFileKeys } from "./keys";
@@ -112,12 +114,6 @@ test("with nothing checked Delete sends the pane's file, and the pane moves on",
   await expect.poll(getPaneItem).toBe(sphinx);
 });
 
-type Invoke = (cmd: string, args?: unknown) => Promise<unknown>;
-
-/** The dev mock's own answer to a command, for a test that holds one back. */
-const theMock = (): Invoke =>
-  (window as unknown as { __TAURI_INTERNALS__: { invoke: Invoke } }).__TAURI_INTERNALS__.invoke;
-
 const count = (calls: [string, unknown][], cmd: string) =>
   calls.filter(([one]) => one === cmd).length;
 
@@ -145,6 +141,70 @@ test("a second Delete before the first lands sends nothing more, and no banner s
   );
   expect(getReport()).toBeNull();
   await expect.poll(getPaneItem).toBe(sphinx);
+});
+
+test("Delete again while a delete on the queue sends the same files starts no second job", async () => {
+  const at = await renderIt();
+  const ids = [await idOf("felucca.mp4"), await idOf("sphinx.jpg")];
+  await check(at, "felucca.mp4");
+  await check(at, "sphinx.jpg");
+  const ended: Deleted = {
+    kind: "files",
+    jobId: 91,
+    batch: null,
+    report: { trashed: 0, refused: [] },
+    whole: 2,
+    cancelled: true,
+    stopped: null,
+  };
+  await recording(
+    async (calls) => {
+      await userEvent.keyboard("{Delete}");
+      await expect.poll(() => count(calls, "trash_items")).toBe(1);
+      await userEvent.keyboard("{Delete}");
+      await userEvent.keyboard("{Control>}{Shift>}C{/Shift}{/Control}");
+      await expect.poll(() => sent(calls, "copy_item_paths")).toEqual({ itemIds: ids });
+      expect(count(calls, "trash_items")).toBe(1);
+
+      await afterDeleted(ended);
+      await userEvent.keyboard("{Delete}");
+      await expect.poll(() => count(calls, "trash_items")).toBe(2);
+      await afterDeleted(ended);
+    },
+    (cmd) => (cmd === "trash_items" ? { kind: "started", jobId: 91 } : undefined),
+  );
+});
+
+test("Delete again while an outright delete is still going asks nothing and sends nothing", async () => {
+  const at = await renderIt();
+  const pyramid = await idOf("pyramid.jpg");
+  onDriveWithoutBin([pyramid], "USB Drive (E:)");
+  showInPane(pyramid, CAIRO);
+  const real = theMock();
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await recording(
+    async (calls) => {
+      await userEvent.keyboard("{Delete}");
+      const question = at.foot.getByRole("region", { name: /has no Recycle Bin/ });
+      await question.getByRole("button", { name: "Delete Permanently" }).click();
+      await expect.poll(() => sent(calls, "delete_for_good")).toEqual({ itemIds: [pyramid] });
+      await expect.element(question).not.toBeInTheDocument();
+      await userEvent.keyboard("{Delete}");
+      release();
+      await expect
+        .element(at.foot.getByText("Permanently deleted pyramid.jpg from USB Drive (E:)."))
+        .toBeVisible();
+      const counts = ["binless_items", "delete_for_good", "trash_items"].map((cmd) =>
+        count(calls, cmd),
+      );
+      expect(counts).toEqual([1, 1, 0]);
+    },
+    (cmd, args) => (cmd === "delete_for_good" ? held.then(() => real(cmd, args)) : undefined),
+  );
+  expect(getReport()).toBeNull();
 });
 
 test("Delete held down deletes the pane's file once, not the files that take its place", async () => {
