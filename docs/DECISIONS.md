@@ -1268,6 +1268,17 @@ does not use, but a key whose folder has gone did mean something, so its press s
 where the folder was. A key does nothing in a field, over a menu, a question or Settings, or in
 the Trash, whose only way out is Restore. The top row and the number pad are the same keys.
 
+## One press, one act
+
+**A press that deletes or moves files acts once**, built for #275. The pane moves on only once a
+send lands, so until then a second Delete, a second click on the bar's Delete or a second digit
+found the same file and sent it again; the Trash found it no longer live and the banner said it
+was not deleted, with Retry, though it was. So while a delete or a move is still sending a file,
+another asked for it sends nothing, whichever key, bar or menu asked; and a held Delete or digit
+acts on its first press alone, or Windows' repeat would go on to the file that took the pane's
+place. Behind that, a file already in the Trash when a delete reaches it is passed over, neither
+sent nor refused, since the act that sent it already said so, with its Undo.
+
 ## Search
 
 **The query's text is the whole state of a search**, as ggallery's was and as Claude Design drew

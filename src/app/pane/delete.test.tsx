@@ -2,6 +2,7 @@ import { beforeEach, expect, test } from "vitest";
 import { render } from "vitest-browser-react";
 
 import { refuseRecycling, resetBin } from "../../dev/mock";
+import { recording } from "../../dev/recording";
 import { folderItems, undoLast } from "../../ipc/commands";
 import { Foot } from "../navigation/Foot";
 import { setNews } from "../navigation/foot-slot";
@@ -118,4 +119,16 @@ test("in a set, the rest are one batch with Undo and the one refused is named", 
 
   await screen.getByRole("button", { name: "Undo" }).click();
   await expect.poll(async () => (await folderItems(6)).length).toBe(3);
+});
+
+test("a delete asked again before the first lands sends the file once", async () => {
+  const pyramid = await id("pyramid.jpg");
+  showInPane(pyramid, CAIRO);
+  const screen = await render(<Harness />);
+  await recording(async (calls) => {
+    await Promise.all([deleteFiles([pyramid]), deleteFiles([pyramid])]);
+    expect(calls.filter(([cmd]) => cmd === "trash_items")).toHaveLength(1);
+  });
+  await expect.element(screen.getByText("Moved pyramid.jpg to the Recycle Bin.")).toBeVisible();
+  expect(getReport()).toBeNull();
 });

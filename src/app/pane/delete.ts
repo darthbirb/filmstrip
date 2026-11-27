@@ -17,14 +17,20 @@ import {
 } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
+import { once } from "./going";
 import { moveOn, moveOnFrom } from "./move-on";
 import { askNoBin } from "./no-bin";
 
 /**
  * Deletes files: those on a drive with no Recycle Bin are asked about, once for them all, and the
- * rest go to the Recycle Bin at once. DECISIONS.md "A drive with no Recycle Bin".
+ * rest go to the Recycle Bin at once. Nothing goes while a delete or a move is still sending one
+ * of them. DECISIONS.md "A drive with no Recycle Bin".
  */
 export async function deleteFiles(itemIds: number[]) {
+  await once(itemIds, () => askOrSend(itemIds));
+}
+
+async function askOrSend(itemIds: number[]) {
   const back = document.activeElement;
   const drives = await binlessItems(itemIds).catch((error: unknown) => {
     sayFailed(deletedFailed(itemIds.length), error);

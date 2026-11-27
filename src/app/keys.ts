@@ -28,13 +28,14 @@ function digitOf(event: KeyboardEvent) {
 
 /**
  * A digit moves what is checked, or the pane's file when nothing is, to the folder it is bound
- * to. It does nothing in a field, over a menu, a question or Settings, or in the Trash.
+ * to. It does nothing in a field, over a menu, a question or Settings, or in the Trash; held, it
+ * moves once.
  */
 export function useDestinationKeys() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const digit = digitOf(event);
-      if (digit === null || !keyIsFree(event)) return;
+      if (digit === null || event.repeat || !keyIsFree(event)) return;
       if (getPlace()?.kind === "trash") return;
       event.preventDefault();
       void press(digit);
@@ -48,14 +49,17 @@ type FileKey = "delete" | "copy" | "copyPath";
 
 function fileKeyOf(event: KeyboardEvent): FileKey | null {
   if (event.altKey || event.metaKey) return null;
-  if (event.key === "Delete" && !event.ctrlKey && !event.shiftKey) return "delete";
+  if (event.key === "Delete" && !event.ctrlKey && !event.shiftKey) {
+    return event.repeat ? null : "delete";
+  }
   if (event.key.toLowerCase() !== "c" || !event.ctrlKey) return null;
   return event.shiftKey ? "copyPath" : "copy";
 }
 
 /**
  * Explorer's keys for files: Delete, Ctrl+C and Ctrl+Shift+C do what the bar's Delete, Copy and
- * Copy as Path do, to what is checked, or the pane's file when nothing is.
+ * Copy as Path do, to what is checked, or the pane's file when nothing is. Held, Delete deletes
+ * once.
  */
 export function useFileKeys() {
   useEffect(() => {

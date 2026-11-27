@@ -99,6 +99,55 @@ test("with nothing checked it moves the pane's file, and the pane moves on to th
   await expect.element(page.getByText("Moved pyramid.jpg to People.")).toBeVisible();
 });
 
+type Invoke = (cmd: string, args?: unknown) => Promise<unknown>;
+
+/** The dev mock's own answer to a command, for a test that holds one back. */
+const theMock = (): Invoke =>
+  (window as unknown as { __TAURI_INTERNALS__: { invoke: Invoke } }).__TAURI_INTERNALS__.invoke;
+
+test("a second press before the first move lands moves nothing more", async () => {
+  await renderIt();
+  const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
+  showInPane(pyramid, CAIRO);
+  const real = theMock();
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await recording(
+    async (calls) => {
+      await userEvent.keyboard("1");
+      await expect.poll(() => moved(calls)).toEqual({ itemIds: [pyramid], folderId: 5 });
+      await userEvent.keyboard("1");
+      release();
+      await expect.element(page.getByText("Moved pyramid.jpg to People.")).toBeVisible();
+      expect(calls.filter(([cmd]) => cmd === "move_items")).toHaveLength(1);
+    },
+    (cmd, args) => (cmd === "move_items" ? held.then(() => real(cmd, args)) : undefined),
+  );
+  await expect.poll(getPaneItem).toBe(sphinx);
+});
+
+test("a key held down moves the pane's file once, not the files that take its place", async () => {
+  await renderIt();
+  const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
+  showInPane(pyramid, CAIRO);
+  await userEvent.keyboard("{1>}");
+  await expect.element(page.getByText("Moved pyramid.jpg to People.")).toBeVisible();
+  await expect.poll(getPaneItem).toBe(sphinx);
+  await recording(async (calls) => {
+    for (let n = 0; n < 3; n += 1) {
+      const again = { key: "1", code: "Digit1", repeat: true, bubbles: true, cancelable: true };
+      document.body.dispatchEvent(new KeyboardEvent("keydown", again));
+    }
+    await userEvent.keyboard("{/1}");
+    await userEvent.keyboard("2");
+    await expect.element(page.getByText("Already in Cairo.")).toBeVisible();
+    expect(moved(calls)).toBeUndefined();
+  });
+  expect((await folderItems(5)).map((row) => row.id)).toEqual([pyramid]);
+});
+
 test("a checked set holding the pane's file moves the pane past the last of them", async () => {
   await renderIt();
   const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];

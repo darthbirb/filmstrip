@@ -24,6 +24,7 @@ import { movedBannerLine, movedFailed, moveStoppedLine, reasonSentence } from ".
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
 import { keepFocusThrough } from "./act-focus";
+import { once } from "./going";
 import { type MoveOn, moveOn, moveOnFrom, moveOnLanded, stillListed } from "./move-on";
 import { restoreFiles } from "./restore";
 
@@ -284,9 +285,14 @@ type Into = Pick<FolderEntry, "id" | "title">;
  * Moves the files and says what happened: the line at the foot for what went, the banner over
  * the grid for what did not; and hands back the report. When the pane's file leaves its place
  * the pane moves on, as after a delete. A move between drives is a job, which says so when it
- * ends, and hands back only that it started. DECISIONS.md "Undo".
+ * ends, and hands back only that it started. Nothing goes while a delete or a move is still
+ * sending one of them. DECISIONS.md "Undo".
  */
 export async function moveFiles(itemIds: number[], to: Into) {
+  return once(itemIds, () => moveNow(itemIds, to));
+}
+
+async function moveNow(itemIds: number[], to: Into) {
   const pane = await moveOnFrom(itemIds);
   const moved = await moveItems(itemIds, to.id).catch((error: unknown) => {
     sayFailed(movedFailed(itemIds.length, to.title), error);

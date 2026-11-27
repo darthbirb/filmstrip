@@ -135,7 +135,8 @@ selection somewhere. Destination hotkeys exist for the folders used most.
 
 An organiser on Windows takes Explorer's keys. None of them reaches past a text field, which
 keeps its own. Delete, Ctrl+C, Ctrl+Shift+C and the digits act on what is checked, or on the file
-in the pane when nothing is.
+in the pane when nothing is. Held, Delete and the digits act once, and a second press before the
+files have gone sends nothing more.
 
 - **Delete** sends the files to the Recycle Bin, as the bar's Delete does.
 - **F2** renames the focused tile's file, or the focused folder in navigation.
