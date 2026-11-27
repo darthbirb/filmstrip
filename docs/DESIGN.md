@@ -1040,17 +1040,17 @@ toward the rest surface.
   shown on `raised-hi`; and the section's settings as rows in an `inset` group, each a label and
   its control. A section whose body is its own, as Sources is, can close with a caption of its
   own over such rows. Sources' rows end in its two doorways side by side, raised buttons with the
-  plus glyph: Add Source… and Add Sorting Source…. One that heads itself, as Tags does, fills the section: its name in semibold
-  `row` with what it holds after it in `small` `fg-dim`, and a list that scrolls inside it, so the
-  dialog never grows; its Line stands at the section's foot. Backups heads itself the same way,
-  with Back Up Now at the head's end, and its Band stands where the Line does. Trash heads itself
-  too, how many files the library has in the Recycle Bin and their size after its name, or
-  Nothing in it, over two lines on where a deleted file goes: the recycle glyph, and the usb
-  glyph for a drive with no bin, in `glyph`, each sentence in `small` `fg-dim`. Empty Trash… in
-  `danger` ends its head while it holds anything, and asks under the head in the row question's
-  shape, its own `line-danger` ring round it, disabled while it asks. Emptying, the head counts
-  as it goes from the job's line and the `progress` bar, `head-progress` wide, stands where the
-  button was.
+  plus glyph: Add Source… and Add Sorting Source…. One that heads itself, as Tags does, fills the
+  section: its name in semibold `row` with what it holds after it in `small` `fg-dim`, and a list
+  that scrolls inside it, so the dialog never grows; its Line stands at the section's foot. Backups
+  heads itself the same way, with Back Up Now at the head's end, and its Band stands where the Line
+  does. Trash heads itself too, how many files the library has in the Recycle Bin and their size
+  after its name, or Nothing in it, over two lines on where a deleted file goes: the recycle glyph,
+  and the usb glyph for a drive with no bin, in `glyph`, each sentence in `small` `fg-dim`. Empty
+  Trash… in `danger` ends its head while it holds anything, and asks under the head in the row
+  question's shape, its own `line-danger` ring round it, disabled while it asks. Emptying, the head
+  counts as it goes from the job's line and the `progress` bar, `head-progress` wide, stands where
+  the button was.
 - **Filter field.** Narrows the list under it as you type: `bar-field` tall on `ground` at the
   `nested` corner in a `line-control` ring, `line-strong` while it has the focus, the search glyph
   before it in `fg-dim` and "3 of 228" at its end in `small` tabular figures once something is

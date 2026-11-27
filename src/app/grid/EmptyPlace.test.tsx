@@ -1,7 +1,7 @@
 import { beforeEach, expect, test } from "vitest";
 import { render } from "vitest-browser-react";
 
-import { recording } from "../../dev/recording";
+import { kindsAdded } from "../../dev/kinds-added";
 import type { SourceSummary } from "../../ipc/bindings/SourceSummary";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { getPlace, type Place, setPlace } from "../place";
@@ -25,10 +25,7 @@ test("the app's own two places are named and explain nothing; the Sorting Box of
   await expect.element(sorting.getByText("Nothing to Sort")).toBeVisible();
   expect(lines(sorting.container)).toEqual(["Nothing to Sort"]);
   const add = sorting.getByRole("button", { name: "Add Sorting Source…" });
-  await recording(async (calls) => {
-    await add.click();
-    await expect.poll(() => calls.map(([command]) => command)).toContain("pick_folder");
-  });
+  expect(await kindsAdded(() => add.click())).toEqual(["sorting"]);
 
   const trash = await render(<EmptyPlace place={{ kind: "trash" }} />);
   await expect.element(trash.getByText("Trash Is Empty")).toBeVisible();
