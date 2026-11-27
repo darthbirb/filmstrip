@@ -352,13 +352,7 @@ test("a walk shows above the baseline while it runs, and leaves when it ends", a
   const line = () => screen.getByText(/^Indexing/);
   expect(inSight(line())).toBe(false);
 
-  await emit("job-progress", {
-    phase: "working",
-    pending: 4120,
-    running: 0,
-    failed: 0,
-    completed: 6880,
-  });
+  await emit("job-progress", { ...IDLE, phase: "working", pending: 4120, completed: 6880 });
   await expect.element(line()).toBeVisible();
   await expect.element(screen.getByText("Indexing 4,120…")).toBeVisible();
   await expect.element(screen.getByText("63%")).toBeVisible();
@@ -395,13 +389,7 @@ test("with nothing thrown away, the Trash wears no badge", async () => {
 
 test("a refusal stacks above the walk, and dismissing it leaves the walk alone", async () => {
   const screen = await render(<Foot />);
-  await emit("job-progress", {
-    phase: "working",
-    pending: 4120,
-    running: 0,
-    failed: 0,
-    completed: 6880,
-  });
+  await emit("job-progress", { ...IDLE, phase: "working", pending: 4120, completed: 6880 });
   await expect.element(screen.getByText("Indexing 4,120…")).toBeVisible();
 
   setRefused({ why: "inside", clash: "Pictures", path: "C:UsersadaPicturesTrips" });

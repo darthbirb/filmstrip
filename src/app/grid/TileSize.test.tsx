@@ -103,3 +103,33 @@ test("Ctrl+wheel over the grid steps the tile size and saves it, a touchpad's sm
   expect(turn(100, false)).toBe(false);
   expect(getPreferences().tile).toBe(15);
 });
+
+test("a wheel that turns in lines steps the tile size once a notch", async () => {
+  await page.viewport(1000, 700);
+  const screen = await render(
+    <div style={{ display: "flex", flexDirection: "column", width: 1000, height: 600 }}>
+      <TileSize />
+      <div data-testid="grid" style={{ flex: 1, minHeight: 0 }}>
+        <Grid mode="uniform" />
+      </div>
+    </div>,
+  );
+  await expect.poll(side).toBeGreaterThan(0);
+  const over = screen.getByTestId("grid").getByRole("button").first().element();
+  const notch = (deltaY: number) =>
+    over.dispatchEvent(
+      new WheelEvent("wheel", {
+        deltaY,
+        deltaMode: WheelEvent.DOM_DELTA_LINE,
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+
+  notch(-1);
+  expect(getPreferences().tile).toBe(15);
+  notch(3);
+  notch(3);
+  await expect.element(screen.getByRole("button", { name: "Tile Size: Small" })).toBeVisible();
+});

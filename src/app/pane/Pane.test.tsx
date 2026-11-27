@@ -7,6 +7,7 @@ import { render } from "vitest-browser-react";
 import { inSight } from "../../dev/in-sight";
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
+import type { Progress } from "../../ipc/bindings/Progress";
 import { folderItems, itemDetail } from "../../ipc/commands";
 import { Grid } from "../grid/Grid";
 import { type Place, setPlace } from "../place";
@@ -297,7 +298,21 @@ test("the pane reads the item again when background work moves on", async () => 
   );
   await expect.poll(() => asked).toBe(1);
 
-  await emit("job-progress", { phase: "working", pending: 1, running: 1, failed: 0, completed: 3 });
+  const working: Progress = {
+    phase: "working",
+    pending: 1,
+    running: 1,
+    failed: 0,
+    completed: 3,
+    copies: [],
+    exports: [],
+    moves: [],
+    deletes: [],
+    walks: 0,
+    walkedSource: null,
+    thumbed: [],
+  };
+  await emit("job-progress", working);
   await expect.poll(() => asked).toBe(2);
 });
 

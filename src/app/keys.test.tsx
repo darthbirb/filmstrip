@@ -1,8 +1,8 @@
-import { beforeEach, expect, test } from "vitest";
+import { beforeAll, beforeEach, expect, onTestFinished, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
-import { recording } from "../dev/recording";
+import { recording, theMock } from "../dev/recording";
 import {
   deleteFolder,
   destinationKeys,
@@ -18,6 +18,7 @@ import { useDestinationKeys } from "./keys";
 import { Foot } from "./navigation/Foot";
 import { getNews, setNews } from "./navigation/foot-slot";
 import { loadIndex, refreshIndex, resetIndex } from "./navigation/index-store";
+import { watchMoves } from "./pane/move-picker";
 import { addToPane, getPaneItem, getPaneSet, showInPane } from "./pane/pane-store";
 import { type Place, setPlace } from "./place";
 import { showReport } from "./undo/report-store";
@@ -34,6 +35,10 @@ const CAIRO: Place = {
     { id: 6, title: "Cairo" },
   ],
 };
+
+beforeAll(async () => {
+  await watchMoves();
+});
 
 beforeEach(async () => {
   while (await undoLast()) {}
@@ -99,6 +104,49 @@ test("with nothing checked it moves the pane's file, and the pane moves on to th
   await expect.element(page.getByText("Moved pyramid.jpg to People.")).toBeVisible();
 });
 
+test("a second press before the first move lands moves nothing more", async () => {
+  await renderIt();
+  const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
+  showInPane(pyramid, CAIRO);
+  const real = theMock();
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await recording(
+    async (calls) => {
+      await userEvent.keyboard("1");
+      await expect.poll(() => moved(calls)).toEqual({ itemIds: [pyramid], folderId: 5 });
+      await userEvent.keyboard("1");
+      release();
+      await expect.element(page.getByText("Moved pyramid.jpg to People.")).toBeVisible();
+      expect(calls.filter(([cmd]) => cmd === "move_items")).toHaveLength(1);
+    },
+    (cmd, args) => (cmd === "move_items" ? held.then(() => real(cmd, args)) : undefined),
+  );
+  await expect.poll(getPaneItem).toBe(sphinx);
+});
+
+test("a key held down moves the pane's file once, not the files that take its place", async () => {
+  await renderIt();
+  const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
+  showInPane(pyramid, CAIRO);
+  await userEvent.keyboard("{1>}");
+  await expect.element(page.getByText("Moved pyramid.jpg to People.")).toBeVisible();
+  await expect.poll(getPaneItem).toBe(sphinx);
+  await recording(async (calls) => {
+    for (let n = 0; n < 3; n += 1) {
+      const again = { key: "1", code: "Digit1", repeat: true, bubbles: true, cancelable: true };
+      document.body.dispatchEvent(new KeyboardEvent("keydown", again));
+    }
+    await userEvent.keyboard("{/1}");
+    await userEvent.keyboard("2");
+    await expect.element(page.getByText("Already in Cairo.")).toBeVisible();
+    expect(moved(calls)).toBeUndefined();
+  });
+  expect((await folderItems(5)).map((row) => row.id)).toEqual([pyramid]);
+});
+
 test("a checked set holding the pane's file moves the pane past the last of them", async () => {
   await renderIt();
   const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
@@ -149,6 +197,28 @@ test("a move of the pane's file that runs as a job between drives moves the pane
   }
   await expect.poll(async () => (await indexProgress()).moves, { timeout: 5000 }).toEqual([]);
   expect((await folderItems(5)).map((row) => row.id)).toEqual([pyramid]);
+});
+
+test("a second press while a move between drives sends the same files starts no second job", async () => {
+  await renderIt();
+  const ids = [await idOf("felucca.mp4"), await idOf("pyramid.jpg")];
+  await userEvent.click(page.getByRole("checkbox", { name: "Select felucca.mp4" }));
+  await userEvent.click(page.getByRole("checkbox", { name: "Select pyramid.jpg" }));
+  const before = location.href;
+  history.replaceState(null, "", "?across");
+  try {
+    await recording(async (calls) => {
+      await userEvent.keyboard("1");
+      await expect.poll(() => moved(calls)).toEqual({ itemIds: ids, folderId: 5 });
+      await expect.poll(async () => (await indexProgress()).moves).not.toEqual([]);
+      await userEvent.keyboard("1");
+      await expect.poll(async () => (await indexProgress()).moves, { timeout: 5000 }).toEqual([]);
+      expect(calls.filter(([cmd]) => cmd === "move_items")).toHaveLength(1);
+    });
+  } finally {
+    history.replaceState(null, "", before);
+  }
+  expect((await folderItems(5)).map((row) => row.id).sort()).toEqual([...ids].sort());
 });
 
 test("with a set in the pane and nothing checked a key moves nothing, and says why", async () => {
@@ -222,6 +292,21 @@ test("a key whose folder has gone moves nothing, and says which key and where it
   await userEvent.keyboard("4");
   await expect.element(page.getByText("Key 4 has no folder.")).toBeVisible();
   await expect.element(page.getByText("People has gone from Pictures.")).toBeVisible();
+});
+
+test("a key does nothing while an auto popover is open, with the focus outside it", async () => {
+  await renderIt();
+  showInPane(await idOf("sphinx.jpg"), CAIRO);
+  const auto = document.createElement("div");
+  auto.popover = "auto";
+  document.body.append(auto);
+  onTestFinished(() => auto.remove());
+  await recording(async (calls) => {
+    auto.showPopover();
+    expect(auto.contains(document.activeElement)).toBe(false);
+    await userEvent.keyboard("1");
+    expect(moved(calls)).toBeUndefined();
+  });
 });
 
 test("a key does nothing in a field, or in the Trash", async () => {

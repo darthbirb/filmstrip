@@ -5,6 +5,7 @@ import type { Failure } from "../../ipc/bindings/Failure";
 import type { Progress } from "../../ipc/bindings/Progress";
 import { indexFailures, indexProgress, retryFailedJobs } from "../../ipc/commands";
 import { unasked } from "../failure";
+import { jobsListed } from "../pane/going";
 
 /** How far the background work has got, and what it could not read. DECISIONS.md "Background work". */
 type Work = { progress: Progress | null; failures: Failure[] };
@@ -44,6 +45,7 @@ export function resetWork() {
 async function report(progress: Progress | null) {
   const before = snapshot.progress?.failed ?? 0;
   publish({ ...snapshot, progress });
+  if (progress) jobsListed(progress);
   if (progress && progress.failed !== before) await loadFailures();
 }
 

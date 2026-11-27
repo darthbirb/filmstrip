@@ -2,7 +2,7 @@ import { beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
-import { folderItems, undoLast } from "../../ipc/commands";
+import { folderItems, trashItems, undoLast } from "../../ipc/commands";
 import { Grid } from "../grid/Grid";
 import { Foot } from "../navigation/Foot";
 import { setNews } from "../navigation/foot-slot";
@@ -101,4 +101,31 @@ test("F2 on a tile shows its file in the pane with the name as a field", async (
   expect(getPaneItem()).toBe(
     (await folderItems(6)).find((row) => row.diskName === "sphinx.jpg")?.id,
   );
+});
+
+test("Shift+F2 on a tile, or F2 on a trashed one, renames nothing", async () => {
+  await page.viewport(1300, 800);
+  const pyramid = getPaneItem();
+  const sphinx = (await folderItems(6)).find((row) => row.diskName === "sphinx.jpg")?.id ?? -1;
+  const screen = await render(
+    <div style={{ display: "flex" }}>
+      <div data-testid="grid" style={{ flex: "none", width: 800, height: 600 }}>
+        <Grid mode="uniform" />
+      </div>
+      <Harness />
+    </div>,
+  );
+  const tile = () => screen.getByTestId("grid").getByRole("button", { name: "sphinx.jpg" });
+  await expect.element(tile()).toBeVisible();
+  (tile().element() as HTMLElement).focus();
+  await userEvent.keyboard("{Shift>}{F2}{/Shift}");
+  expect(getPaneItem()).toBe(pyramid);
+
+  await trashItems([sphinx]);
+  setPlace({ kind: "trash" });
+  await expect.element(tile()).toBeVisible();
+  (tile().element() as HTMLElement).focus();
+  await userEvent.keyboard("{F2}");
+  expect(getPaneItem()).toBe(pyramid);
+  expect(screen.getByRole("textbox", { name: "Rename sphinx.jpg" }).query()).toBeNull();
 });

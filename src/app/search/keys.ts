@@ -1,8 +1,8 @@
 import { useEffect } from "react";
 
-import { autoPopoverOpen } from "../../ui/Menu";
 import { dragging } from "../grid/drag";
 import { getSelection } from "../grid/selection";
+import { keyIsFree } from "../key-free";
 import { getFullScreen } from "../pane/full-screen";
 import { getPlace } from "../place";
 import { focusSearch } from "./SearchField";
@@ -11,7 +11,7 @@ import { goBack } from "./search";
 /**
  * Ctrl+F puts the caret in the search field from anywhere but a dialog, as Explorer's does. Escape
  * leaves a search's results for where it began, once nothing else is open to close first: a menu,
- * a field, full screen, a checked set. Artboards › A search is a place.
+ * a field, a question, full screen, a checked set. Artboards › A search is a place.
  */
 export function useSearchKeys() {
   useEffect(() => {
@@ -24,13 +24,7 @@ export function useSearchKeys() {
         focusSearch();
         return;
       }
-      if (event.key !== "Escape") return;
-      if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
-      const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest("input, textarea, select, [contenteditable], [role=menu], [popover]")) {
-        return;
-      }
-      if (autoPopoverOpen() || document.querySelector("dialog[open]")) return;
+      if (event.key !== "Escape" || !keyIsFree(event)) return;
       if (getPlace()?.kind !== "search") return;
       if (getFullScreen() || dragging() || getSelection().ids.length > 0) return;
       event.preventDefault();

@@ -17,14 +17,20 @@ import {
 } from "../undo/lines";
 import { showReport } from "../undo/report-store";
 import { afterAct } from "../undo/undo";
+import { goingUntilEnd, jobEnded, once } from "./going";
 import { moveOn, moveOnFrom } from "./move-on";
 import { askNoBin } from "./no-bin";
 
 /**
  * Deletes files: those on a drive with no Recycle Bin are asked about, once for them all, and the
- * rest go to the Recycle Bin at once. DECISIONS.md "A drive with no Recycle Bin".
+ * rest go to the Recycle Bin at once. Nothing goes while a delete or a move is still sending one
+ * of them. DECISIONS.md "A drive with no Recycle Bin".
  */
 export async function deleteFiles(itemIds: number[]) {
+  await once(itemIds, () => askOrSend(itemIds));
+}
+
+async function askOrSend(itemIds: number[]) {
   const back = document.activeElement;
   const drives = await binlessItems(itemIds).catch((error: unknown) => {
     sayFailed(deletedFailed(itemIds.length), error);
@@ -64,6 +70,7 @@ async function sendToBin(itemIds: number[], asked: number) {
   });
   if (!done) return 0;
   if (done.kind === "started") {
+    void goingUntilEnd(done.jobId, itemIds);
     sending.set(done.jobId, asked);
     moveOn(pane, []);
     return 0;
@@ -104,6 +111,7 @@ function settleTrashed(batch: Batch | null, report: TrashReport, asked: number) 
  * Line counting what went against what it was asked. One that stopped on its own says why.
  */
 export async function afterTrashed(deleted: Extract<Deleted, { kind: "files" }>) {
+  jobEnded(deleted.jobId);
   await libraryChanged();
   const asked = sending.get(deleted.jobId) ?? 0;
   sending.delete(deleted.jobId);
@@ -130,18 +138,20 @@ async function deleteFilesForGood(
   drives: readonly string[],
 ) {
   const itemIds = files.map((file) => file.id);
-  const pane = await moveOnFrom(itemIds);
-  const report = await deleteForGood(itemIds).catch((error: unknown) => {
-    sayFailed(deletedFailed(itemIds.length), error);
-    return null;
+  await once(itemIds, async () => {
+    const pane = await moveOnFrom(itemIds);
+    const report = await deleteForGood(itemIds).catch((error: unknown) => {
+      sayFailed(deletedFailed(itemIds.length), error);
+      return null;
+    });
+    if (!report) return;
+    const [first] = report.refused;
+    if (first) setNews({ kind: "kept", line: forGoodKeptLine(report.refused, report.deleted) });
+    else {
+      const one = files.length === 1 ? files[0]?.name : undefined;
+      setNews({ kind: "said", line: forGoodLine(report.deleted, drives, one) });
+    }
+    moveOn(pane, report.refused);
+    await libraryChanged();
   });
-  if (!report) return;
-  const [first] = report.refused;
-  if (first) setNews({ kind: "kept", line: forGoodKeptLine(report.refused, report.deleted) });
-  else {
-    const one = files.length === 1 ? files[0]?.name : undefined;
-    setNews({ kind: "said", line: forGoodLine(report.deleted, drives, one) });
-  }
-  moveOn(pane, report.refused);
-  await libraryChanged();
 }

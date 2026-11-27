@@ -4,6 +4,7 @@ import { copyItemPaths, itemDetail } from "../ipc/commands";
 import { failed } from "./failure";
 import { inTrash } from "./grid/place-items";
 import { getChecked } from "./grid/selection";
+import { keyIsFree } from "./key-free";
 import { setNews } from "./navigation/foot-slot";
 import { getIndex } from "./navigation/index-store";
 import { deleteFiles } from "./pane/delete";
@@ -27,14 +28,14 @@ function digitOf(event: KeyboardEvent) {
 
 /**
  * A digit moves what is checked, or the pane's file when nothing is, to the folder it is bound
- * to. It does nothing in a field, over a menu or Settings, or in the Trash.
+ * to. It does nothing in a field, over a menu, a question or Settings, or in the Trash; held, it
+ * moves once.
  */
 export function useDestinationKeys() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const digit = digitOf(event);
-      if (digit === null || !keyIsFree(event)) return;
-      if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+      if (digit === null || event.repeat || !keyIsFree(event)) return;
       if (getPlace()?.kind === "trash") return;
       event.preventDefault();
       void press(digit);
@@ -44,32 +45,27 @@ export function useDestinationKeys() {
   }, []);
 }
 
-/** Whether a key is the app's: not in a field, a menu, a question or Settings. */
-function keyIsFree(event: KeyboardEvent) {
-  if (event.defaultPrevented) return false;
-  const target = event.target instanceof Element ? event.target : null;
-  const own = "input, textarea, select, [contenteditable], [role=menu], [popover], [data-question]";
-  return !target?.closest(own) && !document.querySelector("dialog[open]");
-}
-
 type FileKey = "delete" | "copy" | "copyPath";
 
 function fileKeyOf(event: KeyboardEvent): FileKey | null {
   if (event.altKey || event.metaKey) return null;
-  if (event.key === "Delete" && !event.ctrlKey && !event.shiftKey) return "delete";
+  if (event.key === "Delete" && !event.ctrlKey && !event.shiftKey) {
+    return event.repeat ? null : "delete";
+  }
   if (event.key.toLowerCase() !== "c" || !event.ctrlKey) return null;
   return event.shiftKey ? "copyPath" : "copy";
 }
 
 /**
  * Explorer's keys for files: Delete, Ctrl+C and Ctrl+Shift+C do what the bar's Delete, Copy and
- * Copy as Path do, to what is checked, or the pane's file when nothing is.
+ * Copy as Path do, to what is checked, or the pane's file when nothing is. Held, Delete deletes
+ * once.
  */
 export function useFileKeys() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const key = fileKeyOf(event);
-      if (key === null || !keyIsFree(event)) return;
+      if (key === null || !keyIsFree(event, { modifiers: true })) return;
       event.preventDefault();
       void actOn(key);
     };

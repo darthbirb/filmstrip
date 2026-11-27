@@ -641,6 +641,46 @@ pub fn unended(conn: &Connection, batch_id: &str) -> Result<bool> {
     )?)
 }
 
+/// How many acts the journal keeps, the newest by their newest row. DECISIONS.md "Undo".
+pub const KEPT_ACTS: i64 = 1_000;
+
+/// Deletes every act older than the newest [`KEPT_ACTS`], whole, its subjects going with it, so
+/// undo reaches no further back. An act the redo holds any of, one a job still names, and one a
+/// send to the Recycle Bin not yet settled will write to, stay. SCHEMA.md "The undo journal".
+pub fn prune(conn: &Connection) -> Result<()> {
+    prune_to(conn, KEPT_ACTS)
+}
+
+fn prune_to(conn: &Connection, kept: i64) -> Result<()> {
+    let sending: Vec<String> = crate::db::recycling::unsettled(conn)?
+        .into_iter()
+        .filter_map(|one| one.batch_id)
+        .collect();
+    conn.execute(
+        "WITH kept(batch_id) AS (
+             SELECT batch_id FROM journal GROUP BY batch_id ORDER BY MAX(id) DESC LIMIT ?1
+         ),
+         held(batch_id) AS (
+             SELECT batch_id FROM journal WHERE undone IS NOT NULL
+           UNION
+             SELECT json_extract(payload, '$.batchId') FROM job
+              WHERE kind IN (SELECT value FROM json_each(?2))
+                AND json_extract(payload, '$.batchId') IS NOT NULL
+           UNION
+             SELECT value FROM json_each(?3)
+         )
+         DELETE FROM journal
+          WHERE batch_id NOT IN (SELECT batch_id FROM kept)
+            AND batch_id NOT IN (SELECT batch_id FROM held)",
+        params![
+            kept,
+            serde_json::to_string(&ACTS)?,
+            serde_json::to_string(&sending)?
+        ],
+    )?;
+    Ok(())
+}
+
 /// The file or folder a row is about, once the row can no longer be undone: its name, the folder
 /// it was in, and why. A mark written before folders were marked names a file by `itemId`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1562,6 +1602,105 @@ mod tests {
             (back.from.as_str(), back.to.as_str()),
             ("Cairo", "Untitled")
         );
+    }
+
+    fn subjects_of(conn: &Connection, item_id: i64) -> i64 {
+        conn.query_row(
+            "SELECT COUNT(*) FROM journal_subject WHERE item_id = ?1",
+            params![item_id],
+            |r| r.get(0),
+        )
+        .unwrap()
+    }
+
+    /// Five acts, each moving one file: item 1 first, item 5 last.
+    fn five_acts(conn: &Connection) -> Vec<String> {
+        (1..=5)
+            .map(|item_id| {
+                let act = new_batch();
+                record_item_move(conn, &act, item_id, 1, 2).unwrap();
+                act
+            })
+            .collect()
+    }
+
+    #[test]
+    fn pruning_keeps_the_newest_acts_whole_and_takes_the_rest_with_their_subjects() {
+        let conn = conn();
+        let acts = five_acts(&conn);
+        record_item_move(&conn, &acts[1], 6, 1, 2).unwrap();
+
+        prune_to(&conn, 3).unwrap();
+
+        for gone in [&acts[0], &acts[2]] {
+            assert!(batch(&conn, gone).unwrap().is_empty());
+        }
+        assert_eq!(subjects_of(&conn, 1), 0);
+        assert_eq!(subjects_of(&conn, 3), 0);
+        assert_eq!(
+            batch(&conn, &acts[1]).unwrap().len(),
+            2,
+            "an act counts by its newest row, and is kept whole"
+        );
+        assert_eq!(subjects_of(&conn, 2), 1);
+        assert_eq!(latest_batch(&conn).unwrap(), Some(acts[1].clone()));
+
+        prune_to(&conn, 3).unwrap();
+        assert_eq!(
+            batch(&conn, &acts[3]).unwrap().len(),
+            1,
+            "and nothing more goes"
+        );
+    }
+
+    #[test]
+    fn pruning_leaves_the_redo_a_running_job_and_an_unsettled_send_their_acts() {
+        let conn = conn();
+        let acts = five_acts(&conn);
+        let undone = batch(&conn, &acts[0]).unwrap()[0].id;
+        set_undone(&conn, undone, next_undo(&conn).unwrap(), &Kept::default()).unwrap();
+        crate::db::jobs::enqueue(
+            &conn,
+            crate::jobs::kinds::MOVE,
+            &serde_json::json!({ "batchId": acts[1] }).to_string(),
+            0,
+        )
+        .unwrap();
+        crate::db::recycling::add(
+            &conn,
+            &crate::db::recycling::Sending::new(
+                std::path::Path::new("D:/Trips/sphinx.jpg"),
+                9,
+                "u",
+                Some(acts[2].as_str()),
+            ),
+        )
+        .unwrap();
+
+        prune_to(&conn, 1).unwrap();
+
+        assert_eq!(latest_undone(&conn).unwrap(), Some(acts[0].clone()));
+        assert!(still_undone(&conn, undone).unwrap());
+        assert_eq!(batch(&conn, &acts[1]).unwrap().len(), 1);
+        assert_eq!(batch(&conn, &acts[2]).unwrap().len(), 1);
+        assert!(batch(&conn, &acts[3]).unwrap().is_empty());
+        assert_eq!(latest_batch(&conn).unwrap(), Some(acts[4].clone()));
+    }
+
+    #[test]
+    fn pruning_a_journal_below_the_floor_keeps_undo_stopped_at_it() {
+        let conn = conn();
+        let acts = five_acts(&conn);
+        set_floor(&conn).unwrap();
+
+        prune_to(&conn, 1).unwrap();
+        assert_eq!(latest_batch(&conn).unwrap(), None);
+        assert!(below_floor(&conn, &acts[4]).unwrap());
+
+        let after = new_batch();
+        record_item_move(&conn, &after, 7, 1, 2).unwrap();
+        assert_eq!(latest_batch(&conn).unwrap(), Some(after.clone()));
+        assert!(!below_floor(&conn, &after).unwrap());
     }
 
     mod timing {

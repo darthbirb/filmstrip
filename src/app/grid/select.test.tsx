@@ -266,6 +266,20 @@ test("an open auto popover closes at Escape first, with the focus outside it; a 
   expect(manual.matches(":popover-open")).toBe(true);
 });
 
+test("Ctrl+A checks nothing while an auto popover is open, with the focus outside it", async () => {
+  await renderGrid();
+  const auto = document.createElement("div");
+  auto.popover = "auto";
+  document.body.append(auto);
+  onTestFinished(() => auto.remove());
+  (tile(0).element() as HTMLElement).focus();
+
+  auto.showPopover();
+  expect(auto.contains(document.activeElement)).toBe(false);
+  await userEvent.keyboard("{Control>}a{/Control}");
+  expect(getSelection().ids).toEqual([]);
+});
+
 test("Ctrl+A in a field selects its text and checks nothing", async () => {
   await renderGrid();
   const field = document.createElement("input");

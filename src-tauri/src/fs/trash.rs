@@ -50,18 +50,29 @@ pub struct Origin {
     pub gone: bool,
 }
 
-/// Everything in the trash, the most recent first.
+/// Everything in the trash, the most recent first, each folder it left read with all the others.
 pub fn listing(conn: &Connection) -> Result<Vec<Trashed>> {
-    items::in_trash(conn)?
+    let held = items::in_trash(conn)?;
+    let left: Vec<i64> = held
+        .iter()
+        .map(|(row, _)| row.folder_id)
+        .collect::<HashSet<_>>()
         .into_iter()
-        .map(|(row, trashed_at)| {
-            Ok(Trashed {
-                from: origin(conn, row.folder_id)?,
-                row,
-                trashed_at,
-            })
+        .collect();
+    let paths = sources::place_paths(conn, &left)?;
+    let live = folders::live_at_each(conn, &left)?;
+    Ok(held
+        .into_iter()
+        .map(|(row, trashed_at)| Trashed {
+            from: Origin {
+                folder_id: row.folder_id,
+                path: paths.get(&row.folder_id).cloned().unwrap_or_default(),
+                gone: !live.contains_key(&row.folder_id),
+            },
+            row,
+            trashed_at,
         })
-        .collect()
+        .collect())
 }
 
 /// A folder named from its source's own folder down, and whether it or one at its place is live.
@@ -73,7 +84,8 @@ pub fn origin(conn: &Connection, folder_id: i64) -> Result<Origin> {
     })
 }
 
-/// Sends each item to the trash under one batch, so one undo brings the whole selection back.
+/// Sends each item to the trash under one batch, so one undo brings the whole selection back. One
+/// already in the trash, sent by an earlier act, is passed over: neither sent nor refused.
 pub fn trash_items(conn: &Connection, item_ids: &[i64], batch_id: &str) -> Result<TrashReport> {
     let _turn = super::turn();
     Ok(trash_each(conn, item_ids, batch_id, &relocate::Unwatched, false)?.report)
@@ -117,7 +129,7 @@ fn trash_each(
         let _turn = turn_each.then(super::turn);
         if sent.contains(&item_id) {
             outcome.report.trashed += 1;
-        } else {
+        } else if !items::is_trashed(conn, item_id)? {
             match trash_unjournalled(conn, item_id, Some(batch_id)) {
                 Ok(()) => outcome.report.trashed += 1,
                 Err(err) => outcome
@@ -1161,6 +1173,31 @@ mod tests {
         assert!(items::is_live(&conn, pyramid).unwrap());
     }
 
+    #[test]
+    fn a_file_already_in_the_trash_when_a_second_delete_arrives_is_passed_over() {
+        let (conn, root, cairo) = library("sent-twice");
+        stand_in();
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        let first = journal::new_batch();
+        trash_items(&conn, &[pyramid], &first).unwrap();
+        let second = journal::new_batch();
+
+        let report = trash_items(&conn, &[pyramid, sphinx], &second).unwrap();
+
+        assert_eq!(
+            report,
+            TrashReport {
+                trashed: 1,
+                refused: Vec::new()
+            }
+        );
+        cairo_holds(&root, &[]);
+        assert_eq!(journal::batch(&conn, &second).unwrap().len(), 1);
+        undo::undo_batch(&conn, &first).unwrap();
+        cairo_holds(&root, &["pyramid.jpg"]);
+    }
+
     /// Cairo holding sphinx.jpg, pyramid.jpg and then each name here, walked; their ids, sphinx first.
     fn with_more(conn: &Connection, root: &Path, cairo: i64, names: &[&str]) -> Vec<i64> {
         for name in names {
@@ -2122,6 +2159,45 @@ mod tests {
 
     mod timing {
         use super::*;
+
+        #[test]
+        #[ignore = "timing: runs alone, one test at a time"]
+        fn ten_thousand_trashed_files_from_a_thousand_folders_list_inside_a_second() {
+            let (conn, _, cairo) = library("timing-listing");
+            let tx = db::begin(&conn).unwrap();
+            let left: Vec<i64> = (0..1_000)
+                .map(|n| folders::create(&tx, cairo, &format!("Day {n}")).unwrap())
+                .collect();
+            for n in (0..1_000).step_by(2) {
+                folders::retire_subtree_at(&tx, left[n], 2).unwrap();
+            }
+            for n in (0..1_000).step_by(4) {
+                folders::create(&tx, cairo, &format!("Day {n}")).unwrap();
+            }
+            let trashed: Vec<i64> = (0..10_000_i64)
+                .map(|n| {
+                    tx.execute(
+                        "INSERT INTO item (uuid, source_id, folder_id, disk_name, ext, size_bytes,
+                                           mtime, kind, added_at, deleted_at, trashed_at)
+                         VALUES ('t' || ?1, 1, ?2, ?1 || '.jpg', 'jpg', 1, 1, 'image', 1, ?1, ?1)",
+                        rusqlite::params![n, left[(n % 1_000) as usize]],
+                    )
+                    .unwrap();
+                    tx.last_insert_rowid()
+                })
+                .collect();
+            tx.commit().unwrap();
+            journal::grow_to_two_hundred_thousand(&conn, &trashed);
+
+            let started = std::time::Instant::now();
+            let held = listing(&conn).unwrap();
+            let took = started.elapsed();
+
+            assert_eq!(held.len(), 10_000);
+            assert_eq!(held.iter().filter(|one| one.from.gone).count(), 2_500);
+            assert_eq!(held[0].from.path, ["Library", "Trips", "Cairo", "Day 999"]);
+            assert!(took < std::time::Duration::from_secs(1), "took {took:?}");
+        }
 
         #[test]
         #[ignore = "timing: runs alone, one test at a time"]

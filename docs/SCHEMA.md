@@ -206,9 +206,14 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   move's way back among them, are not its subjects. Forgetting and dropping files find their rows
   through it, and `journal::drop_items` drops many files in one set of statements. Of the folder
   subjects only `retag`'s are read so far; a one-folder row's are kept for
-  `journal::forget_source`, which still reads the journal's JSON, and for pruning (#264).
+  `journal::forget_source`, which still reads the journal's JSON.
 - Undo never reaches a row at or below `setting.undo_floor`, which a restore sets to the newest
   row the restored journal holds.
+- Each launch keeps the newest `journal::KEPT_ACTS` batches, ranked by their newest row, and
+  deletes every other batch whole, its subjects going by the trigger (`journal::prune`). A batch
+  with any undone row, one a copy, move or delete job names by `batchId`, and one an unsettled
+  send in `setting.recycling` names, stay whatever their rank. The newest row always stays, so a
+  row written after a restore is numbered above its floor.
 
 ## Destination keys
 

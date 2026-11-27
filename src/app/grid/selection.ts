@@ -3,7 +3,7 @@ import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { BranchFile } from "../../ipc/bindings/BranchFile";
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
 import { folderBranchFiles } from "../../ipc/commands";
-import { autoPopoverOpen } from "../../ui/Menu";
+import { keyIsFree } from "../key-free";
 import { whenLibraryChanges } from "../library";
 import { getFullScreen } from "../pane/full-screen";
 import { getPaneItem } from "../pane/pane-store";
@@ -232,16 +232,9 @@ whenLibraryChanges(readBranchAgain);
 export function useSelectionKeys(order: readonly number[]) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.altKey || event.metaKey) return;
-      const target = event.target instanceof Element ? event.target : null;
-      const own =
-        "input, textarea, select, [contenteditable], [role=menu], [popover], [data-question]";
-      if (target?.closest(own)) {
-        return;
-      }
-      if (document.querySelector("dialog[open]")) return;
+      if (event.altKey || event.metaKey || !keyIsFree(event, { modifiers: true })) return;
       if (event.key === "Escape" && !event.ctrlKey && !event.shiftKey) {
-        if (autoPopoverOpen() || getFullScreen() || dragging()) return;
+        if (getFullScreen() || dragging()) return;
         if (held.selection.ids.length === 0) return;
         event.preventDefault();
         clearChecked();
