@@ -836,8 +836,9 @@ under whatever is being looked at by then. So whether it leaves is judged from w
 out of a folder it does, and out of the Sorting Box unless into a sorting source. A search can
 only be asked once the job lands, since it may find the file by its name or by the folder it
 lived in, so there the pane stays on the file until then and moves on if the search has lost it.
-It has landed once it has left the queue as "One press, one act" tells it, so one already gone
-when its start is answered moves the pane on then. One the job leaves where it was is named by its banner.
+It has landed once it has left the queue, as "One press, one act" tells it: a job already gone
+when its start is answered has landed then, and the search is asked at once. One the job leaves
+where it was is named by its banner.
 
 **The focus stays where the act was taken**, settled on 25 November 2026. Delete and Restore take
 their file's bar with them, which dropped the focus to the page and sent a keyboard or screen
@@ -1291,11 +1292,13 @@ the same files, with its own line and Cancel. It has left once its end is heard,
 stopped too, or once the queue's report no longer lists it after listing it, which also covers a
 job that failed or panicked and said nothing. A job already gone when its start is answered lets
 its files go at once, and a job id, which the queue reuses, is remembered only while its job
-holds files. A worker claims a job a moment before its line starts, and a report in that moment
-would let the files go early; the cost is a second job, which the pass-over below keeps quiet. A
-held Delete or digit acts on its first press alone, or Windows' repeat would go on to the file
-that took the pane's place. Behind that, a file already in the Trash when a delete reaches it is
-passed over, neither sent nor refused, since the act that sent it already said so, with its Undo.
+holds files. A worker claims a job a moment before its line starts, so the queue lists a move or
+a delete it has claimed at none settled until its line does, and never lists one again once its
+line has ended, though its row runs a moment longer: no report leaves out a job still running,
+or brings back one that has ended at none settled. A held Delete or digit acts on its first
+press alone, or Windows' repeat would go on to the file that took the pane's place. Behind that,
+a file already in the Trash when a delete reaches it is passed over, neither sent nor refused,
+since the act that sent it already said so, with its Undo.
 
 ## Search
 

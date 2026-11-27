@@ -136,6 +136,22 @@ test("what waits on a job runs once it has left, and once only", async () => {
   );
 });
 
+test("what waits on a job runs once its end is heard, and not again as the queue drops it", async () => {
+  const listed = await listing(14);
+  let ran = 0;
+  await recording(
+    async () => {
+      await goingUntilEnd(14, [111], () => ran++);
+      expect(ran).toBe(0);
+      jobEnded(14);
+      expect(ran).toBe(1);
+      jobsListed({ moves: [], deletes: [] });
+      expect(ran).toBe(1);
+    },
+    (cmd) => (cmd === "index_progress" ? listed : undefined),
+  );
+});
+
 test("what waits on a job already gone when its start is answered runs then", async () => {
   const empty = await listing();
   let ran = 0;

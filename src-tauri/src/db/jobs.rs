@@ -151,6 +151,18 @@ pub fn waiting(conn: &Connection, kind: &str) -> Result<Vec<(i64, String)>> {
     Ok(rows)
 }
 
+/// Each job of a kind waiting or running, oldest first, with its payload.
+pub fn queued(conn: &Connection, kind: &str) -> Result<Vec<(i64, String)>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, payload FROM job
+          WHERE kind = ?1 AND status IN ('pending', 'running') ORDER BY id",
+    )?;
+    let rows = stmt
+        .query_map([kind], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(rows)
+}
+
 /// Takes every job of a kind off the table, whatever its state, and returns their payloads.
 pub fn take_all(conn: &Connection, kind: &str) -> Result<Vec<String>> {
     let mut stmt = conn.prepare("DELETE FROM job WHERE kind = ?1 RETURNING payload")?;

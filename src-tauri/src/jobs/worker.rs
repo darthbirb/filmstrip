@@ -211,6 +211,8 @@ struct MoveControl<'a> {
 /// A move's line and its Cancel go when it ends, however it ends: a panic included.
 impl Drop for MoveControl<'_> {
     fn drop(&mut self) {
+        // Ended before the line goes, or a report in between lists its running row at 0%.
+        lock(&self.inner.ended).insert(self.job_id);
         lock(&self.inner.moves).remove(&self.job_id);
         lock(&self.inner.cancelled).remove(&self.job_id);
     }
@@ -481,6 +483,8 @@ impl<'a> DeleteControl<'a> {
 /// A delete's line and its Cancel go when it ends, however it ends: a panic included.
 impl Drop for DeleteControl<'_> {
     fn drop(&mut self) {
+        // Ended before the line goes, or a report in between lists its running row at 0%.
+        lock(&self.inner.ended).insert(self.job_id);
         lock(&self.inner.deletes).remove(&self.job_id);
         lock(&self.inner.cancelled).remove(&self.job_id);
     }

@@ -262,6 +262,9 @@ pub struct QueueInner {
     exports: Mutex<BTreeMap<i64, Exporting>>,
     moves: Mutex<BTreeMap<i64, Moving>>,
     deletes: Mutex<BTreeMap<i64, Deleting>>,
+    /// Moves and deletes whose line has ended while their row still runs, so no report lists them
+    /// again. DECISIONS.md "One press, one act".
+    ended: Mutex<HashSet<i64>>,
     cancelled: Mutex<HashSet<i64>>,
 }
 
@@ -298,6 +301,7 @@ impl QueueInner {
             exports: Mutex::new(BTreeMap::new()),
             moves: Mutex::new(BTreeMap::new()),
             deletes: Mutex::new(BTreeMap::new()),
+            ended: Mutex::new(HashSet::new()),
             cancelled: Mutex::new(HashSet::new()),
         }
     }
@@ -311,6 +315,16 @@ impl QueueInner {
         } else {
             Phase::Idle
         };
+        let (moves, deletes) = {
+            let moving = lock(&self.moves);
+            let deleting = lock(&self.deletes);
+            // Read after the lines and before the table, or a line ending in between shows at 0%.
+            let ended = lock(&self.ended);
+            (
+                moves(conn, &moving, &ended)?,
+                deletes(conn, &deleting, &ended)?,
+            )
+        };
         Ok(Progress {
             phase,
             pending: counts.pending,
@@ -319,8 +333,8 @@ impl QueueInner {
             completed: self.completed.load(Ordering::Relaxed),
             copies: copies(conn, &lock(&self.copies))?,
             exports: exports(conn, &lock(&self.exports))?,
-            moves: moves(conn, &lock(&self.moves))?,
-            deletes: deletes(conn, &lock(&self.deletes))?,
+            moves,
+            deletes,
             walks: self.walks.load(Ordering::Relaxed),
             walked_source: *lock(&self.walked_source),
             thumbed: Vec::new(),
@@ -472,11 +486,16 @@ fn copies(conn: &Connection, running: &BTreeMap<i64, Copying>) -> Result<Vec<Cop
     Ok(copies)
 }
 
-/// Each move running, and each waiting its turn at none of its files settled, oldest first.
-fn moves(conn: &Connection, running: &BTreeMap<i64, Moving>) -> Result<Vec<Moving>> {
+/// Each move running, and each waiting its turn or claimed and not yet begun at none of its files
+/// settled, oldest first.
+fn moves(
+    conn: &Connection,
+    running: &BTreeMap<i64, Moving>,
+    ended: &HashSet<i64>,
+) -> Result<Vec<Moving>> {
     let mut moves: Vec<Moving> = running.values().cloned().collect();
-    for (job_id, payload) in table::waiting(conn, kinds::MOVE)? {
-        if running.contains_key(&job_id) {
+    for (job_id, payload) in table::queued(conn, kinds::MOVE)? {
+        if running.contains_key(&job_id) || ended.contains(&job_id) {
             continue;
         }
         let Ok(payload) = serde_json::from_str::<kinds::MovePayload>(&payload) else {
@@ -494,12 +513,17 @@ fn moves(conn: &Connection, running: &BTreeMap<i64, Moving>) -> Result<Vec<Movin
     Ok(moves)
 }
 
-/// Each delete running, and each waiting its turn at none of its files settled, oldest first.
-fn deletes(conn: &Connection, running: &BTreeMap<i64, Deleting>) -> Result<Vec<Deleting>> {
+/// Each delete running, and each waiting its turn or claimed and not yet begun at none of its
+/// files settled, oldest first.
+fn deletes(
+    conn: &Connection,
+    running: &BTreeMap<i64, Deleting>,
+    ended: &HashSet<i64>,
+) -> Result<Vec<Deleting>> {
     let mut deletes: Vec<Deleting> = running.values().cloned().collect();
     for kind in kinds::DELETES {
-        for (job_id, payload) in table::waiting(conn, kind)? {
-            if running.contains_key(&job_id) {
+        for (job_id, payload) in table::queued(conn, kind)? {
+            if running.contains_key(&job_id) || ended.contains(&job_id) {
                 continue;
             }
             if let Some(line) = worker::waiting_line(job_id, kind, &payload) {
@@ -667,23 +691,34 @@ fn work(inner: &QueueInner) {
         // A decoder that panics on one malformed file costs that job, never the app.
         let outcome =
             std::panic::catch_unwind(AssertUnwindSafe(|| worker::execute(inner, &mut conn, &job)));
-        let _ = match outcome {
-            Ok(Ok(worker::Done::Finished)) => {
-                inner.completed.fetch_add(1, Ordering::Relaxed);
-                table::complete(&conn, job.id)
-            }
-            Ok(Ok(worker::Done::Paused)) => table::release(&conn, job.id),
-            Ok(Err(err)) => {
-                let retry = job.attempt < kinds::MAX_ATTEMPTS && worker::is_transient(&err);
-                table::fail(&conn, job.id, &Reason::of(&err), retry)
-            }
-            Err(_) => {
-                eprintln!("job {}: the worker stopped on its file", job.id);
-                table::fail(&conn, job.id, &Reason::Unreadable, false)
-            }
-        };
+        settle(inner, &conn, &job, &outcome);
         drop(open);
     }
+}
+
+/// Takes a job's row out of running as it went, and only then forgets that its line ended.
+fn settle(
+    inner: &QueueInner,
+    conn: &Connection,
+    job: &table::QueuedJob,
+    outcome: &std::thread::Result<Result<worker::Done>>,
+) {
+    let _ = match outcome {
+        Ok(Ok(worker::Done::Finished)) => {
+            inner.completed.fetch_add(1, Ordering::Relaxed);
+            table::complete(conn, job.id)
+        }
+        Ok(Ok(worker::Done::Paused)) => table::release(conn, job.id),
+        Ok(Err(err)) => {
+            let retry = job.attempt < kinds::MAX_ATTEMPTS && worker::is_transient(err);
+            table::fail(conn, job.id, &Reason::of(err), retry)
+        }
+        Err(_) => {
+            eprintln!("job {}: the worker stopped on its file", job.id);
+            table::fail(conn, job.id, &Reason::Unreadable, false)
+        }
+    };
+    lock(&inner.ended).remove(&job.id);
 }
 
 /// Sends progress once per tick, and only when it changed — which is also what makes a queue that
@@ -1374,6 +1409,38 @@ mod tests {
     }
 
     #[test]
+    fn a_move_claimed_and_not_yet_begun_is_listed_and_one_ended_is_never_listed_again() {
+        let (conn, dir, _, people, ids) = library_to_move("move-claimed");
+        let job_id = enqueue_move_items(&conn, &ids, people).unwrap();
+        let (said, heard) = mpsc::channel();
+        let inner = hearing_moves(&dir, said);
+        let mut worker = db::open(&dir.join("library.db")).unwrap();
+        let job = table::claim(&mut worker).unwrap().unwrap();
+        assert_eq!(job.id, job_id);
+        assert_eq!(
+            inner.progress(&conn).unwrap().moves,
+            [Moving {
+                job_id,
+                folder_id: people,
+                to: "People".into(),
+                done: 0,
+                whole: 2,
+            }],
+            "claimed, its line not yet begun"
+        );
+
+        let outcome = Ok(worker::execute(&inner, &mut worker, &job));
+        assert!(!heard.try_recv().unwrap().cancelled);
+        assert!(
+            inner.progress(&conn).unwrap().moves.is_empty(),
+            "ended, its row still running"
+        );
+        settle(&inner, &worker, &job, &outcome);
+        assert!(inner.progress(&conn).unwrap().moves.is_empty());
+        assert!(lock(&inner.ended).is_empty());
+    }
+
+    #[test]
     fn a_move_waiting_after_a_crash_is_no_act_until_it_ends_and_cancel_ends_it_with_what_went() {
         let (conn, dir, trips, people, ids) = library_to_move("move-cancel-waiting");
         let job = enqueue_move_items(&conn, &ids, people).unwrap();
@@ -1471,11 +1538,11 @@ mod tests {
     fn run_here(inner: &QueueInner, dir: &Path) -> worker::Done {
         let mut conn = db::open(&dir.join("library.db")).unwrap();
         let job = table::claim(&mut conn).unwrap().unwrap();
-        let done = worker::execute(inner, &mut conn, &job).unwrap();
-        match done {
-            worker::Done::Finished => table::complete(&conn, job.id).unwrap(),
-            worker::Done::Paused => table::release(&conn, job.id).unwrap(),
-        }
+        let outcome = Ok(worker::execute(inner, &mut conn, &job));
+        settle(inner, &conn, &job, &outcome);
+        let Ok(Ok(done)) = outcome else {
+            panic!("job {} failed", job.id);
+        };
         done
     }
 
@@ -1556,6 +1623,36 @@ mod tests {
             !dir.join(format!("library/Trips/IMG_{}.jpg", kinds::AT_ONCE))
                 .exists()
         );
+    }
+
+    #[test]
+    fn a_delete_claimed_and_not_yet_begun_is_listed_and_one_ended_is_never_listed_again() {
+        let (conn, dir, _, ids) = library_to_delete("delete-claimed", kinds::AT_ONCE + 1);
+        let job_id = enqueue_trash(&conn, &ids).unwrap();
+        let (said, heard) = mpsc::channel();
+        let inner = hearing_deletes(&dir, said);
+        let mut worker = db::open(&dir.join("library.db")).unwrap();
+        let job = table::claim(&mut worker).unwrap().unwrap();
+        assert_eq!(job.id, job_id);
+        let listed = |inner: &QueueInner| {
+            let deletes = inner.progress(&conn).unwrap().deletes;
+            deletes
+                .iter()
+                .map(|one| (one.job_id, one.done))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            listed(&inner),
+            [(job_id, 0)],
+            "claimed, its line not yet begun"
+        );
+
+        let outcome = Ok(worker::execute(&inner, &mut worker, &job));
+        assert!(matches!(heard.try_recv().unwrap(), Deleted::Files { .. }));
+        assert!(listed(&inner).is_empty(), "ended, its row still running");
+        settle(&inner, &worker, &job, &outcome);
+        assert!(listed(&inner).is_empty());
+        assert!(lock(&inner.ended).is_empty());
     }
 
     #[test]
