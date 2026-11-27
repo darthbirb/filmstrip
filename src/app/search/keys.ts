@@ -11,7 +11,7 @@ import { goBack } from "./search";
 /**
  * Ctrl+F puts the caret in the search field from anywhere but a dialog, as Explorer's does. Escape
  * leaves a search's results for where it began, once nothing else is open to close first: a menu,
- * a field, full screen, a checked set. Artboards › A search is a place.
+ * a field, a question, full screen, a checked set. Artboards › A search is a place.
  */
 export function useSearchKeys() {
   useEffect(() => {

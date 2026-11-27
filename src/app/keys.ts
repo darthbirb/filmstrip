@@ -28,7 +28,7 @@ function digitOf(event: KeyboardEvent) {
 
 /**
  * A digit moves what is checked, or the pane's file when nothing is, to the folder it is bound
- * to. It does nothing in a field, over a menu or Settings, or in the Trash.
+ * to. It does nothing in a field, over a menu, a question or Settings, or in the Trash.
  */
 export function useDestinationKeys() {
   useEffect(() => {
