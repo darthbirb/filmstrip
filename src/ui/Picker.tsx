@@ -13,6 +13,8 @@ export type PickerRow = {
   depth: number;
   /** Quieter words at the row's end: where it is, or why it cannot be picked. */
   detail?: string;
+  /** The detail is cut before the label is, as a sorting source's name is after the Sorting Box. */
+  yields?: boolean;
   /** The folder's own files and those at or below it, for its pill; none, no pill. */
   count?: { own: number; all: number };
   disabled?: boolean;
@@ -194,14 +196,21 @@ export function Picker({
                   filled
                   className={`shrink-0 text-glyph ${row.disabled ? "" : "text-fg-dim"}`}
                 />
-                <span className="min-w-0 flex-1 truncate">{row.label}</span>
-                {row.count && <CountPill {...row.count} tone={row.disabled ? "barred" : "rest"} />}
+                <span className={`min-w-0 truncate ${row.yields ? "" : "flex-1"}`}>
+                  {row.label}
+                </span>
+                {!row.yields && row.count && (
+                  <CountPill {...row.count} tone={row.disabled ? "barred" : "rest"} />
+                )}
                 {row.detail && (
                   <span
-                    className={`shrink-0 whitespace-nowrap text-small ${row.disabled ? "" : "text-fg-dim"}`}
+                    className={`whitespace-nowrap text-small ${row.yields ? "min-w-0 flex-1 truncate text-right" : "shrink-0"} ${row.disabled ? "" : "text-fg-dim"}`}
                   >
                     {row.detail}
                   </span>
+                )}
+                {row.yields && row.count && (
+                  <CountPill {...row.count} tone={row.disabled ? "barred" : "rest"} />
                 )}
               </div>
             ))}

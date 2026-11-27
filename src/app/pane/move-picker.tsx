@@ -129,10 +129,13 @@ function MovePicker({ request }: { request: MoveRequest }) {
     const title = byId.get(folder.parentId)?.title;
     return source && title ? `${title} · ${source}` : title;
   };
+  const namesSource = (id: number | null) => id !== null && sorting.get(id) !== undefined;
   const flat = (folder: FolderEntry): PickerRow => ({
     ...row(folder, 0, barred, sorting),
     detail:
       folder.id === request.folderId ? "current" : (parentName(folder) ?? sorting.get(folder.id)),
+    yields:
+      folder.id !== request.folderId && (namesSource(folder.id) || namesSource(folder.parentId)),
   });
 
   const sections: PickerSection[] = [];
@@ -259,6 +262,7 @@ function tree(
           : {
               count: { own: folder.itemCount, all: folder.allCount },
               detail: sorting.get(folder.id),
+              yields: sorting.get(folder.id) !== undefined,
             }),
         expanded: inside ? open.has(folder.id) : undefined,
       });

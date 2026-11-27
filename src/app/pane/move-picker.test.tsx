@@ -103,6 +103,51 @@ test("with several sorting sources the Sorting Box's rows, and its folders' pare
   );
 });
 
+test("a long sorting source's name is cut before Sorting Box is, and nothing spills out of a row", async () => {
+  const every = await listSources();
+  const incoming = every.find((source) => source.kind === "sorting");
+  if (!incoming) throw new Error("the mock has no sorting source");
+  const long = "Photos from the old phone, before it was wiped and sold";
+  const cards = { ...incoming, id: 9, title: "Cards", root: "E:\\Cards", rootFolderId: 99 };
+  await createFolder(incoming.rootFolderId, "Day 2");
+  await recording(
+    async () => {
+      resetIndex();
+      await loadIndex();
+      const screen = await render(<Harness item={await inCairo("pyramid.jpg")} />);
+      await screen.getByRole("button", { name: "Move to…" }).click();
+      const picker = screen.getByRole("dialog", { name: "Move to" });
+      const option = picker.getByRole("option", { name: /^Sorting Box/ });
+      await expect.element(option).toBeVisible();
+      const whole = (row: Element) => {
+        const name = row.querySelector<HTMLElement>(".truncate");
+        const detail = row.querySelector<HTMLElement>(".whitespace-nowrap");
+        const edge = picker.element().getBoundingClientRect().right;
+        return {
+          name: name && name.scrollWidth <= name.clientWidth,
+          cut: detail && detail.scrollWidth > detail.clientWidth,
+          inside: [...row.children].every((child) => child.getBoundingClientRect().right <= edge),
+        };
+      };
+      const tree = option.element();
+      expect(whole(tree)).toEqual({ name: true, cut: true, inside: true });
+      expect(tree.lastElementChild?.classList.contains("rounded-badge")).toBe(true);
+
+      await picker.getByRole("combobox").fill("day");
+      const found = picker.getByRole("option", { name: /^Day 2/ });
+      await expect.element(found).toBeVisible();
+      expect(whole(found.element())).toEqual({ name: true, cut: true, inside: true });
+      expect(found.element().querySelector(".whitespace-nowrap")?.textContent).toBe(
+        `Sorting Box · ${long}`,
+      );
+    },
+    (cmd) =>
+      cmd === "list_sources"
+        ? [...every.map((one) => (one.id === incoming.id ? { ...one, title: long } : one)), cards]
+        : undefined,
+  );
+});
+
 test("the tree's rows carry navigation's pill, and a recent row names its parent instead", async () => {
   const screen = await render(<Harness item={await inCairo("pyramid.jpg")} />);
   await screen.getByRole("button", { name: "Move to…" }).click();
