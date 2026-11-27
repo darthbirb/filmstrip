@@ -1,3 +1,5 @@
+import { useLayoutEffect } from "react";
+
 import type { ItemDetail } from "../../ipc/bindings/ItemDetail";
 import { Files, formatBytes, formatDimensions, formatDuration } from "../../lib/format";
 import { EmptyState } from "../../ui/EmptyState";
@@ -5,6 +7,7 @@ import { GlyphButton } from "../../ui/GlyphButton";
 import { PushDown } from "../../ui/PushDown";
 import { usePreferences } from "../preferences";
 import { Actions } from "./Actions";
+import { answerOnEmpty } from "./act-focus";
 import { Details } from "./Details";
 import { DETAILS_ID, DetailsToggle } from "./DetailsToggle";
 import { FolderPane, FolderPaneHeader } from "./FolderPane";
@@ -99,6 +102,7 @@ export function Pane() {
 }
 
 function Empty({ gone }: { gone: { path: string | null } | null }) {
+  useLayoutEffect(answerOnEmpty, []);
   return gone ? (
     <EmptyState glyph="image" title="This File Has Gone" path={gone.path ?? undefined} />
   ) : (

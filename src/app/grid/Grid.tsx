@@ -26,6 +26,7 @@ import { SkeletonTile } from "../../ui/Skeleton";
 import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
 import { fromFocus, groundMenu, placeMenu } from "../menus/ground";
 import { itemMenu, setMenu } from "../menus/item-menu";
+import { answerOnGrid } from "../pane/act-focus";
 import { setFullScreen } from "../pane/full-screen";
 import { showInPane, usePaneItem, usePaneSet } from "../pane/pane-store";
 import { startRename } from "../pane/rename";
@@ -112,6 +113,11 @@ export function Grid({ mode }: { mode: LayoutMode }) {
   useEffect(() => {
     if (items) keepChecked(items);
   }, [items]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: each list drawn answers.
+  useLayoutEffect(() => {
+    if (scroller.current) answerOnGrid(scroller.current);
+  }, [order]);
 
   // Once the ring has moved, its tile scrolls into view and takes the focus.
   useLayoutEffect(() => {
@@ -238,7 +244,7 @@ export function Grid({ mode }: { mode: LayoutMode }) {
       // Where a drag from Explorer finds the grid it rests on.
       data-drop="grid"
       // The menu key needs the focus here: a click on the ground keeps it, and Tab when no tile can.
-      tabIndex={grounded ? (items?.length ? -1 : 0) : undefined}
+      tabIndex={grounded && !items?.length ? 0 : -1}
       onContextMenu={onGround}
       className={`focus-ring-inset h-full overflow-auto ${lit ? "rounded-control inset-ring-2 inset-ring-plate" : ""}`}
     >

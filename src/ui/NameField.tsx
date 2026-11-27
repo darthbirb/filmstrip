@@ -7,8 +7,9 @@ type Props = {
   /** Why the name typed cannot be used, said under the field, which keeps it until it changes. */
   taken: string | null;
   onEdit: () => void;
-  onCommit: (name: string) => void;
-  onCancel: () => void;
+  /** `byKey` when Enter or Escape closed it, with the focus in it. */
+  onCommit: (name: string, byKey: boolean) => void;
+  onCancel: (byKey: boolean) => void;
 };
 
 /**
@@ -41,16 +42,16 @@ export function NameField({ label, name, taken, onEdit, onCommit, onCancel }: Pr
   }, [name]);
 
   // Once committed, the field waits for the answer; a taken name holds Enter until it is edited.
-  const commit = () => {
+  const commit = (byKey: boolean) => {
     if (settled.current || taken) return;
     settled.current = true;
     const typed = field.current?.value.trim() ?? "";
-    if (typed && typed !== name) onCommit(typed);
-    else onCancel();
+    if (typed && typed !== name) onCommit(typed, byKey);
+    else onCancel(byKey);
   };
-  const cancel = () => {
+  const cancel = (byKey: boolean) => {
     settled.current = true;
-    onCancel();
+    onCancel(byKey);
   };
 
   return (
@@ -65,16 +66,16 @@ export function NameField({ label, name, taken, onEdit, onCommit, onCancel }: Pr
           settled.current = false;
           onEdit();
         }}
-        onBlur={() => (taken ? cancel() : commit())}
+        onBlur={() => (taken ? cancel(false) : commit(false))}
         onKeyDown={(event) => {
           // Its keys are the field's: Escape here is not full screen's, nor Ctrl+Z the journal's.
           event.stopPropagation();
           if (event.key === "Enter") {
             event.preventDefault();
-            commit();
+            commit(true);
           } else if (event.key === "Escape") {
             event.preventDefault();
-            cancel();
+            cancel(true);
           }
         }}
         className="focus-ring h-bar-field w-full min-w-0 rounded-nested bg-ground px-2 text-fg-hi text-ui tabular-nums inset-ring inset-ring-line-control selection:bg-plate selection:text-on-plate aria-invalid:inset-ring-line-danger"

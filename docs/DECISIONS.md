@@ -707,7 +707,9 @@ plain header, having none of these.
   need the drive.
 - **Escape abandons a note, and a click away keeps it.** Half a note is still what was meant, so
   leaving the box saves it, where a half-typed tag or name is dropped; Enter is a new line, since
-  a note is prose, and Ctrl+Enter saves. Saved empty, the note is gone: none is no note.
+  a note is prose, and Ctrl+Enter saves. Saved empty, the note is gone: none is no note. Closed
+  from inside, by its keys or its buttons, the box gives the focus to the note or Add Note… in its
+  place, whichever the saved note turns out to be.
 - **A tag the folder already carries is refused where it is typed**, its own or one from above:
   adding it again would change nothing a search can see. The line names the folder it comes from,
   which is where it can be taken off. A folder's name is a tag only a rename changes, so it has no
@@ -801,7 +803,9 @@ outside the app, never for the person's own act.
 details if they are shut and turns that row into a field, the stem selected and the extension in
 the field but outside the selection, so it can be changed on purpose and not by typing. A name
 already taken is said under the field, which keeps it and holds Enter until it is edited; nothing
-is renamed behind the person's back and no suffix is invented.
+is renamed behind the person's back and no suffix is invented. **Enter or Escape gives the focus
+back to what opened the field**, the ⋯, the tile F2 was pressed on, or the Name row itself, so the
+keyboard is where it was; a click away leaves it where the click put it.
 
 **Copy as Path is a row, never a button**, added on 12 October 2026: the bar is drawn with three glyph
 buttons, and a second copy glyph beside the first would be two squares no one could tell apart.
@@ -842,7 +846,12 @@ has done its work; when that bar has no such button, as a file restored inside a
 shows the library's bar, the strip's frame for the file takes it, or its picture once the strip
 no longer runs through it, as a restored file leaves a search of the Trash. Only a focus that fell
 to the page is taken back: one the act moved on purpose, as the question about a drive with no
-Recycle Bin does, stays where it went. A pane left empty has nothing to take it.
+Recycle Bin does, stays where it went. **A pane the act leaves with no file hands the focus to
+the grid**, since the pane has nothing left to hold it: the grid's tile in the tab order, or the
+grid itself once it has no tile, as after the last file of a place or of the Trash. A tile that
+takes it and then leaves with its file, the grid's list arriving after the pane emptied, hands it
+on to the grid the same way. The Trash's and a search's grid take the focus that way only, and
+are still no tab stop of their own.
 
 **A video plays on a plate of the app's own**, drawn by Claude Design and built on 12 October
 2026, in place of the controls the window brings with it: play, the track, the time and the mute
