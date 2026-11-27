@@ -13,7 +13,10 @@ export type PickerRow = {
   depth: number;
   /** Quieter words at the row's end: where it is, or why it cannot be picked. */
   detail?: string;
-  /** The detail is cut before the label is, as a sorting source's name is after the Sorting Box. */
+  /**
+   * The detail is cut before the label is and fills the room after it, so the label leaves the row's
+   * end and the pill keeps it: a sorting source's name after the Sorting Box.
+   */
   yields?: boolean;
   /** The folder's own files and those at or below it, for its pill; none, no pill. */
   count?: { own: number; all: number };
@@ -199,9 +202,6 @@ export function Picker({
                 <span className={`min-w-0 truncate ${row.yields ? "" : "flex-1"}`}>
                   {row.label}
                 </span>
-                {!row.yields && row.count && (
-                  <CountPill {...row.count} tone={row.disabled ? "barred" : "rest"} />
-                )}
                 {row.detail && (
                   <span
                     className={`whitespace-nowrap text-small ${row.yields ? "min-w-0 flex-1 truncate text-right" : "shrink-0"} ${row.disabled ? "" : "text-fg-dim"}`}
@@ -209,9 +209,7 @@ export function Picker({
                     {row.detail}
                   </span>
                 )}
-                {row.yields && row.count && (
-                  <CountPill {...row.count} tone={row.disabled ? "barred" : "rest"} />
-                )}
+                {row.count && <CountPill {...row.count} tone={row.disabled ? "barred" : "rest"} />}
               </div>
             ))}
           </Fragment>

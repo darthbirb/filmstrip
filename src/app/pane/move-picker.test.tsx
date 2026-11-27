@@ -131,7 +131,7 @@ test("a long sorting source's name is cut before Sorting Box is, and nothing spi
       };
       const tree = option.element();
       expect(whole(tree)).toEqual({ name: true, cut: true, inside: true });
-      expect(tree.lastElementChild?.classList.contains("rounded-badge")).toBe(true);
+      expect(withoutGlyphs(tree.textContent)).toBe(`Sorting Box${long}3/33 of 3`);
 
       await picker.getByRole("combobox").fill("day");
       const found = picker.getByRole("option", { name: /^Day 2/ });
