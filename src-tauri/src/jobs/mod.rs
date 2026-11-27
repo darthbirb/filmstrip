@@ -1545,7 +1545,11 @@ mod tests {
             (job_id, 13, false, None)
         );
         assert_eq!(report.trashed, 1);
-        assert_eq!(report.refused.len(), 12, "the rest had gone already");
+        assert!(
+            report.refused.is_empty(),
+            "the rest were in the Trash already, so passed over: {:?}",
+            report.refused
+        );
         assert_eq!(batch.map(|went| went.files), Some(1));
         assert!(inner.progress(&conn).unwrap().deletes.is_empty());
         assert!(
