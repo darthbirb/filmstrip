@@ -301,10 +301,10 @@ async function moveNow(itemIds: number[], to: Into) {
   if (!moved) return null;
   remember(to);
   if (moved.kind === "started") {
-    void goingUntilEnd(moved.jobId, itemIds);
-    if (pane.next === pane.shown) return "started" as const;
-    if (pane.origin?.kind === "search") landing.set(moved.jobId, pane);
-    else if (await leavesAhead(pane.origin, to)) moveOn(pane, []);
+    const stays = pane.next === pane.shown;
+    const lands = !stays && pane.origin?.kind === "search";
+    void goingUntilEnd(moved.jobId, itemIds, lands ? () => void moveOnLanded(pane) : undefined);
+    if (!stays && !lands && (await leavesAhead(pane.origin, to))) moveOn(pane, []);
     return "started" as const;
   }
   const { batch, report } = moved;
@@ -343,9 +343,6 @@ async function moveNow(itemIds: number[], to: Into) {
 async function moveOnOut(pane: MoveOn) {
   if (pane.next !== pane.shown && !(await stillListed(pane))) moveOn(pane, []);
 }
-
-// Moves between drives out of a search, by job, waiting to land before the search is asked.
-const landing = new Map<number, MoveOn>();
 
 /**
  * Whether a move between drives takes the file out of its place, judged as it starts: out of a
@@ -395,9 +392,6 @@ export async function moveFolderTo(
 export async function afterMoved(moved: Moved) {
   jobEnded(moved.jobId);
   await libraryChanged();
-  const pane = landing.get(moved.jobId);
-  landing.delete(moved.jobId);
-  if (pane) await moveOnLanded(pane);
   const { batch, refused, whole, to, stopped } = moved;
   const into = { id: moved.folderId, title: to };
   const [only] = refused;

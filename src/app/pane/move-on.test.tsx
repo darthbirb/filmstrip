@@ -1,7 +1,11 @@
+import { emit } from "@tauri-apps/api/event";
 import { afterEach, beforeAll, beforeEach, expect, test } from "vitest";
 import { render } from "vitest-browser-react";
 
 import { resetBin } from "../../dev/mock";
+import { recording, theMock } from "../../dev/recording";
+import type { ItemsMoved } from "../../ipc/bindings/ItemsMoved";
+import type { Moved } from "../../ipc/bindings/Moved";
 import {
   createFolder,
   folderItems,
@@ -10,7 +14,7 @@ import {
   trashItems,
   undoLast,
 } from "../../ipc/commands";
-import { setNews } from "../navigation/foot-slot";
+import { getNews, setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { type Place, setPlace } from "../place";
 import { updatePreferences } from "../preferences";
@@ -197,6 +201,39 @@ test("a move between drives out of a search it leaves moves the pane on once it 
   expect(getPaneItem()).toBe(pyramid);
   await expect.poll(async () => (await indexProgress()).moves, { timeout: 5000 }).toEqual([]);
   await expect.poll(getPaneItem).toBe(sphinx);
+  expect((await folderItems(5)).map((row) => row.id)).toEqual([pyramid]);
+});
+
+test("a move between drives that lands before its start is answered still moves the pane on", async () => {
+  const pyramid = await id(6, "pyramid.jpg");
+  const sphinx = await id(6, "sphinx.jpg");
+  const { screen } = await showing(pyramid, IN_CAIRO);
+  const real = theMock();
+  const landedFirst = async (args: unknown): Promise<ItemsMoved> => {
+    const done = (await real("move_items", args)) as ItemsMoved;
+    if (done.kind !== "done" || !done.batch) throw new Error("the mock did not move it at once");
+    const moved: Moved = {
+      jobId: 9001,
+      folderId: 5,
+      to: "People",
+      batch: done.batch,
+      whole: 1,
+      refused: [],
+      cancelled: false,
+      stopped: null,
+    };
+    await emit("move-done", moved);
+    await expect.poll(getNews).toMatchObject({ batchId: done.batch.batchId });
+    return { kind: "started", jobId: 9001 };
+  };
+
+  await recording(
+    async () => {
+      await moveTo(screen, "Move to…", /People/);
+      await expect.poll(getPaneItem).toBe(sphinx);
+    },
+    (cmd, args) => (cmd === "move_items" ? landedFirst(args) : undefined),
+  );
   expect((await folderItems(5)).map((row) => row.id)).toEqual([pyramid]);
 });
 
