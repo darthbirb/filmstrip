@@ -1,4 +1,4 @@
-import { beforeEach, expect, test } from "vitest";
+import { beforeEach, expect, onTestFinished, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
@@ -222,6 +222,21 @@ test("a key whose folder has gone moves nothing, and says which key and where it
   await userEvent.keyboard("4");
   await expect.element(page.getByText("Key 4 has no folder.")).toBeVisible();
   await expect.element(page.getByText("People has gone from Pictures.")).toBeVisible();
+});
+
+test("a key does nothing while an auto popover is open, with the focus outside it", async () => {
+  await renderIt();
+  showInPane(await idOf("sphinx.jpg"), CAIRO);
+  const auto = document.createElement("div");
+  auto.popover = "auto";
+  document.body.append(auto);
+  onTestFinished(() => auto.remove());
+  await recording(async (calls) => {
+    auto.showPopover();
+    expect(auto.contains(document.activeElement)).toBe(false);
+    await userEvent.keyboard("1");
+    expect(moved(calls)).toBeUndefined();
+  });
 });
 
 test("a key does nothing in a field, or in the Trash", async () => {

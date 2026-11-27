@@ -10,10 +10,11 @@ import {
 } from "react";
 
 import type { ItemRow } from "../../ipc/bindings/ItemRow";
-import { autoPopoverOpen, useContextMenu } from "../../ui/Menu";
+import { useContextMenu } from "../../ui/Menu";
 import { StepButton } from "../../ui/StepButton";
 import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
 import { useGridItems } from "../grid/useGridItems";
+import { keyIsFree } from "../key-free";
 import { itemMenu } from "../menus/item-menu";
 import type { Place } from "../place";
 import { answerOnStrip } from "./act-focus";
@@ -102,7 +103,7 @@ function Track({ items, current, from }: TrackProps) {
     const target = moves[event.key];
     const item = target === undefined ? undefined : items[target];
     if (!item || index < 0 || target === index || inPane.size !== 1) return;
-    if (event.defaultPrevented || !stepsFrom(event, scroller.current)) return;
+    if (!stepsFrom(event, scroller.current)) return;
     event.preventDefault();
     showInPane(item.id, from);
     focusPicture(item.id);
@@ -218,16 +219,12 @@ function Track({ items, current, from }: TrackProps) {
 
 /**
  * Whether a key is the pane's to step with: its strip is in sight, the focus is in the pane or the
- * pane is full screen, and no field, menu, dialog or modifier has the key.
+ * pane is full screen, and the key is free: no field, menu, question, dialog or modifier has it.
  */
 function stepsFrom(event: globalThis.KeyboardEvent, strip: HTMLElement | null) {
   if (!strip || strip.closest("[inert]")) return false;
-  if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return false;
+  if (!keyIsFree(event)) return false;
   const target = event.target instanceof Element ? event.target : null;
-  if (target?.closest("input, textarea, select, [contenteditable], [role=menu], [popover]")) {
-    return false;
-  }
-  if (autoPopoverOpen() || document.querySelector("dialog[open]")) return false;
   return getFullScreen() || target?.closest('[aria-label="Pane"]') != null;
 }
 

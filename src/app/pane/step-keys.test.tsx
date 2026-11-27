@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test } from "vitest";
+import { afterEach, beforeEach, expect, onTestFinished, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
@@ -209,6 +209,23 @@ test("a field in the pane keeps the arrows", async () => {
   await userEvent.keyboard("{ArrowRight}{ArrowLeft}{Home}{End}");
   expect(getPaneItem()).toBe(await idOf("pyramid.jpg"));
   await expect.element(field).toHaveFocus();
+});
+
+test("a question in the pane keeps the arrows", async () => {
+  await showing("pyramid.jpg");
+  await expect.poll(shown).toBe("pyramid.jpg");
+  const question = document.createElement("section");
+  question.dataset.question = "";
+  question.tabIndex = -1;
+  document.querySelector("aside[aria-label='Pane']")?.append(question);
+  onTestFinished(() => question.remove());
+
+  const pyramid = await idOf("pyramid.jpg");
+  for (const key of ["{ArrowRight}", "{ArrowLeft}", "{Home}", "{End}"]) {
+    question.focus();
+    await userEvent.keyboard(key);
+    expect(getPaneItem()).toBe(pyramid);
+  }
 });
 
 test("with the pane hidden, Full Screen from the shown file's menu puts the focus on its picture", async () => {

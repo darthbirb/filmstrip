@@ -196,6 +196,28 @@ test("none of the keys acts in a text field, or over Settings", async () => {
   });
 });
 
+test("none of the keys acts while an auto popover is open, with the focus outside it", async () => {
+  await renderIt();
+  const sphinx = await idOf("sphinx.jpg");
+  showInPane(sphinx, CAIRO);
+  const auto = document.createElement("div");
+  auto.dataset.stray = "";
+  auto.popover = "auto";
+  document.body.append(auto);
+  await recording(async (calls) => {
+    auto.showPopover();
+    expect(auto.contains(document.activeElement)).toBe(false);
+    await userEvent.keyboard("{Delete}");
+    await userEvent.keyboard("{Control>}c{/Control}");
+    await userEvent.keyboard("{Control>}{Shift>}C{/Shift}{/Control}");
+    expect(auto.matches(":popover-open")).toBe(true);
+    auto.hidePopover();
+    await userEvent.keyboard("{Control>}{Shift>}C{/Shift}{/Control}");
+    await expect.poll(() => sent(calls, "copy_item_paths")).toEqual({ itemIds: [sphinx] });
+    never(calls, "trash_items", "binless_items", "copy_items");
+  });
+});
+
 test("with several in the pane and nothing checked the keys act on nothing", async () => {
   const at = await renderIt();
   const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];

@@ -188,6 +188,21 @@ test("an open auto popover closes at Escape first, with the focus outside it; a 
   expect(manual.matches(":popover-open")).toBe(true);
 });
 
+test("a question keeps Escape for itself, and the search stays", async () => {
+  setPlace(searching("path:Pictures/Trips cairo"));
+  const screen = await renderPlace();
+  await expect.element(screen.getByRole("button", { name: "pyramid.jpg" })).toBeVisible();
+  const question = document.createElement("section");
+  question.dataset.question = "";
+  question.tabIndex = -1;
+  document.body.append(question);
+  onTestFinished(() => question.remove());
+
+  question.focus();
+  await userEvent.keyboard("{Escape}");
+  expect(getPlace()?.kind).toBe("search");
+});
+
 test("Search Everywhere asks again without the scope", async () => {
   setPlace(searching("path:Pictures/Trips hotel"));
   const screen = await renderPlace();
