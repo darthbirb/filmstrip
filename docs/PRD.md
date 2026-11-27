@@ -17,11 +17,12 @@ and a keyboard, any display size and text scale.
 - **Looking comes first.** Browsing a folder, opening a picture and stepping through its
   neighbours is instant; nothing else may slow it down.
 - **The user's files are safe.** The app never overwrites, never loses a file halfway through a
-  move, and every change on disk can be undone, across a restart, but three. Two delete for good,
-  the only acts that do, and both ask first: emptying the library's files from the Recycle Bin,
-  and Delete on a drive with no Recycle Bin. The third deletes nothing: a copy or a Restore to…
-  onto a drive with no bin, whose undo would have to delete the file, so it lets the act go and
-  the file stays (DECISIONS.md "A drive with no Recycle Bin").
+  move, and every change on disk in the newest thousand acts can be undone, across a restart, but
+  three (DECISIONS.md "Undo"). Two delete for good, the only acts that do, and both ask first:
+  emptying the library's files from the Recycle Bin, and Delete on a drive with no Recycle Bin.
+  The third deletes nothing: a copy or a Restore to… onto a drive with no bin, whose undo would
+  have to delete the file, so the undo lets the act go and the file stays
+  (DECISIONS.md "A drive with no Recycle Bin").
 - **Folders stay real.** A folder is a directory and an item is a file under its own name;
   removing a source forgets the index and never the files (PRODUCT.md "Folders and sources").
 - **Local and private.** No account, no network service, no telemetry. The release is a
