@@ -162,3 +162,29 @@ test("a row's quieter words are cut before its label is", async () => {
   expect(detail && detail.scrollWidth > detail.clientWidth).toBe(true);
   expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth);
 });
+
+test("a long label with quieter words is cut at the row's edge rather than spilling past it", async () => {
+  const screen = await render(
+    <Surface
+      groups={[
+        [
+          {
+            id: "pick",
+            label: "Photos from the old phone, before it was wiped and sold",
+            detail: "Incoming",
+            glyph: "sortingBox",
+            onSelect: () => {},
+          },
+        ],
+      ]}
+    />,
+  );
+  await userEvent.click(screen.getByRole("button", { name: "thing" }), { button: "right" });
+  const row = screen.getByRole("menuitem").element();
+  const [label] = [...row.querySelectorAll<HTMLElement>("span.truncate")];
+  expect(label && label.scrollWidth > label.clientWidth).toBe(true);
+  const inner =
+    row.getBoundingClientRect().right - Number.parseFloat(getComputedStyle(row).paddingRight);
+  expect(label?.getBoundingClientRect().right).toBeLessThanOrEqual(inner + 0.5);
+  expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth);
+});

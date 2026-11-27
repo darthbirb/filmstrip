@@ -91,13 +91,16 @@ function MenuList({
               className={`text-glyph ${action.tone === "danger" ? "" : "text-fg-dim"}`}
             />
           )}
+          {/* The label shrinks from its own width and the detail grows from none, so the detail goes first. */}
           <span
-            className={`truncate ${action.detail === undefined ? "min-w-0 flex-1" : "shrink-0"} ${action.quiet && !action.chosen ? "text-fg-dim" : ""}`}
+            className={`min-w-0 truncate ${action.detail === undefined ? "flex-1" : ""} ${action.quiet && !action.chosen ? "text-fg-dim" : ""}`}
           >
             {action.label}
           </span>
           {action.detail !== undefined && (
-            <span className="ml-auto min-w-0 truncate text-fg-dim text-small">{action.detail}</span>
+            <span className="min-w-0 flex-1 truncate text-right text-fg-dim text-small">
+              {action.detail}
+            </span>
           )}
           {action.trail !== undefined && (
             <span className="shrink-0 font-mono text-fg-dim text-small">{action.trail}</span>
