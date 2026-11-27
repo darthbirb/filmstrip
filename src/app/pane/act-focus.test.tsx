@@ -1,21 +1,33 @@
 import { afterEach, beforeEach, expect, test } from "vitest";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { resetBin } from "../../dev/mock";
 import { recording, theMock } from "../../dev/recording";
 import { folderItems, trashItems, undoLast } from "../../ipc/commands";
+import { Grid } from "../grid/Grid";
 import { setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex } from "../navigation/index-store";
 import { type Place, setPlace } from "../place";
 import { resetSearches } from "../search/results";
 import { showReport } from "../undo/report-store";
-import { answerOnBar, answerOnStrip, forgetActFocus, keepFocusThrough } from "./act-focus";
+import {
+  answerOnBar,
+  answerOnEmpty,
+  answerOnGrid,
+  answerOnStrip,
+  forgetActFocus,
+  keepFocusThrough,
+} from "./act-focus";
+import { MovePickerHost, openMovePicker } from "./move-picker";
 import { Pane } from "./Pane";
 import { PaneDetailProvider } from "./pane-detail";
 import { getPaneItem, showInPane } from "./pane-store";
 
-// Against the dev mock: Cairo (6) holds felucca.mp4, pyramid.jpg and sphinx.jpg, in that order.
+// Against the dev mock: Pictures (1) holds cover.jpg alone, and Cairo (6) holds felucca.mp4,
+// pyramid.jpg and sphinx.jpg, in that order.
+
+const PICTURES: Place = { kind: "folder", sourceId: 1, path: [{ id: 1, title: "Pictures" }] };
 
 const CAIRO: Place = {
   kind: "folder",
@@ -34,6 +46,7 @@ beforeEach(async () => {
   while (await undoLast()) {}
   setNews(null);
   showReport(null);
+  openMovePicker(null);
   resetSearches();
   showInPane(null);
   resetIndex();
@@ -51,14 +64,15 @@ function make<K extends keyof HTMLElementTagNameMap>(tag: K) {
 
 afterEach(() => {
   forgetActFocus();
+  openMovePicker(null);
   showInPane(null);
   if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   for (const element of made.splice(0)) element.remove();
 });
 
-async function id(name: string) {
-  const row = (await folderItems(6)).find((item) => item.diskName === name);
-  if (!row) throw new Error(`the mock has no ${name} in Cairo`);
+async function id(name: string, folderId = 6) {
+  const row = (await folderItems(folderId)).find((item) => item.diskName === name);
+  if (!row) throw new Error(`the mock has no ${name} in folder ${folderId}`);
   return row.id;
 }
 
@@ -88,6 +102,51 @@ async function showing(file: number, place: Place) {
   const screen = await render(<Harness />);
   const bar = screen.getByRole("toolbar", { name: "Actions" });
   return { screen, bar };
+}
+
+function WithGrid() {
+  return (
+    <PaneDetailProvider>
+      <div style={{ display: "flex" }}>
+        <section aria-label="Grid" style={{ flex: "none", width: 700, height: 600 }}>
+          <Grid mode="uniform" />
+        </section>
+        <aside
+          aria-label="Pane"
+          style={{ display: "flex", flexDirection: "column", width: 400, height: 700 }}
+        >
+          <Pane />
+        </aside>
+      </div>
+      <MovePickerHost />
+    </PaneDetailProvider>
+  );
+}
+
+/** The pane's file, chosen from one place, beside the grid of that place or another. */
+async function besideGrid(file: number, from: Place, grid: Place = from) {
+  await page.viewport(1200, 800);
+  setPlace(grid);
+  showInPane(file, from);
+  const screen = await render(<WithGrid />);
+  const region = screen.getByRole("region", { name: "Grid" });
+  const bar = screen.getByRole("toolbar", { name: "Actions" });
+  await expect.element(bar).toBeVisible();
+  return { screen, region, bar };
+}
+
+/** Whether the grid itself, not one of its tiles, holds the focus. */
+const onGrid = () => document.activeElement?.matches('section[aria-label="Grid"] > div') ?? false;
+
+async function restoreTo(screen: Awaited<ReturnType<typeof besideGrid>>["screen"]) {
+  await screen
+    .getByRole("toolbar", { name: "Actions" })
+    .getByRole("button", { name: "Restore to…" })
+    .click();
+  await screen
+    .getByRole("dialog", { name: "Restore to" })
+    .getByRole("option", { name: /People/ })
+    .click();
 }
 
 test("Delete pressed with Enter leaves the focus on Delete for the next file", async () => {
@@ -209,4 +268,82 @@ test("a focus that moves on its own drops the request, so a later bar takes noth
   answerOnBar(bar, 1);
   expect(document.activeElement).toBe(document.body);
   finish();
+});
+
+test("Delete pressed with Enter on a place's only file gives the focus to the grid it emptied", async () => {
+  const cover = await id("cover.jpg", 1);
+  const { region, bar } = await besideGrid(cover, PICTURES);
+  await expect.element(region.getByRole("button", { name: "cover.jpg" })).toBeVisible();
+  (bar.getByRole("button", { name: "Delete" }).element() as HTMLElement).focus();
+  await userEvent.keyboard("{Enter}");
+
+  await expect.poll(getPaneItem).toBeNull();
+  await expect.element(region.getByRole("button", { name: "cover.jpg" })).not.toBeInTheDocument();
+  await expect.poll(onGrid).toBe(true);
+});
+
+test("Restore on the Trash's last file gives the focus to the Trash's grid", async () => {
+  const pyramid = await id("pyramid.jpg");
+  await trashItems([pyramid]);
+  const { region, bar } = await besideGrid(pyramid, TRASH);
+  await expect.element(region.getByRole("button", { name: "pyramid.jpg" })).toBeVisible();
+  await bar.getByRole("button", { name: "Restore", exact: true }).click();
+
+  await expect.poll(getPaneItem).toBeNull();
+  await expect.element(region.getByRole("button", { name: "pyramid.jpg" })).not.toBeInTheDocument();
+  await expect.poll(onGrid).toBe(true);
+});
+
+test("a pane emptied beside the grid of another place gives the focus to that grid's tab stop", async () => {
+  const cover = await id("cover.jpg", 1);
+  const { region, bar } = await besideGrid(cover, PICTURES, CAIRO);
+  const felucca = region.getByRole("button", { name: "felucca.mp4" });
+  await expect.element(felucca).toBeVisible();
+  await bar.getByRole("button", { name: "Delete" }).click();
+
+  await expect.poll(getPaneItem).toBeNull();
+  await expect.element(felucca).toHaveFocus();
+});
+
+test("Restore to… on the Trash's last file gives the focus to the grid, as Restore does", async () => {
+  const pyramid = await id("pyramid.jpg");
+  await trashItems([pyramid]);
+  const { screen, region } = await besideGrid(pyramid, TRASH);
+  await expect.element(region.getByRole("button", { name: "pyramid.jpg" })).toBeVisible();
+  await restoreTo(screen);
+
+  await expect.poll(getPaneItem).toBeNull();
+  await expect.element(region.getByRole("button", { name: "pyramid.jpg" })).not.toBeInTheDocument();
+  await expect.poll(onGrid).toBe(true);
+});
+
+test("restored to a folder inside a search, the file's bar has no Restore to…, so its picture takes the focus", async () => {
+  const pyramid = await id("pyramid.jpg");
+  await trashItems([pyramid, await id("sphinx.jpg"), await id("felucca.mp4")]);
+  const { screen, bar } = await besideGrid(pyramid, TRASHED);
+  await expect.element(screen.getByRole("listbox", { name: "Filmstrip" })).toBeVisible();
+  await restoreTo(screen);
+
+  await expect.element(bar.getByRole("button", { name: "Move to…" })).toBeVisible();
+  expect(getPaneItem()).toBe(pyramid);
+  await expect.poll(onPicture).toBe(true);
+});
+
+test("a tile that took the focus and then left with its file hands it to the grid", async () => {
+  const grid = make("div");
+  grid.dataset.drop = "grid";
+  grid.tabIndex = -1;
+  const tile = make("button");
+  tile.dataset.item = "1";
+  tile.tabIndex = 0;
+  grid.append(tile);
+  document.body.append(grid);
+
+  keepFocusThrough("Delete", Promise.resolve());
+  answerOnEmpty();
+  expect(document.activeElement).toBe(tile);
+
+  tile.remove();
+  answerOnGrid(grid);
+  expect(document.activeElement).toBe(grid);
 });
