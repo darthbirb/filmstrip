@@ -560,19 +560,20 @@ error came with. An ellipsis only where a choice or
 typing follows before anything happens, and figures for a count. One act has one name everywhere
 it appears; the Components sheet's Words block lists them, with the reason each changed.
 
-Names that drifted are held to one. **Sorting Box** is every sorting source wherever the person
-meets one: a question's answer, Move to…, the pick a paste or a drop asks, and an act's line. Where
-there are several, the source's own name follows in `small` `fg-dim`, cut before Sorting Box is.
-Three places keep the source's own name. Settings › Sources, its Move Its Files To dropdown
-included, is where sources are told apart, renamed and given a kind, so each goes by the name it
-is renamed by. A favourite is one folder, not the Sorting Box, and is named as that folder's
-header names it. A search's text, `path:Incoming/Day 2`, and the list's rows and the path chip
-that write it: the text has to read back as that one folder, and with several sorting sources
-"Sorting Box" would name none of them. A result's place is only read, so it says Sorting Box ›
-Day 2. **Permanently** in a sentence ("Permanently delete pyramid.jpg,
-2 MB?"), never "for good"; Delete Permanently on a button. **Recycle Bin** in full, never "the
-bin", and a file emptied from it elsewhere is "Emptied from the Recycle Bin outside Filmstrip".
-Delete's line says where the file went: "Moved sphinx.jpg to the Recycle Bin."
+Names that drifted are held to one. **Sorting Box** is every sorting source wherever one is said:
+a question's answer, Move to…, the pick a paste or a drop asks, an act's line, and where a file
+or a found folder sits ("in Sorting Box", Sorting Box › Day 2). Where there are several, the
+source's own name follows in `small` `fg-dim`, cut before Sorting Box is. Where a source's folder
+is stood in or written as one folder, it keeps the source's own name, because each has to lead
+or read back to that folder, and with several sorting sources "Sorting Box" would name none of
+them: a folder's header and its steps back, which open that folder and write its `path:` scope;
+a favourite kept on it, which opens that header; a search's text, `path:Incoming/Day 2`, with
+the list's rows and the path chip that write it; and Settings › Sources with its Move Its Files
+To dropdown, where sources are told apart, renamed and given a kind. **Permanently** in a
+sentence ("Permanently delete pyramid.jpg, 2 MB?"), never "for good"; Delete Permanently on a
+button. **Recycle Bin** in full, never "the bin", and a file emptied from it elsewhere is
+"Emptied from the Recycle Bin outside Filmstrip". Delete's line says where the file went: "Moved
+sphinx.jpg to the Recycle Bin."
 **Remove Key** takes a destination key off a folder, in its menu as in Settings › Keys. The tags
 screen's keys are **label keys** ("214 tags · 4 label keys", Rename Label Key…), so "key" alone
 is always a destination key. A paste and a drop that ask which sorting source both ask **Copy
@@ -912,7 +913,8 @@ toward the rest surface.
   folder's parent, or "current" in place of the pill on the one the file is in, drawn in `fg-dim`
   and never picked. A sorting source's name, after the Sorting Box or a folder in one, is cut
   before the row's name is, and sits before the pill so the pills keep their column. Moving a
-  folder, its own branch is drawn the same way. The field keeps the focus; the arrows move a `raised-hi` row, Enter picks it, Right and Left open and shut it.
+  folder, its own branch is drawn the same way. The field keeps the focus; the arrows move a
+  `raised-hi` row, Enter picks it, Right and Left open and shut it.
 - **Full screen.** The pane takes the frame below the bar, keeping its header, picture and
   filmstrip and losing only the columns beside it. Its control is a glyph button at the header's
   left end, an arrow pointing along the edge that moves: left going in, right coming out, where it
