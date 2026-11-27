@@ -836,7 +836,8 @@ under whatever is being looked at by then. So whether it leaves is judged from w
 out of a folder it does, and out of the Sorting Box unless into a sorting source. A search can
 only be asked once the job lands, since it may find the file by its name or by the folder it
 lived in, so there the pane stays on the file until then and moves on if the search has lost it.
-One the job leaves where it was is named by its banner.
+It has landed once it has left the queue as "One press, one act" tells it, so one already gone
+when its start is answered moves the pane on then. One the job leaves where it was is named by its banner.
 
 **The focus stays where the act was taken**, settled on 25 November 2026. Delete and Restore take
 their file's bar with them, which dropped the focus to the page and sent a keyboard or screen

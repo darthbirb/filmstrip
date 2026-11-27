@@ -4,8 +4,11 @@ import { unasked } from "../failure";
 
 // How many sends hold each file; one held by any is going, and a second press on it sends nothing.
 const going = new Map<number, number>();
-// Each job on the queue holding files, and whether the queue has listed it yet.
-const byJob = new Map<number, { itemIds: readonly number[]; listed: boolean }>();
+// Each job on the queue holding files, whether the queue has listed it yet, and what waits on it.
+const byJob = new Map<
+  number,
+  { itemIds: readonly number[]; listed: boolean; ended: (() => void) | undefined }
+>();
 
 function take(itemIds: readonly number[]) {
   for (const id of itemIds) going.set(id, (going.get(id) ?? 0) + 1);
@@ -35,24 +38,28 @@ export async function once<T>(itemIds: readonly number[], work: () => Promise<T>
 
 /**
  * Keeps files going while the job on the queue that sends them is there: until its end is heard,
- * or the queue no longer lists it, however it left. One already gone lets them go at once, and a
- * job given the id of one that ended unheard takes its place.
+ * or the queue no longer lists it, however it left; then `ended` runs. One already gone lets them
+ * go at once, and a job given the id of one that ended unheard takes its place.
  */
-export async function goingUntilEnd(jobId: number, itemIds: readonly number[]) {
+export async function goingUntilEnd(jobId: number, itemIds: readonly number[], ended?: () => void) {
   jobEnded(jobId);
   take(itemIds);
-  byJob.set(jobId, { itemIds, listed: false });
+  byJob.set(jobId, { itemIds, listed: false, ended });
   const asked = new Set(byJob.keys());
   const now = await indexProgress().catch(unasked);
   if (now) jobsListed(now, asked);
 }
 
-/** A job that sends files has ended, however it ended, and its files are free again. */
+/**
+ * A job that sends files has ended, however it ended: its files are free again, and what waited
+ * on it runs.
+ */
 export function jobEnded(jobId: number) {
   const job = byJob.get(jobId);
   if (!job) return;
   byJob.delete(jobId);
   letGo(job.itemIds);
+  job.ended?.();
 }
 
 /**
