@@ -775,22 +775,24 @@ function searchFor(query: string, sort?: unknown): SearchOutcome {
   const files = (trash ? (ITEMS[TRASH] ?? []) : everyItem().filter((item) => item.folderId > 0))
     .map((item): Hit => {
       const gone = trashed.get(item.id);
-      const path = (gone?.folders ?? crumbs(item.folderId).folders).map((crumb) => crumb.title);
+      const path = (gone?.folders ?? crumbs(item.folderId).folders).map((crumb, at) =>
+        at === 0 ? placeName(crumb.id) : crumb.title,
+      );
       return {
         ...item,
         at: { folderId: item.folderId, path, gone: false },
         trashedAt: gone?.at ?? null,
       };
     })
-    .filter((hit) =>
-      terms.every(({ shape, text }) => {
-        const path = lower(hit.at.path);
+    .filter((hit) => {
+      const above = trashed.get(hit.id)?.folders ?? crumbs(hit.folderId).folders;
+      const path = lower(above.map((crumb) => crumb.title));
+      return terms.every(({ shape, text }) => {
         if (shape.kind === "path") return within(path, shape);
         if (shape.kind === "place") return shape.place === "trash" || hit.folderId === 2;
         if (shape.kind === "tag") {
           const value = fold(shape.value);
           // A file carries every tag its folders do, a band's as well as their names.
-          const above = trashed.get(hit.id)?.folders ?? crumbs(hit.folderId).folders;
           const added = above.some((crumb) =>
             ownOf(crumb.id).tags.some((tag) => tag.key === null && tag.value === value),
           );
@@ -799,8 +801,8 @@ function searchFor(query: string, sort?: unknown): SearchOutcome {
         if (shape.kind === "label") return false;
         const word = unquote(text).toLowerCase();
         return hit.diskName.toLowerCase().includes(word) || path.includes(word);
-      }),
-    );
+      });
+    });
   const words = terms.filter((term) => term.shape.kind === "text");
   const found: FolderMatch[] = [...parents()]
     .filter(([id, { title }]) => {

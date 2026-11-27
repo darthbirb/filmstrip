@@ -10,3 +10,13 @@ export function sortingDetail(
 ) {
   return sources.filter((one) => one.kind === "sorting").length > 1 ? source.title : undefined;
 }
+
+/** The folders above a place as a search says them: a sorting source's own is the Sorting Box. */
+export function saidAbove(
+  path: readonly { title: string }[],
+  sourceId: number,
+  sources: readonly Pick<SourceSummary, "id" | "kind">[],
+) {
+  const sorting = sources.some((one) => one.id === sourceId && one.kind === "sorting");
+  return path.slice(0, -1).map((crumb, at) => (at === 0 && sorting ? SORTING_BOX : crumb.title));
+}

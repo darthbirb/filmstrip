@@ -3,7 +3,7 @@ import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { withoutGlyphs } from "../../dev/words";
-import { folderItems, trashItems, undoLast } from "../../ipc/commands";
+import { createFolder, folderItems, trashItems, undoLast } from "../../ipc/commands";
 import { Grid } from "../grid/Grid";
 import { placeItems } from "../grid/place-items";
 import { SelectionBar } from "../grid/SelectionBar";
@@ -91,6 +91,30 @@ test("a search's folders stand before its files, each under its heading, and a c
       { id: 4, title: "Trips" },
       { id: 6, title: "Cairo" },
     ],
+  });
+});
+
+test("a file in a sorting source is captioned Sorting Box, while its query keeps the source's own name", async () => {
+  setPlace(searching("path:Incoming dsc_0001"));
+  const screen = await renderPlace();
+  const tile = screen.getByRole("button", { name: "DSC_0001.jpg" });
+  await expect.element(tile).toBeVisible();
+  const caption = tile.element().closest("figure")?.querySelector("figcaption");
+  expect(caption?.textContent).toBe("Sorting Box");
+  expect(caption?.getAttribute("title")).toBe("Sorting Box");
+});
+
+test("a found folder in a sorting source is in the Sorting Box, and opens under the source's own name", async () => {
+  await createFolder(2, "Day 2");
+  setPlace(searching("day"));
+  const screen = await renderPlace();
+  const card = screen.getByRole("button", { name: /^Day 2/ });
+  await expect.element(card.getByText("in Sorting Box", { exact: true })).toBeVisible();
+
+  await card.click();
+  expect(getPlace()).toMatchObject({
+    kind: "folder",
+    path: [{ id: 2, title: "Incoming" }, { title: "Day 2" }],
   });
 });
 
