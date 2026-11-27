@@ -25,6 +25,7 @@ import {
   letGo,
   movedBannerLine,
   movedFailed,
+  nameOrCount,
   noBinDetail,
   noBinHead,
   pathsFailed,
@@ -357,11 +358,16 @@ test("a name holding a character Windows refuses is refused with the character n
 
 test("an act that failed names what it could not do, the file by name or the files counted", () => {
   const one = [{ id: 1, diskName: "_DSC4411.ARW" }];
-  const unnamed = [{ id: 1 }, { id: 2 }, { id: 3 }];
+  const two = [...one, { id: 2, diskName: "_DSC4412.ARW" }];
+  expect(nameOrCount(one)).toBe("_DSC4411.ARW");
+  expect(nameOrCount([{ id: 1 }])).toBe(1);
+  expect(nameOrCount(two)).toBe(2);
   expect(shownFailed("_DSC4411.ARW")).toBe("Could not show _DSC4411.ARW in Explorer.");
-  expect(copiedFailed(one)).toBe("Could not copy _DSC4411.ARW.");
-  expect(copiedFailed([{ id: 1 }])).toBe("Could not copy 1 file.");
-  expect(pathsFailed(unnamed)).toBe("Could not copy the paths of 3 files.");
+  expect(copiedFailed("_DSC4411.ARW")).toBe("Could not copy _DSC4411.ARW.");
+  expect(copiedFailed(1)).toBe("Could not copy 1 file.");
+  expect(pathsFailed("_DSC4411.ARW")).toBe("Could not copy the path of _DSC4411.ARW.");
+  expect(pathsFailed(1)).toBe("Could not copy the path of 1 file.");
+  expect(pathsFailed(3)).toBe("Could not copy the paths of 3 files.");
   expect(movedFailed(3, "Lisbon")).toBe("Could not move 3 files to Lisbon.");
   expect(restoredFailed(1, null)).toBe("Could not restore 1 file.");
   expect(favouriteFailed("Lisbon", false)).toBe("Could not favourite Lisbon.");

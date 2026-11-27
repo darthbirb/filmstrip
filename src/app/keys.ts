@@ -12,7 +12,7 @@ import { moveFiles } from "./pane/move-picker";
 import { getPaneItem, getPaneSet } from "./pane/pane-store";
 import { copyFiles } from "./paste/clipboard";
 import { getPlace } from "./place";
-import { copiedFailed, deletedFailed, movedFailed, pathsFailed } from "./undo/lines";
+import { copiedFailed, deletedFailed, movedFailed, nameOrCount, pathsFailed } from "./undo/lines";
 
 // Destination keys: the ten digits, each bound to a folder a press moves files into.
 // DECISIONS.md "Destination keys".
@@ -76,7 +76,7 @@ export function useFileKeys() {
 
 const oneFailed = (key: FileKey) => {
   if (key === "delete") return deletedFailed(1);
-  return key === "copy" ? copiedFailed([{ id: 0 }]) : pathsFailed([{ id: 0 }]);
+  return key === "copy" ? copiedFailed(1) : pathsFailed(1);
 };
 
 async function actOn(key: FileKey) {
@@ -84,9 +84,10 @@ async function actOn(key: FileKey) {
   // A trashed file goes only by Restore, as the bar in the Trash has nothing else.
   if (!chosen || chosen.files.length === 0 || chosen.files.every(inTrash)) return;
   const ids = chosen.files.map((file) => file.id);
+  const what = nameOrCount(chosen.files);
   if (key === "delete") await deleteFiles(ids);
-  else if (key === "copy") await copyFiles(ids).catch(failed(copiedFailed(chosen.files)));
-  else await copyItemPaths(ids).catch(failed(pathsFailed(chosen.files)));
+  else if (key === "copy") await copyFiles(ids).catch(failed(copiedFailed(what)));
+  else await copyItemPaths(ids).catch(failed(pathsFailed(what)));
 }
 
 /**

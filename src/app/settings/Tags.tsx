@@ -39,7 +39,7 @@ import { ContextMenu, type MenuAnchor, type MenuGroups } from "../../ui/Menu";
 import type { OfferRow } from "../../ui/OfferList";
 import { TermField, TypedTerm } from "../../ui/TermField";
 import { MoreButton, RowQuestion, TermGroup, TermRow, type TermSort } from "../../ui/TermTable";
-import { failed, sayFailed } from "../failure";
+import { failed, sayFailed, unasked } from "../failure";
 import { libraryChanged, whenLibraryChanges } from "../library";
 import { setNews, useNews } from "../navigation/foot-slot";
 import { addToSearch, searchFor } from "../search/search";
@@ -149,7 +149,7 @@ export function Tags() {
       batch = await run();
     } catch (error) {
       sayFailed(what, error);
-      load();
+      void listTags().then(setVocabulary).catch(unasked);
       back.current = row;
       return;
     }

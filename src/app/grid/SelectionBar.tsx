@@ -20,7 +20,7 @@ import { openMovePicker } from "../pane/move-picker";
 import { restoreFiles } from "../pane/restore";
 import { copyFiles } from "../paste/clipboard";
 import { TagSheet, whenTagSheetAsked } from "../tags/TagSheet";
-import { copiedFailed } from "../undo/lines";
+import { copiedFailed, nameOrCount } from "../undo/lines";
 import { inTrash } from "./place-items";
 import {
   type CheckedFile,
@@ -108,7 +108,7 @@ function InLibrary({ rows }: { rows: readonly CheckedFile[] }) {
   const remove = `Delete ${Files(ids.length)}`;
   const run = {
     favourite: () => setFavourites(rows, !favourite),
-    copy: () => void copyFiles(ids).catch(failed(copiedFailed(rows))),
+    copy: () => void copyFiles(ids).catch(failed(copiedFailed(nameOrCount(rows)))),
     export: () => exportChecked(ids),
     delete: () => void deleteFiles(ids),
   };

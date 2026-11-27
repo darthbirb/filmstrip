@@ -12,7 +12,7 @@ import { startRename } from "../pane/rename";
 import { restoreFiles } from "../pane/restore";
 import { copyFiles } from "../paste/clipboard";
 import { openTagSheet } from "../tags/TagSheet";
-import { copiedFailed, openFailed, pathsFailed, shownFailed } from "../undo/lines";
+import { copiedFailed, nameOrCount, openFailed, pathsFailed, shownFailed } from "../undo/lines";
 
 /** A file, with when it went to the Trash when it is there; a checked branch's go unnamed. */
 type Item = {
@@ -83,13 +83,13 @@ export function setMenu(items: readonly Item[], trash: boolean): HeadedMenu {
           id: "copy",
           label: "Copy",
           glyph: "copy",
-          onSelect: () => void copyFiles(ids).catch(failed(copiedFailed(items))),
+          onSelect: () => void copyFiles(ids).catch(failed(copiedFailed(nameOrCount(items)))),
         },
         {
           id: "copy-path",
           label: "Copy as Path",
           glyph: "copy",
-          onSelect: () => void copyItemPaths(ids).catch(failed(pathsFailed(items))),
+          onSelect: () => void copyItemPaths(ids).catch(failed(pathsFailed(nameOrCount(items)))),
         },
         { id: "export", label: "Export…", glyph: "zip", onSelect: () => exportChecked(ids) },
       ],
@@ -179,13 +179,13 @@ export function itemMenu(item: Item & { diskName: string }, show: () => void): M
         id: "copy",
         label: "Copy",
         glyph: "copy",
-        onSelect: () => saying(copyFiles([item.id]), copiedFailed([item])),
+        onSelect: () => saying(copyFiles([item.id]), copiedFailed(item.diskName)),
       },
       {
         id: "copy-path",
         label: "Copy as Path",
         glyph: "copy",
-        onSelect: () => saying(copyItemPaths([item.id]), pathsFailed([item])),
+        onSelect: () => saying(copyItemPaths([item.id]), pathsFailed(item.diskName)),
       },
       {
         id: "open",

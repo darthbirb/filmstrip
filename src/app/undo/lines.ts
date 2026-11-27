@@ -588,23 +588,22 @@ export function reasonText(reason: Reason): string {
 /** A character Windows refuses in a name, quoted, or said in words when it cannot be seen. */
 const character = (one: string) => (/\p{Cc}/u.test(one) ? "a control character" : `“${one}”`);
 
-/** A file, by its name when the act knew it. */
-type Named = { id: number; diskName?: string };
-
-/** Files by the one name, or counted when there are more or it is not known. */
-const named = (items: readonly Named[]) => {
+/** The one file's name when it is known, else how many: what a failed act's wording takes. */
+export function nameOrCount(items: readonly { id: number; diskName?: string }[]): string | number {
   const [first] = items;
-  return items.length === 1 && first?.diskName ? first.diskName : files(items.length);
-};
+  return items.length === 1 && first?.diskName ? first.diskName : items.length;
+}
+
+const said = (what: string | number) => (typeof what === "number" ? files(what) : what);
 
 /** What an act that failed says before why: what it could not do, to what. */
 export const shownFailed = (name: string) => `Could not show ${name} in Explorer.`;
 export const openFailed = (name: string) => `Could not open ${name}.`;
-export const copiedFailed = (items: readonly Named[]) => `Could not copy ${named(items)}.`;
-export const pathsFailed = (items: readonly Named[]) =>
-  items.length === 1
-    ? `Could not copy the path of ${named(items)}.`
-    : `Could not copy the paths of ${named(items)}.`;
+export const copiedFailed = (what: string | number) => `Could not copy ${said(what)}.`;
+export const pathsFailed = (what: string | number) =>
+  typeof what === "string" || what === 1
+    ? `Could not copy the path of ${said(what)}.`
+    : `Could not copy the paths of ${said(what)}.`;
 
 export const movedFailed = (count: number, to: string) =>
   `Could not move ${files(count)} to ${to}.`;
@@ -614,8 +613,9 @@ export const restoredFailed = (count: number, to: string | null) =>
 
 /** What a favourite that failed says, before why: `what` is a name, or files counted when unnamed. */
 export function favouriteFailed(what: string | number, was: boolean) {
-  const named = typeof what === "number" ? files(what) : what;
-  return was ? `Could not remove ${named} from favourites.` : `Could not favourite ${named}.`;
+  return was
+    ? `Could not remove ${said(what)} from favourites.`
+    : `Could not favourite ${said(what)}.`;
 }
 
 /** Why, as the sentence after the one that says what failed. */

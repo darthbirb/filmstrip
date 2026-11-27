@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 
 import { setItemFavorite } from "../ipc/commands";
 import { sayFailed } from "./failure";
-import { favouriteFailed } from "./undo/lines";
+import { favouriteFailed, nameOrCount } from "./undo/lines";
 
 // What was just set wins over what was last read, so the pane's bar and every menu show a change at
 // once rather than at the next read of the index.
@@ -44,8 +44,7 @@ export function setFavourites(
   favourite: boolean,
 ) {
   const itemIds = items.map((item) => item.id);
-  const [first] = items;
-  const what = items.length === 1 && first?.diskName ? first.diskName : items.length;
+  const what = nameOrCount(items);
   const before = itemIds.map((id) => chosen.get(id));
   for (const id of itemIds) chosen.set(id, favourite);
   changed();
