@@ -3,7 +3,7 @@ import { beforeEach, expect, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
-import { recording } from "../../dev/recording";
+import { kindsAdded } from "../../dev/kinds-added";
 import { getPlace, setPlace } from "../place";
 import { Breadcrumb } from "./Breadcrumb";
 import { loadIndex, resetIndex } from "./index-store";
@@ -156,10 +156,7 @@ test("the Sorting Box's way in is its row's menu, and the tree holds nothing els
   await userEvent.keyboard("{Shift>}{F10}{/Shift}");
   const add = screen.getByRole("menuitem", { name: "Add Sorting Source…" });
   await expect.element(add).toBeVisible();
-  await recording(async (calls) => {
-    await add.click();
-    await expect.poll(() => calls.map(([command]) => command)).toContain("pick_folder");
-  });
+  expect(await kindsAdded(() => add.click())).toEqual(["sorting"]);
 });
 
 test("a refused folder says so and changes nothing, and a second refusal replaces the first", async () => {

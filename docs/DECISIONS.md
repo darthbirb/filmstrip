@@ -589,10 +589,10 @@ really "no pictures here". They keep one shape so they do not read as five desig
 names the folder or source it is talking about. **Only a folder of folders and the Sorting Box
 offer an action**: the first lists its folders as buttons, because going into one is the obvious
 next move and the counts are already known, and an empty Sorting Box offers Add Sorting Source…,
-the one way it fills, as "Places, not queries" says; a button that only restates the situation
-is worse than no button. A place whose
-folders are not known yet says nothing at all rather than guessing at "empty", and an unreachable
-source says what it last held — see "A walk only judges what it read".
+the one way it fills, as "Places, not queries" says; a button that only restates the situation is
+worse than no button. A place whose folders are not known yet says nothing at all rather than
+guessing at "empty", and an unreachable source says what it last held — see "A walk only judges what
+it read".
 
 **Checking files is a gesture of its own**, drawn by Claude Design and built on 25 September
 2026. A click shows a picture and never checks it; the box on the tile checks it, and so do Ctrl
