@@ -1765,7 +1765,8 @@ waits, where Explorer can see it too.
 
 - **Each trashed row records where the bin keeps its file.** The send already reads the file's
   names before and after the shell takes it (DECISIONS.md "Sending to the Recycle Bin"), and the
-  name it gained under `$Recycle.Bin` is the shell's own name for it there, `$R…`. That name goes
+  name it gained under `$Recycle.Bin` is the shell's own name for it there, `$R…`; a file that can
+  never have a second name has it from the shell instead. That name goes
   in `item.bin_path`, and the file's identity, its volume's serial and its index on it, in
   `item.bin_file`, so a file is known by what it is rather than by a name another file could
   take. No crate reads the bin: listing it through the shell's namespace means COM and every file
@@ -1895,7 +1896,23 @@ the way back; a single file is never purged from the app, as Explorer's bin can 
 built on 20 October 2026 for #110, and since #192 the way every Delete goes. The Recycle Bin cannot
 take every file: a drive with none, such as a removable one or a network share, the bin turned off,
 or a file over its quota. There the shell deletes it outright, and asking it not to means a dialog,
-which the app never shows on its behalf.
+which the app never shows on its behalf. Two guards keep the promise since #263: the shell's own
+word on each file before it deletes it, on every drive, and the file's names read from the disk,
+wherever the drive has hard links.
+
+- **`IFileOperation`, with a sink that stops any delete outright**, as the careful sends of
+  Electron and send2trash do. Before the shell deletes the file it calls the sink's
+  `PreDeleteItem`, and sets `TSF_DELETE_RECYCLE_IF_POSSIBLE` only when the file is going to the
+  bin; without it the sink answers `E_ABORT`, which cancels that delete and the operation, and the
+  file is refused where it was. The operation runs with `FOF_NO_UI` and `FOFX_RECYCLEONDELETE`, so
+  the shell asks nothing, on a thread of its own in a single-threaded apartment, which the
+  interface needs and the app's other threads are never asked to be. `PostDeleteItem` hands back
+  the file's new name in the bin. What the sink answers is decided by `fs::recycle::Watch`, plain
+  code the tests run; the COM around it only passes the shell's flags in and the answer out. It
+  replaced `SHFileOperationW`, which had no way to refuse, so the second name alone kept the
+  promise and a drive without hard links could not delete at all. Why the bin refused a file is
+  not told apart: too large, the bin off, or a delete outright are all the Recycle Bin refusing,
+  and a send that fails on the disk is said in the log.
 
 - **A second name first, then its names, then the shell, then its names again.** Before the
   shell is asked, the file is given a second name beside it by a hard link, and that file's names
@@ -1904,17 +1921,18 @@ which the app never shows on its behalf.
   before is the file counted as sent; its second name goes once the Trash has recorded it, so a
   stop between the two still finds it. Otherwise, and when its names cannot be read afterwards,
   the second name is given the file's own name back and the file is refused. Whatever the shell
-  answers, the disk says which happened, so a refusal is never mistaken for a send. The count of
-  names, compared before and after, is not enough: something on the disk giving the file a name
-  elsewhere while the shell deletes it outright leaves the count unchanged, with the file in
-  neither the Trash nor the bin. A user's file can already have other names, from a dedup tool or
+  answers, the disk says which happened, so a refusal is never mistaken for a send, and a shell
+  that deleted a file outright after the sink let it go leaves the second name as the file. The
+  count of names, compared before and after, is not enough: something on the disk giving the file
+  a name elsewhere while the shell deletes it outright leaves the count unchanged, with the file
+  in neither the Trash nor the bin. A user's file can already have other names, from a dedup tool or
   a link-based backup, and keeps them into the Trash, since trashing within a volume is a rename;
   one can even be in the bin already, when the user recycled another of its names. Those never
   count as the send, being there before it.
-- **A file whose names cannot be read is never sent.** A drive or filter that cannot list a
-  file's names, or one without hard links, would leave the app unable to tell a send from a
-  delete; read only after the shell, it turned a file the bin took into a refusal, and every retry
-  left one more copy in the bin. So the names are read before the shell is asked, and where they
+- **A file whose names cannot be read is never sent.** A drive or filter that gives a second name
+  but cannot list a file's names would leave the app unable to tell a send from a delete; read
+  only after the shell, it turned a file the bin took into a refusal, and every retry left one
+  more copy in the bin. So the names are read before the shell is asked, and where they
   cannot be, the second name is removed and the file refused without asking. Names are read in
   verbatim form, as `std::fs` and `noclobber` pass theirs, since the second name is longer than
   the file's and can pass MAX_PATH where the file does not.
@@ -1938,20 +1956,44 @@ which the app never shows on its behalf.
   has a second name beside its file to settle once that folder is reached.
 - **The send says where the bin put it**: the name the file gained under `$Recycle.Bin`, and its
   identity, read from the second name before the shell is asked, since the file keeps it in the
-  bin. DECISIONS.md "The Trash is the Recycle Bin".
-- **`SHFileOperationW`, not `IFileOperation`.** The newer interface can refuse an outright delete
-  before it happens, but only through a COM sink the app would have to implement; the second name
-  gets the same promise from one flat call. Why the bin refused a file is not told apart: too
-  large, the bin off, or a delete outright are all the Recycle Bin refusing, and a send that fails
-  on the disk is said in the log.
-- **What the shell is never asked is refused with its own reason** (#219). `SHFileOperationW`
-  takes no path of MAX_PATH or longer, so such a file is refused before its second name is made,
-  as a path too long for the Recycle Bin, rather than handed over to fail as the bin's refusal.
-  A file that cannot be given its second name, or whose names cannot be read, is refused naming
-  its drive, as Explorer names it, since the drive is what lacks hard links: a fixed exFAT or FAT
-  drive has a bin, but no way for the send to tell a recycle from a delete. When the disk says the
-  file itself is the cause, another app holding it or access denied, that reason is given instead.
-  Whether such a drive should send another way is left open; the reason says which it was.
+  bin, or for a file with no second name from its name in the bin afterwards.
+  DECISIONS.md "The Trash is the Recycle Bin".
+- **A file that can never have a second name is sent on the shell's word** (#263). A fixed exFAT
+  or FAT32 drive has a bin but no hard links, which the disk says as `ERROR_INVALID_FUNCTION` or
+  `ERROR_NOT_SUPPORTED`, and a file with all the names NTFS allows one is refused another with
+  `ERROR_TOO_MANY_LINKS`. Such a file is handed to the shell with the sink alone. Still at its
+  path afterwards, or when the disk cannot say, it was refused. Gone, it counts as sent only under
+  the name `PostDeleteItem` gave, inside the bin of its own volume and still a file with the size
+  and last write it had; its identity is read there rather than before, since FAT gives a file a
+  new index when it moves to another folder.
+  Gone with no such name, it is said to be no longer on disk, and the log says the shell did not
+  say where: the sink let it go only into the bin, so Explorer has it, but the Trash cannot list
+  what it cannot find, and the next walk retires its row.
+- **What a send without a second name cannot do**, written down rather than built:
+  - A stop between the shell taking the file and its row being recorded leaves the file in the
+    Recycle Bin and its row where it was. Its mark has no second name and no names to settle, so
+    the launch only lets it go; finding the file would mean reading every `$I…` record in that
+    drive's bin for its old path, which one an earlier file of the same name left matches too.
+    Explorer still lists it, to put back or empty, and the next walk retires its row as a file it
+    finds gone.
+  - One put back from Explorer is not found at its own path by its identity on FAT, whose index
+    changed with the move, so the look in the bin retires its row as emptied and the walk brings
+    the file in again as new, without its tags. A Restore from the app moves it back as on any
+    drive.
+  - A Restore whose record then fails moves the file back into the bin, which on FAT gives it a
+    new index, so its row's `bin_file` no longer names it and the next look in the bin retires
+    the row as emptied while Explorer still lists the file.
+  - The one guard is the shell's word. A shell that deleted such a file outright without asking
+    the sink first would leave nothing to put back, where the second name would have.
+- **What the shell is never asked is refused with its own reason** (#219). The shell is handed no
+  path of MAX_PATH or longer, the limit `SHFileOperationW` had and the send keeps, so such a file
+  is refused before its second name is made, as a path too long for the Recycle Bin, rather than
+  handed over to fail as the bin's refusal. A file gone before its second name is made is no
+  longer on disk. When the disk says the file itself is the cause, another app holding it or
+  access denied, that reason is given. Only where the disk refuses the second name for a reason
+  that says neither, or the names of one it made cannot be read, is the file refused naming its
+  drive as Explorer names it, since then neither guard can be trusted to run: the send never falls
+  back to the sink alone on an answer it cannot read.
 - **The second name is made in the file's own folder.** Delete hands `send` a file where it is,
   so its second name is made there, hidden by its dot from the walk, and nothing else would ever
   find it. Its mark joins the list in `setting.recycling` before the send and leaves only once
@@ -1962,10 +2004,14 @@ which the app never shows on its behalf.
   second names.
 - **Tests never reach the real bin.** The shell is behind the `Bin` trait, which also says
   whether a name is inside it and lets go of the record it keeps; the tests' stand-in recycles
-  into a folder of its own, deletes outright or refuses, while the second name and the file's
-  names are real. Its files start with
-  one name and with several, one of them already in the bin, and gain one from outside while the
-  shell acts. Names that cannot be read are made so by a switch only tests have.
+  into a folder of its own, deletes outright, refuses, or names the wrong place, while the second
+  name and the file's names are real. Before it acts it asks the app's own `Watch`, with the flags
+  the shell gives a file it can recycle or one it cannot, so a file it says cannot be recycled is
+  refused by the code the real sink runs. Its files start with one name and with several, one of
+  them already in the bin, and gain one from outside while the shell acts. Names that cannot be
+  read, and second names the disk refuses, are made so by switches only tests have. The COM
+  between the shell and `Watch`, and what the real shell passes it, are left to a check by hand
+  on a real drive.
 
 ## A drive with no Recycle Bin
 

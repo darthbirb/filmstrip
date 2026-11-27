@@ -153,9 +153,9 @@ fn sent_under(conn: &Connection, batch_id: &str) -> Result<HashSet<i64>> {
         .collect())
 }
 
-/// Sends one item's file to the Recycle Bin and records where the bin keeps it. A file gone from
-/// where the index has it is refused, and the next walk retires it; one the bin will not take, or
-/// on a drive with no bin and never sent, stays. DECISIONS.md "Sending to the Recycle Bin".
+/// Sends one item's file to the Recycle Bin and records where the bin keeps it. Refused before the
+/// shell is asked: a row gone from the index, a file gone from disk, a drive with no bin, a path
+/// too long for the shell, a file that cannot be held. DECISIONS.md "Sending to the Recycle Bin".
 pub(super) fn trash_unjournalled(
     conn: &Connection,
     item_id: i64,
@@ -199,6 +199,16 @@ pub(super) fn trash_unjournalled(
         Sent::Unheld(code) => {
             recycling::settled(conn, &from)?;
             return Err(AppError::refused(unheld(&from, code)));
+        }
+        Sent::Untraced => {
+            recycling::settled(conn, &from)?;
+            eprintln!(
+                "recycle: {} left its folder, and the shell did not say where",
+                from.display()
+            );
+            return Err(AppError::refused(Reason::NotOnDisk {
+                name: file.disk_name,
+            }));
         }
     };
 
@@ -1007,7 +1017,10 @@ mod tests {
     #[test]
     fn a_file_whose_path_is_too_long_for_the_shell_stays_and_says_so() {
         let (conn, root, cairo) = library("too-long");
-        let room = 262 - root.join("Trips/Cairo").as_os_str().len() - 1;
+        let cairo_units =
+            std::os::windows::ffi::OsStrExt::encode_wide(root.join("Trips/Cairo").as_os_str())
+                .count();
+        let room = 262 - cairo_units - 1;
         let long = format!("{}.jpg", "l".repeat(room - 4));
         std::fs::write(root.join("Trips/Cairo").join(&long), "l").unwrap();
         walk::reconcile(&conn).unwrap();
@@ -1027,8 +1040,11 @@ mod tests {
 
     #[cfg(windows)]
     #[test]
-    fn a_file_its_drive_cannot_give_a_second_name_stays_naming_the_drive() {
-        for (code, why) in [(1, None), (32, Some(Reason::InUse))] {
+    fn a_file_that_cannot_be_held_for_its_send_stays_saying_why() {
+        let gone = Reason::NotOnDisk {
+            name: "sphinx.jpg".into(),
+        };
+        for (code, why) in [(87, None), (32, Some(Reason::InUse)), (2, Some(gone))] {
             let (conn, root, cairo) = library(&format!("unlinkable-{code}"));
             let sphinx = id_of(&conn, cairo, "sphinx.jpg");
             let bin = stand_in();
@@ -1047,6 +1063,91 @@ mod tests {
             assert!(recycling::unsettled(&conn).unwrap().is_empty());
             cairo_holds(&root, &["pyramid.jpg", "sphinx.jpg"]);
         }
+    }
+
+    /// The disk's answer to a second name on a drive without hard links.
+    #[cfg(windows)]
+    const NO_HARD_LINKS: i32 = 1;
+
+    #[cfg(windows)]
+    #[test]
+    fn on_a_drive_without_hard_links_a_file_goes_to_the_bin_and_one_undo_brings_it_back() {
+        let (conn, root, cairo) = library("linkless-round-trip");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let bin = stand_in();
+        recycle::links_fail(NO_HARD_LINKS);
+        let batch = journal::new_batch();
+
+        let report = trash_items(&conn, &[pyramid], &batch).unwrap();
+
+        assert_eq!(report.trashed, 1);
+        cairo_holds(&root, &["sphinx.jpg"]);
+        let binned = bin_file(&conn, pyramid);
+        assert!(binned.starts_with(bin.dir().unwrap()));
+        assert_eq!(std::fs::read_to_string(&binned).unwrap(), "p");
+        assert!(items::is_trashed(&conn, pyramid).unwrap());
+        assert!(recycling::unsettled(&conn).unwrap().is_empty());
+        assert_eq!(look_in_bin(&conn).unwrap(), Looked::default());
+        assert!(items::is_trashed(&conn, pyramid).unwrap());
+
+        undo::undo_batch(&conn, &batch).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(root.join("Trips/Cairo/pyramid.jpg")).unwrap(),
+            "p"
+        );
+        assert!(items::is_live(&conn, pyramid).unwrap());
+        let kept = tags::item_effective_tags(&conn, pyramid).unwrap();
+        assert!(kept.iter().any(|tag| tag.value == "cairo"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn on_a_drive_without_hard_links_a_file_the_bin_cannot_take_stays_whole() {
+        let (conn, root, cairo) = library("linkless-unrecyclable");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        let mut bin = Fake::new(Stand::Recycles(root.parent().unwrap().join("bin")));
+        bin.unrecyclable.push("sphinx".into());
+        let bin = stand_in_as(bin);
+        recycle::links_fail(NO_HARD_LINKS);
+
+        let report = trash_items(&conn, &[pyramid, sphinx], &journal::new_batch()).unwrap();
+
+        assert_eq!(report.trashed, 1);
+        assert_eq!(
+            (report.refused[0].id, &report.refused[0].reason),
+            (sphinx, &Reason::BinRefused)
+        );
+        assert_eq!(bin.asked.borrow().len(), 2);
+        cairo_holds(&root, &["sphinx.jpg"]);
+        assert_eq!(
+            std::fs::read_to_string(root.join("Trips/Cairo/sphinx.jpg")).unwrap(),
+            "s"
+        );
+        assert!(items::is_live(&conn, sphinx).unwrap());
+        assert!(items::is_trashed(&conn, pyramid).unwrap());
+        assert!(recycling::unsettled(&conn).unwrap().is_empty());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn on_a_drive_without_hard_links_a_send_the_app_stopped_during_leaves_the_file_in_the_bin() {
+        let (conn, root, cairo) = library("linkless-stopped");
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        recycle::links_fail(NO_HARD_LINKS);
+        let bin = stopped_during_send(&conn, cairo, &journal::new_batch());
+
+        settle_unfinished_send(&conn).unwrap();
+
+        assert!(recycling::unsettled(&conn).unwrap().is_empty());
+        assert!(items::is_live(&conn, pyramid).unwrap());
+        cairo_holds(&root, &["sphinx.jpg"]);
+        let kept = crate::fs::settled_names(bin.dir().unwrap(), |seen| seen.len() == 1);
+        assert_eq!(kept, ["pyramid.jpg"]);
+        assert_eq!(
+            std::fs::read_to_string(bin.dir().unwrap().join("pyramid.jpg")).unwrap(),
+            "p"
+        );
     }
 
     #[test]

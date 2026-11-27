@@ -43,14 +43,21 @@ chrono = { version = "=0.4.45", default-features = false, features = ["clock"] }
 [target.'cfg(windows)'.dependencies]
 clipboard-win = "5"
 # MoveFileExW, for a rename that refuses a name already taken where std's replaces it; a file's
-# names, and SHFileOperationW, for a send to the Recycle Bin that never destroys a file; a drive's
-# kind, for one with no Recycle Bin.
+# names, for a send to the Recycle Bin that never destroys a file; a drive's kind, for one with no
+# Recycle Bin.
 windows-sys = { version = "=0.61.2", features = [
     "Win32_Foundation",
     "Win32_Storage_FileSystem",
     "Win32_System_WindowsProgramming",
+] }
+# IFileOperation and the progress sink that stops it deleting a file outright; windows-core is
+# what the sink's `#[implement]` expands to. Both already come in through Tauri's WebView2.
+windows = { version = "=0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
     "Win32_UI_Shell",
 ] }
+windows-core = "=0.62.2"
 
 [profile.release]
 opt-level = 3
