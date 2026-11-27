@@ -11,7 +11,7 @@ import { NameField } from "../../ui/NameField";
 import { libraryChanged } from "../library";
 import { setPlace } from "../place";
 import { Chips, TagsRow } from "../tags/TagsRow";
-import { renameFile, startRename, stopRename, useRenaming } from "./rename";
+import { answerRename, renameFile, startRename, stopRename, useRenaming } from "./rename";
 
 /** Where the item is, its file, its dates, its labels and tags, and the name it has on disk. */
 export function Details({ item, tags }: { item: ItemDetail; tags: EffectiveTag[] }) {
@@ -68,6 +68,7 @@ function Name({ item }: { item: ItemDetail }) {
   if (!renaming) {
     return (
       <button
+        ref={answerRename}
         type="button"
         title="Rename"
         onClick={() => startRename(item.id)}
@@ -87,10 +88,10 @@ function Name({ item }: { item: ItemDetail }) {
       name={item.diskName}
       taken={taken}
       onEdit={() => setTaken(null)}
-      onCommit={(name) => void renameFile(item, name).then(setTaken)}
-      onCancel={() => {
+      onCommit={(name, byKey) => void renameFile(item, name, byKey).then(setTaken)}
+      onCancel={(byKey) => {
         setTaken(null);
-        stopRename();
+        stopRename(byKey);
       }}
     />
   );

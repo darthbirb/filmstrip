@@ -25,6 +25,10 @@ type Props = {
 /** What was written and not saved, and why. */
 type Unsaved = { text: string; why: string };
 
+// The note whose box closed with the focus in it, and the note it will read once saved: its
+// control takes the focus again as a saved note remounts the row, until that note is drawn.
+let handing: { of: string; note: string | null } | null = null;
+
 /**
  * A note as prose where it stands, and the box it becomes. Enter is a new line; Ctrl+Enter, Save
  * or a click away keeps it, and Escape or Cancel leaves the note as it was. DESIGN.md "Components".
@@ -33,6 +37,20 @@ export function NoteField({ note, of, onSave }: Props) {
   const [writing, setWriting] = useState(false);
   const [unsaved, setUnsaved] = useState<Unsaved | null>(null);
   const [focus, setFocus] = useState(true);
+  const control = useRef<HTMLButtonElement>(null);
+  const open = () => {
+    handing = null;
+    setWriting(true);
+  };
+
+  useLayoutEffect(() => {
+    if (writing || handing?.of !== of) return;
+    const now = document.activeElement;
+    const lost = now === null || now === document.body || now === control.current;
+    if (lost) control.current?.focus();
+    if (!lost || handing.note === note) handing = null;
+  }, [writing, note, of]);
+
   if (writing) {
     return (
       <Box
@@ -40,7 +58,8 @@ export function NoteField({ note, of, onSave }: Props) {
         of={of}
         why={unsaved?.why ?? null}
         focus={focus}
-        onDone={(kept) => {
+        onDone={(kept, inside) => {
+          handing = inside ? { of, note: kept === undefined ? note : kept } : null;
           setWriting(false);
           setUnsaved(null);
           setFocus(true);
@@ -48,7 +67,7 @@ export function NoteField({ note, of, onSave }: Props) {
           void onSave(kept).then((why) => {
             if (why === null) return;
             const active = document.activeElement;
-            setFocus(active === null || active === document.body);
+            setFocus(active === null || active === document.body || active === control.current);
             setUnsaved({ text: kept ?? "", why });
             setWriting(true);
           });
@@ -59,7 +78,7 @@ export function NoteField({ note, of, onSave }: Props) {
   if (note === null) {
     return (
       <span className="flex py-px">
-        <ChipButton look="outline" onClick={() => setWriting(true)}>
+        <ChipButton ref={control} look="outline" onClick={open}>
           Add Note…
         </ChipButton>
       </span>
@@ -67,9 +86,10 @@ export function NoteField({ note, of, onSave }: Props) {
   }
   return (
     <button
+      ref={control}
       type="button"
       aria-label={`Change Note on ${of}`}
-      onClick={() => setWriting(true)}
+      onClick={open}
       className="group focus-ring flex items-start gap-1.5 rounded-badge text-left"
     >
       <span className="whitespace-pre-line text-pretty">{note}</span>
@@ -89,8 +109,11 @@ type BoxProps = {
   why: string | null;
   /** Whether it takes the caret as it opens. */
   focus: boolean;
-  /** What to keep, or `undefined` to keep the note as it was. */
-  onDone: (kept: string | null | undefined) => void;
+  /**
+   * What to keep, or `undefined` to keep the note as it was; `inside` when the focus was in the
+   * box as it closed.
+   */
+  onDone: (kept: string | null | undefined, inside: boolean) => void;
 };
 
 function Box({ note, of, why, focus, onDone }: BoxProps) {
@@ -117,11 +140,11 @@ function Box({ note, of, why, focus, onDone }: BoxProps) {
     return () => cancelAnimationFrame(asking);
   }, [focus]);
 
-  const finish = (keep: boolean) => {
+  const finish = (keep: boolean, inside = true) => {
     if (settled.current) return;
     settled.current = true;
     const text = field.current?.value.trim() ?? "";
-    onDone(keep ? text || null : undefined);
+    onDone(keep ? text || null : undefined, inside);
   };
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key === "Escape") {
@@ -135,7 +158,7 @@ function Box({ note, of, why, focus, onDone }: BoxProps) {
   };
   // Leaving the box, not moving between its field and its buttons, keeps what was written.
   const onBlur = (event: FocusEvent) => {
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) finish(true);
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) finish(true, false);
   };
 
   return (
