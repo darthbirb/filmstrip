@@ -654,7 +654,7 @@ export function undoFailedLine(batch: Batch | null, error: unknown): string {
  * The line after a redo a newer act stopped before its end: what went, counted against what the
  * redo held, then that it stopped.
  */
-export function redoStoppedLine({ batch, filesBack }: UndoReport): string {
+export function redoStoppedLine({ batch, filesBack, foldersBack }: UndoReport): string {
   const { act, files: whole } = batch;
   const stop = "A newer act stopped the redo.";
   const part = `${formatCount(filesBack)} of ${files(whole)}`;
@@ -666,7 +666,10 @@ export function redoStoppedLine({ batch, filesBack }: UndoReport): string {
     case "restore":
       return `Restored ${part}${act.to ? ` to ${act.to}` : ""}. ${stop}`;
     case "copy":
-      return `Copied ${part} to ${act.to}. ${stop}`;
+      if (filesBack > 0) return `Copied ${part} to ${act.to}. ${stop}`;
+      if (act.folder && whole > 0)
+        return `Copied ${act.folder} to ${act.to} but none of its ${files(whole)}. ${stop}`;
+      return `Copied ${formatCount(foldersBack)} of ${folders(batch.folders)} to ${act.to}. ${stop}`;
     default:
       return `Redid part of “${actLine(batch).replace(/\.$/, "")}”. ${stop}`;
   }

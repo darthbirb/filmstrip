@@ -678,4 +678,24 @@ test("a redo a newer act stopped counts what went and says it stopped", () => {
   expect(redoStoppedLine(stopped(TO_TRASH, 214, 100))).toBe(
     `Redid part of “Deleted Lisbon and its 214 files”. ${stop}`,
   );
+  const restore: Act = { kind: "restore", to: "Cairo", one: null };
+  expect(redoStoppedLine(stopped(restore, 5, 2))).toBe(`Restored 2 of 5 files to Cairo. ${stop}`);
+  const scattered: Act = { kind: "restore", to: null, one: null };
+  expect(redoStoppedLine(stopped(scattered, 5, 2))).toBe(`Restored 2 of 5 files. ${stop}`);
+
+  const files: Act = { kind: "copy", to: "Lisbon", one: null, folder: null, folders: 0 };
+  expect(redoStoppedLine(stopped(files, 10, 4))).toBe(`Copied 4 of 10 files to Lisbon. ${stop}`);
+  const folders = (act: Act, files: number, folders: number, foldersBack: number) => ({
+    batch: batch(act, files, folders),
+    filesBack: 0,
+    foldersBack,
+    stayed: [],
+    stopped: true,
+  });
+  const tree: Act = { kind: "copy", to: "Lisbon", one: null, folder: "Alexandria", folders: 1 };
+  expect(redoStoppedLine(folders(tree, 10, 3, 1))).toBe(
+    `Copied Alexandria to Lisbon but none of its 10 files. ${stop}`,
+  );
+  const mix: Act = { kind: "copy", to: "Lisbon", one: null, folder: null, folders: 2 };
+  expect(redoStoppedLine(folders(mix, 0, 3, 1))).toBe(`Copied 1 of 3 folders to Lisbon. ${stop}`);
 });
