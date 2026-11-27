@@ -26,6 +26,7 @@ import { SkeletonTile } from "../../ui/Skeleton";
 import { THUMB_FRAME, ThumbFace } from "../../ui/Thumb";
 import { fromFocus, groundMenu, placeMenu } from "../menus/ground";
 import { itemMenu, setMenu } from "../menus/item-menu";
+import { useIndex } from "../navigation/index-store";
 import { answerOnGrid } from "../pane/act-focus";
 import { setFullScreen } from "../pane/full-screen";
 import { showInPane, usePaneItem, usePaneSet } from "../pane/pane-store";
@@ -35,6 +36,7 @@ import { type Place, setPlace, usePlace } from "../place";
 import { usePreferences } from "../preferences";
 import { useSearchOutcome } from "../search/results";
 import { scopeTo } from "../search/search";
+import { saidAbove } from "../sorting-box";
 import { pressTile } from "./drag";
 import { EmptyPlace } from "./EmptyPlace";
 import { rowOf, step } from "./keys";
@@ -78,6 +80,7 @@ export function Grid({ mode }: { mode: LayoutMode }) {
   const search = place?.kind === "search" ? place : null;
   const outcome = useSearchOutcome(search?.query);
   const found = (search && outcome?.kind === "found" && outcome.folders) || NO_FOLDERS;
+  const { sources } = useIndex();
   const hits = search && items?.every((item) => "at" in item) ? (items as Hit[]) : null;
   const [block, setBlock] = useState<HTMLDivElement | null>(null);
   const foldersHeight = useHeight(block);
@@ -285,7 +288,7 @@ export function Grid({ mode }: { mode: LayoutMode }) {
                     title={folder.title}
                     own={folder.ownCount}
                     count={folder.count}
-                    above={folder.path.slice(0, -1).map((crumb) => crumb.title)}
+                    above={saidAbove(folder.path, folder.sourceId, sources ?? [])}
                     matched={folder.matched}
                     cover={folder.cover ? convertFileSrc(folder.cover) : undefined}
                     onOpen={() =>
