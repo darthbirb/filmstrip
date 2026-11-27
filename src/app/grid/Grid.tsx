@@ -244,6 +244,7 @@ export function Grid({ mode }: { mode: LayoutMode }) {
       // Where a drag from Explorer finds the grid it rests on.
       data-drop="grid"
       // The menu key needs the focus here: a click on the ground keeps it, and Tab when no tile can.
+      // An emptied pane hands the focus here too, so never no tabindex: DECISIONS.md "The pane".
       tabIndex={grounded && !items?.length ? 0 : -1}
       onContextMenu={onGround}
       className={`focus-ring-inset h-full overflow-auto ${lit ? "rounded-control inset-ring-2 inset-ring-plate" : ""}`}

@@ -162,7 +162,7 @@ test("the Trash opens nothing on its ground", async () => {
   await renderAt({ kind: "trash" });
   await rightClickGround();
   expect(document.querySelector("[role=menu]")).toBeNull();
-  expect(grid().tabIndex).toBe(-1);
+  expect(grid().getAttribute("tabindex")).toBe("-1");
 });
 
 test("a search opens nothing on its ground", async () => {
@@ -170,7 +170,7 @@ test("a search opens nothing on its ground", async () => {
   await renderAt({ kind: "search", query: "cairo", back: null });
   await rightClickGround();
   expect(document.querySelector("[role=menu]")).toBeNull();
-  expect(grid().tabIndex).toBe(-1);
+  expect(grid().getAttribute("tabindex")).toBe("-1");
 });
 
 test("the menu key on the focused grid opens it against the grid's corner", async () => {

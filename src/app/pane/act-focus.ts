@@ -2,15 +2,18 @@ import { focusPicture } from "./picture-focus";
 
 // Only a focus that fell to the page is taken back; any focus that moves on purpose drops the request.
 // A frame or a tile given the focus is held until the focus moves on, as its list may drop it yet.
-let wanted: { name: string } | { frame: HTMLElement | null } | { grid: HTMLElement | null } | null =
-  null;
+let wanted:
+  | { name: string }
+  | { frame: HTMLElement | null }
+  | { inGrid: HTMLElement | null }
+  | null = null;
 
 const STRIP = '[role="listbox"][aria-label="Filmstrip"]';
 const GRID = '[data-drop="grid"]';
 
 const onFocusIn = (event: FocusEvent) => {
   if (wanted && "frame" in wanted && event.target === wanted.frame) return;
-  if (wanted && "grid" in wanted && event.target === wanted.grid) return;
+  if (wanted && "inGrid" in wanted && event.target === wanted.inGrid) return;
   drop();
 };
 
@@ -78,9 +81,9 @@ export function answerOnStrip(frame: HTMLElement | null, outside: number | null)
 
 /** A pane left with no file hands the focus to the grid. */
 export function answerOnEmpty() {
-  if (wanted === null || "grid" in wanted) return;
+  if (wanted === null || "inGrid" in wanted) return;
   if (!lost()) return drop();
-  wanted = { grid: null };
+  wanted = { inGrid: null };
   const grid = document.querySelector<HTMLElement>(GRID);
   if (grid) answerOnGrid(grid);
 }
@@ -90,11 +93,11 @@ export function answerOnEmpty() {
  * the grid itself when it has none; and again once its list drops the tile that took it.
  */
 export function answerOnGrid(grid: HTMLElement) {
-  if (wanted === null || !("grid" in wanted)) return;
-  if (wanted.grid?.isConnected) return;
+  if (wanted === null || !("inGrid" in wanted)) return;
+  if (wanted.inGrid?.isConnected) return;
   if (!lost()) return drop();
   const tile = grid.querySelector<HTMLElement>('[data-item][tabindex="0"]') ?? grid;
-  wanted = { grid: tile };
+  wanted = { inGrid: tile };
   tile.focus();
 }
 
