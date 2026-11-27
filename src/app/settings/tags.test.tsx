@@ -130,6 +130,33 @@ test("a rename that worked keeps its line when the list cannot be read again aft
   await expect.poll(values).toContain("nile");
 });
 
+test("a rename that failed still says so when the list cannot be read again after it", async () => {
+  await opened();
+  await userEvent.click(more("egypt"));
+  await userEvent.click(menuRow("Rename…"));
+  const busy = { kind: "io", reason: { kind: "busy" } };
+  const rereads: Promise<unknown>[] = [];
+  await recording(
+    async () => {
+      await userEvent.keyboard("nile{Enter}");
+      await expect.poll(() => rereads.length).toBe(1);
+      await Promise.allSettled(rereads);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    },
+    (cmd) => {
+      if (cmd === "rename_tag") return Promise.reject(busy);
+      if (cmd !== "list_tags") return undefined;
+      const reread = Promise.reject(busy);
+      rereads.push(reread);
+      return reread;
+    },
+  );
+  expect(getNews()).toEqual({
+    kind: "failed",
+    line: "Could not rename egypt to nile. The index is busy. Try again in a moment.",
+  });
+});
+
 test("renaming onto a tag that exists asks to merge on the row, and Escape puts the row back", async () => {
   await opened();
   await userEvent.click(more("egypt"));
