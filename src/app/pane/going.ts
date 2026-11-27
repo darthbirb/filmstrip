@@ -1,8 +1,11 @@
+import type { Progress } from "../../ipc/bindings/Progress";
+import { indexProgress } from "../../ipc/commands";
+import { unasked } from "../failure";
+
 // How many sends hold each file; one held by any is going, and a second press on it sends nothing.
 const going = new Map<number, number>();
-const byJob = new Map<number, readonly number[]>();
-// A job can be heard ending before its start has been answered.
-const endedUnheld = new Set<number>();
+// Each job on the queue holding files, and whether the queue has listed it yet.
+const byJob = new Map<number, { itemIds: readonly number[]; listed: boolean }>();
 
 function take(itemIds: readonly number[]) {
   for (const id of itemIds) going.set(id, (going.get(id) ?? 0) + 1);
@@ -30,20 +33,40 @@ export async function once<T>(itemIds: readonly number[], work: () => Promise<T>
   }
 }
 
-/** Keeps files going while the job on the queue that sends them runs, until it is heard to end. */
-export function goingUntilEnd(jobId: number, itemIds: readonly number[]) {
-  if (endedUnheld.delete(jobId)) return;
+/**
+ * Keeps files going while the job on the queue that sends them is there: until its end is heard,
+ * or the queue no longer lists it, however it left. One already gone lets them go at once, and a
+ * job given the id of one that ended unheard takes its place.
+ */
+export async function goingUntilEnd(jobId: number, itemIds: readonly number[]) {
+  jobEnded(jobId);
   take(itemIds);
-  byJob.set(jobId, itemIds);
+  byJob.set(jobId, { itemIds, listed: false });
+  const asked = new Set(byJob.keys());
+  const now = await indexProgress().catch(unasked);
+  if (now) jobsListed(now, asked);
 }
 
 /** A job that sends files has ended, however it ended, and its files are free again. */
 export function jobEnded(jobId: number) {
-  const itemIds = byJob.get(jobId);
-  if (!itemIds) {
-    endedUnheld.add(jobId);
-    return;
-  }
+  const job = byJob.get(jobId);
+  if (!job) return;
   byJob.delete(jobId);
-  letGo(itemIds);
+  letGo(job.itemIds);
+}
+
+/**
+ * What the queue lists: a job it listed before and lists no more has left it. A report sent
+ * before a job was listed says nothing of it, except one asked for after the jobs in `started`
+ * had started.
+ */
+export function jobsListed(
+  progress: Pick<Progress, "moves" | "deletes">,
+  started: ReadonlySet<number> = new Set(),
+) {
+  const there = new Set([...progress.moves, ...progress.deletes].map((one) => one.jobId));
+  for (const [jobId, job] of byJob) {
+    if (there.has(jobId)) job.listed = true;
+    else if (job.listed || started.has(jobId)) jobEnded(jobId);
+  }
 }

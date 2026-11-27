@@ -70,7 +70,7 @@ async function sendToBin(itemIds: number[], asked: number) {
   });
   if (!done) return 0;
   if (done.kind === "started") {
-    goingUntilEnd(done.jobId, itemIds);
+    void goingUntilEnd(done.jobId, itemIds);
     sending.set(done.jobId, asked);
     moveOn(pane, []);
     return 0;

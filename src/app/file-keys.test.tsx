@@ -5,7 +5,7 @@ import { render } from "vitest-browser-react";
 import { failCommand, onDriveWithoutBin, resetBin } from "../dev/mock";
 import { recording, theMock } from "../dev/recording";
 import type { Deleted } from "../ipc/bindings/Deleted";
-import { folderItems, undoLast } from "../ipc/commands";
+import { folderItems, indexProgress, undoLast } from "../ipc/commands";
 import { afterDeleted } from "./deleted";
 import { Grid } from "./grid/Grid";
 import { clearChecked } from "./grid/selection";
@@ -157,6 +157,8 @@ test("Delete again while a delete on the queue sends the same files starts no se
     cancelled: true,
     stopped: null,
   };
+  const deleting = { jobId: 91, kind: "files", name: "", done: 0, whole: 2 } as const;
+  const queued = { ...(await indexProgress()), deletes: [deleting] };
   await recording(
     async (calls) => {
       await userEvent.keyboard("{Delete}");
@@ -171,7 +173,10 @@ test("Delete again while a delete on the queue sends the same files starts no se
       await expect.poll(() => count(calls, "trash_items")).toBe(2);
       await afterDeleted(ended);
     },
-    (cmd) => (cmd === "trash_items" ? { kind: "started", jobId: 91 } : undefined),
+    (cmd) => {
+      if (cmd === "trash_items") return { kind: "started", jobId: 91 };
+      return cmd === "index_progress" ? queued : undefined;
+    },
   );
 });
 

@@ -301,7 +301,7 @@ async function moveNow(itemIds: number[], to: Into) {
   if (!moved) return null;
   remember(to);
   if (moved.kind === "started") {
-    goingUntilEnd(moved.jobId, itemIds);
+    void goingUntilEnd(moved.jobId, itemIds);
     if (pane.next === pane.shown) return "started" as const;
     if (pane.origin?.kind === "search") landing.set(moved.jobId, pane);
     else if (await leavesAhead(pane.origin, to)) moveOn(pane, []);
