@@ -4,6 +4,7 @@ import { copyItemPaths, itemDetail } from "../ipc/commands";
 import { failed } from "./failure";
 import { inTrash } from "./grid/place-items";
 import { getChecked } from "./grid/selection";
+import { keyIsFree } from "./key-free";
 import { setNews } from "./navigation/foot-slot";
 import { getIndex } from "./navigation/index-store";
 import { deleteFiles } from "./pane/delete";
@@ -34,7 +35,6 @@ export function useDestinationKeys() {
     const onKey = (event: KeyboardEvent) => {
       const digit = digitOf(event);
       if (digit === null || !keyIsFree(event)) return;
-      if (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
       if (getPlace()?.kind === "trash") return;
       event.preventDefault();
       void press(digit);
@@ -42,14 +42,6 @@ export function useDestinationKeys() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-}
-
-/** Whether a key is the app's: not in a field, a menu, a question or Settings. */
-function keyIsFree(event: KeyboardEvent) {
-  if (event.defaultPrevented) return false;
-  const target = event.target instanceof Element ? event.target : null;
-  const own = "input, textarea, select, [contenteditable], [role=menu], [popover], [data-question]";
-  return !target?.closest(own) && !document.querySelector("dialog[open]");
 }
 
 type FileKey = "delete" | "copy" | "copyPath";
@@ -69,7 +61,7 @@ export function useFileKeys() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const key = fileKeyOf(event);
-      if (key === null || !keyIsFree(event)) return;
+      if (key === null || !keyIsFree(event, { modifiers: true })) return;
       event.preventDefault();
       void actOn(key);
     };
