@@ -80,14 +80,14 @@ function InLibrary({ item }: { item: ItemDetail }) {
       id: "copy",
       label: "Copy",
       glyph: "copy",
-      run: () => void copyFiles([item.id]).catch(failed(copiedFailed([item]))),
+      run: () => void copyFiles([item.id]).catch(failed(copiedFailed(item.diskName))),
     },
     {
       id: "copy-path",
       label: "Copy as Path",
       glyph: "copy",
       menuOnly: true,
-      run: () => void copyItemPaths([item.id]).catch(failed(pathsFailed([item]))),
+      run: () => void copyItemPaths([item.id]).catch(failed(pathsFailed(item.diskName))),
     },
     {
       id: "open",
