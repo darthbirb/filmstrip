@@ -11,7 +11,7 @@ export function sortingDetail(
   return sources.filter((one) => one.kind === "sorting").length > 1 ? source.title : undefined;
 }
 
-/** The folders above a place, as a file's place is said: a sorting source's own folder is the Sorting Box. */
+/** The folders above a place as a search says them: a sorting source's own is the Sorting Box. */
 export function saidAbove(
   path: readonly { title: string }[],
   sourceId: number,
