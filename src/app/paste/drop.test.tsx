@@ -16,7 +16,7 @@ import { openFolders, setOpenFolders } from "../navigation/open-folders";
 import { watchWork } from "../navigation/work-store";
 import { type Place, setPlace } from "../place";
 import { showReport } from "../undo/report-store";
-import { watchCopies } from "./copy";
+import { resetRecount, watchCopies } from "./copy";
 import { ExplorerGhost, PickHost, useExplorerDrops } from "./drop";
 
 // Against the dev mock: Pictures (D:\Pictures) holds People (5, empty) and Trips (4), Trips holds
@@ -43,6 +43,7 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  resetRecount();
   while (await undoLast()) {}
   setNews(null);
   showReport(null);
@@ -256,8 +257,6 @@ test("a copy's reports recount navigation once, a window after they start", asyn
   };
   const copying = (done: number) => [{ jobId: 9, folderId: 5, to: "People", done, whole: 40 }];
   const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-  // The copy in the test before may still have its recount due.
-  await pause(RELOAD_WINDOW_MS);
 
   await recording(async (calls) => {
     const recounts = () => calls.filter(([cmd]) => cmd === "library_totals").length;

@@ -131,13 +131,20 @@ export async function afterCopied(copied: Copied) {
   else afterAct(batch, whole - came, actLine(batch, whole - came));
 }
 
+let recount: ReturnType<typeof setTimeout> | undefined;
+
+/** Drops a recount still due, for tests. */
+export function resetRecount() {
+  clearTimeout(recount);
+  recount = undefined;
+}
+
 /**
  * Follows each copy and each move between drives: navigation counts again at most once a window
  * as files land, and hears how a copy ended. The grid follows the same reports itself.
  */
 export async function watchCopies() {
   const seen = new Map<number, number>();
-  let recount: ReturnType<typeof setTimeout> | undefined;
   await listen<Progress>("job-progress", ({ payload }) => {
     const lines = [...payload.copies, ...payload.moves];
     const moved = lines.some((one) => seen.get(one.jobId) !== one.done);
