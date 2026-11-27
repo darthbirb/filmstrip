@@ -1,6 +1,6 @@
 //! The Windows Recycle Bin, where Delete sends a file, Restore takes it back from and Empty Trash…
-//! deletes it for good. A send never destroys one: a file the bin cannot take is put back where it
-//! was and reported refused. DECISIONS.md "Sending to the Recycle Bin".
+//! permanently deletes it. A send never destroys one: a file the bin cannot take is put back where
+//! it was and reported refused. DECISIONS.md "Sending to the Recycle Bin".
 
 use std::io;
 use std::path::{Path, PathBuf};
@@ -138,7 +138,7 @@ pub fn release(file: &Path, itself: &str) -> io::Result<()> {
     }
 }
 
-/// Deletes for good the file the bin keeps as `binned`, then the bin's record of it: only a name
+/// Permanently deletes the file the bin keeps as `binned`, then the bin's record of it: only a name
 /// inside the bin, and only while it is still the file `itself` names.
 /// DECISIONS.md "Emptying the Trash".
 pub fn purge(bin: &dyn Bin, binned: &Path, itself: &str) -> io::Result<()> {

@@ -1,5 +1,5 @@
-//! Emptying the Trash: the files the library sent to the Recycle Bin deleted for good, each found
-//! again in the bin first, and nothing else in the bin touched. Nothing is journalled.
+//! Emptying the Trash: the files the library sent to the Recycle Bin permanently deleted, each
+//! found again in the bin first, and nothing else in the bin touched. Nothing is journalled.
 //! DECISIONS.md "Emptying the Trash".
 
 use rusqlite::Connection;
@@ -76,7 +76,7 @@ enum Outcome {
 /// How many deleted files' rows leave the Trash and the journal in one transaction.
 const LEFT_AT_ONCE: usize = 200;
 
-/// Deletes for good each file counted still in the Trash as it was counted, one turn of the disk
+/// Permanently deletes each file counted still in the Trash as it was counted, one turn of the disk
 /// per file, so a restore between two takes its file out of reach; one it cannot finish stays.
 /// Only the app's closing stops it. DECISIONS.md "Background work".
 pub fn empty(conn: &Connection, counted: &[Counted], control: &impl Control) -> Result<Emptied> {

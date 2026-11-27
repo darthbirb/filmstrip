@@ -1740,11 +1740,11 @@ export function emptyOutside(itemIds: readonly number[]) {
 const binless = new Map<number, string>();
 /** Folders on such a drive, so what is copied or restored into them is on it too. */
 const binlessFolders = new Map<number, string>();
-/** Files that would not go when deleted for good, as one open in another app. */
+/** Files that would not go when permanently deleted, as one open in another app. */
 const undeletable = new Set<number>();
-/** Files deleted for good, which only a test's reset brings back. */
+/** Files permanently deleted, which only a test's reset brings back. */
 let goneForGood: ItemRow[] = [];
-/** Folders deleted with nothing journalled, every file in them gone for good. */
+/** Folders deleted with nothing journalled, every file in them permanently deleted. */
 let foldersGoneForGood: { node: FolderNode; parent: number }[] = [];
 
 /** Puts these files on a drive with no Recycle Bin. */
@@ -1752,7 +1752,7 @@ export function onDriveWithoutBin(itemIds: readonly number[], drive: string) {
   for (const id of itemIds) binless.set(id, drive);
 }
 
-/** Has these files refuse to be deleted for good. */
+/** Has these files refuse to be permanently deleted. */
 export function refuseDeleting(itemIds: readonly number[]) {
   for (const id of itemIds) undeletable.add(id);
 }
@@ -1869,7 +1869,7 @@ function dropFromJournal(item: ItemRow) {
   }
 }
 
-/** Deletes for good the files counted still in the Trash, one at a time, as the Rust job does. */
+/** Permanently deletes the files counted still in the Trash, one at a time, as the Rust job does. */
 function emptyTrash(counted: readonly Counted[]): number {
   undone.length = 0;
   const emptied: Emptied = { deleted: 0, bytes: 0, gone: 0, kept: 0, stayed: [] };

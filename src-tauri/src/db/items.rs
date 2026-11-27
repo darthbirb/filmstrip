@@ -435,7 +435,7 @@ pub fn forget(conn: &Connection, id: i64, why: Forgot) -> Result<()> {
     crate::db::search::index_item(conn, id)
 }
 
-/// Takes a trashed item out of the Trash for good, its file gone from the Recycle Bin: retired
+/// Takes a trashed item out of the Trash permanently, its file gone from the Recycle Bin: retired
 /// where it was, keeping its tags and its name, or forgotten where another row has that name now.
 pub fn retire_trashed(conn: &Connection, id: i64, at: i64) -> Result<()> {
     retire_all_trashed(conn, &[id], at)

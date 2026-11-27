@@ -422,6 +422,25 @@ test("a line for an act that changed nothing has a check and no Undo, and leaves
   setNews(null);
 });
 
+test("folded, the rail's Undo is a label and its key, the act's line read out as its description", async () => {
+  const line = "Moved 2 files to People.";
+  const failure = "Could not undo “Moved 2 files to People”. The disk is full.";
+  const screen = await render(<Foot rail />);
+  try {
+    for (const news of [
+      { kind: "done", line, batchId: "b" },
+      { kind: "undoFailed", line: failure, batchId: "b" },
+    ] as const) {
+      setNews(news);
+      const undo = screen.getByRole("button", { name: "Undo · Ctrl+Z", exact: true });
+      await expect.element(undo).toHaveAttribute("title", "Undo · Ctrl+Z");
+      await expect.element(undo).toHaveAttribute("aria-description", news.line);
+    }
+  } finally {
+    setNews(null);
+  }
+});
+
 test("the baseline is read again when a walk goes quiet", async () => {
   let now = TOTALS;
   mockIPC(

@@ -171,7 +171,7 @@ pub(super) fn move_unjournalled(
 pub enum Contents {
     /// Into the trash, with the folder.
     Trash,
-    /// Deleted for good where their drive has no Recycle Bin, once asked, and the rest into the
+    /// Permanently deleted where their drive has no Recycle Bin, once asked, and the rest into the
     /// trash, with the folder. DECISIONS.md "A drive with no Recycle Bin".
     Permanently,
     /// Into a sorting source's top level, subfolders and all.
@@ -188,7 +188,7 @@ pub enum Contents {
 pub struct DeleteReport {
     pub deleted: bool,
     pub refused: Vec<Stayed>,
-    /// How many of its files went for good, from a drive with no Recycle Bin.
+    /// How many of its files were permanently deleted, from a drive with no Recycle Bin.
     pub outright: u32,
 }
 

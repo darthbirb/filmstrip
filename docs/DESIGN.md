@@ -1112,7 +1112,7 @@ toward the rest surface.
   "Nothing to undo." does, in the Band's alarm: the `warning` glyph in `danger` on `danger-wash`
   inside a `line-danger` ring. A long one wraps a `tile-gap` short of the window's edge, growing
   up from the slot, so its reason is never cut off. It goes at the next key or click, and the
-  button, the same one the act's Undo was, keeps it in its tooltip.
+  button, the same one the act's Undo was, keeps it in its `aria-description`.
 - **Line.** What an act did, in the Band's slot and shape without its alarm: a `glyph` in `fg-dim`
   (a check after an act, the undo arrow after an undo), the sentence in `ui`, the way back under it
   as a raised Undo button, and a dismiss. After an undo the button is Redo, with the redo arrow,
@@ -1122,8 +1122,8 @@ toward the rest surface.
   library, as a drop on the pane past its limit, has no Undo, and leaves the folded rail; so does
   an act's line once the act has left the journal, as when the Trash finds its files emptied from
   the Recycle Bin, its sentence kept. It shares the one slot with the Band, and the newest of the
-  two replaces the other. Folded, the rail keeps the Undo glyph button alone, its sentence in
-  the tooltip; "Nothing to undo." comes out beside the rail on `panel` with the overlay shadow, as
+  two replaces the other. Folded, the rail keeps the Undo glyph button alone, its tooltip
+  "Undo · Ctrl+Z" and its sentence in its `aria-description`; "Nothing to undo." comes out beside the rail on `panel` with the overlay shadow, as
   does "The clipboard holds no files.", with the clipboard glyph.
 - **Copy line.** A copy in progress has the walk's line of its own at the foot, above the walk:
   "Copying to Lisbon…" in `small` `fg-mid`, its figure in `fg`, a dismiss whose tooltip is Cancel

@@ -128,7 +128,7 @@ fn just_before_each_row(then: impl FnMut() + 'static) {
     BEFORE_EACH_ROW.with(|hook| *hook.borrow_mut() = Some(Box::new(then)));
 }
 
-/// Carries out one row again, never deleting for good: a file bound for a drive with no bin stays.
+/// Carries out one row again, never a permanent delete: a file bound for a drive with no bin stays.
 fn again(conn: &Connection, batch_id: &str, entry: &Entry) -> Result<Again> {
     match entry.op.as_str() {
         journal::FOLDER_CREATE => {

@@ -123,7 +123,7 @@ export function Trash() {
 }
 
 /**
- * Deletes the files counted for good as a job, outside the section, so leaving it loses nothing;
+ * Permanently deletes the files counted as a job, outside the section, so leaving it loses nothing;
  * the head counts from the job's line once it has one.
  */
 async function emptyAll(counted: Counted[]) {

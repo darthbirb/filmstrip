@@ -6,6 +6,6 @@ import type { Stayed } from "./Stayed";
  */
 export type DeleteReport = { deleted: boolean, refused: Array<Stayed>, 
 /**
- * How many of its files went for good, from a drive with no Recycle Bin.
+ * How many of its files were permanently deleted, from a drive with no Recycle Bin.
  */
 outright: number, };

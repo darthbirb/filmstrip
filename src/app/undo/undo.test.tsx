@@ -114,10 +114,11 @@ test("folded, a failed undo keeps the rail's Undo and its sentence comes out bes
   const failure = "Could not undo “Moved 2 files to People”. The disk is full.";
   failUndo(true);
   try {
-    await screen.getByRole("button", { name: /^Undo · Moved 2 files/ }).click();
+    await screen.getByRole("button", { name: "Undo · Ctrl+Z", exact: true }).click();
     await expect.element(screen.getByText(failure)).toBeVisible();
-    const again = screen.getByRole("button", { name: `Undo · ${failure} · Ctrl+Z` });
+    const again = screen.getByRole("button", { name: "Undo · Ctrl+Z", exact: true });
     await expect.element(again).toBeVisible();
+    expect(again.element().getAttribute("aria-description")).toBe(failure);
     expect(document.activeElement, "the focus stays on the button pressed").toBe(again.element());
   } finally {
     failUndo(false);
@@ -130,7 +131,7 @@ test("folded, a failed undo keeps the rail's Undo and its sentence comes out bes
   await userEvent.keyboard("{Shift}");
   await expect.poll(() => out()?.matches(":popover-open")).toBe(false);
   await expect
-    .element(screen.getByRole("button", { name: `Undo · ${failure} · Ctrl+Z` }))
+    .element(screen.getByRole("button", { name: "Undo · Ctrl+Z", exact: true }))
     .toBeVisible();
 });
 

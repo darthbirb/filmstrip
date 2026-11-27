@@ -271,7 +271,8 @@ function News({ news, rail }: { news: FootNews; rail: boolean }) {
           <OutOfRail news={news} sentence={news.kind === "undoFailed" ? news.line : null} alarm>
             <GlyphButton
               glyph="undo"
-              label={`Undo · ${news.line} · Ctrl+Z`}
+              label="Undo · Ctrl+Z"
+              description={news.line}
               onClick={() => void undo(news.batchId)}
             />
           </OutOfRail>

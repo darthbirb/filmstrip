@@ -391,7 +391,7 @@ pub async fn trash_to_empty(state: State<'_, AppState>) -> Result<ToEmpty> {
     run(&state, empty::to_empty).await
 }
 
-/// Deletes for good, from the Recycle Bin, the files counted that are still in the Trash, as a
+/// Permanently deletes, from the Recycle Bin, the files counted that are still in the Trash, as a
 /// job whose line counts them as it goes; nothing can undo it, nor cancel it.
 #[tauri::command]
 pub async fn empty_trash(state: State<'_, AppState>, counted: Vec<Counted>) -> Result<i64> {

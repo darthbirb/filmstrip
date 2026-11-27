@@ -10,7 +10,7 @@ export type FootNews =
   | { kind: "refused"; refused: Refused }
   /** Files the Recycle Bin would not take, which stay where they were; nothing was deleted. */
   | { kind: "binRefused"; line: string; detail: string }
-  /** Files a delete for good would not remove, which stay where they were; nothing to undo. */
+  /** Files a permanent delete would not remove, which stay where they were; nothing to undo. */
   | { kind: "kept"; line: string }
   /** An act that could not be done, then why. */
   | { kind: "failed"; line: string }
