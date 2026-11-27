@@ -94,6 +94,16 @@ test("a search's folders stand before its files, each under its heading, and a c
   });
 });
 
+test("a file in a sorting source is captioned Sorting Box, while its query keeps the source's own name", async () => {
+  setPlace(searching("path:Incoming dsc_0001"));
+  const screen = await renderPlace();
+  const tile = screen.getByRole("button", { name: "DSC_0001.jpg" });
+  await expect.element(tile).toBeVisible();
+  const caption = tile.element().closest("figure")?.querySelector("figcaption");
+  expect(caption?.textContent).toBe("Sorting Box");
+  expect(caption?.getAttribute("title")).toBe("Sorting Box");
+});
+
 test("the keyboard and a screen reader meet the folders, then the files' heading, then the files", async () => {
   setPlace(searching("path:Pictures/Trips cairo"));
   await page.viewport(1200, 800);

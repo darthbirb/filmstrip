@@ -772,10 +772,16 @@ function searchFor(query: string, sort?: unknown): SearchOutcome {
   const within = (path: string[], shape: Shape & { kind: "path" }) =>
     lower(shape.titles).every((title, at) => path[at] === title);
   const trash = terms.some((term) => term.text === "is:trashed");
+  const titlesOf = new Map<number, string[]>();
   const files = (trash ? (ITEMS[TRASH] ?? []) : everyItem().filter((item) => item.folderId > 0))
     .map((item): Hit => {
       const gone = trashed.get(item.id);
-      const path = (gone?.folders ?? crumbs(item.folderId).folders).map((crumb) => crumb.title);
+      const folders = gone?.folders ?? crumbs(item.folderId).folders;
+      titlesOf.set(
+        item.id,
+        folders.map((crumb) => crumb.title),
+      );
+      const path = folders.map((crumb, at) => (at === 0 ? placeName(crumb.id) : crumb.title));
       return {
         ...item,
         at: { folderId: item.folderId, path, gone: false },
@@ -784,7 +790,7 @@ function searchFor(query: string, sort?: unknown): SearchOutcome {
     })
     .filter((hit) =>
       terms.every(({ shape, text }) => {
-        const path = lower(hit.at.path);
+        const path = lower(titlesOf.get(hit.id) ?? []);
         if (shape.kind === "path") return within(path, shape);
         if (shape.kind === "place") return shape.place === "trash" || hit.folderId === 2;
         if (shape.kind === "tag") {
