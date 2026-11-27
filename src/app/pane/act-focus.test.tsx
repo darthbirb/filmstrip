@@ -3,7 +3,7 @@ import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { resetBin } from "../../dev/mock";
-import { recording } from "../../dev/recording";
+import { recording, theMock } from "../../dev/recording";
 import { folderItems, trashItems, undoLast } from "../../ipc/commands";
 import { setNews } from "../navigation/foot-slot";
 import { loadIndex, resetIndex } from "../navigation/index-store";
@@ -82,12 +82,6 @@ const onPicture = () =>
   document.activeElement?.parentElement?.tagName === "FIGURE" &&
   document.activeElement.closest("aside") !== null;
 
-type Invoke = (cmd: string, args?: unknown) => Promise<unknown>;
-
-/** The dev mock's own answer to a command, for a test that holds one back. */
-const invoke = (): Invoke =>
-  (window as unknown as { __TAURI_INTERNALS__: { invoke: Invoke } }).__TAURI_INTERNALS__.invoke;
-
 async function showing(file: number, place: Place) {
   setPlace(place);
   showInPane(file, place);
@@ -157,7 +151,7 @@ test("restored inside a search whose list comes back after the file's detail, th
     .getByRole("option", { name: "pyramid.jpg" });
   await expect.element(frame).toBeVisible();
 
-  const real = invoke();
+  const real = theMock();
   let release = () => {};
   const held = new Promise<void>((resolve) => {
     release = resolve;

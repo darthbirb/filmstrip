@@ -84,7 +84,8 @@ pub fn origin(conn: &Connection, folder_id: i64) -> Result<Origin> {
     })
 }
 
-/// Sends each item to the trash under one batch, so one undo brings the whole selection back.
+/// Sends each item to the trash under one batch, so one undo brings the whole selection back. One
+/// already in the trash, sent by an earlier act, is passed over: neither sent nor refused.
 pub fn trash_items(conn: &Connection, item_ids: &[i64], batch_id: &str) -> Result<TrashReport> {
     let _turn = super::turn();
     Ok(trash_each(conn, item_ids, batch_id, &relocate::Unwatched, false)?.report)
@@ -128,7 +129,7 @@ fn trash_each(
         let _turn = turn_each.then(super::turn);
         if sent.contains(&item_id) {
             outcome.report.trashed += 1;
-        } else {
+        } else if !items::is_trashed(conn, item_id)? {
             match trash_unjournalled(conn, item_id, Some(batch_id)) {
                 Ok(()) => outcome.report.trashed += 1,
                 Err(err) => outcome
@@ -1069,6 +1070,31 @@ mod tests {
         undo::undo_batch(&conn, &batch).unwrap();
         cairo_holds(&root, &["pyramid.jpg", "sphinx.jpg"]);
         assert!(items::is_live(&conn, pyramid).unwrap());
+    }
+
+    #[test]
+    fn a_file_already_in_the_trash_when_a_second_delete_arrives_is_passed_over() {
+        let (conn, root, cairo) = library("sent-twice");
+        stand_in();
+        let pyramid = id_of(&conn, cairo, "pyramid.jpg");
+        let sphinx = id_of(&conn, cairo, "sphinx.jpg");
+        let first = journal::new_batch();
+        trash_items(&conn, &[pyramid], &first).unwrap();
+        let second = journal::new_batch();
+
+        let report = trash_items(&conn, &[pyramid, sphinx], &second).unwrap();
+
+        assert_eq!(
+            report,
+            TrashReport {
+                trashed: 1,
+                refused: Vec::new()
+            }
+        );
+        cairo_holds(&root, &[]);
+        assert_eq!(journal::batch(&conn, &second).unwrap().len(), 1);
+        undo::undo_batch(&conn, &first).unwrap();
+        cairo_holds(&root, &["pyramid.jpg"]);
     }
 
     /// Cairo holding sphinx.jpg, pyramid.jpg and then each name here, walked; their ids, sphinx first.

@@ -3,8 +3,10 @@ import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { failCommand, onDriveWithoutBin, resetBin } from "../dev/mock";
-import { recording } from "../dev/recording";
-import { folderItems, undoLast } from "../ipc/commands";
+import { recording, theMock } from "../dev/recording";
+import type { Deleted } from "../ipc/bindings/Deleted";
+import { folderItems, indexProgress, undoLast } from "../ipc/commands";
+import { afterDeleted } from "./deleted";
 import { Grid } from "./grid/Grid";
 import { clearChecked } from "./grid/selection";
 import { useFileKeys } from "./keys";
@@ -14,7 +16,7 @@ import { loadIndex, resetIndex } from "./navigation/index-store";
 import { NoBinQuestion, resetNoBinQuestion } from "./pane/no-bin";
 import { addToPane, getPaneItem, showInPane } from "./pane/pane-store";
 import { type Place, setPlace } from "./place";
-import { showReport } from "./undo/report-store";
+import { getReport, showReport } from "./undo/report-store";
 
 // Against the dev mock: Cairo (6) holds felucca.mp4, pyramid.jpg and sphinx.jpg, in that order.
 
@@ -110,6 +112,125 @@ test("with nothing checked Delete sends the pane's file, and the pane moves on",
   await userEvent.keyboard("{Delete}");
   await expect.element(at.foot.getByText("Moved pyramid.jpg to the Recycle Bin.")).toBeVisible();
   await expect.poll(getPaneItem).toBe(sphinx);
+});
+
+const count = (calls: [string, unknown][], cmd: string) =>
+  calls.filter(([one]) => one === cmd).length;
+
+test("a second Delete before the first lands sends nothing more, and no banner says it stayed", async () => {
+  const at = await renderIt();
+  const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
+  showInPane(pyramid, CAIRO);
+  const real = theMock();
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await recording(
+    async (calls) => {
+      await userEvent.keyboard("{Delete}");
+      await expect.poll(() => sent(calls, "trash_items")).toEqual({ itemIds: [pyramid] });
+      await userEvent.keyboard("{Delete}");
+      release();
+      await expect
+        .element(at.foot.getByText("Moved pyramid.jpg to the Recycle Bin."))
+        .toBeVisible();
+      expect([count(calls, "binless_items"), count(calls, "trash_items")]).toEqual([1, 1]);
+    },
+    (cmd, args) => (cmd === "trash_items" ? held.then(() => real(cmd, args)) : undefined),
+  );
+  expect(getReport()).toBeNull();
+  await expect.poll(getPaneItem).toBe(sphinx);
+});
+
+test("Delete again while a delete on the queue sends the same files starts no second job", async () => {
+  const at = await renderIt();
+  const ids = [await idOf("felucca.mp4"), await idOf("sphinx.jpg")];
+  await check(at, "felucca.mp4");
+  await check(at, "sphinx.jpg");
+  const ended: Deleted = {
+    kind: "files",
+    jobId: 91,
+    batch: null,
+    report: { trashed: 0, refused: [] },
+    whole: 2,
+    cancelled: true,
+    stopped: null,
+  };
+  const deleting = { jobId: 91, kind: "files", name: "", done: 0, whole: 2 } as const;
+  const queued = { ...(await indexProgress()), deletes: [deleting] };
+  await recording(
+    async (calls) => {
+      await userEvent.keyboard("{Delete}");
+      await expect.poll(() => count(calls, "trash_items")).toBe(1);
+      await userEvent.keyboard("{Delete}");
+      await userEvent.keyboard("{Control>}{Shift>}C{/Shift}{/Control}");
+      await expect.poll(() => sent(calls, "copy_item_paths")).toEqual({ itemIds: ids });
+      expect(count(calls, "trash_items")).toBe(1);
+
+      await afterDeleted(ended);
+      await userEvent.keyboard("{Delete}");
+      await expect.poll(() => count(calls, "trash_items")).toBe(2);
+      await afterDeleted(ended);
+    },
+    (cmd) => {
+      if (cmd === "trash_items") return { kind: "started", jobId: 91 };
+      return cmd === "index_progress" ? queued : undefined;
+    },
+  );
+});
+
+test("Delete again while an outright delete is still going asks nothing and sends nothing", async () => {
+  const at = await renderIt();
+  const pyramid = await idOf("pyramid.jpg");
+  onDriveWithoutBin([pyramid], "USB Drive (E:)");
+  showInPane(pyramid, CAIRO);
+  const real = theMock();
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await recording(
+    async (calls) => {
+      await userEvent.keyboard("{Delete}");
+      const question = at.foot.getByRole("region", { name: /has no Recycle Bin/ });
+      await question.getByRole("button", { name: "Delete Permanently" }).click();
+      await expect.poll(() => sent(calls, "delete_for_good")).toEqual({ itemIds: [pyramid] });
+      await expect.element(question).not.toBeInTheDocument();
+      await userEvent.keyboard("{Delete}");
+      release();
+      await expect
+        .element(at.foot.getByText("Permanently deleted pyramid.jpg from USB Drive (E:)."))
+        .toBeVisible();
+      const counts = ["binless_items", "delete_for_good", "trash_items"].map((cmd) =>
+        count(calls, cmd),
+      );
+      expect(counts).toEqual([1, 1, 0]);
+    },
+    (cmd, args) => (cmd === "delete_for_good" ? held.then(() => real(cmd, args)) : undefined),
+  );
+  expect(getReport()).toBeNull();
+});
+
+test("Delete held down deletes the pane's file once, not the files that take its place", async () => {
+  const at = await renderIt();
+  const [pyramid, sphinx] = [await idOf("pyramid.jpg"), await idOf("sphinx.jpg")];
+  showInPane(pyramid, CAIRO);
+  await userEvent.keyboard("{Delete>}");
+  await expect.element(at.foot.getByText("Moved pyramid.jpg to the Recycle Bin.")).toBeVisible();
+  await expect.poll(getPaneItem).toBe(sphinx);
+  await recording(async (calls) => {
+    for (let n = 0; n < 3; n += 1) {
+      const held = { key: "Delete", code: "Delete", repeat: true, bubbles: true, cancelable: true };
+      document.body.dispatchEvent(new KeyboardEvent("keydown", held));
+    }
+    await userEvent.keyboard("{/Delete}");
+    await userEvent.keyboard("{Control>}{Shift>}C{/Shift}{/Control}");
+    await expect.poll(() => sent(calls, "copy_item_paths")).toEqual({ itemIds: [sphinx] });
+    never(calls, "binless_items", "trash_items");
+  });
+  expect(getReport()).toBeNull();
+  expect(await idOf("sphinx.jpg")).toBe(sphinx);
 });
 
 test("Delete on a drive with no Recycle Bin asks, and Delete in the question asks no more", async () => {

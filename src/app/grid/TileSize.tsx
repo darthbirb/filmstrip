@@ -36,7 +36,7 @@ export function tileSize(saved: number | undefined) {
 }
 
 /** A step bigger or smaller than the saved size, saved as the dropdown saves it. */
-export function stepTile(by: 1 | -1) {
+function stepTile(by: 1 | -1) {
   const at = STEPS.findIndex((step) => step.value === tileStep(getPreferences().tile));
   const next = STEPS[at + by];
   if (next) updatePreferences({ tile: rem(next.value) });
