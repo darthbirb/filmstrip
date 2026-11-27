@@ -121,30 +121,35 @@ pub fn live_at(conn: &Connection, folder_id: i64) -> Result<Option<i64>> {
 pub fn live_at_each(conn: &Connection, folder_ids: &[i64]) -> Result<HashMap<i64, i64>> {
     let mut stmt = conn.prepare(
         "WITH RECURSIVE
-           up(start, title, parent_id, source_id, depth) AS (
-               SELECT id, title, parent_id, source_id, 0 FROM folder
+           up(start, titles, parent_id, source_id) AS (
+               SELECT id, CASE WHEN parent_id IS NULL THEN json_array() ELSE json_array(title) END,
+                      parent_id, source_id
+                 FROM folder
                 WHERE id IN (SELECT value FROM json_each(?1)) AND deleted_at IS NOT NULL
              UNION ALL
-               SELECT u.start, f.title, f.parent_id, f.source_id, u.depth + 1
+               SELECT u.start,
+                      CASE WHEN f.parent_id IS NULL THEN u.titles
+                           ELSE json_insert(u.titles, '$[#]', f.title) END,
+                      f.parent_id, f.source_id
                  FROM folder f JOIN up u ON f.id = u.parent_id
            ),
-           down(start, depth, here) AS (
-               SELECT u.start, u.depth, r.id
+           down(start, titles, at, here) AS (
+               SELECT u.start, u.titles, json_array_length(u.titles) - 1, r.id
                  FROM up u JOIN folder r
                    ON r.source_id = u.source_id AND r.parent_id IS NULL AND r.deleted_at IS NULL
                 WHERE u.parent_id IS NULL
              UNION ALL
-               SELECT d.start, d.depth - 1, c.id
-                 FROM down d
-                 JOIN up u ON u.start = d.start AND u.depth = d.depth - 1
-                 JOIN folder c
-                   ON c.parent_id = d.here AND c.title = u.title COLLATE NAME_FOLD
+               SELECT d.start, d.titles, d.at - 1, c.id
+                 FROM down d JOIN folder c
+                   ON c.parent_id = d.here
+                  AND c.title = json_extract(d.titles, '$[' || d.at || ']') COLLATE NAME_FOLD
                   AND c.deleted_at IS NULL
+                WHERE d.at >= 0
            )
          SELECT id, id FROM folder
           WHERE id IN (SELECT value FROM json_each(?1)) AND deleted_at IS NULL
          UNION ALL
-         SELECT start, here FROM down WHERE depth = 0",
+         SELECT start, here FROM down WHERE at < 0",
     )?;
     let found = stmt
         .query_map(params![serde_json::to_string(folder_ids)?], |r| {
