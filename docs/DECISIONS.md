@@ -1804,7 +1804,7 @@ waits, where Explorer can see it too.
   folder of that name.
 - **`data\trash` is never touched.** A folder of that name from an earlier build is neither read,
   emptied nor deleted; the app no longer makes one.
-- **Two acts cannot be undone, and both ask first**, as PRD.md "What must always hold" has it.
+- **Two acts delete for good, and both ask first**, as PRD.md "What must always hold" has it.
   Empty Trash… deletes for good only what the library sent to the bin
   (DECISIONS.md "Emptying the Trash"), and Delete on a drive with no bin only the files it asked
   about (DECISIONS.md "A drive with no Recycle Bin").
