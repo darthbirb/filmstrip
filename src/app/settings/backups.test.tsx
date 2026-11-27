@@ -4,6 +4,7 @@ import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
 import { forgetOnRestore, resetBackups } from "../../dev/mock";
+import type { Progress } from "../../ipc/bindings/Progress";
 import { listBackups } from "../../ipc/commands";
 import { getNews, setNews } from "../navigation/foot-slot";
 import { watchWork } from "../navigation/work-store";
@@ -71,6 +72,21 @@ test("Restore… asks on its row, and Escape puts the row back with the focus on
   expect(document.activeElement).toBe(restoreOn(2));
 });
 
+const IDLE: Progress = {
+  phase: "idle",
+  pending: 0,
+  running: 0,
+  failed: 0,
+  completed: 0,
+  copies: [],
+  exports: [],
+  moves: [],
+  deletes: [],
+  walks: 0,
+  walkedSource: null,
+  thumbed: [],
+};
+
 test("Restore… names each copy, move and export it stops first", async () => {
   await watchWork();
   await opened();
@@ -78,11 +94,7 @@ test("Restore… names each copy, move and export it stops first", async () => {
   const line = { folderId: 5, to: "People", done: 1, whole: 4 };
   const export_ = { jobId: 3, zip: "Trips.zip", path: "D:ExportsTrips.zip", done: 0, whole: 2 };
   await emit("job-progress", {
-    phase: "idle",
-    pending: 0,
-    running: 0,
-    failed: 0,
-    completed: 0,
+    ...IDLE,
     copies: [{ jobId: 1, ...line }],
     moves: [{ jobId: 2, ...line }],
     exports: [export_],
@@ -94,16 +106,7 @@ test("Restore… names each copy, move and export it stops first", async () => {
       "The copy, the move and the export running now are stopped first, as Cancel would stop them.",
     );
   await userEvent.keyboard("{Escape}");
-  await emit("job-progress", {
-    phase: "idle",
-    pending: 0,
-    running: 0,
-    failed: 0,
-    completed: 0,
-    copies: [],
-    moves: [],
-    exports: [],
-  });
+  await emit("job-progress", IDLE);
 });
 
 test("a restore holds Settings open, then keeps the way back on top with the focus on it", async () => {
