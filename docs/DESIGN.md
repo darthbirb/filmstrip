@@ -562,8 +562,14 @@ it appears; the Components sheet's Words block lists them, with the reason each 
 
 Names that drifted are held to one. **Sorting Box** is every sorting source wherever the person
 meets one: a question's answer, Move to…, the pick a paste or a drop asks, and an act's line. Where
-there are several, the source's own name follows in `small` `fg-dim`; Settings › Sources alone
-lists them by their own names. **Permanently** in a sentence ("Permanently delete pyramid.jpg,
+there are several, the source's own name follows in `small` `fg-dim`, cut before Sorting Box is.
+Three places keep the source's own name. Settings › Sources, its Move Its Files To dropdown
+included, is where sources are told apart, renamed and given a kind, so each goes by the name it
+is renamed by. A favourite is one folder, not the Sorting Box, and is named as that folder's
+header names it. A search's text, `path:Incoming/Day 2`, and the list's rows and the path chip
+that write it: the text has to read back as that one folder, and with several sorting sources
+"Sorting Box" would name none of them. A result's place is only read, so it says Sorting Box ›
+Day 2. **Permanently** in a sentence ("Permanently delete pyramid.jpg,
 2 MB?"), never "for good"; Delete Permanently on a button. **Recycle Bin** in full, never "the
 bin", and a file emptied from it elsewhere is "Emptied from the Recycle Bin outside Filmstrip".
 Delete's line says where the file went: "Moved sphinx.jpg to the Recycle Bin."
@@ -883,7 +889,7 @@ toward the rest surface.
   `line-control` hairline and the overlay shadow. Its rows are `control` tall in `fg`, each glyph
   `glyph`-sized in `fg-dim`, and `raised-hi` under the pointer. A row that needs telling from its
   neighbours ends in quieter words in `small` `fg-dim`, as a Sorting Box row names its source;
-  they are cut before the label is.
+  they are cut before the label is, and the label is cut at the row's end, never past it.
   A rule in `line` stands between two
   groups only when both hold rows. A menu about a thing that is not the row itself, as a
   source's is, opens under a heading: `eyebrow` capitals in `fg-dim`, `chip` tall. The one row
@@ -904,8 +910,9 @@ toward the rest surface.
   the tree. Rows are `control` tall, indented a `chevron` a level with the chevron's square kept on
   every row, a filled glyph in `fg-dim`, the name, and quieter words at the end in `small`: a
   folder's parent, or "current" in place of the pill on the one the file is in, drawn in `fg-dim`
-  and never picked. Moving a folder, its own branch is drawn the same way. The field keeps the
-  focus; the arrows move a `raised-hi` row, Enter picks it, Right and Left open and shut it.
+  and never picked. A sorting source's name, after the Sorting Box or a folder in one, is cut
+  before the row's name is, and sits before the pill so the pills keep their column. Moving a
+  folder, its own branch is drawn the same way. The field keeps the focus; the arrows move a `raised-hi` row, Enter picks it, Right and Left open and shut it.
 - **Full screen.** The pane takes the frame below the bar, keeping its header, picture and
   filmstrip and losing only the columns beside it. Its control is a glyph button at the header's
   left end, an arrow pointing along the edge that moves: left going in, right coming out, where it
