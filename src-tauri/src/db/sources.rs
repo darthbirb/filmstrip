@@ -1,5 +1,6 @@
 //! Registered roots, each a library or a sorting source. PRODUCT.md "The Sorting Box".
 
+use std::collections::HashMap;
 use std::path::Path;
 
 use rusqlite::{Connection, OptionalExtension, params};
@@ -108,22 +109,44 @@ pub fn mark_indexed(conn: &Connection, id: i64) -> Result<()> {
 /// A folder's names from its source's own folder down, as navigation names them: a source's own
 /// folder goes by the source's title, and a sorting source's by the Sorting Box it is shown in.
 pub fn place_path(conn: &Connection, folder_id: i64) -> Result<Vec<String>> {
-    let crumbs = folders::ancestry(conn, folder_id)?;
-    let sorting = match crumbs.first() {
-        Some(root) => {
-            let location = folders::location(conn, root.id)?;
-            get(conn, location.source_id)?.is_some_and(|source| source.kind == SourceKind::Sorting)
-        }
-        None => false,
-    };
-    Ok(crumbs
-        .into_iter()
-        .enumerate()
-        .map(|(at, crumb)| match at {
-            0 if sorting => SORTING_BOX.to_owned(),
-            _ => crumb.title,
-        })
-        .collect())
+    Ok(place_paths(conn, &[folder_id])?
+        .remove(&folder_id)
+        .unwrap_or_default())
+}
+
+/// [`place_path`] for many folders in one statement, each by its id.
+pub fn place_paths(conn: &Connection, folder_ids: &[i64]) -> Result<HashMap<i64, Vec<String>>> {
+    let mut stmt = conn.prepare(
+        "WITH RECURSIVE up(start, title, parent_id, source_id, depth) AS (
+             SELECT id, title, parent_id, source_id, 0 FROM folder
+              WHERE id IN (SELECT value FROM json_each(?1))
+           UNION ALL
+             SELECT u.start, f.title, f.parent_id, f.source_id, u.depth + 1
+               FROM folder f JOIN up u ON f.id = u.parent_id
+         )
+         SELECT u.start, COALESCE(s.title, u.title), s.kind
+           FROM up u LEFT JOIN source s ON u.parent_id IS NULL AND s.id = u.source_id
+          ORDER BY u.start, u.depth DESC",
+    )?;
+    let mut paths: HashMap<i64, Vec<String>> = HashMap::new();
+    let rows = stmt.query_map(params![serde_json::to_string(folder_ids)?], |r| {
+        Ok((
+            r.get::<_, i64>(0)?,
+            r.get::<_, String>(1)?,
+            r.get::<_, Option<String>>(2)?,
+        ))
+    })?;
+    for row in rows {
+        let (start, title, kind) = row?;
+        let path = paths.entry(start).or_default();
+        let sorting = path.is_empty() && kind.as_deref() == Some(SourceKind::Sorting.as_str());
+        path.push(if sorting {
+            SORTING_BOX.to_owned()
+        } else {
+            title
+        });
+    }
+    Ok(paths)
 }
 
 /// A folder as navigation names it, the last of its `place_path`.
@@ -259,6 +282,30 @@ mod tests {
         let mut conn = Connection::open_in_memory().unwrap();
         db::migrate(&mut conn).unwrap();
         conn
+    }
+
+    #[test]
+    fn many_folders_are_each_named_from_their_sources_down() {
+        let conn = conn();
+        let library = add(&conn, "D:/library".as_ref(), "Library", SourceKind::Library).unwrap();
+        let phone = add(&conn, "E:/phone".as_ref(), "Phone", SourceKind::Sorting).unwrap();
+        let top = folders::source_root_folder(&conn, library.id).unwrap();
+        let trips = folders::create(&conn, top, "Trips").unwrap();
+        let cairo = folders::create(&conn, trips, "Cairo").unwrap();
+        folders::retire_subtree_at(&conn, trips, 1).unwrap();
+        let camera = folders::create(
+            &conn,
+            folders::source_root_folder(&conn, phone.id).unwrap(),
+            "Camera",
+        )
+        .unwrap();
+
+        let paths = place_paths(&conn, &[top, cairo, camera, 999]).unwrap();
+        assert_eq!(paths[&top], ["Library"]);
+        assert_eq!(paths[&cairo], ["Library", "Trips", "Cairo"]);
+        assert_eq!(paths[&camera], [SORTING_BOX, "Camera"]);
+        assert!(!paths.contains_key(&999));
+        assert_eq!(place_path(&conn, 999).unwrap(), Vec::<String>::new());
     }
 
     #[test]

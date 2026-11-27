@@ -113,20 +113,50 @@ pub fn child_id(conn: &Connection, parent_id: i64, title: &str) -> Result<Option
 /// The folder itself while it is live; once it has gone, a live folder at the same place, found
 /// title by title from its source's own folder, as one made again under the same name is.
 pub fn live_at(conn: &Connection, folder_id: i64) -> Result<Option<i64>> {
-    if is_live(conn, folder_id)? {
-        return Ok(Some(folder_id));
-    }
-    let at = location(conn, folder_id)?;
-    let Ok(mut here) = source_root_folder(conn, at.source_id) else {
-        return Ok(None);
-    };
-    for title in &at.titles {
-        match child_id(conn, here, title)? {
-            Some(child) => here = child,
-            None => return Ok(None),
-        }
-    }
-    Ok(Some(here))
+    Ok(live_at_each(conn, &[folder_id])?.remove(&folder_id))
+}
+
+/// [`live_at`] for many folders in one statement, each to the live folder found; one with none is
+/// left out.
+pub fn live_at_each(conn: &Connection, folder_ids: &[i64]) -> Result<HashMap<i64, i64>> {
+    let mut stmt = conn.prepare(
+        "WITH RECURSIVE
+           up(start, titles, parent_id, source_id) AS (
+               SELECT id, CASE WHEN parent_id IS NULL THEN json_array() ELSE json_array(title) END,
+                      parent_id, source_id
+                 FROM folder
+                WHERE id IN (SELECT value FROM json_each(?1)) AND deleted_at IS NOT NULL
+             UNION ALL
+               SELECT u.start,
+                      CASE WHEN f.parent_id IS NULL THEN u.titles
+                           ELSE json_insert(u.titles, '$[#]', f.title) END,
+                      f.parent_id, f.source_id
+                 FROM folder f JOIN up u ON f.id = u.parent_id
+           ),
+           down(start, titles, at, here) AS (
+               SELECT u.start, u.titles, json_array_length(u.titles) - 1, r.id
+                 FROM up u JOIN folder r
+                   ON r.source_id = u.source_id AND r.parent_id IS NULL AND r.deleted_at IS NULL
+                WHERE u.parent_id IS NULL
+             UNION ALL
+               SELECT d.start, d.titles, d.at - 1, c.id
+                 FROM down d JOIN folder c
+                   ON c.parent_id = d.here
+                  AND c.title = json_extract(d.titles, '$[' || d.at || ']') COLLATE NAME_FOLD
+                  AND c.deleted_at IS NULL
+                WHERE d.at >= 0
+           )
+         SELECT id, id FROM folder
+          WHERE id IN (SELECT value FROM json_each(?1)) AND deleted_at IS NULL
+         UNION ALL
+         SELECT start, here FROM down WHERE at < 0",
+    )?;
+    let found = stmt
+        .query_map(params![serde_json::to_string(folder_ids)?], |r| {
+            Ok((r.get(0)?, r.get(1)?))
+        })?
+        .collect::<rusqlite::Result<_>>()?;
+    Ok(found)
 }
 
 /// A folder as the navigation lists it. Counts are of live contents: its own, then everything at
@@ -586,6 +616,33 @@ mod tests {
                 (cairo, Some(trips), "Cairo")
             ]
         );
+    }
+
+    #[test]
+    fn many_folders_each_find_the_live_one_at_their_place() {
+        let (conn, root) = library();
+        let trips = create(&conn, root, "Trips").unwrap();
+        let cairo = create(&conn, trips, "Cairo").unwrap();
+        let giza = create(&conn, cairo, "Giza").unwrap();
+        let luxor = create(&conn, trips, "Luxor").unwrap();
+        retire_subtree_at(&conn, trips, 1).unwrap();
+        let trips_again = create(&conn, root, "TRIPS").unwrap();
+        let cairo_again = create(&conn, trips_again, "cairo").unwrap();
+        let giza_again = create(&conn, cairo_again, "Giza").unwrap();
+        let people = create(&conn, root, "People").unwrap();
+
+        let each = live_at_each(&conn, &[trips, cairo, giza, luxor, people, 999]).unwrap();
+        assert_eq!(
+            each,
+            HashMap::from([
+                (trips, trips_again),
+                (cairo, cairo_again),
+                (giza, giza_again),
+                (people, people),
+            ])
+        );
+        assert_eq!(live_at(&conn, giza).unwrap(), Some(giza_again));
+        assert_eq!(live_at(&conn, luxor).unwrap(), None);
     }
 
     #[test]
