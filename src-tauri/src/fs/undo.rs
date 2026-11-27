@@ -27,6 +27,8 @@ pub struct UndoReport {
     pub files_back: u32,
     pub folders_back: u32,
     pub stayed: Vec<Stayed>,
+    /// Whether a newer act stopped a redo before its last row; an undo is never stopped.
+    pub stopped: bool,
 }
 
 /// Reverses one batch by id.
@@ -123,6 +125,7 @@ fn reverse_batch(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
         folders_back: batch.folders.saturating_sub(folders_left + folders_gone),
         batch,
         stayed,
+        stopped: false,
     })
 }
 

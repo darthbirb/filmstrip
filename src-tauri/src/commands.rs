@@ -535,6 +535,12 @@ pub async fn act_to_redo(
     .await
 }
 
+/// Whether the redo still holds the act a line after an undo offers Redo for.
+#[tauri::command]
+pub async fn can_redo(state: State<'_, AppState>, batch_id: String) -> Result<bool> {
+    run(&state, move |conn| redo::can_redo(conn, &batch_id)).await
+}
+
 /// Whether the act a line offers Undo for is still in the journal.
 #[tauri::command]
 pub async fn can_undo(state: State<'_, AppState>, batch_id: String) -> Result<bool> {

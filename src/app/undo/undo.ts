@@ -6,6 +6,7 @@ import type { UndoReport } from "../../ipc/bindings/UndoReport";
 import {
   actToRedo,
   actToUndo,
+  canRedo,
   canUndo,
   redoBatch,
   redoLast,
@@ -19,6 +20,7 @@ import {
   letGo,
   redoBannerLine,
   redoFailedLine,
+  redoStoppedLine,
   undoBannerLine,
   undoFailedLine,
   undoneLine,
@@ -37,6 +39,14 @@ export async function settleLine() {
   const shown = getNews();
   if (shown?.kind !== "done") return;
   const held = await canUndo(shown.batchId).catch(() => true);
+  if (!held && getNews() === shown) setNews({ kind: "said", line: shown.line });
+}
+
+/** Takes Redo off the foot's line once a newer act has dropped what it would carry out again. */
+export async function settleRedo() {
+  const shown = getNews();
+  if (shown?.kind !== "undone" || !shown.batchId) return;
+  const held = await canRedo(shown.batchId).catch(() => true);
   if (!held && getNews() === shown) setNews({ kind: "said", line: shown.line });
 }
 
@@ -131,7 +141,10 @@ export async function redo(batchId?: string, earlier: readonly Stayed[] = []) {
     const left = report.stayed.filter((row) => !letGo(row));
     const gone = [...earlier, ...report.stayed.filter(letGo)];
     if (left.length + gone.length === 0) {
-      afterAct(report.batch);
+      if (!report.stopped) afterAct(report.batch);
+      else if (report.filesBack + report.foldersBack > 0)
+        afterAct(report.batch, 0, redoStoppedLine(report));
+      else sayNothing(true);
       return;
     }
     setNews(null);

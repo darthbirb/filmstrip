@@ -154,11 +154,12 @@ migration's own comments and in [DECISIONS.md](DECISIONS.md).
   as part of its batch, and `journal::latest_batch` passes over it.
 - A redo takes the batch with the highest `undone` and carries its rows out again oldest first,
   each only while it is still marked: a tags screen act can drop the redo partway, and the redo
-  stops there. Each row that goes is written again as the newest from the row in hand, its `redo`
-  taken off and, for a folder made again, its new `folderId`, and the undone row deleted in the
-  same transaction, so the triggers keep its subjects and the next undo reaches it first. A `retag` row is journalled afresh by the act itself, found by the
-  words its `change` names, since an undo can give terms back under other ids. What stayed keeps
-  its mark; one gone from the bin or bound for a drive with no bin is deleted, as an undo's is.
+  stops at the next row it checks. Each row that goes is written again as the newest from the row
+  in hand, its `redo` taken off and, for a folder made again, its new `folderId`, and the undone
+  row deleted in the same transaction, so the triggers keep its subjects and the next undo
+  reaches it first. A `retag` row is journalled afresh by the act itself, found by the words its
+  `change` names, since an undo can give terms back under other ids. What stayed keeps its mark;
+  one gone from the bin or bound for a drive with no bin is deleted, as an undo's is.
 - Every undone row is deleted as a row of a new act is written, unless its batch is the one being
   redone, and as a file is deleted for good or a restore sets the floor (`journal::drop_redo`).
   Undone rows are marked and dropped with the rest when a file leaves the journal.

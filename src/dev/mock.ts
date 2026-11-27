@@ -690,16 +690,21 @@ function takeBack(at: number): UndoReport {
   }
   const filesBack = batch.files - stayed.length;
   if (back.length > 0) undone.push({ batch: { ...batch, files: filesBack }, steps: back, again });
-  return { batch, filesBack, foldersBack: batch.folders, stayed };
+  return { batch, filesBack, foldersBack: batch.folders, stayed, stopped: false };
 }
 
 /** Carries out again what an undo took back, journalled again as the newest act. */
 function carryOutAgain(at: number): UndoReport {
   const [{ batch, steps, again }] = undone.splice(at, 1) as [(typeof undone)[number]];
-  for (const step of again) step();
+  const went = redoStopsAfter ?? steps.length;
+  for (const step of again.slice(0, went)) step();
   recount();
-  journal.push({ batchId: batch.batchId, steps });
-  return { batch, filesBack: batch.files, foldersBack: batch.folders, stayed: [] };
+  journal.push({ batchId: batch.batchId, steps: steps.slice(0, went) });
+  if (went < steps.length) {
+    const filesBack = steps.slice(0, went).filter((step) => "item" in step).length;
+    return { batch, filesBack, foldersBack: 0, stayed: [], stopped: true };
+  }
+  return { batch, filesBack: batch.files, foldersBack: batch.folders, stayed: [], stopped: false };
 }
 
 /** The live folder with this id, and the folder it is in. */
@@ -1527,6 +1532,7 @@ const walkingSource = () =>
 let undoFailing = false;
 let lookupFailing = false;
 let redoFailing = false;
+let redoStopsAfter: number | null = null;
 const undoFails = () => undoFailing || new URLSearchParams(location.search).has("undo-fails");
 const diskFull = () => Promise.reject<AppError>({ kind: "io", reason: { kind: "diskFull" } });
 
@@ -1718,6 +1724,11 @@ function failureOf(cmd: string): Reason | undefined {
 /** Has every redo fail on a full disk, or succeed again. */
 export function failRedo(failing: boolean) {
   redoFailing = failing;
+}
+
+/** Has every redo stop after this many rows, as a newer act journalled meanwhile does; or not. */
+export function stopRedoAfter(rows: number | null) {
+  redoStopsAfter = rows;
 }
 
 /** Has every undo fail, or succeed again, as `?undo-fails` does; and the look for its act, too. */
@@ -2273,6 +2284,7 @@ const COMMANDS: Record<string, (args: Args) => unknown> = {
     if (at < 0) return invalid();
     return redoFailing ? diskFull() : carryOutAgain(at);
   },
+  can_redo: ({ batchId }) => undone.some((one) => one.batch.batchId === batchId),
   act_to_redo: ({ batchId }) => {
     const one = batchId ? undone.find((it) => it.batch.batchId === batchId) : undone.at(-1);
     return one?.batch ?? null;

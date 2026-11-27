@@ -1121,7 +1121,8 @@ toward the rest surface.
   is said as "Nothing to undo." is, with the redo arrow. An act that changed nothing in the
   library, as a drop on the pane past its limit, has no Undo, and leaves the folded rail; so does
   an act's line once the act has left the journal, as when the Trash finds its files emptied from
-  the Recycle Bin, its sentence kept. It shares the one slot with the Band, and the newest of the
+  the Recycle Bin, its sentence kept, and the line after an undo loses its Redo the same way once
+  a newer act has dropped the redo. It shares the one slot with the Band, and the newest of the
   two replaces the other. Folded, the rail keeps the Undo glyph button alone, its tooltip
   "Undo · Ctrl+Z" and its sentence in its `aria-description`; "Nothing to undo." comes out beside the rail on `panel` with the overlay shadow, as
   does "The clipboard holds no files.", with the clipboard glyph.
