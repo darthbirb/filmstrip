@@ -2,6 +2,7 @@ import { beforeEach, expect, test } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 
+import { failRedo, failUndo } from "../../dev/mock";
 import { recording } from "../../dev/recording";
 import { withoutGlyphs } from "../../dev/words";
 import {
@@ -104,6 +105,94 @@ test("Rename… renames a tag everywhere, its line has Undo, and Undo puts it ba
   (page.getByRole("button", { name: "Redo", exact: true }).element() as HTMLElement).focus();
   await userEvent.keyboard("{Control>}y{/Control}");
   await expect.poll(values).toContain("nile valley");
+});
+
+test("a failed Undo or Redo here says why in the section, with the button to try again", async () => {
+  await opened();
+  await userEvent.click(more("egypt"));
+  await userEvent.click(menuRow("Rename…"));
+  await userEvent.keyboard("nile{Enter}");
+  await expect.poll(values).toContain("nile");
+  const act = "Renamed the tag egypt to nile on 3 files and 1 folder";
+
+  failUndo(true);
+  try {
+    await userEvent.click(page.getByRole("button", { name: "Undo", exact: true }));
+    await expect
+      .element(page.getByText(`Could not undo “${act}”. The disk is full.`, { exact: true }))
+      .toBeVisible();
+  } finally {
+    failUndo(false);
+  }
+  await userEvent.click(page.getByRole("button", { name: "Undo", exact: true }));
+  await expect
+    .element(page.getByText("The tag nile is egypt again.", { exact: true }))
+    .toBeVisible();
+
+  failRedo(true);
+  try {
+    await userEvent.click(page.getByRole("button", { name: "Redo", exact: true }));
+    await expect
+      .element(page.getByText(`Could not redo “${act}”. The disk is full.`, { exact: true }))
+      .toBeVisible();
+  } finally {
+    failRedo(false);
+  }
+  await userEvent.click(page.getByRole("button", { name: "Redo", exact: true }));
+  await expect.element(page.getByText(`${act}.`, { exact: true })).toBeVisible();
+  await expect.poll(values).toContain("nile");
+});
+
+test("Ctrl+Z in the section tries a failed undo again", async () => {
+  await opened();
+  await userEvent.click(more("egypt"));
+  await userEvent.click(menuRow("Rename…"));
+  await userEvent.keyboard("nile{Enter}");
+  await expect.poll(values).toContain("nile");
+  const act = "Renamed the tag egypt to nile on 3 files and 1 folder";
+
+  failUndo(true);
+  try {
+    more("nile").element().focus();
+    await userEvent.keyboard("{Control>}z{/Control}");
+    await expect
+      .element(page.getByText(`Could not undo “${act}”. The disk is full.`, { exact: true }))
+      .toBeVisible();
+  } finally {
+    failUndo(false);
+  }
+  more("nile").element().focus();
+  await userEvent.keyboard("{Control>}z{/Control}");
+  await expect.poll(values).toContain("egypt");
+  await expect
+    .element(page.getByText("The tag nile is egypt again.", { exact: true }))
+    .toBeVisible();
+});
+
+test("Ctrl+Y in the section tries a failed redo again", async () => {
+  await opened();
+  await userEvent.click(more("egypt"));
+  await userEvent.click(menuRow("Rename…"));
+  await userEvent.keyboard("nile{Enter}");
+  await expect.poll(values).toContain("nile");
+  const act = "Renamed the tag egypt to nile on 3 files and 1 folder";
+  await userEvent.click(page.getByRole("button", { name: "Undo", exact: true }));
+  await expect.poll(values).toContain("egypt");
+
+  failRedo(true);
+  try {
+    more("egypt").element().focus();
+    await userEvent.keyboard("{Control>}y{/Control}");
+    await expect
+      .element(page.getByText(`Could not redo “${act}”. The disk is full.`, { exact: true }))
+      .toBeVisible();
+  } finally {
+    failRedo(false);
+  }
+  more("egypt").element().focus();
+  await userEvent.keyboard("{Control>}y{/Control}");
+  await expect.poll(values).toContain("nile");
+  await expect.element(page.getByText(`${act}.`, { exact: true })).toBeVisible();
 });
 
 test("a rename that worked keeps its line when the list cannot be read again after it", async () => {

@@ -60,6 +60,7 @@ pub fn run() {
             commands::redo_last,
             commands::redo_batch,
             commands::act_to_redo,
+            commands::can_redo,
             commands::clipboard_files,
             commands::count_carried,
             commands::paste_files,

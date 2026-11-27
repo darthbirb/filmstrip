@@ -29,6 +29,7 @@ import {
 } from "../../ipc/commands";
 import { files, formatCount, formatCounted } from "../../lib/format";
 import { fold, labelTerm, tagTerm } from "../../lib/queryTerm";
+import { Band } from "../../ui/Band";
 import { Button } from "../../ui/Button";
 import { Chip, KeyOnlyChip } from "../../ui/Chip";
 import { EmptyState, NothingMatches } from "../../ui/EmptyState";
@@ -130,11 +131,16 @@ export function Tags() {
   });
 
   const line =
-    news && (news.kind === "done" || news.kind === "undone") && news.batchId
-      ? mine.current.has(news.batchId)
-        ? news
-        : null
+    news &&
+    (news.kind === "done" ||
+      news.kind === "undone" ||
+      news.kind === "undoFailed" ||
+      news.kind === "redoFailed") &&
+    news.batchId &&
+    mine.current.has(news.batchId)
+      ? news
       : null;
+  const undoing = line?.kind === "done" || line?.kind === "undoFailed";
 
   const stop = () => {
     if (editing) back.current = editing.row;
@@ -802,9 +808,7 @@ export function Tags() {
   // undo carries it out again: the list it changed is in view.
   const onKeyDown = (event: KeyboardEvent) => {
     const key = undoKeyOf(event);
-    if (!line || !key) return;
-    if (!(key === "undo" && line.kind === "done") && !(key === "redo" && line.kind === "undone"))
-      return;
+    if (!line || !key || (key === "undo") !== undoing) return;
     const target = event.target;
     if (target instanceof HTMLElement && target.matches("input, textarea, select")) return;
     event.preventDefault();
@@ -859,6 +863,28 @@ export function Tags() {
       {line?.kind === "undone" && (
         <Line
           glyph="undo"
+          sentence={line.line}
+          action={
+            <Button glyph="redo" title="Redo · Ctrl+Y" onClick={() => void redo(line.batchId)}>
+              Redo
+            </Button>
+          }
+          onDismiss={() => setNews(null)}
+        />
+      )}
+      {line?.kind === "undoFailed" && (
+        <Band
+          sentence={line.line}
+          action={
+            <Button glyph="undo" title="Undo · Ctrl+Z" onClick={() => void undo(line.batchId)}>
+              Undo
+            </Button>
+          }
+          onDismiss={() => setNews(null)}
+        />
+      )}
+      {line?.kind === "redoFailed" && (
+        <Band
           sentence={line.line}
           action={
             <Button glyph="redo" title="Redo · Ctrl+Y" onClick={() => void redo(line.batchId)}>

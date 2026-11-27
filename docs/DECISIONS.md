@@ -1425,13 +1425,17 @@ it. Two acts delete for good, and both ask first: Empty Trash…, and Delete on 
   through the undos the last first, and each row redone is journalled again as the newest, so
   Ctrl+Z takes it back once more. A new act drops the redo as it writes its first row, since what
   it would put back no longer follows from what is there; so does a file deleted for good, by
-  Empty Trash… or on a drive with no bin, and a restore of the index. A tags screen act does not
-  wait for the disk, so a redo checks each row is still undone before carrying it out, and stops
-  at the first that is not: what it carried out is journalled, and nothing after the new act is. **A redo never deletes for
-  good:** a file whose drive has lost its bin since stays, as an undo's does, and nothing that
-  cannot be undone is ever offered as a redo, since it was never journalled. A folder an undo
-  took away keeps its title for the redo, made again under a new id; a tags screen act is carried
-  out again by the words its line names, since its undo can give terms back under other ids.
+  Empty Trash… or on a drive with no bin, and a restore of the index. The line after an undo
+  loses its Redo once the redo is dropped, checked as a copy, move or delete going on reports,
+  since those journal as they go. A tags screen act does not wait for the disk, so a redo checks
+  each row is still undone before carrying it out, and stops at the first that is not. The row
+  already past its check when the new act came is carried out and journalled, as is everything
+  before it; nothing after it is. The line then counts what went against what the redo held and
+  says a newer act stopped it. **A redo never deletes for good:** a file whose drive has lost its
+  bin since stays, as an undo's does, and nothing that cannot be undone is ever offered as a
+  redo, since it was never journalled. A folder an undo took away keeps its title for the redo,
+  made again under a new id; a tags screen act is carried out again by the words its line names,
+  since its undo can give terms back under other ids.
 - **The disk changes first, then the index and the journal together.** A disk that refuses leaves
   nothing claiming it succeeded, and a transaction that fails puts the disk back.
 - **One act, one batch, one undo.** A batch comes back newest row first. Each row leaves the
@@ -2096,7 +2100,8 @@ disk, and a list of words is not.
   merge across five does.
 - **Ctrl+Z works in the section while its line stands**, because the list it changes is in view;
   elsewhere in Settings it still does nothing, as DECISIONS.md "Undo" has it. In the filter or a
-  field it is the field's own.
+  field it is the field's own. An undo or a redo of its act that failed stands there too, as the
+  Band with Undo or Redo to try again, since the foot it would say it at is behind Settings.
 
 ## Testing in a real browser, never jsdom
 

@@ -43,10 +43,15 @@ pub fn act_to_redo(conn: &Connection, batch_id: Option<&str>) -> Result<Option<B
             None => return Ok(None),
         },
     };
-    if journal::undone_batch(conn, &batch_id)?.is_empty() {
+    if !can_redo(conn, &batch_id)? {
         return Ok(None);
     }
     acts::describe_undone(conn, &batch_id).map(Some)
+}
+
+/// Whether the redo still holds anything of a batch: a new act drops it.
+pub fn can_redo(conn: &Connection, batch_id: &str) -> Result<bool> {
+    Ok(!journal::undone_batch(conn, batch_id)?.is_empty())
 }
 
 /// How a row reads once it has gone again.
@@ -67,9 +72,11 @@ fn replay(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
     let batch = acts::describe_undone(conn, batch_id)?;
     let mut stayed = Vec::new();
     let (mut files_back, mut folders_back) = (0, 0);
+    let mut stopped = false;
     for entry in &entries {
         // A tag act takes no turn of the disk, and journalling one drops the redo meanwhile.
         if !journal::still_undone(conn, entry.id)? {
+            stopped = true;
             break;
         }
         if let Some(forgotten) = journal::gone(entry) {
@@ -112,6 +119,7 @@ fn replay(conn: &Connection, batch_id: &str) -> Result<UndoReport> {
         folders_back,
         batch,
         stayed,
+        stopped,
     })
 }
 
@@ -337,6 +345,7 @@ mod tests {
             }
         );
         assert_eq!((report.files_back, report.stayed.len()), (2, 0));
+        assert!(!report.stopped);
         assert!(lib.at("People/pyramid.jpg").is_file());
         assert!(lib.at("People/sphinx.jpg").is_file());
         assert!(
@@ -606,8 +615,10 @@ mod tests {
         });
 
         let report = redo_last(&lib.conn).unwrap().unwrap();
-        assert_eq!(report.files_back, 2);
+        assert_eq!((report.files_back, report.batch.files), (2, 3));
+        assert!(report.stopped && report.stayed.is_empty());
         assert_eq!(rows.get(), 2, "the redo stops once the tag drops it");
+        assert!(!can_redo(&lib.conn, &moved).unwrap());
         let homes: Vec<Option<i64>> = files.iter().map(|id| lib.folder_of(*id)).collect();
         assert_eq!(homes, [Some(lib.people), Some(lib.people), Some(lib.cairo)]);
         assert_eq!(redo_last(&lib.conn).unwrap(), None);
@@ -640,9 +651,12 @@ mod tests {
     #[test]
     fn a_new_act_drops_the_redo_and_so_does_a_restore_of_the_index() {
         let lib = library("dropped");
-        items::move_items(&lib.conn, &lib.files, lib.people, &journal::new_batch()).unwrap();
+        let moved = journal::new_batch();
+        items::move_items(&lib.conn, &lib.files, lib.people, &moved).unwrap();
         undo_last(&lib.conn).unwrap().unwrap();
+        assert!(can_redo(&lib.conn, &moved).unwrap());
         folders::create(&lib.conn, lib.trips, "Lisbon", &journal::new_batch()).unwrap();
+        assert!(!can_redo(&lib.conn, &moved).unwrap());
         assert_eq!(act_to_redo(&lib.conn, None).unwrap(), None);
         assert_eq!(redo_last(&lib.conn).unwrap(), None);
         assert!(lib.at("Trips/Cairo/pyramid.jpg").is_file());

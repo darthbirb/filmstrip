@@ -33,6 +33,7 @@ import {
   reasonText,
   redoBannerLine,
   redoFailedLine,
+  redoStoppedLine,
   refusedName,
   restoredBannerLine,
   restoredFailed,
@@ -50,6 +51,7 @@ const undone = (act: Act, files: number, filesBack = files, stayed: Stayed[] = [
   filesBack,
   foldersBack: 0,
   stayed,
+  stopped: false,
 });
 
 const MOVE: Act = { kind: "move", from: "Trips", to: "Cairo", one: null };
@@ -465,9 +467,15 @@ test("an act on the tags screen says what it touched, and undoing it puts the te
   for (const [act, files, folders, line, back] of rows) {
     const done = batch(act, files, folders);
     expect(actLine(done)).toBe(line);
-    expect(undoneLine({ batch: done, filesBack: files, foldersBack: folders, stayed: [] })).toBe(
-      back,
-    );
+    expect(
+      undoneLine({
+        batch: done,
+        filesBack: files,
+        foldersBack: folders,
+        stayed: [],
+        stopped: false,
+      }),
+    ).toBe(back);
   }
 });
 
@@ -655,4 +663,39 @@ test("a failed redo names its act in one sentence, or says only why when the act
     "Could not redo “Moved 3 files to Cairo”. The disk is full.",
   );
   expect(redoFailedLine(null, full)).toBe("Could not redo. The disk is full.");
+});
+
+test("a redo a newer act stopped counts what went and says it stopped", () => {
+  const stopped = (act: Act, files: number, back: number) => ({
+    ...undone(act, files, back),
+    stopped: true,
+  });
+  const stop = "A newer act stopped the redo.";
+  expect(redoStoppedLine(stopped(MOVE, 3, 2))).toBe(`Moved 2 of 3 files to Cairo. ${stop}`);
+  expect(redoStoppedLine(stopped(DELETE, 4, 1))).toBe(
+    `Moved 1 of 4 files to the Recycle Bin. ${stop}`,
+  );
+  expect(redoStoppedLine(stopped(TO_TRASH, 214, 100))).toBe(
+    `Redid part of “Deleted Lisbon and its 214 files”. ${stop}`,
+  );
+  const restore: Act = { kind: "restore", to: "Cairo", one: null };
+  expect(redoStoppedLine(stopped(restore, 5, 2))).toBe(`Restored 2 of 5 files to Cairo. ${stop}`);
+  const scattered: Act = { kind: "restore", to: null, one: null };
+  expect(redoStoppedLine(stopped(scattered, 5, 2))).toBe(`Restored 2 of 5 files. ${stop}`);
+
+  const files: Act = { kind: "copy", to: "Lisbon", one: null, folder: null, folders: 0 };
+  expect(redoStoppedLine(stopped(files, 10, 4))).toBe(`Copied 4 of 10 files to Lisbon. ${stop}`);
+  const folders = (act: Act, files: number, folders: number, foldersBack: number) => ({
+    batch: batch(act, files, folders),
+    filesBack: 0,
+    foldersBack,
+    stayed: [],
+    stopped: true,
+  });
+  const tree: Act = { kind: "copy", to: "Lisbon", one: null, folder: "Alexandria", folders: 1 };
+  expect(redoStoppedLine(folders(tree, 10, 3, 1))).toBe(
+    `Copied Alexandria to Lisbon but none of its 10 files. ${stop}`,
+  );
+  const mix: Act = { kind: "copy", to: "Lisbon", one: null, folder: null, folders: 2 };
+  expect(redoStoppedLine(folders(mix, 0, 3, 1))).toBe(`Copied 1 of 3 folders to Lisbon. ${stop}`);
 });

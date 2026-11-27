@@ -6,6 +6,7 @@ import type { Progress } from "../../ipc/bindings/Progress";
 import { indexFailures, indexProgress, retryFailedJobs } from "../../ipc/commands";
 import { unasked } from "../failure";
 import { jobsListed } from "../pane/going";
+import { settleRedo } from "../undo/undo";
 
 /** How far the background work has got, and what it could not read. DECISIONS.md "Background work". */
 type Work = { progress: Progress | null; failures: Failure[] };
@@ -46,6 +47,8 @@ async function report(progress: Progress | null) {
   const before = snapshot.progress?.failed ?? 0;
   publish({ ...snapshot, progress });
   if (progress) jobsListed(progress);
+  if (progress && progress.copies.length + progress.moves.length + progress.deletes.length > 0)
+    void settleRedo();
   if (progress && progress.failed !== before) await loadFailures();
 }
 

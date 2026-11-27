@@ -6,4 +6,8 @@ import type { Stayed } from "./Stayed";
  * The act an undo or a redo carried, how much of it went, and what could not, each with where it
  * still is and why.
  */
-export type UndoReport = { batch: Batch, filesBack: number, foldersBack: number, stayed: Array<Stayed>, };
+export type UndoReport = { batch: Batch, filesBack: number, foldersBack: number, stayed: Array<Stayed>, 
+/**
+ * Whether a newer act stopped a redo before its last row; an undo is never stopped.
+ */
+stopped: boolean, };

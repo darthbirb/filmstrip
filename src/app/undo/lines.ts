@@ -650,6 +650,31 @@ export function undoFailedLine(batch: Batch | null, error: unknown): string {
   return `Could not undo “${line}”. ${whyFailed(error)}`;
 }
 
+/**
+ * The line after a redo a newer act stopped before its end: what went, counted against what the
+ * redo held, then that it stopped.
+ */
+export function redoStoppedLine({ batch, filesBack, foldersBack }: UndoReport): string {
+  const { act, files: whole } = batch;
+  const stop = "A newer act stopped the redo.";
+  const part = `${formatCount(filesBack)} of ${files(whole)}`;
+  switch (act.kind) {
+    case "move":
+      return `Moved ${part} to ${act.to}. ${stop}`;
+    case "delete":
+      return `Moved ${part} to the Recycle Bin. ${stop}`;
+    case "restore":
+      return `Restored ${part}${act.to ? ` to ${act.to}` : ""}. ${stop}`;
+    case "copy":
+      if (filesBack > 0) return `Copied ${part} to ${act.to}. ${stop}`;
+      if (act.folder && whole > 0)
+        return `Copied ${act.folder} to ${act.to} but none of its ${files(whole)}. ${stop}`;
+      return `Copied ${formatCount(foldersBack)} of ${folders(batch.folders)} to ${act.to}. ${stop}`;
+    default:
+      return `Redid part of “${actLine(batch).replace(/\.$/, "")}”. ${stop}`;
+  }
+}
+
 /** What the foot says when a redo failed, its Redo kept to try again, as an undo's failure is. */
 export function redoFailedLine(batch: Batch | null, error: unknown): string {
   if (!batch) return `Could not redo. ${whyFailed(error)}`;

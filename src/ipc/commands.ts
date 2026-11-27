@@ -138,6 +138,8 @@ export const redoBatch = (batchId: string) => invoke<UndoReport>("redo_batch", {
 export const actToRedo = (batchId: string | null) =>
   invoke<Batch | null>("act_to_redo", { batchId });
 
+export const canRedo = (batchId: string) => invoke<boolean>("can_redo", { batchId });
+
 export const clipboardFiles = () => invoke<Carried | null>("clipboard_files");
 
 export const countCarried = (paths: string[]) => invoke<Carried>("count_carried", { paths });
