@@ -115,7 +115,7 @@ pub struct DeleteFolderPayload {
     pub name: String,
     /// The files it held as it was asked.
     pub whole: u32,
-    /// How many files runs before a restart deleted for good, which no journal row counts.
+    /// How many files runs before a restart permanently deleted, which no journal row counts.
     #[serde(default)]
     pub outright: u32,
 }

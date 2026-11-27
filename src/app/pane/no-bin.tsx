@@ -26,7 +26,7 @@ let asking: NoBinAsking | null = null;
 let count = 0;
 const listeners = new Set<() => void>();
 
-/** Asks, once for them all, before files on drives with no Recycle Bin are deleted for good. */
+/** Asks, once for them all, before files on drives with no Recycle Bin are permanently deleted. */
 export function askNoBin(next: NoBinAsking | null) {
   // Full screen hides the grid's notices, where this is drawn. DECISIONS.md "A drive with no Recycle Bin".
   if (next) setFullScreen(false);

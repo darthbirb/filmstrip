@@ -2,6 +2,6 @@
 import type { Stayed } from "./Stayed";
 
 /**
- * What deleting files for good did: how many went, and each one that stayed, with why.
+ * What permanently deleting files did: how many went, and each one that stayed, with why.
  */
 export type GoneReport = { deleted: number, refused: Array<Stayed>, };

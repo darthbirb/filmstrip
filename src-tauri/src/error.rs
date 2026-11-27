@@ -78,7 +78,7 @@ pub enum Reason {
     },
     /// The Recycle Bin would not take it, so it is where it was.
     BinRefused,
-    /// Its drive has no Recycle Bin, so it was never sent, and goes only when deleted for good.
+    /// Its drive has no Recycle Bin, so it was never sent, and goes only when permanently deleted.
     NoBin {
         drive: String,
     },

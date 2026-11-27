@@ -89,7 +89,7 @@ pub fn under(conn: &Connection, folder_id: i64) -> Result<Vec<BinlessDrive>> {
     among(conn, &items::live_under(conn, folder_id)?)
 }
 
-/// What deleting files for good did: how many went, and each one that stayed, with why.
+/// What permanently deleting files did: how many went, and each one that stayed, with why.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, TS)]
 #[serde(rename_all = "camelCase")]
 #[ts(export)]
